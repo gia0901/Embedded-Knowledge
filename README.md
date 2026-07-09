@@ -4,7 +4,7 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 
 > 📌 Định hướng, quy ước viết và vai trò của trợ lý được mô tả trong [CLAUDE.md](CLAUDE.md). Đọc file đó trước nếu bạn là người mới tham gia (hoặc là AI bắt đầu một phiên làm việc mới).
 >
-> 🗺️ **Muốn thấy bức tranh lớn — 15 topic liên kết với nhau thế nào?** Đọc [OVERVIEW.md](OVERVIEW.md) (bản đồ tư duy toàn bộ). Mỗi README topic cũng có mục "Bức tranh tổng thể" riêng.
+> 🗺️ **Muốn thấy bức tranh lớn — các topic kiến thức (01–14) liên kết với nhau thế nào?** Đọc [OVERVIEW.md](OVERVIEW.md) (bản đồ tư duy toàn bộ). Mỗi README topic cũng có mục "Bức tranh tổng thể" riêng.
 
 ---
 
@@ -37,6 +37,8 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 | 12 | [Design Patterns](12-design-patterns/) | SOLID, creational/structural/behavioral | ✅ |
 | 13 | [DSA](13-dsa/) | Big-O, cấu trúc dữ liệu, pattern giải thuật | ✅ |
 | 14 | [Networking](14-networking/) | TCP/IP, socket, HTTP/TLS/MQTT | ✅ |
+| 15 | [Prep](15_prep/) | chuẩn bị phỏng vấn thực tế: first round, technical round | 🟡 |
+| 16 | [Book Summaries](16-book-summaries/) | tóm tắt sách chuyên ngành (quy ước riêng trong README topic) | 🟡 |
 | 00 | [Glossary](00-glossary.md) | tra cứu nhanh thuật ngữ EN | ✅ |
 
 ---

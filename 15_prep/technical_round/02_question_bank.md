@@ -276,7 +276,7 @@ void dfs(const std::vector<std::vector<int>>& g, int u, std::vector<bool>& vis) 
     for (int v : g[u]) if (!vis[v]) dfs(g, v, vis);
 }
 ```
-
+    
 ### C9. Đếm số bit 1 (Brian Kernighan)
 ```cpp
 int popcount(unsigned x) {

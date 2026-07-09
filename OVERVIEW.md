@@ -1,6 +1,6 @@
 # OVERVIEW — Bản đồ tư duy toàn bộ tài liệu
 
-> File này nối **15 topic** thành một bức tranh thống nhất. Đọc nó để thấy *vì sao* các topic được sắp xếp như vậy và chúng *liên kết* ra sao — thay vì học rời rạc. Đây là "hiểu kiến trúc cốt lõi" mà mục tiêu Senior hướng tới.
+> File này nối **các topic kiến thức (01–14 + glossary)** thành một bức tranh thống nhất. (Topic 15 Prep và 16 Book Summaries là lớp bổ trợ thực chiến/đọc sâu, không thuộc bản đồ này.) Đọc nó để thấy *vì sao* các topic được sắp xếp như vậy và chúng *liên kết* ra sao — thay vì học rời rạc. Đây là "hiểu kiến trúc cốt lõi" mà mục tiêu Senior hướng tới.
 
 ---
 

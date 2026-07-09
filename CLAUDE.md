@@ -154,11 +154,16 @@ Embedded-Interview/
 │   ├── tcp-ip.md                 # mô hình, TCP vs UDP, handshake
 │   └── sockets-and-protocols.md  # socket API, HTTP/TLS/MQTT
 │
+├── 15_prep/                      # Chuẩn bị phỏng vấn thực tế (first_round, technical_round)
+│
+├── 16-book-summaries/            # Tóm tắt sách chuyên ngành theo cụm chủ đề
+│   └── README.md                 # ⚠️ QUY ƯỚC RIÊNG của topic này — đọc trước khi viết/sửa file trong đó
+│
 ├── 00-glossary.md                # Tra cứu nhanh thuật ngữ EN ↔ giải thích
-└── OVERVIEW.md                   # Bản đồ tư duy: 15 topic liên kết thế nào
+└── OVERVIEW.md                   # Bản đồ tư duy: các topic kiến thức (01–14) liên kết thế nào
 ```
 
-> **Hai tầng "bức tranh tổng thể":** `OVERVIEW.md` nối *toàn bộ* 15 topic; mỗi README topic có mục "🗺️ Bức tranh tổng thể" nối *các file con* trong topic đó. Đây là phần thể hiện "hiểu kiến trúc cốt lõi" thay vì kiến thức rời rạc.
+> **Hai tầng "bức tranh tổng thể":** `OVERVIEW.md` nối *toàn bộ* các topic kiến thức (01–14); mỗi README topic có mục "🗺️ Bức tranh tổng thể" nối *các file con* trong topic đó. Đây là phần thể hiện "hiểu kiến trúc cốt lõi" thay vì kiến thức rời rạc.
 
 > Danh sách file con ở trên là **khung gợi ý**, sẽ điều chỉnh/thêm bớt khi viết. Topic mới có thể bổ sung nếu cần.
 > Topic 12–14 + glossary là **bổ sung sau** so với kế hoạch gốc (Design Patterns, DSA, Networking) theo background người học.
@@ -195,6 +200,8 @@ Embedded-Interview/
 | 13 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns (bổ sung) |
 | 14 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
+| 15 Prep | 🟡 Đang dùng | tài liệu chuẩn bị phỏng vấn thực tế, cập nhật theo nhu cầu |
+| 16 Book summaries | 🟡 Đang viết | Quy ước xong; tiến độ chi tiết từng cuốn xem `16-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu
 
