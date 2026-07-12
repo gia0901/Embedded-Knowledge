@@ -1,41 +1,42 @@
-# Mastering Embedded Linux Programming — Frank Vasquez & Chris Simmonds (3rd edition, 2021)
+# Mastering Embedded Linux Programming — Chris Simmonds (1st edition, 2015)
 
-> **Nguồn summary:** kiến thức Claude, chưa đối chiếu PDF. ⚠️ Số chương theo 3rd edition (21 chương) — có thể lệch so với bản in cụ thể, sẽ chốt khi đối chiếu PDF.
-> **Vì sao đọc cuốn này:** "giáo trình BSP" sát nhất trên thị trường — đi trọn chuỗi toolchain → bootloader → kernel → rootfs → build system → storage/update → driver → init/power → debug/RT, đúng phạm vi công việc và phạm vi phỏng vấn của vị trí **Embedded Software Engineer (BSP)**.
-> **Trọng tâm bản summary này:** các phần liên quan BSP được viết sâu và đánh 🎯; các chương ứng dụng userspace (đã có topic 03–04 và OSTEP phủ) viết lướt có chủ đích.
+> **Nguồn summary:** ⚠️ **PDF của người học là 1st edition (2015, 14 chương)** — không phải 3rd edition (2021) như giả định ban đầu. Trạng thái đối chiếu từng file ghi trong bảng dưới; số trang `(tr. X)` trong các file **đã đối chiếu** là theo đúng bản PDF này (`/home/gia/Desktop/Books/Mastering Embedded Linux Programming.pdf`).
+> **Vì sao đọc cuốn này:** "giáo trình BSP" sát nhất — đi trọn chuỗi toolchain → bootloader → kernel → rootfs → build system → storage → driver → init → debug/RT, đúng phạm vi công việc và phỏng vấn của vị trí **Embedded Software Engineer (BSP)**.
+> **Quy ước trong các file:** nội dung không đánh dấu = có trong sách; **🆕 = bổ sung ngoài sách** (kiến thức hiện đại 2015 chưa có — TF-A/secure boot, FIT chi tiết, EPROBE_DEFER, earlycon, OTA framework, Yocto hiện đại...); **⚠️ = sách lỗi thời ở điểm đó.**
 
 ---
 
 ## TL;DR — cuốn sách này dạy gì
 
-Xây một hệ Embedded Linux từ con số 0 gồm **bốn thành phần** — toolchain, bootloader, kernel, root filesystem — rồi vận hành vòng đời của nó: build tự động (Buildroot/Yocto), chọn chiến lược lưu trữ trên flash, **cập nhật ngoài hiện trường không được phép chết** (A/B, atomic), giao tiếp phần cứng qua driver và device tree, khởi động (init), quản lý điện, và cuối cùng là debug/profile/realtime. Triết lý xuyên suốt: mọi lựa chọn (thư viện C, FS, init, cơ chế update) là **trade-off có thể biện luận** — đúng chất câu hỏi phỏng vấn BSP.
+Xây một hệ Embedded Linux từ con số 0 quanh **bốn thành phần** (tr. 5): toolchain → bootloader → kernel → root filesystem; rồi vận hành: build tự động (Buildroot/Yocto), chiến lược lưu trữ flash, giao tiếp driver, init, và debug/profile/realtime. Triết lý xuyên suốt: mọi lựa chọn (libc, FS, init, cách update) là **trade-off biện luận được** — đúng chất câu hỏi phỏng vấn BSP.
 
 ## 🕐 Đọc gì nếu chỉ có N giờ
 
-- **~3 giờ:** [bootloader-kernel.md](bootloader-kernel.md) — boot flow + kernel + device tree là lõi của mọi buổi phỏng vấn BSP.
-- **~6 giờ:** thêm [storage-update.md](storage-update.md) (flash, UBI, OTA update) và cụm Yocto trong [build-systems.md](build-systems.md).
+- **~3 giờ:** [bootloader-kernel.md](bootloader-kernel.md) — boot flow + device tree + build/boot kernel là lõi của mọi buổi phỏng vấn BSP.
+- **~6 giờ:** thêm [storage-update.md](storage-update.md) (flash, UBI, update) và cụm Yocto trong [build-systems.md](build-systems.md).
 - **~9 giờ:** thêm [toolchain-rootfs.md](toolchain-rootfs.md) và cụm Real-time trong [debug-realtime.md](debug-realtime.md).
 
 ## 🎯 Lộ trình ôn nhanh trước interview (BSP)
 
-1. **Boot flow ARM đầy đủ + U-Boot** ([bootloader-kernel.md](bootloader-kernel.md)) — câu mở màn kinh điển "kể từ lúc cấp nguồn đến shell".
-2. **Kernel build + Device Tree** ([bootloader-kernel.md](bootloader-kernel.md)) — compatible/probe/deferred probe.
-3. **Storage flash + cập nhật OTA** ([storage-update.md](storage-update.md)) — MTD/UBI vs eMMC, A/B update, bootcount/watchdog.
-4. **Yocto** ([build-systems.md](build-systems.md)) — layer/recipe/bbappend; hầu hết công ty BSP dùng Yocto.
-5. **Real-time: PREEMPT_RT, cyclictest, nguồn latency** ([debug-realtime.md](debug-realtime.md)).
-6. **Toolchain & rootfs tối giản** ([toolchain-rootfs.md](toolchain-rootfs.md)) — sysroot, glibc vs musl, NFS boot.
+1. **Boot flow ARM + U-Boot + Device Tree** ([bootloader-kernel.md](bootloader-kernel.md)) — câu mở màn "kể từ lúc cấp nguồn".
+2. **Kernel build/Kconfig + porting board** ([bootloader-kernel.md](bootloader-kernel.md)).
+3. **Storage flash + update** ([storage-update.md](storage-update.md)) — MTD/UBI vs eMMC, A/B update.
+4. **Yocto/Buildroot** ([build-systems.md](build-systems.md)).
+5. **Real-time** ([debug-realtime.md](debug-realtime.md)) — PREEMPT_RT, cyclictest, nguồn latency.
+6. **Toolchain & rootfs tối giản** ([toolchain-rootfs.md](toolchain-rootfs.md)) — sysroot, hai loại kernel panic, NFS boot.
 7. **Driver interface + init + power** ([drivers-init-power.md](drivers-init-power.md)).
-8. Phần ứng dụng/debug userspace ([debug-realtime.md](debug-realtime.md) nửa đầu) — đã trùng nhiều với topic 04/09, ôn bằng repo là chính.
 
-## 🗺️ Bản đồ: chương ↔ file ↔ topic liên quan
+## 🗺️ Bản đồ: chương (1st ed) ↔ file ↔ trạng thái đối chiếu
 
-| File | Chương (3rd ed ⚠️) | Nội dung | 🎯 BSP |
-|------|--------------------|----------|--------|
-| [toolchain-rootfs.md](toolchain-rootfs.md) | 1–2, 5 | Toolchain, cross-compile, sysroot; root filesystem tối giản | 🎯 |
-| [bootloader-kernel.md](bootloader-kernel.md) | 3–4 | ROM→SPL→U-Boot→kernel; cấu hình/build kernel; device tree | 🎯🎯 |
-| [build-systems.md](build-systems.md) | 6–8 | Buildroot vs Yocto; bitbake, recipe, layer, SDK | 🎯 |
-| [storage-update.md](storage-update.md) | 9–10 | NOR/NAND, MTD, UBI/UBIFS, eMMC; update OTA A/B, Mender/RAUC/SWUpdate | 🎯🎯 |
-| [drivers-init-power.md](drivers-init-power.md) | 11–15 | Giao tiếp driver từ userspace, viết module; init (BusyBox/SysV/systemd); power management | 🎯 |
-| [debug-realtime.md](debug-realtime.md) | 16–21 | Process/thread/memory (lướt); GDB remote; perf/ftrace; **PREEMPT_RT** | RT 🎯 |
+| File | Chương 1st ed (trang) | 🎯 BSP | Trạng thái đối chiếu |
+|------|----------------------|--------|----------------------|
+| [toolchain-rootfs.md](toolchain-rootfs.md) | 1 (tr. 1), 2 Toolchains (tr. 13), 5 Root Filesystem (tr. 95) | 🎯 | Kiến thức + mục lục |
+| [bootloader-kernel.md](bootloader-kernel.md) | **3 Bootloaders + Device Tree (tr. 41), 4 Kernel (tr. 69)** | 🎯🎯 | ✅ **ĐÃ ĐỐI CHIẾU SÂU toàn văn** |
+| [build-systems.md](build-systems.md) | 6 Build System: Buildroot + Yocto (tr. 129) | 🎯 | Kiến thức + mục lục (Yocto trong file theo bản hiện đại — sách 2015 đã cũ nhiều ở chương này) |
+| [storage-update.md](storage-update.md) | 7 Storage Strategy (tr. 159; "Updating in the field" chỉ có tr. 192–195) | 🎯🎯 | Kiến thức + mục lục; phần OTA/A-B framework chủ yếu là 🆕 ngoài sách (1st ed nói rất ngắn) |
+| [drivers-init-power.md](drivers-init-power.md) | 8 Device Drivers (tr. 197), 9 Init (tr. 229); **power: 1st ed KHÔNG có chương này** → phần power là 🆕 | 🎯 | Kiến thức + mục lục |
+| [debug-realtime.md](debug-realtime.md) | 10 Processes/Threads (tr. 247), 11 Memory (tr. 273), 12 GDB (tr. 295), 13 Profiling/Tracing, 14 Real-Time | RT 🎯 | Kiến thức + mục lục |
+
+> Ghi chú edition: 3rd edition (2021) thêm hẳn các chương Yocto sâu, "Updating Software in the Field" (OTA đầy đủ), "Managing Power" — nội dung tương ứng trong các file trên vẫn giữ (giá trị phỏng vấn cao) nhưng được hiểu là 🆕 so với PDF 1st ed đang có. Nếu sau này có PDF 3rd ed, chỉ cần đối chiếu bổ sung các file đó.
 
 Liên kết repo: [05-drivers-device-tree/](../../05-drivers-device-tree/), [06-build-systems/](../../06-build-systems/), [08-embedded-systems/](../../08-embedded-systems/), [09-debugging/](../../09-debugging/).

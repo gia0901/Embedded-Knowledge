@@ -104,7 +104,7 @@
 |------|-----------|---------|
 | Effective Modern C++ — Scott Meyers | ✅ Xong (chưa đối chiếu PDF) | Đủ 8 cụm / 42 items; sẽ đối chiếu khi có PDF |
 | Operating Systems: Three Easy Pieces (OSTEP) — Arpaci-Dusseau | ✅ Xong (chưa đối chiếu PDF) | Thư mục `ostep/`: README + 4 file (CPU, Memory, Concurrency, Persistence) |
-| Mastering Embedded Linux Programming — Vasquez & Simmonds (3rd ed) | ✅ Xong (chưa đối chiếu PDF) | Thư mục `melp/`: README + 6 file, trọng tâm BSP (bootloader/DT, storage/update, Yocto, RT) |
+| Mastering Embedded Linux Programming — Simmonds (**1st ed 2015** — PDF người học) | ✅ Xong; **ch. 3–4 đã đối chiếu sâu toàn văn** | Thư mục `melp/`: README + 6 file; `bootloader-kernel.md` đối chiếu sâu + số trang thật; các file khác kiến thức + mục lục, đánh dấu 🆕 phần ngoài sách |
 | Linux Kernel Development — Robert Love (3rd ed) | ✅ Xong (đối chiếu mục lục + số trang PDF) | Thư mục `lkd/`: README + 6 file; mỗi cụm có mục "⚠️ Đã thay đổi so với sách" cập nhật kernel ~6.x |
 | LDD3 / Bootlin materials | ⬜ Chưa bắt đầu | Ưu tiên 3 (BSP): đọc chọn lọc char driver, interrupt, DMA; Bootlin slides miễn phí cập nhật hơn |
 | The Linux Programming Interface — Michael Kerrisk | ⬜ Chưa bắt đầu | Lùi ưu tiên (userspace API — ít trúng BSP); giá trị dài hạn vẫn giữ |
