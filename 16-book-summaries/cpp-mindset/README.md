@@ -30,7 +30,8 @@ Sách này **không phải sách luyện interview** — giá trị chính là n
 | File | Chương (trang) | Nội dung | Trạng thái |
 |------|----------------|----------|------------|
 | [thinking-computationally.md](thinking-computationally.md) | 1 (tr. 1–35) | 4 thành phần computational thinking; modern C++ good practice (CMake, ranges, concepts, expected, testing) | ✅ **Đã đọc sâu toàn văn** |
-| abstraction-complexity.md | 2 (tr. 37–60), 3 (tr. 61–81) | Nối bài toán ↔ cơ chế C++ (hàm/class/template/traits); Big-O, amortized, họ thuật toán, cache-aware/SIMD/branch | ⬜ Chờ đọc |
+| [abstraction-in-detail.md](abstraction-in-detail.md) | 2 (tr. 37–60) | 4 loại bài toán; standard algorithms (ví dụ grid signal); functions/classes/templates-concepts-traits — khi nào dùng gì; static vs dynamic polymorphism | ✅ **Đã đọc sâu toàn văn** (kèm 2 lỗi in của sách được đánh dấu ⚠️) |
+| algorithmic-complexity.md | 3 (tr. 61–81) | Big-O, amortized, họ thuật toán, cache-aware/SIMD/branch | ⬜ Chờ đọc |
 | machine-data-structures.md | 4 (tr. 83–118), 5 (tr. 119–143) | CPU/cache line/SIMD/speculation; VM & scheduler; allocator, SoA-AoS, small/static vector, span, flat & hash map | ⬜ Chờ đọc (**ưu tiên kế** — giá trị embedded cao nhất) |
 | modularity.md | 6 (tr. 145–161) | Static/shared lib, export symbols, stable interface, memory qua boundary, C++ modules | ⬜ Chờ đọc |
 | project-rubber-duckies.md | 7–12 (tr. 163–283) | Dự án xuyên suốt: CLI, CSV/JSON, regex parser, k-means, reflection | ⬜ Chờ đọc (sẽ lướt có chủ đích — giá trị nằm ở *cách làm*, không phải chi tiết code) |

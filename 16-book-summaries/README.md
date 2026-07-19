@@ -73,6 +73,11 @@
 - Rút gọn về đúng trọng tâm: lược header, boilerplate, error-handling lặp lại, full source không cần thiết.
 - **Comment giải thích bằng tiếng Việt** tại các dòng quan trọng.
 - Mặc định C++17 với sách C++; giữ C với sách Linux/OS khi ví dụ gốc là C.
+- **MÔ TẢ code không thay được CHO XEM code**: sách có listing đáng giá thì summary phải chứa code thật (đã rút gọn), không được tóm bằng văn xuôi — kể cả ở chương "lý thuyết".
+
+**Insight/đúc kết — phải có neo:**
+- Mọi kết luận trong "Insight đáng nhớ" phải **bám vào ví dụ, đoạn code hoặc trích dẫn cụ thể** của sách (kèm số trang) — không đúc kết "chay".
+- Ý kiến/liên hệ riêng của người viết summary phải đánh dấu 🆕 để tách khỏi ý của sách.
 
 **Góc interview — câu hỏi & đáp án:**
 - Mỗi câu hỏi kèm **đáp án đầy đủ** (không phải gợi ý ngắn), có thể gồm code, hình vẽ, sơ đồ để làm rõ.
