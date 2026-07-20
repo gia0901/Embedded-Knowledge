@@ -31,8 +31,9 @@ Sách này **không phải sách luyện interview** — giá trị chính là n
 |------|----------------|----------|------------|
 | [thinking-computationally.md](thinking-computationally.md) | 1 (tr. 1–35) | 4 thành phần computational thinking; modern C++ good practice (CMake, ranges, concepts, expected, testing) | ✅ **Đã đọc sâu toàn văn** |
 | [abstraction-in-detail.md](abstraction-in-detail.md) | 2 (tr. 37–60) | 4 loại bài toán; standard algorithms (ví dụ grid signal); functions/classes/templates-concepts-traits — khi nào dùng gì; static vs dynamic polymorphism | ✅ **Đã đọc sâu toàn văn** (kèm 2 lỗi in của sách được đánh dấu ⚠️) |
-| algorithmic-complexity.md | 3 (tr. 61–81) | Big-O, amortized, họ thuật toán, cache-aware/SIMD/branch | ⬜ Chờ đọc |
-| machine-data-structures.md | 4 (tr. 83–118), 5 (tr. 119–143) | CPU/cache line/SIMD/speculation; VM & scheduler; allocator, SoA-AoS, small/static vector, span, flat & hash map | ⬜ Chờ đọc (**ưu tiên kế** — giá trị embedded cao nhất) |
+| [algorithmic-complexity.md](algorithmic-complexity.md) | 3 (tr. 61–81) | Quy nạp; Big-O + amortized (push_back <3n); iterative/recursive/D&C (power O(log n), quicksort); graph/optimization/DP/randomized; cache/SIMD/branch | ✅ **Đã đọc sâu toàn văn** (kèm lỗi in partition swap của sách được đánh dấu ⚠️) |
+| [understanding-the-machine.md](understanding-the-machine.md) | 4 (tr. 83–118) | CPU/pipeline/ISA/cpuid/OpenMP; storage spectrum + cache line (SoA/AoS); cache-blocked matmul (547→289→24ms); SIMD (auto-vec/multiversioning/intrinsics/alignas/restrict); branch prediction (clamp, Spectre); VM/TLB + CPU affinity | ✅ **Đã đọc sâu toàn văn** (kèm 2 lỗi in của sách được đánh dấu ⚠️) |
+| data-structures.md | 5 (tr. 119–143) | allocator, SoA-AoS, small/static vector, span, flat & hash map | ⬜ Chờ đọc (giá trị embedded cao) |
 | modularity.md | 6 (tr. 145–161) | Static/shared lib, export symbols, stable interface, memory qua boundary, C++ modules | ⬜ Chờ đọc |
 | project-rubber-duckies.md | 7–12 (tr. 163–283) | Dự án xuyên suốt: CLI, CSV/JSON, regex parser, k-means, reflection | ⬜ Chờ đọc (sẽ lướt có chủ đích — giá trị nằm ở *cách làm*, không phải chi tiết code) |
 | scale-gpu-profiling.md | 13–15 (tr. 285–350) | Mutex/IPC/bottlenecks/cloud; GPU CUDA/Thrust/SYCL; perf | ⬜ Chờ đọc (GPU lướt; perf kỹ) |
