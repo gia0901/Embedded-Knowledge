@@ -154,7 +154,9 @@ Embedded-Interview/
 │   ├── tcp-ip.md                 # mô hình, TCP vs UDP, handshake
 │   └── sockets-and-protocols.md  # socket API, HTTP/TLS/MQTT
 │
-├── 15_prep/                      # Chuẩn bị phỏng vấn thực tế (first_round, technical_round)
+├── 15_prep/                      # Chuẩn bị phỏng vấn thực tế
+│   ├── study-plans/              # ⭐ Chiến lược ôn theo 2 vị trí: BSP & C++ (sprint + nền tảng) + gap-register
+│   └── technical_round/          # Lý thuyết cốt lõi, question bank (C++/BSP), behavioral STAR
 │
 ├── 16-book-summaries/            # Tóm tắt sách chuyên ngành theo cụm chủ đề
 │   └── README.md                 # ⚠️ QUY ƯỚC RIÊNG của topic này — đọc trước khi viết/sửa file trong đó
@@ -200,7 +202,7 @@ Embedded-Interview/
 | 13 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns (bổ sung) |
 | 14 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
-| 15 Prep | 🟡 Đang dùng | tài liệu chuẩn bị phỏng vấn thực tế, cập nhật theo nhu cầu |
+| 15 Prep | 🟡 Đang dùng | **study-plans/** (chiến lược ôn theo vị trí BSP & C++ + gap-register); technical_round (01 lý thuyết, 02 question bank, 03 behavioral, 04 bsp question bank) |
 | 16 Book summaries | 🟡 Đang viết | Quy ước xong; tiến độ chi tiết từng cuốn xem `16-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu

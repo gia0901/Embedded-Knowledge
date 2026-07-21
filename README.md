@@ -37,52 +37,22 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 | 12 | [Design Patterns](12-design-patterns/) | SOLID, creational/structural/behavioral | ✅ |
 | 13 | [DSA](13-dsa/) | Big-O, cấu trúc dữ liệu, pattern giải thuật | ✅ |
 | 14 | [Networking](14-networking/) | TCP/IP, socket, HTTP/TLS/MQTT | ✅ |
-| 15 | [Prep](15_prep/) | chuẩn bị phỏng vấn thực tế: first round, technical round | 🟡 |
+| 15 | [Prep](15_prep/) | chiến lược ôn theo vị trí (study-plans) + technical round (lý thuyết, question bank, behavioral) | 🟡 |
 | 16 | [Book Summaries](16-book-summaries/) | tóm tắt sách chuyên ngành (quy ước riêng trong README topic) | 🟡 |
 | 00 | [Glossary](00-glossary.md) | tra cứu nhanh thuật ngữ EN | ✅ |
 
 ---
 
-## 3. Lộ trình học gợi ý (1–3 tháng)
+## 3. Chiến lược ôn tập theo vị trí
 
-Lộ trình cân bằng giữa **xây nền tảng** và **luyện phỏng vấn**. Mỗi giai đoạn nên dành thời gian cuối tuần làm **mock interview** với topic 11.
+Kế hoạch ôn được tổ chức theo **2 hướng nghề nghiệp đã chọn**, đặt tại **[15_prep/study-plans/](15_prep/study-plans/)** — đây là **nguồn chiến lược duy nhất** (thay cho lộ trình generic trước đây):
 
-### Giai đoạn 1 — Nền tảng ngôn ngữ (Tuần 1–3)
-Trọng tâm phỏng vấn thường rơi nhiều nhất vào C++.
-- **Tuần 1:** `01 C/C++ Fundamentals` — memory model, con trỏ/tham chiếu, OOP, vtable.
-- **Tuần 2:** `02 Modern C++` — RAII & smart pointer, move semantics, perfect forwarding.
-- **Tuần 3:** `02 Modern C++` (tiếp) — concurrency: thread, mutex, atomic, memory order.
-- 🔁 Song song: làm câu hỏi `11/cpp.md`.
+- **[Embedded SW Engineer (BSP)](15_prep/study-plans/bsp-plan.md)** — boot/U-Boot, device tree/probe, kernel internals, interrupt/DMA, storage/OTA, real-time.
+- **[System Software / C++ Engineer](15_prep/study-plans/cpp-systemsw-plan.md)** — modern C++, ABI/shared library, concurrency, design pattern, OS fundamentals.
 
-### Giai đoạn 2 — Hệ điều hành & Linux (Tuần 4–6)
-Phần lõi để hiểu hệ thống — nền cho cả driver lẫn debugging.
-- **Tuần 4:** `03 Operating System` — process/thread, context switch, scheduling.
-- **Tuần 5:** `03 Operating System` — virtual memory/paging, IPC, sync primitives & deadlock.
-- **Tuần 6:** `04 Linux System Programming` — file I/O, signal, fork/exec/wait, epoll.
-- 🔁 Song song: câu hỏi `11/operating-system.md`, `11/linux.md`.
+Mỗi kế hoạch có **hai tầng**: 🏃 *sprint* (sát phỏng vấn, chỉ mục 🎯) + 📚 *nền tảng* (dài hơi, phủ toàn diện) — ánh xạ thẳng sang topic + book summary + question bank. Backlog "thiếu gì" nằm ở **[gap-register.md](15_prep/study-plans/gap-register.md)**.
 
-### Giai đoạn 3 — Chuyên sâu Embedded (Tuần 7–9)
-Phần đặc thù vai trò System/Embedded Software.
-- **Tuần 7:** `07 Shared Libraries` — linking/loading, ABI/soname, thiết kế C++ API (rất sát công việc hiện tại của bạn).
-- **Tuần 8:** `05 Drivers & Device Tree` + `06 Build Systems` (cross-compilation).
-- **Tuần 9:** `08 Embedded Systems` — SoC, boot process, RTOS vs Linux, constraints.
-- 🔁 Song song: câu hỏi `11/drivers.md`.
-
-### Giai đoạn 4 — Debug & Tư duy (Tuần 10–12)
-Củng cố điểm yếu (debug) và tư duy Senior.
-- **Tuần 10:** `09 Debugging` — mindset + gdb + sanitizers + memory bugs.
-- **Tuần 11:** `09 Debugging` (tiếp) — strace/ltrace/perf, kernel debugging.
-- **Tuần 12:** `10 Thinking` — problem solving & system design; tổng ôn `11/system-design.md`.
-- 🔁 Mock interview tổng hợp toàn bộ topic.
-
-### Topic bổ sung (đan xen theo nhu cầu)
-Các topic 12–14 + glossary thêm sau, lồng vào lộ trình khi phù hợp:
-- **`12 Design Patterns`** — đọc cùng giai đoạn C++ (Tuần 1–3); SOLID là nền tảng, đáng đọc sớm. (Điểm cần nâng cấp.)
-- **`13 DSA`** — luyện song song **xuyên suốt** trên Leetcode (mỗi tuần vài bài theo pattern).
-- **`14 Networking`** — đọc cùng/sau giai đoạn Linux (Tuần 6) nếu vị trí ứng tuyển có liên quan mạng.
-- **`00 Glossary`** — tra cứu bất cứ lúc nào gặp thuật ngữ chưa rõ.
-
-> ⏩ **Nếu gấp:** ưu tiên Tuần 1–2 (C++ core), Tuần 4–5 (OS core), topic 11 tương ứng, và `09 Debugging/mindset.md`. Các phần còn lại đọc lướt TL;DR.
+> **Tài liệu ôn & tự kiểm tra dùng chung** cho cả hai hướng: [11-interview-questions/](11-interview-questions/) (đáp án ẩn, phân độ khó) và [15_prep/technical_round/](15_prep/) (lý thuyết cốt lõi, question bank C++/BSP, behavioral STAR). Luyện **DSA** ([13-dsa/](13-dsa/)) song song xuyên suốt.
 
 ---
 
