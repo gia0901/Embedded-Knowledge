@@ -26,6 +26,7 @@
 
 | Chủ đề | Ưu tiên | Trạng thái | Hiện có ở đâu | Ghi chú / nên bổ sung |
 |--------|---------|-----------|---------------|----------------------|
+| **Memory model & lock-free** (atomic ordering, happens-before, ABA, hazard pointer) | 🟠 | 🟡 **đang lấp** | Sách [cpp-concurrency](../../16-book-summaries/cpp-concurrency/README.md) đã dựng khung (ch. 5 + ch. 7) | Trước đây **không tài liệu nào trong repo phủ**; đang được lấp bằng summary cuốn C++ Concurrency in Action. Đổi thành ✅ khi 2 chương đó viết xong. |
 | **C++20/23 depth** (ranges, concepts, coroutines) | 🟠 | 🟡 | [cpp-mindset](../../16-book-summaries/cpp-mindset/README.md) (concepts/ranges chạm nhẹ), [EMC++](../../16-book-summaries/effective-modern-cpp.md) (dừng C++14) | EMC++ chỉ tới C++14. Cần bổ sung: ranges/views sâu, concepts thay SFINAE, `std::expected`, `std::span`; **coroutines chưa có ở đâu**. |
 | **Template metaprogramming sâu** (SFINAE, CRTP, type traits) | 🟠 | 🟡 | [01/templates](../../01-cpp-fundamentals/templates.md) (cơ bản), [cpp-mindset/abstraction-in-detail](../../16-book-summaries/cpp-mindset/abstraction-in-detail.md) (traits) | Còn mỏng. CRTP (static polymorphism), tag dispatch, `enable_if`, variadic template, fold expression. |
 | **Coroutines (C++20)** | 🟢 | ⬜ | — | Chưa có. co_await/co_yield, generator, task; ít hỏi ở embedded nhưng xuất hiện ở vị trí C++ hiện đại. |

@@ -112,7 +112,8 @@
 | Mastering Embedded Linux Programming — Simmonds (**1st ed 2015** — PDF người học) | ✅ Xong; **ch. 3–4 đã đối chiếu sâu toàn văn** | Thư mục `melp/`: README + 6 file; `bootloader-kernel.md` đối chiếu sâu + số trang thật; các file khác kiến thức + mục lục, đánh dấu 🆕 phần ngoài sách |
 | Linux Kernel Development — Robert Love (3rd ed) | ✅ Xong (đối chiếu mục lục + số trang PDF) | Thư mục `lkd/`: README + 6 file; mỗi cụm có mục "⚠️ Đã thay đổi so với sách" cập nhật kernel ~6.x |
 | LDD3 / Bootlin materials | ⬜ Chưa bắt đầu | Ưu tiên 3 (BSP): đọc chọn lọc char driver, interrupt, DMA; Bootlin slides miễn phí cập nhật hơn |
-| The C++ Programmer's Mindset — Sam Morley (Packt 2025) | 🟡 Đang viết | Thư mục `cpp-mindset/`: sách MỚI (sau cutoff) → đọc 100% từ PDF; ch. 1 ✅ đọc sâu, còn ch. 2–15 |
+| The C++ Programmer's Mindset — Sam Morley (Packt 2025) | 🟡 Đang viết | Thư mục `cpp-mindset/`: sách MỚI (sau cutoff) → đọc 100% từ PDF; **Phần 1 (ch. 1–6) ✅ xong**, còn ch. 7–15 (dự án + scale/GPU/perf) |
+| C++ Concurrency in Action — Anthony Williams (2nd ed 2019) | 🟡 Khung xong | Thư mục `cpp-concurrency/`: đã dựng README + bản đồ 11 chương (offset trang xác minh). **Giá trị riêng: ch. 5 memory model/ordering + ch. 7 lock-free — repo chưa có ở đâu.** Chờ đọc sâu |
 | The Linux Programming Interface — Michael Kerrisk | ⬜ Chưa bắt đầu | Lùi ưu tiên (userspace API — ít trúng BSP); giá trị dài hạn vẫn giữ |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu

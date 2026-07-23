@@ -35,10 +35,14 @@ Nguồn tự kiểm tra chính: **[02_question_bank.md](../technical_round/02_qu
 
 ### Tuần 2 — Concurrency
 
+> 📖 Nguồn sâu nhất cho tuần này: **[C++ Concurrency in Action](../../16-book-summaries/cpp-concurrency/README.md)** (Williams, 2nd ed) — đọc thay/bổ sung khi cần chiều sâu vượt các mục dưới.
+
 - [ ] 🎯 **thread/mutex/atomic; volatile vs atomic; data race** — [EMC++ cụm 7](../../16-book-summaries/effective-modern-cpp.md) · [02/concurrency](../../02-modern-cpp/concurrency.md)
-- [ ] 🎯 **Lock: spinlock vs mutex, futex; condition variable (while-not-if)** — [ostep/concurrency](../../16-book-summaries/ostep/concurrency.md) cụm 2–3
+- [ ] 🎯 **Lock: spinlock vs mutex, futex; condition variable (while-not-if)** — [ostep/concurrency](../../16-book-summaries/ostep/concurrency.md) cụm 2–3 · sâu: [cpp-concurrency ch. 3–4](../../16-book-summaries/cpp-concurrency/README.md)
 - [ ] 🎯 **4 điều kiện deadlock + cách phá; atomicity violation; std::scoped_lock** — [ostep/concurrency](../../16-book-summaries/ostep/concurrency.md) cụm 5 · [02_question_bank Q15–17](../technical_round/02_question_bank.md)
 - [ ] 🎯 **async vs thread, future, memory order (seq_cst/acquire/release)** — [EMC++ cụm 7](../../16-book-summaries/effective-modern-cpp.md) · [03/sync-primitives](../../03-operating-system/sync-primitives.md)
+- [ ] 🎯🎯 **Memory model sâu: happens-before, synchronizes-with, 6 memory_order, fences** — [cpp-concurrency ch. 5](../../16-book-summaries/cpp-concurrency/README.md) — *chủ đề phân loại senior, repo chưa có nguồn nào khác*
+- [ ] **Lock-free: ABA, hazard pointer, vì sao lock-free ≠ nhanh hơn** — [cpp-concurrency ch. 7](../../16-book-summaries/cpp-concurrency/README.md) *(câu nâng cao)*
 - [ ] Tự kiểm tra: [02_question_bank](../technical_round/02_question_bank.md) **Q15–Q20**
 
 ### Tuần 3 — ABI/Shared library + Design
