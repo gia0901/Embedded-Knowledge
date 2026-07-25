@@ -1,7 +1,8 @@
-# Effective Modern C++ — Scott Meyers (1st edition, 2014)
+# Effective Modern C++ — Scott Meyers (O'Reilly, 2014)
 
-> **Nguồn summary:** kiến thức Claude, chưa đối chiếu PDF
+> **Nguồn summary:** **đọc trực tiếp PDF** `Effective Modern C++.pdf` (Scott Meyers, O'Reilly 2014) — trích nguyên văn "câu đắt" của Meyers (dịch kèm) + đối chiếu từng code listing, mỗi Item neo số trang. **Trang sách = trang PDF − 18**; số trang `(tr. X)` là **trang sách**.
 > **Vì sao đọc cuốn này:** 42 items giải thích *tại sao* nên viết C++11/14 theo cách nào — đúng tầng "insight lý do thiết kế" mà topic 02 (Modern C++) không đủ chỗ trình bày. Rất nhiều câu hỏi interview C++ hiện đại lấy thẳng từ các item của sách này.
+> ⚠️ **Sách viết cho C++11/14 (2014)** — vẫn là chuẩn nền; chỗ nào C++17/20 đã đổi hành vi được đánh dấu **⚠️** ngay tại item (vd `auto x{27}`, mandatory copy elision, `std::jthread`, `[*this]` capture).
 
 ---
 
@@ -27,16 +28,16 @@ C++11/14 không chỉ là "C++ cũ thêm tính năng" mà là một ngôn ngữ 
 
 ## 🗺️ Bản đồ: chương ↔ cụm chủ đề ↔ topic liên quan
 
-| Cụm | Chương sách | Items | 🎯 | Topic liên quan |
+| Cụm | Chương sách (trang) | Items | 🎯 | Topic liên quan |
 |-----|-------------|-------|----|-----------------|
-| 1. Type Deduction | Ch.1 Deducing Types | 1–4 | | [01/templates](../01-cpp-fundamentals/templates.md) |
-| 2. auto | Ch.2 auto | 5–6 | | — |
-| 3. Moving to Modern C++ | Ch.3 | 7–17 | 🎯 | [02/raii-smart-pointers](../02-modern-cpp/raii-smart-pointers.md), [01/oop](../01-cpp-fundamentals/oop.md) |
-| 4. Smart Pointers | Ch.4 | 18–22 | 🎯 | [02/raii-smart-pointers](../02-modern-cpp/raii-smart-pointers.md), [07/api-design](../07-shared-libraries/api-design.md) (Pimpl) |
-| 5. Move & Perfect Forwarding | Ch.5 Rvalue References... | 23–30 | 🎯 | [02/move-semantics](../02-modern-cpp/move-semantics.md) |
-| 6. Lambdas | Ch.6 Lambda Expressions | 31–34 | | [02/lambdas-functional](../02-modern-cpp/lambdas-functional.md) |
-| 7. Concurrency API | Ch.7 The Concurrency API | 35–40 | 🎯 | [02/concurrency](../02-modern-cpp/concurrency.md) |
-| 8. Tweaks | Ch.8 | 41–42 | | — |
+| 1. Type Deduction | Ch.1 Deducing Types (tr. 9–36) | 1–4 | | [01/templates](../01-cpp-fundamentals/templates.md) |
+| 2. auto | Ch.2 auto (tr. 37–48) | 5–6 | | — |
+| 3. Moving to Modern C++ | Ch.3 (tr. 49–116) | 7–17 | 🎯 | [02/raii-smart-pointers](../02-modern-cpp/raii-smart-pointers.md), [01/oop](../01-cpp-fundamentals/oop.md) |
+| 4. Smart Pointers | Ch.4 (tr. 117–156) | 18–22 | 🎯 | [02/raii-smart-pointers](../02-modern-cpp/raii-smart-pointers.md), [07/api-design](../07-shared-libraries/api-design.md) (Pimpl) |
+| 5. Move & Perfect Forwarding | Ch.5 Rvalue References… (tr. 157–214) | 23–30 | 🎯 | [02/move-semantics](../02-modern-cpp/move-semantics.md) |
+| 6. Lambdas | Ch.6 Lambda Expressions (tr. 215–240) | 31–34 | | [02/lambdas-functional](../02-modern-cpp/lambdas-functional.md) |
+| 7. Concurrency API | Ch.7 The Concurrency API (tr. 241–280) | 35–40 | 🎯 | [02/concurrency](../02-modern-cpp/concurrency.md) |
+| 8. Tweaks | Ch.8 (tr. 281–298) | 41–42 | | — |
 
 ---
 
@@ -44,7 +45,7 @@ C++11/14 không chỉ là "C++ cũ thêm tính năng" mà là một ngôn ngữ 
 
 ### Nội dung chính
 
-**Item 1 — Template type deduction: 3 trường hợp.** Mọi thứ xoay quanh dạng tổng quát:
+**Item 1 (tr. 9) — Template type deduction: 3 trường hợp.** Mọi thứ xoay quanh dạng tổng quát:
 
 ```cpp
 template<typename T>
@@ -52,6 +53,8 @@ void f(ParamType param);   // ParamType có thể là T, T&, const T&, T&&, T*..
 
 f(expr);                   // compiler suy ra T VÀ ParamType từ expr
 ```
+
+> 📖 *"The type deduced for T is dependent not just on the type of `expr`, but also on the form of `ParamType`."* (tr. 9) — kiểu suy ra cho `T` **không chỉ phụ thuộc kiểu của `expr` mà còn phụ thuộc *dạng* của `ParamType`**. Đây là câu chốt của cả item: cùng một `expr`, đổi `ParamType` (`T&` → `T` → `T&&`) là ra `T` khác.
 
 **Case 1 — `ParamType` là reference/pointer (không phải universal reference):** bỏ phần reference của `expr`, rồi pattern-match phần còn lại:
 
@@ -81,7 +84,7 @@ f(ptr); // T = const char*  — tính const CỦA POINTER bị bỏ (top-level),
         //                    tính const của POINTEE (nơi trỏ đến) được giữ (không phải top-level)
 ```
 
-**Array & function decay.** Truyền array vào param by-value → decay thành pointer (`const char*`); nhưng param **by-reference** giữ nguyên kiểu 
+**Array & function decay.** Truyền array vào param by-value → decay thành pointer (`const char*`); nhưng dùng param **by-reference** giữ nguyên kiểu 
 **reference to array** → suy ra được cả kích thước:
 
 ```cpp
@@ -96,7 +99,7 @@ std::array<int, arraySize(vals)> mapped;            // dùng được ở compil
 
 Function types decay thành function pointer tương tự.
 
-**Item 2 — `auto` type deduction = template deduction, trừ MỘT ngoại lệ.** Khi khai báo `auto x = expr;`, `auto` đóng vai `T`, toàn bộ type specifier (`const auto&`...) đóng vai `ParamType` — 3 case y hệt Item 1. Ngoại lệ duy nhất: **braced initializer**:
+**Item 2 (tr. 18) — `auto` type deduction = template deduction, trừ MỘT ngoại lệ.** Khi khai báo `auto x = expr;`, `auto` đóng vai `T`, toàn bộ type specifier (`const auto&`...) đóng vai `ParamType` — "*two sides of the same coin*" (hai mặt của cùng đồng xu, tr. 21) — 3 case y hệt Item 1. Ngoại lệ duy nhất: **braced initializer**:
 
 ```cpp
 auto x1 = 27;      // int
@@ -110,7 +113,7 @@ auto x4{27};       // sách (2014): initializer_list<int>
 
 Từ C++14: `auto` làm return type của hàm và `auto` trong lambda parameter dùng **template deduction** (không phải auto deduction) → `return {1, 2, 3};` trong hàm trả về `auto` là **compile error**.
 
-**Item 3 — `decltype` trả về đúng declared type, không bỏ gì cả.** `decltype(name)` → đúng kiểu khai báo của `name` (giữ nguyên `const`, `&`). Quy tắc đặc biệt: với **expression phức tạp hơn một cái tên** mà là lvalue kiểu `T` → `decltype` trả về `T&`:
+**Item 3 (tr. 23) — `decltype` trả về đúng declared type, không bỏ gì cả.** `decltype(name)` → đúng kiểu khai báo của `name` (giữ nguyên `const`, `&`). Quy tắc đặc biệt: với **expression (lvalue) phức tạp hơn một cái tên** kiểu `T` → `decltype` trả về `T&`:
 
 ```cpp
 int x = 0;
@@ -139,7 +142,7 @@ Nếu dùng `auto` thường làm return type → template deduction **bỏ mấ
 
 ### Ít quan trọng
 
-- **Item 4 — Cách xem deduced type:** IDE hover, cố ý gây compile error với template chưa định nghĩa (`template<typename T> class TD;` rồi `TD<decltype(x)> xType;` — đọc error message), hoặc Boost.TypeIndex; `typeid`/`std::type_info::name` **không đáng tin** vì nó decay kiểu như pass-by-value (Item 4).
+- **Item 4 (tr. 30) — Cách xem deduced type:** IDE hover, cố ý gây compile error với template chưa định nghĩa (`template<typename T> class TD;` rồi `TD<decltype(x)> xType;` — đọc error message), hoặc Boost.TypeIndex; `typeid`/`std::type_info::name` **không đáng tin** vì nó decay kiểu như pass-by-value (Item 4).
 
 ### Góc interview
 
@@ -172,7 +175,7 @@ Vì ngữ nghĩa khác nhau:
 
 ### Nội dung chính
 
-**Item 5 — Ưu tiên `auto` hơn khai báo kiểu tường minh.** Không chỉ là gõ ít hơn — `auto` **loại bỏ nhiều lớp bug**:
+**Item 5 (tr. 37) — Ưu tiên `auto` hơn khai báo kiểu tường minh.** Không chỉ là gõ ít hơn — `auto` **loại bỏ nhiều lớp bug**. Meyers gói gọn ở Things to Remember: *"auto variables must be initialized, are generally immune to type mismatches that can lead to portability or efficiency problems…"* (tr. 47) — biến `auto` **buộc phải khởi tạo** và **miễn nhiễm phần lớn lỗi lệch kiểu** gây hại portability/hiệu năng. Cụ thể:
 
 1. **Buộc phải khởi tạo:** `auto x;` không compile → hết bug biến chưa init.
 2. **Tránh "type shortcut" sai lệch âm thầm:**
@@ -200,7 +203,7 @@ for (const auto& p : m) { ... }   // ✅ đúng kiểu, không copy
 
 Đánh đổi: code kém "đọc ngay ra kiểu" — sách lập luận rằng tên hàm/ngữ cảnh thường đã đủ thông tin, và các IDE hiển thị kiểu khi cần; sai lệch kiểu tường minh gây hại nhiều hơn lợi ích đọc hiểu.
 
-**Item 6 — Bẫy "invisible proxy type": dùng explicitly typed initializer idiom.** Một số `operator[]`/expression trả về **proxy object** thay vì giá trị thật:
+**Item 6 (tr. 43) — Bẫy "invisible proxy type": dùng explicitly typed initializer idiom.** Câu chốt của item: *"As a general rule, 'invisible' proxy classes don't play well with `auto`."* (tr. 45) — các **proxy class "vô hình" không hợp với `auto`**. Một số `operator[]`/expression trả về **proxy object** thay vì giá trị thật:
 
 ```cpp
 std::vector<bool> features(const Widget& w);   // trả về by value
@@ -257,7 +260,7 @@ if (ok) { ... }
 
 ### Nội dung chính
 
-**Item 7 — `{}` vs `()` khi khởi tạo.** Braced initialization (`{}`) là "uniform initialization": dùng được ở mọi ngữ cảnh (default member init, container phần tử, non-copyable object), và có 2 ưu điểm an toàn:
+**Item 7 (tr. 49) — `{}` vs `()` khi khởi tạo.** Braced initialization (`{}`) là "uniform initialization": *"the most widely usable initialization syntax"* (tr. 65) — cú pháp khởi tạo **dùng được ở nhiều ngữ cảnh nhất**: (default member init, container phần tử, non-copyable object), và có 2 ưu điểm an toàn:
 
 ```cpp
 double d = 3.7;
@@ -277,7 +280,7 @@ std::vector<int> v2{10, 20};   // 2 phần tử: 10 và 20  — khác hẳn!
 
 Hệ quả thiết kế: thêm `initializer_list` ctor vào class đã có ctor khác là **thay đổi ý nghĩa code client** đang dùng `{}`. Trong template generic (như `make_unique` dùng `(...)` bên trong), người viết phải *chọn hộ* người dùng một trong hai — không có đáp án chung, chỉ cần chọn nhất quán và document.
 
-**Item 8 — Dùng `nullptr`, không dùng `0`/`NULL`.** `0` là `int`, `NULL` là macro kiểu integral — cả hai không phải kiểu pointer:
+**Item 8 (tr. 58) — Dùng `nullptr`, không dùng `0`/`NULL`.** `0` là `int`, `NULL` là macro kiểu integral — cả hai không phải kiểu pointer:
 
 ```cpp
 void f(int);
@@ -289,7 +292,7 @@ f(nullptr);  // ✅ gọi f(void*) — nullptr có kiểu std::nullptr_t, conver
 
 Trong template, truyền `0`/`NULL` deduction ra kiểu `int` → không match parameter kiểu pointer → lỗi khó hiểu. `nullptr` còn làm code tự-document: thấy là biết đang nói về pointer.
 
-**Item 9 — `using` (alias declaration) thay cho `typedef`.** Lý do quyết định: **alias template** — `typedef` không template hoá được:
+**Item 9 (tr. 63) — `using` (alias declaration) thay cho `typedef`.** Lý do quyết định: **alias template** — `typedef` không template hoá được:
 
 ```cpp
 template<typename T>
@@ -307,7 +310,7 @@ MyAllocListT<Widget>::type lw2;                    // dài dòng
 
 Đây chính là lý do C++14 thêm `std::remove_const_t<T>` (alias) bên cạnh `std::remove_const<T>::type` (C++11).
 
-**Item 10 — Scoped enum (`enum class`) thay unscoped `enum`.** Ba lợi ích:
+**Item 10 (tr. 67) — Scoped enum (`enum class`) thay unscoped `enum`.** Ba lợi ích:
 
 | | `enum Color {...}` | `enum class Color {...}` |
 |---|---|---|
@@ -321,7 +324,7 @@ enum class Status: std::uint8_t;   // forward declare + chọn size — hữu í
 
 Trường hợp unscoped enum còn hữu ích: đặt tên index cho `std::get<>` của tuple (tận dụng implicit conversion sang `size_t`).
 
-**Item 11 — `= delete` thay cho "private + không định nghĩa".** Cách C++98 (khai báo private, không implement) chỉ chặn ở **link time** và chỉ với code ngoài class. `= delete`:
+**Item 11 (tr. 74) — `= delete` thay cho "private + không định nghĩa".** Cách C++98 (khai báo private, không implement) chỉ chặn ở **link time** và chỉ với code ngoài class. `= delete`:
 - Lỗi ngay **compile time**, kể cả khi member/friend gọi.
 - Dùng được cho **hàm tự do** và **template specialization** — chặn overload/instantiation không mong muốn:
 
@@ -336,7 +339,7 @@ template<> void processPointer<void>(void*) = delete;   // cấm void*
 
 Quy ước: deleted function nên để `public` — compiler check accessibility trước deleted status, để private sẽ ra error message gây hiểu lầm.
 
-**Item 12 — Viết `override` cho mọi hàm virtual override.** Override đòi hỏi khớp **chính xác**: tên, tham số, const-ness, reference qualifier, exception spec tương thích; return type covariant. Sai một điểm → hàm mới **che (hide)** chứ không override — compile vẫn qua, bug chỉ lộ lúc runtime:
+**Item 12 (tr. 79) — Viết `override` cho mọi hàm virtual override.** Override đòi hỏi khớp **chính xác**: tên, tham số, const-ness, reference qualifier, exception spec tương thích; return type covariant. Sai một điểm → hàm mới **che (hide)** chứ không override — compile vẫn qua, bug chỉ lộ lúc runtime:
 
 ```cpp
 class Base {
@@ -363,23 +366,23 @@ public:
 auto vals = makeWidget().data();   // dùng bản && → move, không copy
 ```
 
-**Item 13 — Ưu tiên `const_iterator`:** C++11 làm nó thực dụng: `cbegin()/cend()`, các hàm `insert/erase` nhận `const_iterator`. Trong code generic dùng non-member `std::begin/std::end` (C++14 thêm `std::cbegin/std::cend`). Quy tắc cũ "dùng const bất cứ khi nào có thể" áp dụng cho cả iterator.
+**Item 13 (tr. 86) — Ưu tiên `const_iterator`:** C++11 làm nó thực dụng: `cbegin()/cend()`, các hàm `insert/erase` nhận `const_iterator`. Trong code generic dùng non-member `std::begin/std::end` (C++14 thêm `std::cbegin/std::cend`). Quy tắc cũ "dùng const bất cứ khi nào có thể" áp dụng cho cả iterator.
 
-**Item 14 — `noexcept` là một phần của interface, và là đòn bẩy tối ưu.**
+**Item 14 (tr. 90) — `noexcept` là một phần của interface, và là đòn bẩy tối ưu.** Câu chốt: *"`noexcept` is part of a function's interface, and … callers may depend on it."* (tr. 96) — `noexcept` **là một phần interface**, caller được quyền dựa vào nó (nên gỡ nó sau này là phá interface).
 - Với hàm `noexcept`, compiler **không cần giữ stack ở trạng thái unwindable** → code gọn hơn. Nếu exception thoát ra khỏi hàm `noexcept` → `std::terminate` (không unwind).
 - Quan trọng nhất với move: `std::vector::push_back` khi grow muốn move phần tử sang buffer mới, nhưng phải giữ **strong exception guarantee** → chỉ move nếu move ctor `noexcept`, ngược lại **copy** (cơ chế `std::move_if_noexcept`). → **Move ctor/assignment không `noexcept` = mất gần hết lợi ích hiệu năng khi ở trong container.**
 - `swap` cũng conditionally noexcept dựa trên noexcept của phần tử.
 - Mặc định ngầm: **destructor và deallocation ngầm là `noexcept`**.
 - Chỉ khai `noexcept` khi cam kết **lâu dài** — gỡ `noexcept` sau này là phá interface. Phù hợp tự nhiên với hàm "wide contract" (không tiền điều kiện).
 
-**Item 15 — `constexpr` = "có thể tính lúc compile time".**
+**Item 15 (tr. 97) — `constexpr` = "có thể tính lúc compile time".**
 - `constexpr` **object**: hằng compile-time thực thụ, dùng được ở nơi cần constant expression (kích thước array, non-type template argument, enumerator...). Mạnh hơn `const`: `const` chỉ hứa "không đổi", không hứa "biết lúc compile".
 - `constexpr` **function**: gọi với toàn argument compile-time → kết quả compile-time; gọi với runtime value → chạy như hàm thường. **Một hàm phục vụ cả hai thế giới** → mở rộng vùng code có thể "dời" sang compile time (embedded: dời tính toán từ runtime sang lúc build, tiết kiệm CPU/RAM).
 - C++11 giới hạn body = 1 câu `return`; **C++14 nới**: cho phép loop, biến local, nhiều statement; member function `constexpr` C++14 không còn ngầm `const`.
 - Literal type (kể cả class có `constexpr` constructor) dùng được với `constexpr`.
 - Cũng là cam kết interface: bỏ `constexpr` đi là phá client đang dùng ở compile-time context.
 
-**Item 16 — Hàm member `const` phải an toàn cho concurrent read.** Quy ước hậu C++11: `const` = "đọc" → nhiều thread gọi hàm `const` đồng thời **không cần lock** là kỳ vọng hợp lý. Nhưng `mutable` cache phá vỡ điều đó:
+**Item 16 (tr. 103) — Hàm member `const` phải an toàn cho concurrent read.** Quy ước hậu C++11: `const` = "đọc" → nhiều thread gọi hàm `const` đồng thời **không cần lock** là kỳ vọng hợp lý. Nhưng `mutable` cache phá vỡ điều đó:
 
 ```cpp
 class Polynomial {
@@ -399,7 +402,7 @@ private:
 
 Fix: thêm `mutable std::mutex m;` và lock trong `roots()`, hoặc `std::atomic` **nếu chỉ một biến đếm/cờ đơn lẻ**. ⚠️ Hai `std::atomic` liên quan nhau (cached value + valid flag) vẫn race về logic — từ hai biến liên quan trở lên phải dùng mutex. Lưu ý: `std::mutex`/`std::atomic` là move-only... thực ra là **không copy không move** → class chứa chúng mất copyability.
 
-**Item 17 — Quy tắc sinh special member functions (nền của Rule of Five/Zero).** C++11 có 6 hàm đặc biệt: default ctor, dtor, copy ctor, copy assign, move ctor, move assign. Quy tắc sinh tự động:
+**Item 17 (tr. 109) — Quy tắc sinh special member functions (nền của Rule of Five/Zero).** C++11 có 6 hàm đặc biệt: default ctor, dtor, copy ctor, copy assign, move ctor, move assign. Sách nhắc lại **Rule of Three** (tr. 111): tự khai một trong destructor/copy-ctor/copy-assign thì gần như chắc phải khai cả ba. Hai điểm neo từ sách: *"The two copy operations are independent: declaring one doesn't prevent compilers from generating the other"* (tr. 110) — nhưng move thì khác. Quy tắc sinh tự động:
 
 - **Move operations** chỉ được sinh khi class **không khai báo**: copy operation nào, move operation nào, và destructor. (Khai báo 1 trong 5 thứ đó → không sinh move.)
 - **Khai báo move** → copy ctor & copy assign bị `delete` ngầm.
@@ -541,7 +544,7 @@ public:
 
 ### Nội dung chính
 
-**Item 18 — `std::unique_ptr`: ownership độc quyền, chi phí bằng raw pointer.**
+**Item 18 (tr. 118) — `std::unique_ptr`: ownership độc quyền, chi phí bằng raw pointer.** Câu mở đầu item: *"`std::unique_ptr` embodies exclusive ownership semantics."* (tr. 119) — hiện thân của ngữ nghĩa **sở hữu độc quyền**.
 - **Move-only** (copy bị delete) — chuyển ownership là move, ngữ nghĩa rõ ràng: tại mọi thời điểm đúng một chủ.
 - Kích thước **bằng raw pointer**, thao tác gần như không overhead → "mặc định đầu tiên" khi cần smart pointer, kể cả trên embedded.
 - **Custom deleter là một phần của kiểu**: `std::unique_ptr<Widget, decltype(del)>`. Deleter là lambda **không capture** → không tăng size; deleter có state/function pointer → size tăng theo.
@@ -560,7 +563,7 @@ makeInvestment(Ts&&... args);
 - Hai dạng: `unique_ptr<T>` và `unique_ptr<T[]>` (dạng array hiếm dùng — `std::array`/`vector` tốt hơn).
 - **Chuyển ngầm sang `shared_ptr`** được → factory trả `unique_ptr` là thiết kế đúng: client tự quyết ownership model.
 
-**Item 19 — `std::shared_ptr`: shared ownership qua control block.** Cấu trúc:
+**Item 19 (tr. 125) — `std::shared_ptr`: shared ownership qua control block.** Neo từ sách: *"`std::shared_ptr`s are twice the size of a raw pointer"* (tr. 126) — to **gấp đôi raw pointer** (một con trỏ tới object, một tới control block). Cấu trúc:
 
 ```
    shared_ptr<T> (2 con trỏ — to gấp đôi raw ptr)
@@ -594,7 +597,7 @@ std::shared_ptr<Widget> spw2(pw);   // control block #2 — cùng 1 Widget!
 - Biến thể của bug trên: tạo `shared_ptr(this)` trong khi bên ngoài cũng đang có shared_ptr quản lý object → **`std::enable_shared_from_this<T>`** (CRTP): kế thừa nó và gọi `shared_from_this()` — dùng lại control block có sẵn. Tiền đề: phải **đã có** một shared_ptr bên ngoài (thường ép bằng factory + private constructor); nếu chưa có → UB (C++17: ném `std::bad_weak_ptr`).
 - Không có `shared_ptr<T[]>` (đến C++17; C++20 mới thêm) — sách khuyên dùng container chuẩn.
 
-**Item 20 — `std::weak_ptr`: shared_ptr không sở hữu, phát hiện dangling.** weak_ptr trỏ vào object do shared_ptr quản lý nhưng **không tăng strong count** → object hủy được dù weak_ptr còn đó; weak_ptr biết mình đã "expired":
+**Item 20 (tr. 134) — `std::weak_ptr`: shared_ptr không sở hữu, phát hiện dangling.** weak_ptr trỏ vào object do shared_ptr quản lý nhưng **không tăng strong count** → object hủy được dù weak_ptr còn đó; weak_ptr biết mình đã "expired":
 
 ```cpp
 auto spw = std::make_shared<Widget>();
@@ -611,7 +614,7 @@ if (auto sp = wpw.lock()) {         // lock(): atomic "check + tạo shared_ptr"
 
 Ba use case chính: **cache** (object có thể bị hủy bởi nơi khác), **observer list** (subject không sở hữu observer nhưng cần biết observer còn sống), **phá vòng shared_ptr** (A↔B trỏ nhau bằng shared_ptr → strong count không bao giờ về 0 → leak; một chiều đổi thành weak_ptr). Lưu ý: quan hệ cha-con cây thông thường không cần weak_ptr — con trỏ ngược lên cha bằng raw pointer là đủ vì lifetime cha bao trùm con.
 
-**Item 21 — Ưu tiên `make_shared`/`make_unique` hơn `new` trực tiếp.** (`make_unique` từ C++14.) Ba lý do:
+**Item 21 (tr. 139) — Ưu tiên `make_shared`/`make_unique` hơn `new` trực tiếp.** (`make_unique` từ C++14.) Ba lý do:
 
 1. **Không lặp type name** — `auto p = std::make_unique<Widget>();` vs `std::unique_ptr<Widget> p(new Widget);`
 2. **Exception safety:**
@@ -628,7 +631,7 @@ processWidget(std::make_shared<Widget>(), computePriority());   // ✅ kín kẽ
 
 Khi **không** dùng make được: (1) cần **custom deleter**; (2) muốn truyền **braced initializer** (make perfect-forward bằng `()` — muốn `{}` phải tạo `initializer_list` trước); (3) với `make_shared`: class có `operator new/delete` riêng, hoặc hệ thống có **weak_ptr sống rất lâu + object rất lớn** — vì object và control block chung một khối, khối nhớ chỉ được giải phóng khi **cả weak count về 0** → object memory bị "giam" theo weak_ptr.
 
-**Item 22 — Pimpl với `unique_ptr`: destructor phải nằm trong .cpp.** Pimpl (pointer to implementation) cắt dependency biên dịch — header chỉ còn forward declaration:
+**Item 22 (tr. 147) — Pimpl với `unique_ptr`: destructor phải nằm trong .cpp.** Pimpl (pointer to implementation) cắt dependency biên dịch — header chỉ còn forward declaration:
 
 ```cpp
 // widget.h — client không thấy Gadget, vector...
@@ -772,7 +775,7 @@ make_shared:        [ T | control block ]              ← 1 malloc
 
 ### Nội dung chính
 
-**Item 23 — `std::move` không move, `std::forward` không forward.** Cả hai chỉ là **cast**:
+**Item 23 (tr. 158) — `std::move` không move, `std::forward` không forward.** Nguyên văn Meyers: *"`std::move` doesn't move anything. `std::forward` doesn't forward anything."* (tr. 158). Cả hai chỉ là **cast**:
 - `std::move(x)` = cast **vô điều kiện** sang rvalue (`static_cast<remove_reference_t<T>&&>(x)`). Nó chỉ làm `x` **đủ điều kiện** để bị move — move thật xảy ra (hay không) ở constructor/assignment được chọn bởi overload resolution.
 - `std::forward<T>(x)` = cast **có điều kiện**: chỉ cast sang rvalue nếu argument gốc là rvalue (thông tin nằm trong `T` — xem Item 28).
 
@@ -793,7 +796,7 @@ private:
 
 → Quy tắc: **muốn move thì đừng khai `const`**; và đừng tin `std::move` "chắc chắn nhanh" — nó chỉ là lời đề nghị.
 
-**Item 24 — Phân biệt universal reference với rvalue reference.** `T&&` có **hai nghĩa** tùy ngữ cảnh:
+**Item 24 (tr. 164) — Phân biệt universal reference với rvalue reference.** `T&&` có **hai nghĩa** tùy ngữ cảnh:
 
 ```cpp
 void f(Widget&& param);          // rvalue reference — kiểu cụ thể, không deduction
@@ -816,7 +819,7 @@ template<typename T> void f(const T&& v);         // rvalue ref (có const)
 
 Universal reference = "tham chiếu nhận được mọi thứ": lvalue → thành lvalue ref, rvalue → thành rvalue ref.
 
-**Item 25 — `std::move` cho rvalue reference, `std::forward` cho universal reference — ở lần dùng cuối.**
+**Item 25 (tr. 168) — `std::move` cho rvalue reference, `std::forward` cho universal reference — ở lần dùng cuối.**
 
 ```cpp
 class Widget {
@@ -846,7 +849,7 @@ Widget makeWidget() {
 
 Chuẩn quy định: chỗ nào RVO được phép mà compiler không làm, `return w;` cũng tự được xử như rvalue — nghĩa là viết tay `std::move` không bao giờ thắng.
 
-**Items 26–27 — Tránh overload trên universal reference; các lối thoát.** Hàm universal reference là **overload tham lam nhất**: nó instantiate ra exact match cho hầu hết mọi kiểu, nuốt luôn các overload bạn tưởng sẽ được chọn:
+**Items 26–27 (tr. 177, 184) — Tránh overload trên universal reference; các lối thoát.** Hàm universal reference là **overload tham lam nhất**: nó instantiate ra exact match cho hầu hết mọi kiểu, nuốt luôn các overload bạn tưởng sẽ được chọn:
 
 ```cpp
 template<typename T> void logAndAdd(T&& name);   // universal ref
@@ -900,7 +903,7 @@ explicit Person(T&& n) : name(std::forward<T>(n)) {}
 
 (C++20 concepts thay thế toàn bộ kỹ thuật này bằng `requires` — dễ đọc hơn nhiều.) Nhược điểm chung của perfect forwarding interface: error message dài khủng khiếp khi kiểu sai lọt sâu vào trong.
 
-**Item 28 — Reference collapsing: cơ chế bên dưới universal reference.** Người dùng không được khai "reference to reference", nhưng compiler tạo ra trong 4 ngữ cảnh (template instantiation, `auto`, `typedef`/alias, `decltype`) và **collapse** theo quy tắc:
+**Item 28 (tr. 197) — Reference collapsing: cơ chế bên dưới universal reference.** Người dùng không được khai "reference to reference", nhưng compiler tạo ra trong 4 ngữ cảnh (template instantiation, `auto`, `typedef`/alias, `decltype`) và **collapse** theo quy tắc:
 
 ```
   Tham chiếu ngoài
@@ -920,7 +923,7 @@ T&& forward(remove_reference_t<T>& param) {
 }
 ```
 
-**Item 29 — Đừng mặc định move là rẻ.** Ba tình huống move không giúp gì:
+**Item 29 (tr. 203) — Đừng mặc định move là rẻ.** Nhan đề item nói thẳng: giả định move operations *"are not present, not cheap, and not used"* (không tồn tại, không rẻ, không được dùng) — tức đừng tin cả ba. Ba tình huống move không giúp gì:
 - **Kiểu không có move** (legacy C++98, hoặc bị chặn sinh theo Item 17) → `std::move` âm thầm thành copy.
 - **Move không rẻ hơn copy**: `std::string` với **SSO** (small string optimization — chuỗi ngắn nằm ngay trong object, không có pointer để "steal") → move = copy từng byte như copy. `std::array` — dữ liệu nằm **trong object**, move là move **từng phần tử** O(n), khác hẳn `vector` (chỉ chuyển 3 con trỏ, O(1)):
 
@@ -933,7 +936,7 @@ array:   [e0|e1|...|eN] (tại chỗ)           move = move N phần tử   (O(n
 
 → Viết generic code: đừng giả định mọi kiểu move rẻ; đo trước khi tin.
 
-**Item 30 — Các trường hợp perfect forwarding thất bại.** "Thất bại" = deduction fail hoặc deduce ra kiểu sai. Danh sách cần thuộc:
+**Item 30 (tr. 207) — Các trường hợp perfect forwarding thất bại.** "Thất bại" = deduction fail hoặc deduce ra kiểu sai. Danh sách cần thuộc:
 1. **Braced initializer**: `fwd({1, 2, 3})` — template không deduce được braced init (Item 2). Workaround: `auto il = {1,2,3}; fwd(il);`
 2. **`0` hoặc `NULL` làm null pointer** — deduce ra `int`, không phải pointer. Dùng `nullptr`.
 3. **Declaration-only `static const` integral member** — không có definition → không có địa chỉ → reference (universal ref là reference!) không bind được → link error. (C++17 `inline` variable đã xóa vấn đề này.)
@@ -1020,7 +1023,7 @@ array:   [e0|e1|...|eN] (tại chỗ)           move = move N phần tử   (O(n
 
 Từ vựng chuẩn trước đã: **lambda expression** = cú pháp trong source; nó sinh ra một **closure class** (compiler tự đặt tên) và một **closure object** ở runtime. Capture list quyết định closure object chứa gì.
 
-**Item 31 — Tránh default capture (`[&]`, `[=]`) — cả hai đều có bẫy dangling.**
+**Item 31 (tr. 216) — Tránh default capture (`[&]`, `[=]`) — cả hai đều có bẫy dangling.**
 
 **`[&]` — dangling reference lộ liễu:**
 
@@ -1057,7 +1060,7 @@ public:
 
 2. **Biến static không được capture** nhưng vẫn dùng được trong lambda → `[=]` gợi ý "mọi thứ là bản copy độc lập" nhưng biến static thay đổi sau đó **ảnh hưởng closure** — hiểu lầm ngữ nghĩa.
 
-**Item 32 — Init capture (C++14): move object vào closure.** C++11 chỉ có capture by value/reference — không move được (vấn đề với `unique_ptr`, object đắt copy). C++14 thêm **init capture** (generalized lambda capture): tự đặt tên member của closure + biểu thức khởi tạo nó:
+**Item 32 (tr. 224) — Init capture (C++14): move object vào closure.** C++11 chỉ có capture by value/reference — không move được (vấn đề với `unique_ptr`, object đắt copy). C++14 thêm **init capture** (generalized lambda capture): tự đặt tên member của closure + biểu thức khởi tạo nó:
 
 ```cpp
 auto pw = std::make_unique<Widget>();
@@ -1069,7 +1072,7 @@ auto func = [pw = std::move(pw)] {           // member 'pw' của closure ← mo
 
 Workaround C++11 (để hiểu bản chất): tự viết functor class, hoặc `std::bind` object move vào bind rồi lambda nhận reference — C++14 làm những kỹ thuật này lỗi thời.
 
-**Item 33 — Generic lambda + perfect forwarding: `auto&&` và `decltype`.** Lambda C++14 nhận `auto` param; muốn forward tiếp phải lấy được "T" — nhưng lambda không có T tường minh → dùng `decltype`:
+**Item 33 (tr. 229) — Generic lambda + perfect forwarding: `auto&&` và `decltype`.** Lambda C++14 nhận `auto` param; muốn forward tiếp phải lấy được "T" — nhưng lambda không có T tường minh → dùng `decltype`:
 
 ```cpp
 auto f = [](auto&& param) {
@@ -1082,7 +1085,7 @@ auto fVariadic = [](auto&&... params) {
 };
 ```
 
-**Item 34 — Lambda thay cho `std::bind`.** Lambda thắng ở mọi mặt đáng kể: dễ đọc hơn, inline được (bind gọi qua function pointer → khó inline), và bind có các bẫy ngữ nghĩa: argument được **đánh giá tại thời điểm gọi bind** hay khi gọi callable? (ví dụ `steady_clock::now() + 1h` bị chốt sớm); tên hàm overload phải cast tay; mọi argument truyền by-reference ngầm khó thấy. C++14 trở đi: gần như không còn lý do dùng bind (use case cuối cùng của C++11 — move capture và polymorphic call — đều được C++14 giải quyết).
+**Item 34 (tr. 232) — Lambda thay cho `std::bind`.** Lambda thắng ở mọi mặt đáng kể: dễ đọc hơn, inline được (bind gọi qua function pointer → khó inline), và bind có các bẫy ngữ nghĩa: argument được **đánh giá tại thời điểm gọi bind** hay khi gọi callable? (ví dụ `steady_clock::now() + 1h` bị chốt sớm); tên hàm overload phải cast tay; mọi argument truyền by-reference ngầm khó thấy. C++14 trở đi: gần như không còn lý do dùng bind (use case cuối cùng của C++11 — move capture và polymorphic call — đều được C++14 giải quyết).
 
 ### Insight đáng nhớ
 
@@ -1157,7 +1160,7 @@ public:
 
 ### Nội dung chính
 
-**Item 35 — Ưu tiên task-based (`std::async`) hơn thread-based (`std::thread`).** Ba tầng khái niệm "thread": hardware thread (core/hyperthread), software/OS thread (kernel schedule), `std::thread` (object C++ — handle của OS thread). Task-based đẩy các vấn đề tầng thấp cho runtime:
+**Item 35 (tr. 241) — Ưu tiên task-based (`std::async`) hơn thread-based (`std::thread`).** Ba tầng khái niệm "thread": hardware thread (core/hyperthread), software/OS thread (kernel schedule), `std::thread` (object C++ — handle của OS thread). Task-based đẩy các vấn đề tầng thấp cho runtime:
 
 ```cpp
 int doAsyncWork();
@@ -1169,7 +1172,7 @@ auto fut = std::async(doAsyncWork);   // task-based: fut.get() trả về kết 
 
 `std::thread` bắt bạn tự đối mặt: **oversubscription** (nhiều software thread hơn hardware → context switch, cache thrashing), **load balancing**, và **resource exhaustion** (`std::system_error` khi hết thread — kể cả khi hàm là `noexcept`). `std::async` (default policy) được phép "không tạo thread mới" — chạy deferred trên thread gọi `get()` → tự giảm oversubscription. Vẫn cần `std::thread` trực tiếp khi: cần API của thread bên dưới (`native_handle()` → `pthread_setaffinity_np`, priority — nhu cầu thật của embedded/realtime), cần tự quản lý oversubscription cho app đặc thù, hoặc implement công nghệ threading riêng (thread pool).
 
-**Item 36 — Chỉ định `std::launch::async` nếu cần bất đồng bộ thật.** Default policy = `async | deferred` — hệ thống tự chọn:
+**Item 36 (tr. 245) — Chỉ định `std::launch::async` nếu cần bất đồng bộ thật.** Default policy = `async | deferred` — hệ thống tự chọn:
 - `std::launch::async` — chạy trên **thread khác**, bắt đầu ngay.
 - `std::launch::deferred` — **không chạy** cho tới khi `get()/wait()`, chạy **đồng bộ trên thread gọi get**; không bao giờ gọi get → **không bao giờ chạy**.
 
@@ -1191,7 +1194,7 @@ if (fut.wait_for(0s) == std::future_status::deferred) {
 
 Quy tắc: dùng default khi (task không cần chạy concurrent thật, không đụng `thread_local`, chấp nhận có thể không bao giờ chạy nếu không get); ngược lại viết rõ `std::async(std::launch::async, f)`.
 
-**Item 37 — `std::thread` phải unjoinable trên mọi đường ra khỏi scope.** Destructor của một `std::thread` **joinable** → gọi `std::terminate`. Lý do thiết kế: hai lựa chọn còn lại đều tệ hơn — implicit `join` (chờ ngầm → treo khó hiểu), implicit `detach` (thread tiếp tục ghi vào stack frame đã chết → UB kinh dị). Chuẩn chọn "chết to, chết rõ".
+**Item 37 (tr. 250) — `std::thread` phải unjoinable trên mọi đường ra khỏi scope.** Destructor của một `std::thread` **joinable** → gọi `std::terminate` (*"execution of the program is terminated"*, tr. 251). Lý do thiết kế: hai lựa chọn còn lại đều tệ hơn — implicit `join` (chờ ngầm → treo khó hiểu), implicit `detach` (thread tiếp tục ghi vào stack frame đã chết → UB kinh dị). Chuẩn chọn "chết to, chết rõ".
 
 ```cpp
 void doWork() {
@@ -1226,7 +1229,7 @@ private:
 
 (C++20 thêm `std::jthread` — chính là ý tưởng này vào chuẩn, kèm stop token.)
 
-**Item 38 — Destructor của future: thường không block, TRỪ một trường hợp.** Future là một đầu của **kênh caller ↔ callee**; kết quả callee nằm trong **shared state** (heap):
+**Item 38 (tr. 258) — Destructor của future: thường không block, TRỪ một trường hợp.** Future là một đầu của **kênh caller ↔ callee**; kết quả callee nằm trong **shared state** (heap):
 
 ```
   caller                                    callee
@@ -1241,7 +1244,7 @@ private:
 - **Ngoại lệ:** future là cái **cuối cùng** trỏ tới shared state của task chạy qua **`std::async` với policy `async`** (task chưa xong) → dtor **block đến khi task chạy xong** (implicit join). Hệ quả thực tế: vứt future của std::async đi không "fire-and-forget" được — nó chờ!
 - Future từ `std::promise`/`std::packaged_task` không có hành vi đặc biệt này (nhưng chú ý: bạn vẫn phải quản lý thread chạy packaged_task theo Item 37).
 
-**Item 39 — Giao tiếp sự kiện one-shot: void future gọn hơn condvar/flag.** So sánh các cách thread A báo "sự kiện xảy ra" cho thread B:
+**Item 39 (tr. 262) — Giao tiếp sự kiện one-shot: void future gọn hơn condvar/flag.** So sánh các cách thread A báo "sự kiện xảy ra" cho thread B:
 
 | Cách | Vấn đề |
 |---|---|
@@ -1260,7 +1263,7 @@ p.set_value();               // "sự kiện xảy ra"
 
 Giới hạn phải nêu: **one-shot** — promise set một lần duy nhất, không tái sử dụng; có cấp phát heap (shared state). Sự kiện lặp lại nhiều lần → quay về condvar + predicate. Use case đẹp trong sách: tạo thread ở trạng thái "treo" chờ lệnh xuất phát (suspend rồi thả), kết hợp `std::shared_future` để thả **nhiều** thread cùng lúc.
 
-**Item 40 — `std::atomic` cho concurrency, `volatile` cho special memory.** Câu hỏi phân biệt kinh điển, đặc biệt đắt với embedded:
+**Item 40 (tr. 271) — `std::atomic` cho concurrency, `volatile` cho special memory.** Hai câu tổng kết của Meyers (tr. 279): *"`std::atomic` is useful for concurrent programming, but not for accessing special memory"* và *"`volatile` is useful for accessing special memory, but not for concurrent programming"* — hai hợp đồng **trực giao**. Câu hỏi phân biệt kinh điển, đặc biệt đắt với embedded:
 
 - **`std::atomic<T>`**: thao tác **atomic đối với thread khác** — RMW (`++`, `fetch_add`, CAS) là một khối không chia cắt; đồng thời áp đặt **ordering** (mặc định sequentially consistent — code trước store không bị dời xuống sau, các thread thấy thứ tự nhất quán). Nhưng compiler **được phép** tối ưu (gộp, loại) các access "thừa" miễn giữ ngữ nghĩa với thread khác.
 - **`volatile`**: bảo compiler "bộ nhớ này **đặc biệt** — mỗi lần đọc/ghi trong code là một lần đọc/ghi THẬT, không được gộp, không được loại, không đảo với volatile khác" — chính xác là hợp đồng cần cho **memory-mapped I/O** (đọc thanh ghi 2 lần có thể ra 2 giá trị; ghi tưởng-như-thừa vẫn là lệnh gửi phần cứng). Nhưng volatile **KHÔNG** atomic, **KHÔNG** tạo ordering/fence giữa các thread → dùng volatile để đồng bộ thread là **data race = UB**.
@@ -1360,7 +1363,7 @@ void process() {
 
 ### Nội dung chính
 
-**Item 41 — Cân nhắc pass-by-value cho tham số copyable, rẻ-để-move, và luôn-được-copy.** Ba cách viết hàm "nhận rồi giữ lại" một giá trị:
+**Item 41 (tr. 281) — Cân nhắc pass-by-value cho tham số copyable, rẻ-để-move, và luôn-được-copy.** Ba cách viết hàm "nhận rồi giữ lại" một giá trị:
 
 ```cpp
 class Widget {
@@ -1385,7 +1388,7 @@ Kết luận của Meyers: phương án (3) đáng cân nhắc khi **đủ cả 
 
 Hai lưu ý thêm: chuỗi hàm chuyển tiếp by-value **cộng dồn** move qua mỗi tầng; và **by-value bị slicing** với hierarchy — không dùng cho kiểu base class. Với gán (assignment) thay vì construct, phân tích chi phí phức tạp hơn (liên quan capacity có sẵn của chuỗi đích) — by-value có thể đắt hơn tưởng.
 
-**Item 42 — Emplacement thay vì insertion — thường nhanh hơn, không phải luôn luôn.**
+**Item 42 (tr. 292) — Emplacement thay vì insertion — thường nhanh hơn, không phải luôn luôn.**
 
 ```cpp
 std::vector<std::string> vs;

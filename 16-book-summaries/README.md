@@ -107,7 +107,7 @@
 
 | Sách | Trạng thái | Ghi chú |
 |------|-----------|---------|
-| Effective Modern C++ — Scott Meyers | ✅ Xong (chưa đối chiếu PDF) | Đủ 8 cụm / 42 items; sẽ đối chiếu khi có PDF |
+| Effective Modern C++ — Scott Meyers | ✅ Xong; **đã đối chiếu PDF** | Đủ 8 cụm / 42 items; mỗi Item neo số trang thật (trang sách = trang PDF − 18) + trích nguyên văn "câu đắt" của Meyers, dịch kèm |
 | Operating Systems: Three Easy Pieces (OSTEP) — Arpaci-Dusseau | ✅ Xong (chưa đối chiếu PDF) | Thư mục `ostep/`: README + 4 file (CPU, Memory, Concurrency, Persistence) |
 | Mastering Embedded Linux Programming — Simmonds (**1st ed 2015** — PDF người học) | ✅ Xong; **ch. 3–4 đã đối chiếu sâu toàn văn** | Thư mục `melp/`: README + 6 file; `bootloader-kernel.md` đối chiếu sâu + số trang thật; các file khác kiến thức + mục lục, đánh dấu 🆕 phần ngoài sách |
 | Linux Kernel Development — Robert Love (3rd ed) | ✅ Xong (đối chiếu mục lục + số trang PDF) | Thư mục `lkd/`: README + 6 file; mỗi cụm có mục "⚠️ Đã thay đổi so với sách" cập nhật kernel ~6.x |

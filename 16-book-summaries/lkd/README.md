@@ -1,6 +1,6 @@
 # Linux Kernel Development — Robert Love (3rd edition, 2010)
 
-> **Nguồn summary:** kiến thức Claude, **đã đối chiếu mục lục + số trang theo PDF** `Linux.Kernel.Development.3rd.Edition.pdf` (ISBN 978-0-672-32946-3); nội dung chi tiết viết từ kiến thức, đối chiếu chọn lọc. Số trang `(tr. X)` theo bản PDF này.
+> **Nguồn summary:** **đọc trực tiếp PDF** `Linux.Kernel.Development.3rd.Edition.pdf` (ISBN 978-0-672-32946-3) — trích dẫn nguyên văn + code listing lấy từ sách, mỗi ý neo số trang. **Trang sách = trang PDF − 27**; số trang `(tr. X)` là **trang sách**.
 > **Vì sao đọc cuốn này:** kernel internals dễ đọc nhất từng được viết — đúng tầng bên dưới công việc BSP: interrupt, bottom halves, kernel locking, kmalloc/slab, VFS/block. Là "phần chìm" giải thích cho mọi API driver bạn gọi hằng ngày.
 > ⚠️ **Sách viết thời kernel 2.6.34 (2010)** — khung khái niệm vẫn đúng, nhưng nhiều chi tiết đã đổi; mỗi cụm có mục **"⚠️ Đã thay đổi so với sách"** cập nhật đến kernel hiện đại (~6.x). Đọc sách này *kèm* các ghi chú đó, đừng đọc chay.
 
