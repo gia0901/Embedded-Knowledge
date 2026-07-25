@@ -11,14 +11,14 @@
 
 | Chủ đề | Ưu tiên | Trạng thái | Hiện có ở đâu | Ghi chú / nên bổ sung |
 |--------|---------|-----------|---------------|----------------------|
-| **DMA & cache coherency** | 🔴 | 🟡 | [04_bsp C2–C3](../technical_round/04_bsp_question_bank.md), rải trong [lkd/memory](../../16-book-summaries/lkd/memory.md) | Cần topic doc: coherent vs streaming, `dma_map_*`, cache flush/invalidate, IOMMU/SMMU, scatter-gather, dma_addr_t. Hay hỏi ở BSP. |
+| **DMA & cache coherency** | 🔴 | 🟡 | [04_bsp C2–C3](../technical_round/04_bsp_question_bank.md), rải trong [lkd/memory](../../16-book-summaries/lkd/04-memory.md) | Cần topic doc: coherent vs streaming, `dma_map_*`, cache flush/invalidate, IOMMU/SMMU, scatter-gather, dma_addr_t. Hay hỏi ở BSP. |
 | **Yocto / Buildroot** | 🔴 | 🟡 | [melp/build-systems](../../16-book-summaries/melp/build-systems.md) | Topic 06 **thiếu hẳn** — chỉ có Make/CMake/cross-compile. Đa số shop BSP dùng Yocto; cần bổ sung vào 06 (recipe, layer, bbappend, machine/distro, sstate, devtool). |
 | **Power management** | 🟠 | 🟡 | [melp/drivers-init-power](../../16-book-summaries/melp/drivers-init-power.md) cụm 3 | Chưa có topic doc. 4 tầng (cpufreq/cpuidle/runtime PM/system suspend), wakeup source, OPP, DVFS. |
 | **Secure boot / TF-A chiều sâu** | 🟠 | 🟡 | [melp/bootloader-kernel](../../16-book-summaries/melp/bootloader-kernel.md) (🆕 phần bổ sung) | Mới ở mức khái niệm. Cần: chain of trust chi tiết, BL1–BL33, eFuse/OTP, verified boot của U-Boot (FIT + khóa), anti-rollback. |
 | **Bus protocol chiều sâu (I2C/SPI/UART)** | 🟠 | 🟡 | [02_question_bank Q31–34](../technical_round/02_question_bank.md), [11/drivers](../../11-interview-questions/drivers.md) | Có so sánh mức khái niệm; thiếu timing/điện: CPOL/CPHA waveform, clock stretching, START/STOP, arbitration, flow control, tốc độ. |
 | **LDD3 / Bootlin summary** | 🟠 | ⬜ | — (trong hàng đợi sách) | Char driver, ioctl, interrupt, DMA từ góc viết driver thật. Đã lên kế hoạch (xem [16/README](../../16-book-summaries/README.md)). |
 | **pinctrl / clock / regulator framework** | 🟢 | 🟡 | [melp/bootloader-kernel](../../16-book-summaries/melp/bootloader-kernel.md) (nhắc pinctrl) | Chi tiết framework: consumer/provider, clk_get/prepare/enable, regulator_get. |
-| **Device model kernel sâu (kobject/sysfs/uevent)** | 🟢 | 🟡 | [lkd/modules-debug](../../16-book-summaries/lkd/modules-debug.md) cụm 1 | Có khung; có thể đào sâu thêm cho vị trí driver-heavy. |
+| **Device model kernel sâu (kobject/sysfs/uevent)** | 🟢 | 🟡 | [lkd/modules-debug](../../16-book-summaries/lkd/06-modules-debug.md) cụm 1 | Có khung; có thể đào sâu thêm cho vị trí driver-heavy. |
 
 ---
 

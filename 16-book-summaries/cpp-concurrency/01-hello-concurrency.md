@@ -66,7 +66,7 @@ Sách nêu ví dụ: **Erlang** dùng process làm khối xây dựng cơ bản 
 
 **Vì sao cuốn sách chỉ nói về thread (tr. 6)** — lý do rất thực tế, đáng biết: (1) overhead thấp khiến thread là *"the favored approach to concurrency in mainstream languages, including C++"*; (2) **C++ Standard không hề hỗ trợ giao tiếp giữa process** → ứng dụng đa process buộc phải dùng API riêng của nền tảng. Vì vậy *"future references to concurrency assume that this is achieved by using multiple threads."*
 
-> 🆕 *Liên hệ (tùy chọn):* so sánh process vs thread ở tầng OS (address space, clone flags, cô lập lỗi) có ở [ostep/concurrency.md](../ostep/concurrency.md) cụm 1 và [lkd/process-sched-syscalls.md](../lkd/process-sched-syscalls.md). Bảng so sánh đủ dùng cho phỏng vấn đã nằm trong **Góc interview** cuối file này.
+> 🆕 *Liên hệ (tùy chọn):* so sánh process vs thread ở tầng OS (address space, clone flags, cô lập lỗi) có ở [ostep/concurrency.md](../ostep/concurrency.md) cụm 1 và [lkd/01-process-sched-syscalls.md](../lkd/01-process-sched-syscalls.md). Bảng so sánh đủ dùng cho phỏng vấn đã nằm trong **Góc interview** cuối file này.
 
 ### 1.3 Concurrency vs parallelism — khác nhau ở đâu (tr. 6–7)
 

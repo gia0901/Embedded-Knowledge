@@ -1,5 +1,6 @@
 # C++ Concurrency in Action — Anthony Williams (**2nd edition, 2019**, Manning)
 
+> ✅ **HOÀN THÀNH toàn bộ 11 chương** (đọc sâu toàn văn từ PDF). Ưu tiên đầu tư nặng nhất: **ch. 5 (memory model)** + **ch. 7 (lock-free)** — hai chương phân loại senior mà repo chưa có nguồn nào khác phủ.
 > **Nguồn summary:** đọc trực tiếp PDF `C++ Concurrency in Action by Anthony Williams (z-lib.org).pdf` (ISBN 9781617294693). **Đã đối chiếu mục lục + xác minh offset: trang sách = trang PDF − 23.** Mọi số trang `(tr. X)` trong các file là **trang in của sách**.
 > **Phiên bản:** 2nd ed phủ **C++11/14/17** (thêm `std::scoped_lock`, `std::shared_mutex`, parallel algorithms/execution policies so với 1st ed). Tác giả là **primary developer cũ của Boost.Thread** và thành viên C++ Standards panel — đây là sách "từ miệng người viết ra chuẩn".
 > **Quy ước:** không đánh dấu = từ sách · **🆕 = liên hệ/bổ sung của người viết summary** · **⚠️ = lỗi/điểm cần cẩn trọng** · trích dẫn kèm `(tr. X)`.
@@ -23,7 +24,7 @@ Repo đã có concurrency ở **ba tầng khác nhau**, nhưng đều dừng ở
 
 Các chương còn lại **chồng lấn có chủ đích** với tài liệu sẵn có — nhưng theo [quy ước Mục 1](../README.md), summary vẫn **viết đầy đủ tại chỗ, chấp nhận lặp**, để đọc liền mạch không phải nhảy tài liệu; link chéo chỉ đặt cuối file như "đọc thêm (tùy chọn)".
 
-**Liên hệ nghề:** trúng thẳng hướng **System Software / C++** ([cpp-systemsw-plan](../../15_prep/study-plans/cpp-systemsw-plan.md) — Tuần 2 là toàn bộ concurrency). Với **BSP**: chương 5 (memory ordering ↔ barrier trong kernel — [lkd/sync-timers](../lkd/sync-timers.md)) và chương 8 (false sharing, cache ping-pong ↔ [cpp-mindset ch.4](../cpp-mindset/understanding-the-machine.md)) là phần giao nhau đáng đọc.
+**Liên hệ nghề:** trúng thẳng hướng **System Software / C++** ([cpp-systemsw-plan](../../15_prep/study-plans/cpp-systemsw-plan.md) — Tuần 2 là toàn bộ concurrency). Với **BSP**: chương 5 (memory ordering ↔ barrier trong kernel — [lkd/sync-timers](../lkd/03-sync-timers.md)) và chương 8 (false sharing, cache ping-pong ↔ [cpp-mindset ch.4](../cpp-mindset/understanding-the-machine.md)) là phần giao nhau đáng đọc.
 
 ---
 
@@ -64,8 +65,8 @@ Mạch xuyên suốt: mỗi cơ chế được giới thiệu qua **một bug c�
 | [07-lock-free-structures.md](07-lock-free-structures.md) | 7 (tr. 205–250) | **Nonblocking vs lock-free vs wait-free**; lock-free stack/queue (CAS-loop); **3 kỹ thuật memory reclamation** (đếm thread / **hazard pointer** / **split reference counting**); nới lỏng memory order; **ABA problem**; helping | 🎯 | ✅ **Xong** |
 | [08-designing-concurrent-code.md](08-designing-concurrent-code.md) | 8 (tr. 251–299) | Chia việc (dữ liệu/đệ quy/task + pipeline); **cache ping-pong, false sharing, data proximity, oversubscription**; **exception safety** (`async`/`packaged_task`); **Amdahl's law**; parallel `for_each`/`find`/`partial_sum` | 🎯 | ✅ **Xong** |
 | [09-advanced-thread-management.md](09-advanced-thread-management.md) | 9 (tr. 300–326) | **Thread pool** tiến hóa 5 bước (waitable→run_pending_task→local queue→**work stealing**); **interrupting threads** (⚠️ nay `std::jthread`+`std::stop_token` C++20) | 🟠 | ✅ **Xong** |
-| [10-parallel-algorithms.md](10-parallel-algorithms.md) | 10 (tr. 327–338) | **Parallel algorithms C++17**: execution policies (`seq`/`par`/`par_unseq`), ví dụ dùng | 🟠 | ⬜ Chờ đọc |
-| [11-testing-debugging.md](11-testing-debugging.md) | 11 (tr. 339–353) | Các loại bug concurrency; **kỹ thuật định vị bug**: review, test, thiết kế để test được, cấu trúc test đa luồng | 🟠 | ⬜ Chờ đọc |
+| [10-parallel-algorithms.md](10-parallel-algorithms.md) | 10 (tr. 327–338) | **Parallel algorithms C++17**: execution policies `seq`/`par`/`par_unseq` (ràng buộc code + bẫy exception→terminate); Forward Iterator; `transform_reduce` (map-reduce) | 🟠 | ✅ **Xong** |
+| [11-testing-debugging.md](11-testing-debugging.md) | 11 (tr. 339–353) | Loại bug (blocking vs race); **định vị**: 8 câu hỏi review, phân loại bug, brute-force/combination/**TSan**; cấu trúc test (promise "go"); scalability | 🟠 | ✅ **Xong** |
 
 > Phụ lục: A (C++11 features, tr. 354) · B (so sánh thư viện concurrency, tr. 382) · C (message-passing + ATM example, tr. 384) · D (**Thread Library reference**, tr. 401–550 — tra cứu API, không summary).
 

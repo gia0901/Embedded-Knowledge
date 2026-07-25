@@ -953,7 +953,7 @@ public:
 - [ostep/concurrency.md](../ostep/concurrency.md) — lock/mutex nhìn từ tầng OS: spinlock, futex, cách lock được xây từ phần cứng (test-and-set, CAS); deadlock 4 điều kiện Coffman.
 - [03-operating-system/sync-primitives.md](../../03-operating-system/sync-primitives.md) — bản cô đọng mutex/semaphore/deadlock của repo.
 - [EMC++ cụm 7](../effective-modern-cpp.md) — Item 40 (`std::atomic` vs `volatile`), bổ trợ cho double-checked locking.
-- [lkd/sync-timers.md](../lkd/sync-timers.md) — spinlock vs mutex, `spin_lock_irqsave` trong kernel — cùng bài toán loại trừ lẫn nhau ở tầng kernel.
+- [lkd/03-sync-timers.md](../lkd/03-sync-timers.md) — spinlock vs mutex, `spin_lock_irqsave` trong kernel — cùng bài toán loại trừ lẫn nhau ở tầng kernel.
 - Ch. 5 (memory model) giải thích **vì sao** double-checked locking là data race và `call_once` thì không; ch. 6–7 xây các cấu trúc dữ liệu concurrent (lock-based rồi lock-free) trên nền chương này.
 
 **Chương tiếp theo:** [Ch. 4 — Synchronizing concurrent operations →](04-synchronization.md) (condition variable & thread-safe queue, **future/promise/packaged_task/async**, `std::this_thread::sleep_for`, timeout & clock, latches/barriers) — trả lời câu hỏi chương này để ngỏ: làm sao **chờ một sự kiện** mà không đốt CPU.

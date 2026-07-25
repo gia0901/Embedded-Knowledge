@@ -1,6 +1,6 @@
 # LKD — Kernel Synchronization & Timers (ch. 9 tr. 161, ch. 10 tr. 175, ch. 11 tr. 207) 🎯🎯
 
-> Thuộc [LKD](README.md). Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
+> Thuộc [LKD](README.md) · **[⏮ 02 Interrupts & Bottom Halves](02-interrupts-bottomhalves.md)** · **[04 Memory → ⏭](04-memory.md)** · Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
 
 ---
 

@@ -36,10 +36,10 @@ Nguồn tự kiểm tra chính: **[04_bsp_question_bank.md](../technical_round/0
 
 ### Tuần 2 — Interrupt / DMA / MMIO + kernel locking
 
-- [ ] 🎯 **ISR không được ngủ, top/bottom half, threaded IRQ** — [lkd/interrupts-bottomhalves](../../16-book-summaries/lkd/interrupts-bottomhalves.md) · [melp/drivers-init-power](../../16-book-summaries/melp/drivers-init-power.md) cụm 1
-- [ ] 🎯 **Kernel locking: spinlock vs mutex, spin_lock_irqsave, per-CPU, barrier** — [lkd/sync-timers](../../16-book-summaries/lkd/sync-timers.md) cụm 2
+- [ ] 🎯 **ISR không được ngủ, top/bottom half, threaded IRQ** — [lkd/interrupts-bottomhalves](../../16-book-summaries/lkd/02-interrupts-bottomhalves.md) · [melp/drivers-init-power](../../16-book-summaries/melp/drivers-init-power.md) cụm 1
+- [ ] 🎯 **Kernel locking: spinlock vs mutex, spin_lock_irqsave, per-CPU, barrier** — [lkd/sync-timers](../../16-book-summaries/lkd/03-sync-timers.md) cụm 2
 - [ ] 🎯 **DMA: coherent vs streaming, cache maintenance, ioremap, /dev/mem** — [04_bsp C2–C3](../technical_round/04_bsp_question_bank.md) · nền cache: [ostep/virtualization-memory](../../16-book-summaries/ostep/virtualization-memory.md) 🕳️ *(chưa có topic doc riêng — xem gap register)*
-- [ ] 🎯 **Cấp phát bộ nhớ kernel: kmalloc vs vmalloc, GFP_KERNEL vs GFP_ATOMIC** — [lkd/memory](../../16-book-summaries/lkd/memory.md) cụm 1
+- [ ] 🎯 **Cấp phát bộ nhớ kernel: kmalloc vs vmalloc, GFP_KERNEL vs GFP_ATOMIC** — [lkd/memory](../../16-book-summaries/lkd/04-memory.md) cụm 1
 - [ ] Tự kiểm tra: [04_bsp](../technical_round/04_bsp_question_bank.md) **C1–C4**
 
 ### Tuần 3 — Storage/OTA + Real-time + Power
@@ -54,7 +54,7 @@ Nguồn tự kiểm tra chính: **[04_bsp_question_bank.md](../technical_round/0
 
 - [ ] 🎯 **volatile (MMIO) vs std::atomic (threads)** — [EMC++ Item 40](../../16-book-summaries/effective-modern-cpp.md) · [02_question_bank Q10](../technical_round/02_question_bank.md)
 - [ ] 🎯 **Smart pointer, RAII, rule of 5/0** (driver userspace/tooling vẫn dùng) — [EMC++ cụm 4](../../16-book-summaries/effective-modern-cpp.md) · [02-modern-cpp](../../02-modern-cpp/)
-- [ ] 🎯 **Debug board-level: earlycon, oops decode, pstore/ramoops, JTAG, reset reason** — [lkd/modules-debug](../../16-book-summaries/lkd/modules-debug.md) cụm 2 · [melp/debug-realtime](../../16-book-summaries/melp/debug-realtime.md) cụm 2 · [09/kernel-debugging](../../09-debugging/kernel-debugging.md)
+- [ ] 🎯 **Debug board-level: earlycon, oops decode, pstore/ramoops, JTAG, reset reason** — [lkd/modules-debug](../../16-book-summaries/lkd/06-modules-debug.md) cụm 2 · [melp/debug-realtime](../../16-book-summaries/melp/debug-realtime.md) cụm 2 · [09/kernel-debugging](../../09-debugging/kernel-debugging.md)
 - [ ] 🎯 **4 tình huống bring-up/debug** (board câm, crash hiện trường, trễ chu kỳ, chậm dần→bị kill) — [04_bsp H1–H4](../technical_round/04_bsp_question_bank.md)
 - [ ] **Mock**: nói to đáp án A1 (boot flow) + B1 (probe) + C1 (ISR) + D2 (OTA) không nhìn tài liệu
 - [ ] **Behavioral**: ôn STAR + "vì sao rời công ty cũ" + câu hỏi ngược — [technical_round/03_behavior.md](../technical_round/03_behavior.md)

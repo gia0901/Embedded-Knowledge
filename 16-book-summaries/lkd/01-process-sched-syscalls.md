@@ -1,6 +1,6 @@
 # LKD — Process, Scheduler & System Calls kernel-side (ch. 3 tr. 23, ch. 4 tr. 41, ch. 5 tr. 69) 🎯
 
-> Thuộc [LKD](README.md). Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
+> Thuộc [LKD](README.md) · **⏮ (đầu — file 01)** · **[02 Interrupts & Bottom Halves → ⏭](02-interrupts-bottomhalves.md)** · Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
 > Lý thuyết process/scheduling đã có ở [OSTEP](../ostep/virtualization-cpu.md) — file này chỉ lấy phần **kernel hiện thực hóa thế nào**: struct nào, đường code nào, quyết định thiết kế nào.
 
 ---
@@ -9,10 +9,10 @@
 
 ### Nội dung chính
 
-- **task_struct (tr. 24)** — "PCB của Linux": ~1.7KB chứa state, mm (address space — [memory.md](memory.md)), files, tín hiệu, cha/con/anh em (process tree tr. 29 — duyệt bằng `list_head`, cấu trúc ch. 6), scheduling info. Cấp từ **slab** (fork dày đặc — đúng bài kmem_cache). **`current`** (tr. 26): macro trả task đang chạy trên CPU này (thời sách: giấu ở đáy kernel stack qua thread_info; ⚠️ nay x86/arm64 để trong per-CPU/register — ý tưởng "luôn tìm được task của mình trong O(1)" giữ nguyên).
+- **task_struct (tr. 24)** — "PCB của Linux": ~1.7KB chứa state, mm (address space — [04-memory.md](04-memory.md)), files, tín hiệu, cha/con/anh em (process tree tr. 29 — duyệt bằng `list_head`, cấu trúc ch. 6), scheduling info. Cấp từ **slab** (fork dày đặc — đúng bài kmem_cache). **`current`** (tr. 26): macro trả task đang chạy trên CPU này (thời sách: giấu ở đáy kernel stack qua thread_info; ⚠️ nay x86/arm64 để trong per-CPU/register — ý tưởng "luôn tìm được task của mình trong O(1)" giữ nguyên).
 - **State (tr. 27):** TASK_RUNNING (đang chạy *hoặc* sẵn sàng — Linux không tách hai trạng thái này!), TASK_INTERRUPTIBLE (ngủ, signal đánh thức được — mặc định đúng), TASK_UNINTERRUPTIBLE (ngủ lì — cột `D` trong ps, không kill được: thường đang kẹt I/O; nguồn "load average cao mà CPU idle" kinh điển), __TASK_STOPPED, TASK_TRACED.
 - **fork = clone (tr. 31–33):** mọi con đường tạo task (`fork/vfork/pthread_create`) đều xuống **`clone()`** với bộ cờ chia sẻ khác nhau → `copy_process()`: nhân bản task_struct từ slab, **COW address space** (copy page table, hai bên read-only — [OSTEP](../ostep/virtualization-memory.md)), copy/chia sẻ files/signal theo cờ. Chi tiết tinh tế (tr. 32): sau fork **chạy con trước** (nếu con exec ngay thì đỡ COW-fault vô ích của cha) — loại quyết định nhỏ đầy chủ đích đáng kể trong interview.
-- **Thread = task chung tài nguyên (tr. 33):** `clone(CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND)` — kernel **không có khái niệm thread riêng**, chỉ có task_struct chia sẻ nhiều/ít. Kernel threads (tr. 35): mm = NULL ([memory.md](memory.md)).
+- **Thread = task chung tài nguyên (tr. 33):** `clone(CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND)` — kernel **không có khái niệm thread riêng**, chỉ có task_struct chia sẻ nhiều/ít. Kernel threads (tr. 35): mm = NULL ([04-memory.md](04-memory.md)).
 - **Exit & zombie (tr. 36–39):** `do_exit` giải phóng dần tài nguyên nhưng **giữ task_struct tối thiểu** cho cha đọc exit status — zombie; cha `wait` xong mới `release_task`. Cha chết trước → con **reparent về init** (tr. 38) — nguồn gốc kernel của câu zombie/orphan ([FILE 2 Q19](../../15_prep/technical_round/02_question_bank.md)).
 
 ### Góc interview
@@ -91,7 +91,7 @@
 1. **An ninh — pointer có thể trỏ vào kernel:** user truyền địa chỉ vùng kernel; kernel deref hộ rồi ghi kết quả về cho user = nguyên thủy đọc/ghi bộ nhớ kernel tùy ý (privilege escalation cổ điển). `copy_*_user` kiểm tra dải địa chỉ trước (`access_ok`).
 2. **Đúng đắn — trang có thể chưa/không map:** địa chỉ hợp lệ về dải nhưng trang chưa nạp (demand paging) hoặc rác → deref trần gây fault trong kernel; `copy_*_user` có **bảng exception** — fault trong nó được handler định tuyến thành trả `-EFAULT` sạch sẽ thay vì oops.
 3. **TOCTOU/SMAP:** user có thể đổi nội dung giữa hai lần đọc (copy một lần vào buffer kernel rồi mới validate — không validate tại chỗ trên bộ nhớ user); phần cứng hiện đại (SMAP/PAN trên ARM) **cấm kernel chạm bộ nhớ user tùy tiện** — copy_*_user mở cửa sổ hợp lệ có kiểm soát.
-- Hệ quả context: copy_*_user **có thể ngủ** (page fault) → cấm khi giữ spinlock/trong ISR — nối lại đúng luật của [sync-timers.md](sync-timers.md). Trả lời đủ "an ninh + fault an toàn + TOCTOU/SMAP + có thể ngủ" là trọn vẹn.
+- Hệ quả context: copy_*_user **có thể ngủ** (page fault) → cấm khi giữ spinlock/trong ISR — nối lại đúng luật của [03-sync-timers.md](03-sync-timers.md). Trả lời đủ "an ninh + fault an toàn + TOCTOU/SMAP + có thể ngủ" là trọn vẹn.
 
 </details>
 

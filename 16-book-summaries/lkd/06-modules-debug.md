@@ -1,6 +1,6 @@
 # LKD — Devices & Modules, Debugging, Portability (ch. 17 tr. 337, ch. 18 tr. 363, ch. 19 tr. 379, ch. 20 tr. 395) 🎯(ch.17)
 
-> Thuộc [LKD](README.md). Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
+> Thuộc [LKD](README.md) · **[⏮ 05 VFS/Block/Page Cache](05-vfs-block-pagecache.md)** · **⏭ (hết — file 06)** · Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### Nội dung chính
 
-**Module:** đơn vị code nạp/gỡ runtime — `module_init/module_exit`, `MODULE_LICENSE` (GPL — thiếu là "kernel tainted" + không gọi được symbol GPL-only), `EXPORT_SYMBOL[_GPL]` (module chỉ gọi được symbol đã export), tham số `module_param`, build out-of-tree bằng kbuild Makefile. (Nạp theo sự kiện: uevent → udev → modprobe theo **modalias** — đã ở [lkd/interrupts](interrupts-bottomhalves.md)/[MELP](../melp/bootloader-kernel.md).)
+**Module:** đơn vị code nạp/gỡ runtime — `module_init/module_exit`, `MODULE_LICENSE` (GPL — thiếu là "kernel tainted" + không gọi được symbol GPL-only), `EXPORT_SYMBOL[_GPL]` (module chỉ gọi được symbol đã export), tham số `module_param`, build out-of-tree bằng kbuild Makefile. (Nạp theo sự kiện: uevent → udev → modprobe theo **modalias** — đã ở [lkd/interrupts](02-interrupts-bottomhalves.md)/[MELP](../melp/bootloader-kernel.md).)
 
 **Device model — trả lời câu "cái gì đứng sau /sys":**
 - **kobject**: "object base class" của kernel — refcount + tên + vị trí trong cây; nhúng vào struct lớn hơn (`container_of` lấy ngược — idiom C phải biết); mỗi kobject = **một thư mục trong sysfs**; ktype/kset gom nhóm + định nghĩa attribute.

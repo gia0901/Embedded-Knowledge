@@ -1,6 +1,6 @@
 # LKD — Kernel Memory & Process Address Space (ch. 12 tr. 231, ch. 15 tr. 305) 🎯
 
-> Thuộc [LKD](README.md). Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
+> Thuộc [LKD](README.md) · **[⏮ 03 Sync & Timers](03-sync-timers.md)** · **[05 VFS/Block/Page Cache → ⏭](05-vfs-block-pagecache.md)** · Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
 
 ---
 
@@ -27,7 +27,7 @@
 
 **High memory (tr. 253) — ⚠️ chuyện 32-bit:** kernel 32-bit chỉ map thường trực ~896MB đầu; trang cao hơn phải `kmap/kunmap` tạm. **ARM64/x86-64: RAM map thẳng hết, HIGHMEM biến mất** — đọc để hiểu hệ 32-bit cũ (nhiều thiết bị nhúng đời trước vẫn chạy).
 
-**Per-CPU (tr. 255–259):** đã phân tích ở [sync-timers.md](sync-timers.md) — cấp phát bằng `alloc_percpu`, truy cập qua `get_cpu_var/put_cpu_var`.
+**Per-CPU (tr. 255–259):** đã phân tích ở [03-sync-timers.md](03-sync-timers.md) — cấp phát bằng `alloc_percpu`, truy cập qua `get_cpu_var/put_cpu_var`.
 
 ### Insight đáng nhớ
 

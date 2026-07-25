@@ -391,5 +391,5 @@ Sách nói thẳng (tr. 86): không có `console=` đúng thì **không thấy b
 
 - [05/device-tree.md](../../05-drivers-device-tree/device-tree.md), [05/driver-basics.md](../../05-drivers-device-tree/driver-basics.md) — nền DT/driver của repo.
 - [08/boot-process.md](../../08-embedded-systems/boot-process.md) — boot process bản cô đọng.
-- [lkd/modules-debug.md](../lkd/modules-debug.md) — bus–device–driver: phần móng của cơ chế probe.
+- [lkd/06-modules-debug.md](../lkd/06-modules-debug.md) — bus–device–driver: phần móng của cơ chế probe.
 - [OSTEP virtualization-cpu](../ostep/virtualization-cpu.md) — trap/syscall: chuyện sau khi kernel nắm quyền.

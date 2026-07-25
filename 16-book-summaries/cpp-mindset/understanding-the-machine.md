@@ -345,7 +345,7 @@ Sách cảnh báo (tr. 117): *"it is best to interfere with the usual operation 
 
 ### Insight đáng nhớ
 
-- Cụm này là **cầu nối trực tiếp giữa sách C++ này và OSTEP/MELP**: cùng virtual memory/TLB/scheduler nhưng từ góc "tôi là lập trình viên, tối ưu thế nào". 🆕 Ba đòn bẩy tương ứng ba chủ đề đã học sâu ở nơi khác: **TLB thrashing → huge pages** ([OSTEP paging](../ostep/virtualization-memory.md)), **cache nguội khi di chuyển core → CPU affinity** ([MELP debug-realtime](../melp/debug-realtime.md), [OSTEP multiprocessor](../ostep/virtualization-cpu.md)), **page size cho allocator** ([LKD memory](../lkd/memory.md) slab/per-CPU).
+- Cụm này là **cầu nối trực tiếp giữa sách C++ này và OSTEP/MELP**: cùng virtual memory/TLB/scheduler nhưng từ góc "tôi là lập trình viên, tối ưu thế nào". 🆕 Ba đòn bẩy tương ứng ba chủ đề đã học sâu ở nơi khác: **TLB thrashing → huge pages** ([OSTEP paging](../ostep/virtualization-memory.md)), **cache nguội khi di chuyển core → CPU affinity** ([MELP debug-realtime](../melp/debug-realtime.md), [OSTEP multiprocessor](../ostep/virtualization-cpu.md)), **page size cho allocator** ([LKD memory](../lkd/04-memory.md) slab/per-CPU).
 - Câu "để OS làm, đừng tự can thiệp" lặp lại 2 lần (huge pages tr. 116, affinity tr. 117) — 🆕 nhưng với **embedded realtime** thì ngược lại một phần: pin luồng điều khiển bằng affinity + `isolcpus` + hugetlbfs cho DMA là *bắt buộc*, không phải "can thiệp không cần thiết" — sự khác biệt giữa "app desktop chia sẻ máy" và "thiết bị nhúng chuyên dụng" (đúng nghề BSP của bạn).
 
 ---
@@ -407,5 +407,5 @@ Sách cảnh báo (tr. 117): *"it is best to interfere with the usual operation 
 - [algorithmic-complexity.md](algorithmic-complexity.md) — ch. 3 cụm 5 (cache/SIMD/branch) là bản mở màn của chương này; luận điểm "machine sympathy > big-O".
 - [OSTEP virtualization-memory.md](../ostep/virtualization-memory.md), [OSTEP virtualization-cpu.md](../ostep/virtualization-cpu.md) — paging/TLB/cache/multiprocessor scheduling ở tầng OS.
 - [MELP debug-realtime.md](../melp/debug-realtime.md) — CPU affinity, isolcpus, cache trong ngữ cảnh realtime embedded.
-- [LKD memory.md](../lkd/memory.md), [LKD sync-timers.md](../lkd/sync-timers.md) — per-CPU data, cache-line bouncing, slab allocator ở tầng kernel.
+- [LKD memory.md](../lkd/04-memory.md), [LKD sync-timers.md](../lkd/03-sync-timers.md) — per-CPU data, cache-line bouncing, slab allocator ở tầng kernel.
 - [EMC++ Item 40](../effective-modern-cpp.md) — `volatile` (MMIO) vs `std::atomic` (threads) — bổ sung cho phần register/memory.

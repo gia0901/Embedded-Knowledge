@@ -70,22 +70,25 @@ Nếu `ParamType` là `const T&` thì `T = int` cho cả ba (const đã nằm s�
 - `expr` là **lvalue** → `T` và ParamType đều là **lvalue reference** (`int&`) — nhờ reference collapsing (chi tiết ở Cụm 5).
 - `expr` là **rvalue** → như Case 1 (`T = int`, param `int&&`).
 
-**Case 3 — pass-by-value (`T param`):** param là **bản copy độc lập** → bỏ reference, bỏ **top-level** `const`/`volatile`:
+**Case 3 — pass-by-value (`T param`):** param là **bản copy độc lập** → reference trên bản copy không có ý nghĩa → bỏ reference. Tương tự, bỏ **top-level** `const`/`volatile`:
 
 ```cpp
 template<typename T> void f(T param);
 f(cx);  // T = int — bản copy không bị ràng buộc const của bản gốc
 
 const char* const ptr = "hello";
-f(ptr); // T = const char*  — const CỦA POINTER bị bỏ (top-level),
-        //                    const của POINTEE được giữ (không phải top-level)
+f(ptr); // T = const char*  — tính const CỦA POINTER bị bỏ (top-level),
+        //                    tính const của POINTEE (nơi trỏ đến) được giữ (không phải top-level)
 ```
 
-**Array & function decay.** Truyền array vào param by-value → decay thành pointer (`const char*`); nhưng param **by-reference** giữ nguyên kiểu array → suy ra được cả kích thước:
+**Array & function decay.** Truyền array vào param by-value → decay thành pointer (`const char*`); nhưng param **by-reference** giữ nguyên kiểu 
+**reference to array** → suy ra được cả kích thước:
 
 ```cpp
-template<typename T, std::size_t N>                 // suy ra N từ kiểu array
-constexpr std::size_t arraySize(T (&)[N]) noexcept { return N; }
+template<typename T, std::size_t N>                 // suy ra N từ kiểu array ngay từ lúc compile time
+constexpr std::size_t arraySize(T (&)[N]) noexcept {
+    return N;
+}
 
 int vals[] = {1, 3, 7, 9, 11};
 std::array<int, arraySize(vals)> mapped;            // dùng được ở compile time

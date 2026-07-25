@@ -635,7 +635,7 @@ public:
 
 ## Đọc thêm (tùy chọn — nội dung trên đã tự chứa)
 
-- [lkd/sync-timers.md](../lkd/sync-timers.md) — memory barrier trong kernel (`smp_mb`, `smp_rmb`, `smp_wmb`, `READ_ONCE`/`WRITE_ONCE`), `atomic_t`, `cmpxchg` — **cùng bài toán ordering ở tầng kernel**, ánh xạ gần với acquire/release của C++.
+- [lkd/03-sync-timers.md](../lkd/03-sync-timers.md) — memory barrier trong kernel (`smp_mb`, `smp_rmb`, `smp_wmb`, `READ_ONCE`/`WRITE_ONCE`), `atomic_t`, `cmpxchg` — **cùng bài toán ordering ở tầng kernel**, ánh xạ gần với acquire/release của C++.
 - [cpp-mindset/understanding-the-machine.md](../cpp-mindset/understanding-the-machine.md) — cache coherence (MESI), store buffer, vì sao CPU reorder — **nền phần cứng** giải thích vì sao relaxed cho kết quả "phản trực giác".
 - [ostep/concurrency.md](../ostep/concurrency.md) — spinlock từ test-and-set/CAS ở tầng OS, cùng ý tưởng Listing 5.1.
 - [EMC++ cụm 7](../effective-modern-cpp.md) — Item 40 (`std::atomic` vs `volatile` — atomic cho đồng bộ, volatile cho memory-mapped I/O, đừng nhầm).

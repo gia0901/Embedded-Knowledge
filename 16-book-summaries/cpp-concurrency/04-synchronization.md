@@ -862,7 +862,7 @@ std::thread t([sf]{ /* copy riêng */ int v = sf.get(); ... });
 - [ostep/concurrency.md](../ostep/concurrency.md) — condition variable & semaphore từ tầng OS: producer-consumer, vì sao dùng `while` không `if`, Mesa vs Hoare semantics.
 - [03-operating-system/sync-primitives.md](../../03-operating-system/sync-primitives.md) — bản cô đọng condition variable/semaphore của repo.
 - [EMC++ cụm 7](../effective-modern-cpp.md) — Item 35 (`std::async` vs `std::thread`), Item 36 (`std::launch::async` khi cần async thật), Item 38–39 (`std::future` destructor block, chờ one-shot event bằng `void` future).
-- [lkd/sync-timers.md](../lkd/sync-timers.md) — completion & wait queue trong kernel — cùng bài toán "chờ sự kiện không đốt CPU" ở tầng kernel.
+- [lkd/03-sync-timers.md](../lkd/03-sync-timers.md) — completion & wait queue trong kernel — cùng bài toán "chờ sự kiện không đốt CPU" ở tầng kernel.
 - Ch. 5 (memory model) giải thích khái niệm **synchronizes-with**/**happens-before** mà latch dùng (tr. 119); ch. 9 xây thread pool trên nền `packaged_task`.
 
 **Chương tiếp theo:** [Ch. 5 — The C++ memory model and operations on atomic types →](05-memory-model.md) 🎯🎯 (memory location & modification order, atomic types, **synchronizes-with / happens-before**, 6 `memory_order`, release sequence, fences) — công cụ **low-level** làm mọi thứ ở trên hoạt động, và là **chương giá trị interview cao nhất sách**.

@@ -1,6 +1,6 @@
 # LKD — VFS, Block Layer & Page Cache (ch. 13 tr. 261, ch. 14 tr. 289, ch. 16 tr. 323)
 
-> Thuộc [LKD](README.md). Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
+> Thuộc [LKD](README.md) · **[⏮ 04 Memory](04-memory.md)** · **[06 Devices/Modules/Debug → ⏭](06-modules-debug.md)** · Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
 > Nền lý thuyết FS (inode, journaling, đường read/write) đã ở [ostep/persistence.md](../ostep/persistence.md) — file này bổ sung **cách kernel trừu tượng hóa**: bốn object VFS, bio, writeback.
 
 ---
@@ -22,7 +22,7 @@
 
 - **Dentry cache (tr. 276)**: phân giải path (`/usr/bin/vim` = walk từng cấp, mỗi cấp một lần lookup) đắt → cache dentry (kể cả **negative dentry** — "tên này KHÔNG tồn tại", tăng tốc open fail lặp lại); dcache kéo icache theo (dentry pin inode). Đây chính là phần "slab dentry/inode phình to chiếm RAM" — cache thu hồi được, không phải leak.
 - Chuỗi liên kết khi `read(fd, ...)`: fd → `file` (của process, giữ **f_pos**) → dentry → inode → `inode->i_fop->read` của FS thật → page cache (cụm 3).
-- `files_struct` (bảng fd per-process), `fs_struct` (cwd/root), namespace (tr. 286) — cái được chia sẻ/copy theo cờ clone ([process-sched-syscalls.md](process-sched-syscalls.md)).
+- `files_struct` (bảng fd per-process), `fs_struct` (cwd/root), namespace (tr. 286) — cái được chia sẻ/copy theo cờ clone ([01-process-sched-syscalls.md](01-process-sched-syscalls.md)).
 
 ### Góc interview
 

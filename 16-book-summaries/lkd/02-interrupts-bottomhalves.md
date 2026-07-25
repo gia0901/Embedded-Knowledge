@@ -1,6 +1,6 @@
 # LKD — Interrupts & Bottom Halves (ch. 7 tr. 113, ch. 8 tr. 133) 🎯🎯
 
-> Thuộc [LKD](README.md). Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
+> Thuộc [LKD](README.md) · **[⏮ 01 Process/Sched/Syscalls](01-process-sched-syscalls.md)** · **[03 Sync & Timers → ⏭](03-sync-timers.md)** · Nguồn: kiến thức Claude, số trang đối chiếu PDF 3rd ed.
 
 ---
 
@@ -31,7 +31,7 @@ int request_irq(unsigned int irq,           // số IRQ (thời DT: platform_get
 
 **`/proc/interrupts` (tr. 126):** bảng đếm ngắt theo CPU/line/tên — công cụ chẩn đoán số một: IRQ storm (số nhảy điên), ngắt không đến (số đứng im — nghi DT/pinmux/mask), affinity lệch (dồn một CPU — chỉnh `/proc/irq/N/smp_affinity`).
 
-**Điều khiển ngắt (tr. 127–130):** `local_irq_save/restore` (tắt trên **CPU hiện tại** — bảo vệ chống chính ISR trên CPU mình, dùng theo cặp lồng nhau an toàn), `disable_irq[_nosync]/enable_irq` (tắt **một line** mọi CPU — chờ handler đang chạy xong), phân biệt với masking trong controller. Tắt local interrupt **không** bảo vệ dữ liệu khỏi CPU khác — đó là việc của spinlock ([sync-timers.md](sync-timers.md)).
+**Điều khiển ngắt (tr. 127–130):** `local_irq_save/restore` (tắt trên **CPU hiện tại** — bảo vệ chống chính ISR trên CPU mình, dùng theo cặp lồng nhau an toàn), `disable_irq[_nosync]/enable_irq` (tắt **một line** mọi CPU — chờ handler đang chạy xong), phân biệt với masking trong controller. Tắt local interrupt **không** bảo vệ dữ liệu khỏi CPU khác — đó là việc của spinlock ([03-sync-timers.md](03-sync-timers.md)).
 
 ### Insight đáng nhớ
 
@@ -50,7 +50,7 @@ int request_irq(unsigned int irq,           // số IRQ (thời DT: platform_get
 <details><summary>Đáp án</summary>
 
 - Gốc: ISR chạy trong **interrupt context** — mượn CPU, không có task đứng sau → không thể schedule (ngủ = gọi scheduler nhường CPU và chờ wake; không có task để xếp hàng/đánh thức → `scheduling while atomic`); và line ngắt đang mask → kéo dài là mất sự kiện/tăng latency cả hệ.
-- Suy ra cấm: mutex/semaphore (có thể ngủ), `kmalloc(GFP_KERNEL)` (có thể ngủ đợi reclaim), `copy_from/to_user` (có thể page fault → ngủ), msleep, mọi I/O đồng bộ. Được: spinlock (`spin_lock` — và phía process phải dùng `_irqsave` nếu chung lock, xem [sync-timers.md](sync-timers.md)), `GFP_ATOMIC`, đọc/ghi thanh ghi, wake_up, schedule bottom half.
+- Suy ra cấm: mutex/semaphore (có thể ngủ), `kmalloc(GFP_KERNEL)` (có thể ngủ đợi reclaim), `copy_from/to_user` (có thể page fault → ngủ), msleep, mọi I/O đồng bộ. Được: spinlock (`spin_lock` — và phía process phải dùng `_irqsave` nếu chung lock, xem [03-sync-timers.md](03-sync-timers.md)), `GFP_ATOMIC`, đọc/ghi thanh ghi, wake_up, schedule bottom half.
 - Stack nhỏ riêng → không mảng lớn cục bộ, không đệ quy.
 - Chốt bằng thiết kế: ISR = ack + gom tối thiểu + defer (tasklet/workqueue/threaded IRQ) — trả lời có cấu trúc "gốc → hệ quả → thiết kế" thay vì học vẹt danh sách cấm.
 
@@ -86,7 +86,7 @@ int request_irq(unsigned int irq,           // số IRQ (thời DT: platform_get
 - **softirq**: raise trong ISR → chạy tại điểm thoát interrupt; tràn việc → đẩy cho **ksoftirqd** (kernel thread per-CPU, nice thấp — tr. 146) để không chết đói userspace khi bão softirq (câu chuyện thiết kế hay: xử lý ngay thì userspace đói, để sau thì latency — ksoftirqd là thỏa hiệp "xử lý ngay *một ít*, quá thì xuống thread cạnh tranh công bằng").
 - **tasklet** = softirq đóng gói dễ dùng (TASKLET_SOFTIRQ) — `tasklet_schedule(&t)`; bảo đảm không tự chạy song song → driver đỡ lock.
 - **workqueue** = hàng việc do **kworker thread** chạy trong process context — `INIT_WORK`, `schedule_work(&w)` (queue chung), hoặc `alloc_workqueue` riêng; cần ngủ là chọn nó, hết tranh cãi (tr. 153–156).
-- Locking giữa các tầng (tr. 157): dữ liệu chung ISR↔bottom half → bottom half phải `spin_lock_irqsave`... — bảng phối đầy đủ ở [sync-timers.md](sync-timers.md); `local_bh_disable/enable` khi process context cần chặn bottom half.
+- Locking giữa các tầng (tr. 157): dữ liệu chung ISR↔bottom half → bottom half phải `spin_lock_irqsave`... — bảng phối đầy đủ ở [03-sync-timers.md](03-sync-timers.md); `local_bh_disable/enable` khi process context cần chặn bottom half.
 
 ### Insight đáng nhớ
 
@@ -119,7 +119,7 @@ int request_irq(unsigned int irq,           // số IRQ (thời DT: platform_get
 - **softirq**: cùng một softirq **chạy đồng thời trên nhiều CPU** → handler phải thiết kế reentrant: dữ liệu per-CPU hoặc spinlock tự quản — lý do chỉ network/block đủ đô dùng trực tiếp (đổi lấy scale tối đa).
 - **tasklet**: kernel bảo đảm **một tasklet không tự chạy song song** (serialized với chính nó; tasklet khác vẫn song song) → dữ liệu chỉ tasklet đó đụng thì khỏi lock; vẫn phải lock với ISR (irqsave) và với process context.
 - **workqueue**: process context, work item có thể chạy song song trên worker khác nhau (CMWQ) trừ khi ordered workqueue → lock như thread thường (mutex được).
-- Bảng "ai chen được ai" đầy đủ (kèm spin_lock_bh, local_bh_disable) ở [sync-timers.md](sync-timers.md). Nêu ⚠️ tasklet deprecated là điểm cộng thời sự.
+- Bảng "ai chen được ai" đầy đủ (kèm spin_lock_bh, local_bh_disable) ở [03-sync-timers.md](03-sync-timers.md). Nêu ⚠️ tasklet deprecated là điểm cộng thời sự.
 
 </details>
 

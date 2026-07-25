@@ -493,7 +493,7 @@ public:
 
 - [05-memory-model.md](05-memory-model.md) — **BẮT BUỘC đọc trước:** happens-before, synchronizes-with, 6 memory_order, release sequence, CAS weak/strong. Chương 7 là ứng dụng trực tiếp.
 - [06-lock-based-structures.md](06-lock-based-structures.md) — bản lock-based của stack/queue để so sánh (8 dòng vs 37 dòng lock-free).
-- [lkd/sync-timers.md](../lkd/sync-timers.md) — **RCU (Read-Copy-Update)** trong kernel — kỹ thuật reclamation lock-free tương tự hazard pointer, dùng cực nhiều trong Linux kernel.
+- [lkd/03-sync-timers.md](../lkd/03-sync-timers.md) — **RCU (Read-Copy-Update)** trong kernel — kỹ thuật reclamation lock-free tương tự hazard pointer, dùng cực nhiều trong Linux kernel.
 - [cpp-mindset/understanding-the-machine.md](../cpp-mindset/understanding-the-machine.md) — cache coherence (MESI), vì sao atomic chậm + cache ping-pong (ch. 8 sẽ đào sâu).
 - Ch. 8 (designing concurrent code) — false sharing, cache ping-pong, Amdahl's law: giải thích **vì sao** lock-free đôi khi chậm hơn lock-based.
 
