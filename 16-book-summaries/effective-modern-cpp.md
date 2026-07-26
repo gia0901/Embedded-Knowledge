@@ -56,84 +56,201 @@ f(expr);                   // compiler suy ra T VÀ ParamType từ expr
 
 > 📖 *"The type deduced for T is dependent not just on the type of `expr`, but also on the form of `ParamType`."* (tr. 9) — kiểu suy ra cho `T` **không chỉ phụ thuộc kiểu của `expr` mà còn phụ thuộc *dạng* của `ParamType`**. Đây là câu chốt của cả item: cùng một `expr`, đổi `ParamType` (`T&` → `T` → `T&&`) là ra `T` khác.
 
-**Case 1 — `ParamType` là reference/pointer (không phải universal reference):** bỏ phần reference của `expr`, rồi pattern-match phần còn lại:
+**Case 1 — `ParamType` là reference/pointer (không phải universal reference):** quy tắc 2 bước — (1) nếu `expr` là reference thì bỏ phần reference đi, (2) pattern-match phần còn lại của `expr` với `ParamType` để ra `T`.
 
 ```cpp
-template<typename T> void f(T& param);
+template<typename T>
+void f(T& param);             // param là một reference
 
-int x = 27;  const int cx = x;  const int& rx = x;
-f(x);   // T = int         → param: int&
-f(cx);  // T = const int   → param: const int&   (const được GIỮ — an toàn)
-f(rx);  // T = const int   → param: const int&   (reference-ness của rx bị bỏ)
+int x = 27;                   // x  là int
+const int cx = x;             // cx là const int
+const int& rx = x;            // rx là reference tới x (const int)
+
+f(x);    // T = int,        param kiểu int&
+f(cx);   // T = const int,  param kiểu const int&   (const được GIỮ)
+f(rx);   // T = const int,  param kiểu const int&   (bỏ reference-ness của rx, giữ const)
 ```
 
-Nếu `ParamType` là `const T&` thì `T = int` cho cả ba (const đã nằm sẵn trong ParamType).
-
-**Case 2 — `ParamType` là universal reference (`T&&`):** hành xử khác biệt duy nhất trong C++:
-- `expr` là **lvalue** → `T` và ParamType đều là **lvalue reference** (`int&`) — nhờ reference collapsing (chi tiết ở Cụm 5).
-- `expr` là **rvalue** → như Case 1 (`T = int`, param `int&&`).
-
-**Case 3 — pass-by-value (`T param`):** param là **bản copy độc lập** → reference trên bản copy không có ý nghĩa → bỏ reference. Tương tự, bỏ **top-level** `const`/`volatile`:
+Vì sao giữ `const`? Để **an toàn cho caller**: truyền một object `const` vào tham số reference thì object đó phải tiếp tục không sửa được — nên `const` trở thành một phần của `T`. Nếu đổi `ParamType` thành `const T&` thì không cần deduce `const` nữa (nó nằm sẵn trong ParamType) → `T = int` cho cả ba. Con trỏ hoạt động y hệt:
 
 ```cpp
-template<typename T> void f(T param);
-f(cx);  // T = int — bản copy không bị ràng buộc const của bản gốc
+template<typename T>
+void f(T* param);             // param là con trỏ
 
-const char* const ptr = "hello";
-f(ptr); // T = const char*  — tính const CỦA POINTER bị bỏ (top-level),
-        //                    tính const của POINTEE (nơi trỏ đến) được giữ (không phải top-level)
+int x = 27;
+const int* px = &x;           // px là con trỏ tới x (const int)
+
+f(&x);   // T = int,        param kiểu int*
+f(px);   // T = const int,  param kiểu const int*
 ```
 
-**Array & function decay.** Truyền array vào param by-value → decay thành pointer (`const char*`); nhưng dùng param **by-reference** giữ nguyên kiểu 
-**reference to array** → suy ra được cả kích thước:
+**Case 2 — `ParamType` là universal reference (`T&&`):** (universal reference = `T&&` *có deduction* — chi tiết Item 24). Đây là trường hợp **duy nhất trong C++** mà `T` được suy ra thành reference, và nó phân biệt lvalue với rvalue:
+- `expr` là **lvalue** → `T` VÀ param đều là **lvalue reference**;
+- `expr` là **rvalue** → áp quy tắc Case 1 bình thường.
 
 ```cpp
-template<typename T, std::size_t N>                 // suy ra N từ kiểu array ngay từ lúc compile time
+template<typename T>
+void f(T&& param);            // param là universal reference
+
+int x = 27;                   // x  là int
+const int cx = x;             // cx là const int
+const int& rx = x;            // rx là reference tới const int
+
+f(x);    // x  là lvalue  → T = int&,        param kiểu int&
+f(cx);   // cx là lvalue  → T = const int&,  param kiểu const int&
+f(rx);   // rx là lvalue  → T = const int&,  param kiểu const int&
+f(27);   // 27 là rvalue  → T = int,         param kiểu int&&
+```
+
+(Cơ chế lvalue → `T&` là nhờ reference collapsing, giải thích ở Item 28 / Cụm 5.)
+
+**Case 3 — pass-by-value (`T param`):** param là **bản copy hoàn toàn độc lập** với argument (một object mới). Vì là bản copy mới, khi suy ra `T` sẽ bỏ hai thứ: (1) tính reference của argument, (2) tính `const`/`volatile` ở **tầng ngoài cùng (top-level)**. Lý do trực giác: bản gốc không sửa được (const) *không nói lên gì* về việc bản copy có sửa được hay không.
+
+```cpp
+template<typename T>
+void f(T param);              // param truyền BY VALUE — là một bản copy
+
+int x = 27;                   // x  là int
+const int cx = x;             // cx là const int
+const int& rx = x;            // rx là reference tới const int
+
+f(x);    // T = int,  param kiểu int
+f(cx);   // T = int  (bỏ const) — const của cx không ràng buộc được bản copy
+f(rx);   // T = int  (bỏ cả reference lẫn const)
+```
+
+Bẫy tinh tế: **chỉ top-level const bị bỏ**, không phải mọi const. Với con trỏ có hai tầng const:
+
+```cpp
+const char* const ptr = "Fun with pointers";
+//          └─ const NÀY: bản thân con trỏ ptr là const (top-level) — không trỏ đi chỗ khác được
+//    └─ const NÀY: thứ ptr trỏ tới (chuỗi ký tự) là const (low-level) — không sửa ký tự được
+
+f(ptr);  // T = const char*
+         //  • top-level const (của CON TRỎ)        → BỎ  → param là con trỏ sửa được
+         //  • low-level const (của thứ ĐƯỢC TRỎ)   → GIỮ → vẫn không sửa được chuỗi
+```
+
+**Array & function decay.** Một array truyền **by-value** sẽ *decay* (suy biến) thành con trỏ tới phần tử đầu — mất kích thước; nhưng truyền **by-reference** thì giữ nguyên kiểu "reference to array" gồm cả `N`:
+
+```cpp
+const char name[] = "J. P. Briggs";   // kiểu của name là const char[13]
+
+template<typename T> void f(T  param);   // by value
+f(name);   // T = const char*            ← array decay thành con trỏ, MẤT kích thước
+
+template<typename T> void f(T& param);   // by reference
+f(name);   // T = const char (&)[13]     ← giữ nguyên kiểu array, BIẾT N = 13
+```
+
+Khai thác điều này: viết hàm `constexpr` lấy kích thước array **ngay lúc compile time** (không cần `sizeof`):
+
+```cpp
+template<typename T, std::size_t N>                 // N được deduce từ kiểu array
 constexpr std::size_t arraySize(T (&)[N]) noexcept {
     return N;
 }
 
 int vals[] = {1, 3, 7, 9, 11};
-std::array<int, arraySize(vals)> mapped;            // dùng được ở compile time
+std::array<int, arraySize(vals)> mapped;            // arraySize(vals) = 5, dùng được ở compile time
 ```
 
-Function types decay thành function pointer tương tự.
+Tên hàm cũng decay thành con trỏ hàm tương tự (by-value → `void(*)(...)`, by-ref → `void(&)(...)`).
 
-**Item 2 (tr. 18) — `auto` type deduction = template deduction, trừ MỘT ngoại lệ.** Khi khai báo `auto x = expr;`, `auto` đóng vai `T`, toàn bộ type specifier (`const auto&`...) đóng vai `ParamType` — "*two sides of the same coin*" (hai mặt của cùng đồng xu, tr. 21) — 3 case y hệt Item 1. Ngoại lệ duy nhất: **braced initializer**:
+**Item 2 (tr. 18) — `auto` type deduction = template deduction, trừ MỘT ngoại lệ.**
+
+**Bức tranh:** khi bạn viết `auto x = expr;`, hãy tưởng tượng có một template ngầm `template<typename T> void f(ParamType param);` và bạn gọi `f(expr)`. Trong đó `auto` đóng vai `T`, còn cả cụm type specifier (`auto`, `const auto&`, `auto&&`…) đóng vai `ParamType`. Vì thế **3 case của Item 1 áp dụng y hệt** — Meyers gọi hai cơ chế là *"two sides of the same coin"* (hai mặt của cùng đồng xu, tr. 21):
 
 ```cpp
-auto x1 = 27;      // int
-auto x2(27);       // int
-auto x3 = {27};    // std::initializer_list<int>  ← ngoại lệ!
-auto x4{27};       // sách (2014): initializer_list<int>
-                   // ⚠️ sau proposal N3922 (mọi compiler hiện đại): int
+auto        x = 27;      // Case 3 (không ptr, không ref): x  là int
+const auto  cx = x;      // Case 3:                        cx là const int
+const auto& rx = x;      // Case 1 (ref không phải universal): rx là const int&
+auto&&    uref = x;      // Case 2 (universal ref), x là lvalue → uref là int&
 ```
 
-⚠️ Sách viết trước N3922; quy tắc hiện hành: `auto x{v}` (direct-init, 1 phần tử) → kiểu của `v`; `auto x = {v}` (copy-init) → `initializer_list`. Template deduction **thất bại** với braced init (không suy ra được `T`), còn `auto` thì suy ra `initializer_list` — đây là khác biệt duy nhất.
+**Ngoại lệ DUY NHẤT — braced initializer `{ }`.** Đây là chỗ `auto` khác template. Bắt đầu từ chuyện tưởng vô hại: có 4 cách khai báo một `int` giá trị 27 (2 cách cũ C++98 + 2 cách braced C++11):
 
-Từ C++14: `auto` làm return type của hàm và `auto` trong lambda parameter dùng **template deduction** (không phải auto deduction) → `return {1, 2, 3};` trong hàm trả về `auto` là **compile error**.
+```cpp
+int x1 = 27;      int x2(27);       // C++98: cả hai là int = 27
+int x3 = { 27 };  int x4{ 27 };     // C++11 uniform init: vẫn là int = 27
+```
 
-**Item 3 (tr. 23) — `decltype` trả về đúng declared type, không bỏ gì cả.** `decltype(name)` → đúng kiểu khai báo của `name` (giữ nguyên `const`, `&`). Quy tắc đặc biệt: với **expression (lvalue) phức tạp hơn một cái tên** kiểu `T` → `decltype` trả về `T&`:
+Thay `int` → `auto`, hai dòng braced đổi nghĩa hoàn toàn:
+
+```cpp
+auto x1 = 27;     // int, value 27
+auto x2(27);      // int, value 27
+auto x3 = { 27 }; // std::initializer_list<int> chứa 1 phần tử {27}  ← khác!
+auto x4{ 27 };    // sách 2014: cũng initializer_list<int>
+```
+
+Quy tắc đặc biệt: **khi initializer nằm trong `{ }`, `auto` luôn suy ra `std::initializer_list`.** Nếu các phần tử khác kiểu (không suy ra được `T` cho `initializer_list<T>`) → lỗi compile:
+
+```cpp
+auto x5 = { 1, 2, 3.0 };   // ❌ error: không deduce được T (lẫn int và double)
+```
+
+Điểm mấu chốt phân biệt `auto` với template — cùng một `{ 11, 23, 9 }`:
+
+```cpp
+auto x = { 11, 23, 9 };            // ✅ x là std::initializer_list<int>
+
+template<typename T> void f(T param);
+f({ 11, 23, 9 });                  // ❌ error: template KHÔNG deduce được T từ braced init
+
+template<typename T> void g(std::initializer_list<T> il);
+g({ 11, 23, 9 });                  // ✅ T deduce = int (phải nói RÕ initializer_list mới được)
+```
+
+→ **Khác biệt thật sự duy nhất:** `auto` *giả định* braced init là `initializer_list`; template thì *không giả định gì* nên deduction thất bại.
+
+⚠️ **C++17 đổi hành vi `x4`:** sau proposal N3922 (mọi compiler hiện đại), `auto x{ 27 }` (direct-init, đúng 1 phần tử) → suy ra **`int`**; chỉ `auto x = { 27 }` (copy-init, có dấu `=`) mới còn ra `initializer_list<int>`.
+
+⚠️ **C++14 — `auto` return type & lambda param dùng TEMPLATE deduction, không phải auto deduction** → braced init hỏng:
+
+```cpp
+auto createList() { return { 1, 2, 3 }; }   // ❌ error: return type deduce như template
+auto reset = [&v](const auto& x) { v = x; };
+reset({ 1, 2, 3 });                          // ❌ error: param auto deduce như template
+```
+
+**Item 3 (tr. 23) — `decltype` trả về đúng declared type, không bỏ gì cả.**
+
+**Bức tranh:** khác với `auto`/template deduction (hay *gọt bỏ* reference và top-level const), `decltype(expr)` cho ra **đúng kiểu khai báo** của `expr`, giữ nguyên `const` và `&`. Đây là công cụ khi bạn cần lấy chính xác kiểu của một biểu thức để dùng lại (nhất là kiểu trả về của hàm generic).
+
+```cpp
+const int  ci = 0;
+decltype(ci);      // const int         — giữ const
+std::vector<int> v;
+decltype(v[0]);    // int&              — operator[] trả int&, giữ luôn reference
+```
+
+**Quy tắc "bẫy" cần nhớ:** `decltype(name)` cho kiểu của cái tên; nhưng `decltype(expr)` với `expr` là **lvalue phức tạp hơn một cái tên** (kể cả `(name)` có ngoặc) → thêm `&`:
 
 ```cpp
 int x = 0;
-decltype(x)    // int      — x là name
-decltype((x))  // int&     — (x) là lvalue expression, không phải name!
+decltype(x);       // int      — x là một cái tên
+decltype((x));     // int&     — (x) là lvalue EXPRESSION, không còn là cái tên → thêm &
 ```
 
-Ứng dụng chính: viết hàm trả về đúng kiểu mà `operator[]` của container trả về (thường là `T&`, nhưng `vector<bool>` thì không — Item 6):
+**Ứng dụng chính — `decltype(auto)` (C++14).** Vấn đề: viết hàm generic trả về giá trị `c[i]` của container. `operator[]` thường trả `T&` (sửa được), nhưng nếu return type khai `auto` thì auto deduction **bỏ mất reference** → trả về **bản copy**, gán vào không được:
 
 ```cpp
 template<typename Container, typename Index>
-decltype(auto) authAndAccess(Container&& c, Index i) {  // C++14
+auto badAccess(Container& c, Index i) { return c[i]; }   // auto → BỎ &, trả copy
+// badAccess(d, 5) = 10;   ❌ không compile: gán vào một bản tạm
+
+template<typename Container, typename Index>
+decltype(auto) authAndAccess(Container&& c, Index i) {   // C++14
     authenticateUser();
-    return std::forward<Container>(c)[i];   // giữ nguyên reference-ness của c[i]
+    return std::forward<Container>(c)[i];   // decltype(auto): deduce theo quy tắc decltype → GIỮ T&
 }
+// authAndAccess(d, 5) = 10;   ✅ OK
 ```
 
-Nếu dùng `auto` thường làm return type → template deduction **bỏ mất reference** → trả về bản copy → `authAndAccess(d, 5) = 10;` không compile. `decltype(auto)` = "deduce theo quy tắc decltype".
+`decltype(auto)` nghĩa là "suy ra kiểu, nhưng **dùng quy tắc `decltype`** (giữ nguyên) thay vì quy tắc `auto` (gọt bỏ)". (`Container&&` là universal reference để nhận cả lvalue lẫn rvalue container — Item 24/25.)
 
-⚠️ Bẫy kinh điển: trong hàm trả về `decltype(auto)`, viết `return x;` trả về `int`, nhưng `return (x);` trả về `int&` — **reference tới biến local** → UB.
+⚠️ Bẫy kinh điển sinh ra từ quy tắc `(name)` ở trên: trong hàm trả về `decltype(auto)`, `return x;` trả `int`, nhưng `return (x);` trả `int&` — **reference tới biến local** → **dangling → UB**.
 
 ### Insight đáng nhớ
 
@@ -360,13 +477,29 @@ Phần phụ của item: **member function reference qualifiers** — overload t
 ```cpp
 class Widget {
 public:
-    std::vector<int>& data() &  { return values; }             // gọi trên lvalue
-    std::vector<int>  data() && { return std::move(values); }  // gọi trên rvalue → move ra
+    std::vector<int>& data() &  { return values; }             // gọi khi *this là lvalue → trả reference
+    std::vector<int>  data() && { return std::move(values); }  // gọi khi *this là rvalue → move ra
+private:
+    std::vector<int> values;
 };
-auto vals = makeWidget().data();   // dùng bản && → move, không copy
+
+Widget makeWidget();               // factory: trả Widget (một rvalue)
+
+Widget w;
+auto v1 = w.data();                // w là lvalue  → gọi data() &  → COPY values
+auto v2 = makeWidget().data();     // temp là rvalue → gọi data() && → MOVE, không copy
 ```
 
-**Item 13 (tr. 86) — Ưu tiên `const_iterator`:** C++11 làm nó thực dụng: `cbegin()/cend()`, các hàm `insert/erase` nhận `const_iterator`. Trong code generic dùng non-member `std::begin/std::end` (C++14 thêm `std::cbegin/std::cend`). Quy tắc cũ "dùng const bất cứ khi nào có thể" áp dụng cho cả iterator.
+**Item 13 (tr. 86) — Ưu tiên `const_iterator`:** `const_iterator` là bản STL của "con trỏ tới const" (chỉ được đọc, không sửa phần tử). Quy tắc "dùng `const` bất cứ khi nào có thể" áp dụng cho cả iterator — nhưng C++98 dùng nó rất vướng, C++11 mới làm thực dụng: có `cbegin()/cend()`, và `insert/erase` nhận `const_iterator`:
+
+```cpp
+std::vector<int> values{ 1000, 1983, 2011 };
+
+auto it = std::find(values.cbegin(), values.cend(), 1983);  // cbegin/cend → const_iterator
+values.insert(it, 1998);   // C++11: insert nhận const_iterator (C++98 thì không → rất vướng)
+```
+
+Trong code generic, ưu tiên non-member `std::begin/std::end` (và `std::cbegin/std::cend` từ C++14) thay cho member `.cbegin()` — chạy được với cả mảng C và kiểu không có member function.
 
 **Item 14 (tr. 90) — `noexcept` là một phần của interface, và là đòn bẩy tối ưu.** Câu chốt: *"`noexcept` is part of a function's interface, and … callers may depend on it."* (tr. 96) — `noexcept` **là một phần interface**, caller được quyền dựa vào nó (nên gỡ nó sau này là phá interface).
 - Với hàm `noexcept`, compiler **không cần giữ stack ở trạng thái unwindable** → code gọn hơn. Nếu exception thoát ra khỏi hàm `noexcept` → `std::terminate` (không unwind).
@@ -376,11 +509,48 @@ auto vals = makeWidget().data();   // dùng bản && → move, không copy
 - Chỉ khai `noexcept` khi cam kết **lâu dài** — gỡ `noexcept` sau này là phá interface. Phù hợp tự nhiên với hàm "wide contract" (không tiền điều kiện).
 
 **Item 15 (tr. 97) — `constexpr` = "có thể tính lúc compile time".**
-- `constexpr` **object**: hằng compile-time thực thụ, dùng được ở nơi cần constant expression (kích thước array, non-type template argument, enumerator...). Mạnh hơn `const`: `const` chỉ hứa "không đổi", không hứa "biết lúc compile".
-- `constexpr` **function**: gọi với toàn argument compile-time → kết quả compile-time; gọi với runtime value → chạy như hàm thường. **Một hàm phục vụ cả hai thế giới** → mở rộng vùng code có thể "dời" sang compile time (embedded: dời tính toán từ runtime sang lúc build, tiết kiệm CPU/RAM).
-- C++11 giới hạn body = 1 câu `return`; **C++14 nới**: cho phép loop, biến local, nhiều statement; member function `constexpr` C++14 không còn ngầm `const`.
-- Literal type (kể cả class có `constexpr` constructor) dùng được với `constexpr`.
-- Cũng là cam kết interface: bỏ `constexpr` đi là phá client đang dùng ở compile-time context.
+
+**`constexpr` object** = hằng biết ngay lúc biên dịch — mạnh hơn `const` (vốn chỉ hứa "không đổi", không hứa "biết lúc compile"). Dùng được ở nơi *bắt buộc* là constant expression: kích thước array, non-type template argument, enumerator…
+
+**`constexpr` function** = hàm "hai thế giới": gọi với argument biết-lúc-compile → kết quả tính **ngay lúc compile**; gọi với giá trị runtime → chạy như hàm thường:
+
+```cpp
+constexpr int pow(int base, int exp) noexcept {   // C++14 (C++11 phải viết đệ quy 1 dòng return)
+    auto result = 1;
+    for (int i = 0; i < exp; ++i) result *= base;
+    return result;
+}
+
+constexpr auto n = 3;
+std::array<int, pow(3, n)> arr;   // pow(3,3)=27 tính LÚC COMPILE → dùng làm kích thước array
+
+int base = readFromUser();        // giá trị runtime
+auto x = pow(base, n);            // cùng hàm đó, giờ chạy LÚC RUNTIME
+```
+
+**Literal type** — kể cả class tự định nghĩa cũng `constexpr` được, nếu constructor/getter là `constexpr`:
+
+```cpp
+class Point {
+public:
+    constexpr Point(double x = 0, double y = 0) noexcept : x(x), y(y) {}
+    constexpr double xValue() const noexcept { return x; }
+    constexpr double yValue() const noexcept { return y; }
+    void setX(double nx) noexcept { x = nx; }   // setter KHÔNG constexpr (C++11: sửa object)
+private:
+    double x, y;
+};
+
+constexpr Point p1(9.4, 27.7);    // "chạy" constructor NGAY lúc compile
+constexpr Point p2(28.8, 5.3);
+
+constexpr Point midpoint(const Point& a, const Point& b) noexcept {
+    return { (a.xValue() + b.xValue()) / 2, (a.yValue() + b.yValue()) / 2 };
+}
+constexpr auto mid = midpoint(p1, p2);   // cả object mid nằm trong READ-ONLY MEMORY!
+```
+
+Ý nghĩa (đắt cho embedded): *"some computations traditionally done at runtime can migrate to compile time. The more code taking part in the migration, the faster your software will run"* (tr. 100) — **dời tính toán từ runtime sang compile time** → chạy nhanh hơn, tiết kiệm CPU/RAM (đổi lại compile lâu hơn). C++14 nới `constexpr` function (cho loop, biến local, nhiều câu lệnh); member `constexpr` C++14 không còn ngầm `const`. Lưu ý: `constexpr` cũng là **cam kết interface** — bỏ nó đi là phá client đang dùng ở compile-time context.
 
 **Item 16 (tr. 103) — Hàm member `const` phải an toàn cho concurrent read.** Quy ước hậu C++11: `const` = "đọc" → nhiều thread gọi hàm `const` đồng thời **không cần lock** là kỳ vọng hợp lý. Nhưng `mutable` cache phá vỡ điều đó:
 
@@ -830,6 +1000,8 @@ public:
     template<typename T>
     void setName(T&& newName)                  // universal ref → giữ nguyên "tính chất" gốc
         { name = std::forward<T>(newName); }   // lvalue vào → copy; rvalue vào → move
+private:
+    std::string name;
 };
 ```
 
@@ -1085,7 +1257,27 @@ auto fVariadic = [](auto&&... params) {
 };
 ```
 
-**Item 34 (tr. 232) — Lambda thay cho `std::bind`.** Lambda thắng ở mọi mặt đáng kể: dễ đọc hơn, inline được (bind gọi qua function pointer → khó inline), và bind có các bẫy ngữ nghĩa: argument được **đánh giá tại thời điểm gọi bind** hay khi gọi callable? (ví dụ `steady_clock::now() + 1h` bị chốt sớm); tên hàm overload phải cast tay; mọi argument truyền by-reference ngầm khó thấy. C++14 trở đi: gần như không còn lý do dùng bind (use case cuối cùng của C++11 — move capture và polymorphic call — đều được C++14 giải quyết).
+**Item 34 (tr. 232) — Lambda thay cho `std::bind`.** `std::bind` (kế thừa từ C++98 `bind1st/bind2nd`) tạo một callable bằng cách "dán sẵn" một số argument. Lambda thắng nó ở mọi mặt. Ví dụ xương sống của sách: `setAlarm` cần một hàm mới chỉ nhận `Sound`, còn thời điểm (sau 1 giờ) và thời lượng (30 giây) cố định:
+
+```cpp
+void setAlarm(Time t, Sound s, Duration d);
+
+// Cách LAMBDA — rõ ràng:
+auto setSoundL = [](Sound s) {
+    using namespace std::chrono; using namespace std::literals;
+    setAlarm(steady_clock::now() + 1h, s, 30s);   // "now()+1h" tính KHI gọi setSoundL — đúng ý
+};
+
+// Cách BIND — có bẫy:
+using namespace std::placeholders;                // cho "_1"
+auto setSoundB = std::bind(setAlarm,
+                           steady_clock::now() + 1h,   // ⚠️ SAI: tính NGAY lúc gọi bind,
+                           _1,                          //    không phải lúc gọi setSoundB
+                           30s);
+// → báo thức kêu "1 giờ sau khi bind", không phải "1 giờ sau khi setSoundB". `_1` = chỗ trống cho arg thứ nhất.
+```
+
+Ba điểm lambda thắng: (1) **đọc hiểu ngay** — `bind` phải đọc ngược lên khai báo `setAlarm` để biết `_1` là kiểu gì; (2) **đánh giá đúng lúc** — với bind phải bọc thêm `std::bind(std::plus<>(), steady_clock::now(), 1h)` để hoãn tính; (3) **inline được** (bind gọi gián tiếp qua con trỏ hàm → khó inline). Từ C++14, hai use case cuối của bind (move-capture, gọi polymorphic) đều đã có lời giải bằng lambda → **gần như không còn lý do dùng `std::bind`**.
 
 ### Insight đáng nhớ
 
