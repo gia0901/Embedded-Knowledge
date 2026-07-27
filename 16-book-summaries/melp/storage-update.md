@@ -1,15 +1,16 @@
-# MELP — Storage trên Flash & Cập nhật ngoài hiện trường (ch. 9–10) 🎯🎯
+# MELP — Storage trên Flash & Cập nhật ngoài hiện trường (ch. 7) 🎯🎯
 
-> Thuộc [MELP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
+> Thuộc [MELP](README.md). **Nguồn: đã đối chiếu PDF** (1st ed 2015). Trong bản 2015, storage là **Chapter 7 "Storage Strategies"** (tr. 159–195) — không phải ch. 9–10. Số trang `(tr. X)` theo bản PDF này.
+> ⚠️ **Ranh giới sách/🆕:** phần **storage (Cụm 1)** bám sát sách (MTD/UBI/UBIFS/F2FS/read-only rootfs — tr. 159–191). Nhưng **"Updating in the field" trong sách 2015 chỉ vỏn vẹn tr. 192–195** (rất ngắn, chưa có A/B framework chín); nên **gần như toàn bộ Cụm 2** (A/B anti-brick chain, bootcount+watchdog, RAUC/Mender/SWUpdate, anti-rollback, health-check commit) là **🆕 kiến thức OTA hiện đại** — giữ vì giá trị phỏng vấn 🎯🎯 cao, nhưng không phải nội dung sách 2015.
 > Cụm "sống còn" thứ hai của BSP: chọn sai storage/update là sản phẩm chết ngoài hiện trường — interviewer BSP giàu kinh nghiệm gần như chắc chắn hỏi mảng này.
 
 ---
 
-## Cụm 1 — Storage: NOR/NAND thô, MTD/UBI vs eMMC (ch. 9) 🎯
+## Cụm 1 — Storage: NOR/NAND thô, MTD/UBI vs eMMC (ch. 7, tr. 159–191) 🎯
 
 ### Nội dung chính
 
-**Phân loại phần cứng — quyết định toàn bộ software stack phía trên:**
+**Phân loại phần cứng — quyết định toàn bộ software stack phía trên** (NOR tr. 160, NAND tr. 161, Managed flash/eMMC tr. 164):
 
 | | NOR flash | NAND thô (raw) | eMMC / SD |
 |---|---|---|---|
@@ -18,17 +19,17 @@
 | Stack phần mềm | MTD → JFFS2/UBI | MTD → **UBI → UBIFS** | Block → ext4/f2fs |
 | Dùng cho | Bootloader, env, config nhỏ | Thiết bị tối ưu giá | Đại đa số thiết bị hiện đại |
 
-**MTD (Memory Technology Device)** = lớp trừu tượng của kernel cho flash **thô** (không phải block device! — erase block lớn, ghi phải erase trước, có bad block): phân vùng khai trong **DT** (hoặc cmdline `mtdparts=`), lộ ra `/dev/mtdN` (char) + `/dev/mtdblockN`.
+**MTD (Memory Technology Device)** (§"Accessing flash memory from Linux", tr. 166; MTD partitions tr. 167, `mtd` char device tr. 171, `mtdblock` tr. 172) = lớp trừu tượng của kernel cho flash **thô** (không phải block device! — erase block lớn, ghi phải erase trước, có bad block): phân vùng khai trong **DT** (hoặc cmdline `mtdparts=`), lộ ra `/dev/mtdN` (char) + `/dev/mtdblockN`.
 
-**UBI/UBIFS** — cặp chuẩn cho NAND thô:
+**UBI/UBIFS** (tr. 179–182) — cặp chuẩn cho NAND thô:
 - **UBI** (ở trên MTD, dưới FS): quản lý **wear leveling toàn partition**, **bad block**, ánh xạ *logical erase block → physical* (giống LVM cho flash); chia **volume**.
 - **UBIFS** (trên UBI): filesystem journaling, nén, power-cut tolerant — thay thế JFFS2 (mount chậm, scale kém).
 - Phân biệt hay bị hỏi: **JFFS2/UBIFS chạy trên flash thô; ext4/f2fs chạy trên block device (eMMC)** — đặt UBIFS lên eMMC hay ext4 lên NAND thô đều là **sai loại** (eMMC giấu mất geometry flash; NAND thô không có FTL cho block FS).
-- **f2fs**: FS thiết kế cho FTL-device (eMMC/SD) — ghi kiểu log-structured hợp FTL ([OSTEP persistence](../ostep/persistence.md) cụm LFS/FTL là nền lý thuyết).
+- **f2fs** (tr. 187): FS thiết kế cho FTL-device (eMMC/SD) — ghi kiểu log-structured hợp FTL. Sách (2015) mô tả f2fs do Samsung viết, merge mainline 3.8, còn *"marked experimental"* (tr. 187) — 🆕 nay f2fs đã ổn định và phổ biến (Android dùng rộng). ([OSTEP persistence](../ostep/persistence.md) cụm LFS/FTL là nền lý thuyết.)
 
 **eMMC — chi tiết BSP cần biết:** ngoài user area còn **2 boot partition** phần cứng (`/dev/mmcblkNboot0/1` — ROM code nhiều SoC đọc SPL/bootloader từ đây) + **RPMB** (replay-protected — lưu secure data); reliable write; `mmc` utils đọc health/life-time estimate. SD card công nghiệp vs tiêu dùng: khác biệt thật về power-loss và endurance.
 
-**Ba nguyên tắc thiết kế partition của sách:** (1) tách **hệ điều hành (read-only)** khỏi **dữ liệu (read-write)** — rootfs mount **RO** + partition data riêng (RO rootfs = không thể hỏng do power cut, tiền đề update sạch); (2) bootloader/env ở vùng ổn định nhất; (3) chừa chỗ cho update (cụm 2).
+**Nguyên tắc thiết kế partition** (§"Making the root filesystem read-only", tr. 190; read-only compressed FS tr. 188): (1) tách **hệ điều hành (read-only)** khỏi **dữ liệu (read-write)** — rootfs mount **RO** + partition data riêng (RO rootfs = không thể hỏng do power cut, tiền đề update sạch); 🆕 (2) bootloader/env ở vùng ổn định nhất; (3) chừa chỗ cho update (cụm 2).
 
 ### Insight đáng nhớ
 
@@ -64,9 +65,11 @@
 
 ---
 
-## Cụm 2 — Software Update ngoài hiện trường: A/B, atomic, chống brick (ch. 10) 🎯🎯
+## Cụm 2 — Software Update ngoài hiện trường: A/B, atomic, chống brick (ch. 7, "Updating in the field" tr. 192–195) 🎯🎯
 
 ### Nội dung chính
+
+> ⚠️ **Phần lớn cụm này là 🆕 (ngoài sách 2015):** "Updating in the field" trong sách chỉ **4 trang (tr. 192–195)**, mới nêu *ý tưởng* A/B + cần atomic/rollback, chưa có framework chín. Toàn bộ chi tiết A/B anti-brick chain, `bootcount`+watchdog, RAUC/Mender/SWUpdate, anti-rollback version counter, health-check-then-commit dưới đây là **kiến thức OTA hiện đại** — 3rd ed (2021) mới có hẳn chương "Updating Software in the Field". Giữ vì giá trị phỏng vấn 🎯🎯.
 
 **Bài toán:** thiết bị ở nơi không ai chạm tới, update **có thể mất điện/mất mạng giữa chừng, ảnh có thể hỏng, phiên bản mới có thể có bug** — mọi kịch bản đều **không được tạo ra cục gạch (brick)**. Yêu cầu rút thành 3 chữ: **atomic** (chạy bản cũ hoặc bản mới trọn vẹn, không bao giờ nửa nạc nửa mỡ), **robust** (fail thì tự lành), **secure** (chỉ nhận ảnh có chữ ký).
 

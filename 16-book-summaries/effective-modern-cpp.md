@@ -917,8 +917,8 @@ Fix: B → A đổi thành weak_ptr:
 - `shared_ptr<T>(new T)`: **2 lần cấp phát** — một cho T, một cho control block. `make_shared<T>`: **1 lần** cho khối gộp [T | control block] → nhanh hơn, locality tốt hơn, ít fragmentation (đáng kể trên embedded heap nhỏ).
 
 ```
-new + shared_ptr:   [ T ]        [ control block ]     ← 2 malloc, 2 vùng rời
-make_shared:        [ T | control block ]              ← 1 malloc
+new + shared_ptr:   [ T ] + [ control block ]   ← 2 malloc, 2 vùng rời
+make_shared:        [ T | control block ]       ← 1 malloc
 ```
 
 - Kèm lợi ích exception safety: `f(shared_ptr<T>(new T), g())` — C++11/14 cho phép xen kẽ đánh giá, `g()` ném giữa `new` và constructor shared_ptr → leak; `make_shared` gói kín.

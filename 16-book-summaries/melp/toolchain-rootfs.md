@@ -1,6 +1,6 @@
 # MELP — Toolchain & Root Filesystem (ch. 1–2, 5) 🎯
 
-> Thuộc [MELP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
+> Thuộc [MELP](README.md). **Nguồn: đã đối chiếu PDF** (1st ed 2015) — số trang `(tr. X)` theo bản PDF này. **Quy ước:** không đánh dấu = có trong sách · **🆕 = bổ sung ngoài sách** (kiến thức BSP hiện đại 2015 chưa có) · **⚠️ = sách lỗi thời ở điểm đó**.
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### Nội dung chính
 
-**Bốn thành phần của mọi hệ Embedded Linux** (khung của cả cuốn sách): toolchain → bootloader → kernel → root filesystem. Toolchain đứng đầu vì mọi thứ khác được build bằng nó.
+**Bốn thành phần của mọi hệ Embedded Linux** (§"The four elements of embedded Linux", tr. 5) — khung của cả cuốn sách: **toolchain → bootloader → kernel → root filesystem**. Sách: *"Every project begins by obtaining, customizing, and deploying these four elements"* (tr. 5). Toolchain đứng đầu vì mọi thứ khác được build bằng nó.
 
 **Toolchain gồm:** compiler (gcc/clang) + binutils (as, ld, objcopy, objdump...) + **C library** + headers kernel + debugger. **Tuple** định danh mục tiêu: `<arch>-<vendor>-<kernel>-<os/abi>`:
 
@@ -20,7 +20,7 @@ arm-none-eabi              → ARM bare-metal (không Linux — cho MCU/bootload
 
 - **Cross vs native**: build trên host x86 cho target ARM — vì target quá yếu/không tự build được; hệ quả là mọi rắc rối "build tìm thư viện của host thay vì target".
 - **sysroot** — khái niệm trung tâm: cây thư mục chứa **headers + thư viện CỦA TARGET** (`/usr/include`, `/lib`, `/usr/lib`); compiler cross tìm mọi thứ trong sysroot (`--sysroot=`, `-print-sysroot`). Lỗi kinh điển: link nhầm `.so` của host (x86) vào binary ARM → "file in wrong format"; hoặc build system tự ý lấy `/usr/include` của host → compile được, chạy sai.
-- **Chọn C library** — câu trade-off hay gặp:
+- **Chọn C library** (tr. 18) — câu trade-off hay gặp. Sách định vị vai trò libc: *"The C library is the gateway to the kernel for applications"* (tr. 18) — mọi chương trình (kể cả Java/Python) cuối cùng đều gọi qua libc để vào syscall:
 
 | | glibc | musl | uclibc-ng |
 |---|---|---|---|
@@ -28,6 +28,8 @@ arm-none-eabi              → ARM bare-metal (không Linux — cho MCU/bootload
 | Tương thích | Chuẩn de-facto, mọi phần mềm | Rất tốt, đôi khi vá | Kha khá |
 | Đặc điểm | NSS, locale đầy đủ, hiệu năng tốt | Sạch, static linking tốt, license MIT | Cấu hình được từng tính năng |
 | Chọn khi | RAM/flash thoải mái (mặc định) | Hệ nhỏ, container, static | Hệ rất nhỏ kiểu cũ |
+
+> ⚠️ **Sách 2015 đã cũ ở mục này:** sách liệt kê **eglibc** như một lựa chọn riêng — nhưng eglibc **đã merge trở lại glibc từ 2.20** (sách cũng ghi nhận điều này) nên **không còn tồn tại**; và với **musl**, tác giả viết thẳng *"I have no experience of musl libc"* (tr. 18) — musl khi đó còn mới. 🆕 Nay musl là lựa chọn chủ đạo cho hệ nhỏ/static/container (Alpine Linux), nên bảng trên phản ánh thực tế hiện đại chứ không phải khuyến nghị 2015 của sách.
 
 - Nguồn toolchain: vendor SDK, distro (`gcc-aarch64-linux-gnu`), **crosstool-NG** (tự build, kiểm soát trọn), hoặc **để Yocto/Buildroot tự build** (chuẩn nhất cho sản phẩm — toolchain khớp chính xác libc/kernel headers của image).
 - Build lib/app có dependency: `pkg-config` với `PKG_CONFIG_SYSROOT_DIR`, autotools `./configure --host=aarch64-linux-gnu`, CMake **toolchain file** (`CMAKE_TOOLCHAIN_FILE` — set compiler, sysroot, `CMAKE_FIND_ROOT_PATH_MODE_*` để "chỉ tìm trong sysroot") — nối thẳng [06/cmake.md](../../06-build-systems/cmake.md), [06/cross-compilation.md](../../06-build-systems/cross-compilation.md).
@@ -84,7 +86,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)    # headers → CHỈ trong sysroot
 
 ### Nội dung chính
 
-**Rootfs tối thiểu để boot đến shell** — hiểu từng mảnh để không "cargo cult":
+**Rootfs tối thiểu để boot đến shell** (§"What should be in the root filesystem?", tr. 96) — hiểu từng mảnh để không "cargo cult". Sách liệt kê tối thiểu cần: **init, shell, daemons, libraries, configuration files, device nodes, /proc & /sys, kernel modules** (tr. 96):
 
 ```
 /
@@ -101,7 +103,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)    # headers → CHỈ trong sysroot
 └── tmp, run, var        ← tmpfs
 ```
 
-- **Ai là PID 1**: kernel chạy `init=` (mặc định thử `/sbin/init` → `/bin/sh`...) — chương trình đầu tiên và duy nhất kernel đích thân khởi động; mọi thứ còn lại do init đẻ ra. Init chết = kernel panic.
+- **Ai là PID 1**: kernel chạy `init=` (mặc định thử `/sbin/init` → `/bin/sh`...) — chương trình đầu tiên và duy nhất kernel đích thân khởi động; mọi thứ còn lại do init đẻ ra. Init chết = kernel panic. Sách nêu cả biến thể cực đoan (tr. 96): gộp toàn hệ vào **một binary static** chạy thay init — `init=/myprog` trong kernel command line (tác giả nói chỉ gặp cấu hình này đúng một lần).
 - **Quyền sở hữu file khi build**: tạo rootfs trên host bằng user thường → file thuộc uid 1000 — sai; giải pháp **fakeroot** (giả syscall chown/chmod trong user space) hoặc để Buildroot/Yocto lo (họ dùng fakeroot/pseudo bên trong).
 - **Boot phục vụ phát triển — hai vũ khí năng suất:**
   - **NFS root**: `root=/dev/nfs nfsroot=<ip>:/path ip=dhcp` — rootfs nằm trên host, sửa file **thấy ngay trên board không cần flash lại** (chu kỳ dev nhanh gấp bội);

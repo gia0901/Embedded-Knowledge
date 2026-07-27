@@ -1,7 +1,7 @@
 # OSTEP — Phần II: Concurrency (ch. 26–33)
 
-> Thuộc [OSTEP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
-> Crux của phần này: *nhiều luồng thực thi đan xen trên dữ liệu chung — làm sao xây các nguyên thủy đồng bộ (lock, condition variable, semaphore) đúng VÀ hiệu quả, từ hỗ trợ tối thiểu của phần cứng?*
+> Thuộc [OSTEP](README.md). **Nguồn: đọc trực tiếp PDF** (v1.01, ostep.org). OSTEP đánh số trang lại mỗi chương → trích theo **§chương.mục**; số chương đã đối chiếu PDF.
+> Crux của phần này (§26, THE CRUX) — nguyên văn: *"how can we build a correctly working program? What primitives are needed from the OS? What mechanisms should be provided by the hardware?"* — nhiều luồng đan xen trên dữ liệu chung, làm sao xây nguyên thủy đồng bộ (lock, condition variable, semaphore) **đúng VÀ hiệu quả** từ hỗ trợ tối thiểu của phần cứng?
 
 ---
 
@@ -77,7 +77,9 @@ pthread_cond_wait(&cv, &m); pthread_cond_signal(&cv);   // cụm 3
 
 ### Nội dung chính
 
-**Tiêu chí đánh giá một lock:** (1) **mutual exclusion** — đúng đã; (2) **fairness** — có thread đói không; (3) **performance** — chi phí khi không tranh chấp / tranh chấp trên 1 CPU / nhiều CPU.
+**Crux (§28, THE CRUX):** *"How can we build an efficient lock? … using what support from the hardware? What support from the OS?"*
+
+**Tiêu chí đánh giá một lock (§28.2):** (1) **mutual exclusion** — đúng đã; (2) **fairness** — có thread đói không; (3) **performance** — chi phí khi không tranh chấp / tranh chấp trên 1 CPU / nhiều CPU.
 
 **Chuỗi xây dựng — vì sao cần phần cứng:**
 - **Tắt interrupt**: chỉ chạy được trên 1 CPU, trao cho user quyền quá lớn, miss interrupt — chỉ hợp trong kernel cho đoạn cực ngắn.
@@ -143,6 +145,8 @@ void unlock(lock_t *l) { l->flag = 0; }
 ## Cụm 3 — Condition Variables (ch. 30) 🎯
 
 ### Nội dung chính
+
+**Crux (§30, THE CRUX):** *"How to wait for a condition?"* — spin chờ điều kiện thì *"grossly inefficient and wastes CPU cycles, and in some cases, can be incorrect"* (§30).
 
 **Bài toán:** thread cần **chờ một điều kiện** (con đã xong, buffer có hàng...). Spin-check cờ thì đốt CPU → cần cơ chế **ngủ cho tới khi được báo**: condition variable = **hàng đợi các thread đang chờ**, với `wait(cv, mutex)` và `signal(cv)`/`broadcast(cv)`.
 
@@ -238,6 +242,8 @@ Item consume() {
 
 ### Nội dung chính
 
+**Crux (§31, THE CRUX):** *"How can we use semaphores instead of locks and condition variables? … a single primitive for all things related to synchronization?"*
+
 **Semaphore = một số nguyên + hai thao tác atomic** (Dijkstra): `sem_wait` (P) — giảm 1, **âm thì ngủ**; `sem_post` (V) — tăng 1, có kẻ ngủ thì đánh thức một. Giá trị khởi tạo là toàn bộ "tính cách": 
 
 | Khởi tạo | Vai trò |
@@ -278,6 +284,8 @@ Giống nhau ở mức "cho 1 kẻ qua", khác nhau ở **hợp đồng**:
 ## Cụm 5 — Concurrency Bugs (ch. 32) 🎯
 
 ### Nội dung chính
+
+**Crux (§32, THE CRUX):** *"How to handle common concurrency bugs? … What types of bugs exist? How can we avoid them?"*
 
 Nghiên cứu thực nghiệm (Lu et al. — khảo sát bug 4 app lớn: MySQL, Apache, Mozilla, OpenOffice): **đa số bug concurrency KHÔNG phải deadlock** (~2/3 là non-deadlock), và non-deadlock quy về 2 mẫu:
 

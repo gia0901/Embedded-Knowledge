@@ -1,6 +1,6 @@
 # Operating Systems: Three Easy Pieces (OSTEP) — Remzi & Andrea Arpaci-Dusseau (bản online v1.x, ostep.org)
 
-> **Nguồn summary:** kiến thức Claude, chưa đối chiếu PDF. Số chương theo bản online chính thức (v1.00+); ⚠️ số chương có thể lệch ±1 giữa các bản — sẽ chốt khi đối chiếu PDF.
+> **Nguồn summary:** **đọc trực tiếp PDF** `OperatingSystems_ThreeEasyPieces_v1_0.pdf` (v1.01, ostep.org) — trích nguyên văn "the crux" + câu đắt của tác giả (dịch kèm), mỗi ý neo **§chương.mục**. ⚠️ OSTEP **đánh số trang lại từ đầu mỗi chương** (không có trang liên tục cả sách) → trích theo **§chương.mục** (vd §4.1) là ổn định nhất; kèm "tr. Y trong ch. X" khi cần. **Số chương đã đối chiếu PDF v1.01 — khớp.**
 > **Vì sao đọc cuốn này:** giáo trình OS hay nhất để hiểu *bản chất* — mỗi chương xuất phát từ một câu hỏi ("the crux") rồi xây giải pháp từng bước như người thiết kế OS thật. Khớp gần 1:1 với topic 03 và là nền lý thuyết cho topic 04, 05. Sách miễn phí hợp pháp tại ostep.org.
 
 ---

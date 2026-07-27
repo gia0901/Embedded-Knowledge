@@ -1,7 +1,7 @@
 # OSTEP — Phần III: Persistence (ch. 36–45, lướt 48–50)
 
-> Thuộc [OSTEP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
-> Crux của phần này: *dữ liệu phải đúng và còn nguyên sau khi mất điện — trên thiết bị chậm hơn RAM hàng nghìn lần và có thể hỏng nửa chừng khi đang ghi.*
+> Thuộc [OSTEP](README.md). **Nguồn: đọc trực tiếp PDF** (v1.01, ostep.org). OSTEP đánh số trang lại mỗi chương → trích theo **§chương.mục**; số chương đã đối chiếu PDF.
+> Crux của phần này (§36/§39, THE CRUX) — nguyên văn: *"How to store data persistently? … What techniques are needed to do so correctly?"* — dữ liệu phải đúng và còn nguyên sau mất điện, trên thiết bị chậm hơn RAM hàng nghìn lần và có thể hỏng nửa chừng khi đang ghi.
 
 ---
 
@@ -9,7 +9,7 @@
 
 ### Nội dung chính
 
-**Giao tiếp thiết bị (ch. 36).** Device = interface (registers: status/command/data) + internals. Hệ thống nói chuyện với device qua hai cách: **explicit I/O instructions** (x86 `in/out`) hoặc **memory-mapped I/O** — thanh ghi map vào address space, đọc/ghi như bộ nhớ (chuẩn mực trên ARM/embedded — chính là chỗ `volatile` sống, xem [EMC++ Item 40](../effective-modern-cpp.md)).
+**Giao tiếp thiết bị (§36).** Crux §36 (THE CRUX): *"How to integrate I/O into systems? What are the general mechanisms? How can we make them efficient?"* Device = interface (registers: status/command/data) + internals. Hệ thống nói chuyện với device qua hai cách: **explicit I/O instructions** (x86 `in/out`) hoặc **memory-mapped I/O** — thanh ghi map vào address space, đọc/ghi như bộ nhớ (chuẩn mực trên ARM/embedded — chính là chỗ `volatile` sống, xem [EMC++ Item 40](../effective-modern-cpp.md)).
 
 Chuỗi tiến hóa hiệu quả — mỗi bước bớt lãng phí CPU:
 1. **Polling**: CPU quay vòng đọc status chờ device xong — phí CPU khi device chậm.
@@ -85,6 +85,8 @@ Parity = XOR các block cùng stripe; mất một đĩa → khôi phục bằng 
 
 ### Nội dung chính
 
+**Crux (§39, THE CRUX):** *"How should we store data persistently? What APIs are needed? What are the important aspects of the implementation?"*
+
 Hai trừu tượng của storage ảo hóa: **file** (mảng byte, tên thật là **inode number**) và **directory** (danh sách cặp `(tên người đọc được, inode number)` — bản thân directory cũng là file). Từ đó cây tên `/foo/bar` chỉ là chuỗi tra cặp qua từng cấp.
 
 Điểm API đáng chú ý (phần lớn repo 04 đã kỹ — đây là các ý *vì sao* của sách):
@@ -126,6 +128,8 @@ Hai trừu tượng của storage ảo hóa: **file** (mảng byte, tên thật 
 ## Cụm 4 — File System Implementation: vsfs (ch. 40) 🎯
 
 ### Nội dung chính
+
+**Crux (§40, THE CRUX):** *"How to implement a simple file system? What structures are needed on disk? What do they track? How are they accessed?"*
 
 vsfs (very simple FS) — mô hình tối giản mang cấu trúc của ext2. **Bố cục on-disk** (đĩa chia block 4KB):
 
@@ -203,9 +207,9 @@ Mỗi cấp path = ≥2 lần đọc (inode + data) — path dài, thư mục l�
 
 ### Nội dung chính
 
-**FFS (ch. 41) — "disk awareness":** FS đời đầu vứt inode một đầu, data một đầu → mỗi lần đọc file là seek xuyên đĩa. FFS chia đĩa thành **cylinder/block group**, giữ **inode + data + bitmap của nhau ở gần nhau**; chính sách: file cùng directory → cùng group; directory mới → group vắng. Ngoại lệ file lớn: rải mỗi vài MB sang group khác (amortize seek — không cho một file nuốt trọn group). Di sản: mọi FS hiện đại (ext4 block groups) vẫn là con cháu tư tưởng "đặt gần thứ dùng cùng nhau".
+**FFS (§41) — "disk awareness":** Crux §41 (THE CRUX): *"How to reduce file system I/O costs?"* — FS đời đầu vứt inode một đầu, data một đầu → mỗi lần đọc file là seek xuyên đĩa. FFS chia đĩa thành **cylinder/block group**, giữ **inode + data + bitmap của nhau ở gần nhau**; chính sách: file cùng directory → cùng group; directory mới → group vắng. Ngoại lệ file lớn: rải mỗi vài MB sang group khác (amortize seek — không cho một file nuốt trọn group). Di sản: mọi FS hiện đại (ext4 block groups) vẫn là con cháu tư tưởng "đặt gần thứ dùng cùng nhau".
 
-**Crash consistency (ch. 42) — chương đắt nhất phần này.** Ví dụ chuẩn: append 1 block vào file = ghi **3 thứ**: data bitmap (B), inode (I), data block (D). Mất điện giữa chừng — xét từng tổ hợp ghi được 1/3, 2/3:
+**Crash consistency (§42) — chương đắt nhất phần này.** Crux §42 (THE CRUX): *"How to update the disk despite crashes? … how can we ensure the file system keeps the on-disk image in a reasonable state?"* Ví dụ chuẩn: append 1 block vào file = ghi **3 thứ**: data bitmap (B), inode (I), data block (D). Mất điện giữa chừng — xét từng tổ hợp ghi được 1/3, 2/3:
 
 | Ghi được | Hậu quả |
 |---|---|

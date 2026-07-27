@@ -1,11 +1,12 @@
-# MELP — Build Systems: Buildroot & Yocto (ch. 6–8) 🎯
+# MELP — Build Systems: Buildroot & Yocto (ch. 6) 🎯
 
-> Thuộc [MELP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
+> Thuộc [MELP](README.md). **Nguồn: đã đối chiếu PDF** (1st ed 2015). Trong bản 2015, **cả Buildroot lẫn Yocto nằm gọn trong Chapter 6 "Selecting a Build System"** (tr. 129; mục Yocto tr. 141) — không phải ch. 6–8. Số trang `(tr. X)` theo bản PDF này.
+> ⚠️ **Chương này của sách 2015 rất ngắn và đã cũ**: phần lớn chi tiết Yocto trong file (devtool, eSDK, sstate chia sẻ CI, cve-check/SPDX, kiến trúc layer nhiều tầng, meta-BSP vendor) là **🆕 kiến thức Yocto hiện đại** — sách 2015 mới ở mức giới thiệu bitbake/recipe/layer cơ bản. Giữ nội dung hiện đại vì giá trị phỏng vấn cao, nhưng hiểu rõ đâu là của sách đâu là 🆕.
 > Hầu hết công ty làm BSP dùng Yocto — cụm này gần như chắc chắn được hỏi ở mức "bạn đã dùng đến đâu".
 
 ---
 
-## Cụm 1 — Vì sao cần build system; Buildroot (ch. 6)
+## Cụm 1 — Vì sao cần build system; Buildroot (ch. 6, tr. 129)
 
 ### Nội dung chính
 
@@ -48,9 +49,11 @@ Build tay 4 thành phần (toolchain, bootloader, kernel, rootfs) không tái l�
 
 ---
 
-## Cụm 2 — Yocto Project: khái niệm cốt lõi (ch. 7–8) 🎯
+## Cụm 2 — Yocto Project: khái niệm cốt lõi (ch. 6, mục "The Yocto Project" tr. 141) 🎯
 
 ### Nội dung chính
+
+> ⚠️ **Ranh giới sách/🆕:** sách 2015 (tr. 141+) giới thiệu **bitbake, recipe (.bb), layer, MACHINE/DISTRO/image recipe** ở mức cơ bản — các mục đó dưới đây là **của sách**. Còn **`.bbappend` như cơ chế tùy biến chuẩn, sstate cache chia sẻ CI, `devtool`/`bitbake -e` workflow, eSDK, meta-BSP vendor nhiều tầng** là **🆕 Yocto hiện đại** (bổ sung ngoài sách 2015).
 
 **Bộ từ vựng bắt buộc** (phỏng vấn kiểm tra bằng chính các từ này):
 

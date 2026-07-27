@@ -1,11 +1,11 @@
-# MELP — Debug, Profiling & Real-Time (ch. 16–21)
+# MELP — Debug, Profiling & Real-Time (ch. 10–14)
 
-> Thuộc [MELP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
-> Ch. 16 (Packaging Python) bỏ qua có chủ đích — ngoài trọng tâm BSP/C++. Ch. 17–18 (process/thread, memory) lướt vì trùng [OSTEP](../ostep/README.md) + topic 03/04. Trọng tâm file này: **debug từ xa, tracing, và PREEMPT_RT 🎯**.
+> Thuộc [MELP](README.md). **Nguồn: đã đối chiếu PDF** (1st ed 2015). Trong bản 2015: **ch. 10 Processes/Threads** (tr. 247), **ch. 11 Managing Memory** (tr. 273), **ch. 12 Debugging with GDB** (tr. 295), **ch. 13 Profiling and Tracing** (tr. 323), **ch. 14 Real-time Programming** (tr. 353) — là **năm chương cuối** của bản 2015. Số trang `(tr. X)` theo bản PDF này.
+> Ch. 10–11 (process/thread, memory) lướt vì trùng [OSTEP](../ostep/README.md) + topic 03/04. Trọng tâm file này: **debug từ xa (ch. 12), tracing (ch. 13), và PREEMPT_RT (ch. 14) 🎯**. ⚠️ Vài chi tiết hiện đại (PREEMPT_RT mainline ~6.12, eBPF/bcc, libgpiod...) là **🆕** — sách 2015 mô tả PREEMPT_RT còn là **patch ngoài cây** (§"Getting the PREEMPT_RT patches", tr. 362).
 
 ---
 
-## Cụm 1 — Process/Thread & Memory trên thiết bị (ch. 17–18) — lướt có chủ đích
+## Cụm 1 — Process/Thread & Memory trên thiết bị (ch. 10–11, tr. 247, 273) — lướt có chủ đích
 
 ### Nội dung chính (chỉ phần góc nhìn embedded, phần lý thuyết xem OSTEP)
 
@@ -26,7 +26,7 @@
 
 ---
 
-## Cụm 2 — Debug từ xa với GDB (ch. 19) 🎯
+## Cụm 2 — Debug từ xa với GDB (ch. 12, tr. 295) 🎯
 
 ### Nội dung chính
 
@@ -69,11 +69,11 @@ gdbserver :10000 ./app     ◄─TCP─►    aarch64-linux-gnu-gdb ./app-CÓ-SY
 
 ---
 
-## Cụm 3 — Profiling & Tracing (ch. 20)
+## Cụm 3 — Profiling & Tracing (ch. 13, tr. 323)
 
 ### Nội dung chính
 
-Nguyên tắc sách: **"đo trước, đoán sau"** — và chọn công cụ theo tầng câu hỏi:
+Nguyên tắc sách: **"đo trước, đoán sau"** — và chọn công cụ theo tầng câu hỏi (sách: top tr. 325, **perf** tr. 327–332, **Ftrace** tr. 337, LTTng tr. 344, **Valgrind** tr. 347). 🆕 eBPF/bcc là bổ sung ngoài sách 2015:
 
 | Câu hỏi | Công cụ |
 |---|---|
@@ -115,11 +115,11 @@ Nguyên tắc sách: **"đo trước, đoán sau"** — và chọn công cụ th
 
 ---
 
-## Cụm 4 — Real-Time: PREEMPT_RT & thiết kế ứng dụng RT (ch. 21) 🎯
+## Cụm 4 — Real-Time: PREEMPT_RT & thiết kế ứng dụng RT (ch. 14, tr. 353) 🎯
 
 ### Nội dung chính
 
-**Định nghĩa đúng:** real-time = **deterministic** (deadline được đảm bảo/chặn trên), không phải "nhanh" — hệ RT có thể *chậm hơn* về throughput; thứ cần tối thiểu hóa là **latency đuôi (worst-case)**, không phải trung bình.
+**Định nghĩa đúng** (§"What is real-time?", tr. 353): real-time = **deterministic** (deadline được đảm bảo/chặn trên), không phải "nhanh" — hệ RT có thể *chậm hơn* về throughput; thứ cần tối thiểu hóa là **latency đuôi (worst-case)**, không phải trung bình.
 
 **Nguồn latency từ ngắt tới handler ứng dụng — chuỗi phải kể được:**
 
@@ -130,7 +130,7 @@ sự kiện phần cứng → [IRQ latency: ngắt bị mask bao lâu]
 → wakeup task RT → [chạy: cache/TLB nguội, page fault nếu chưa mlock]
 ```
 
-**PREEMPT_RT** (patch lịch sử, các phần chính đã **mainline ~6.12** ⚠️) — biến kernel thành preemptible gần như mọi nơi:
+**PREEMPT_RT** (§"The real-time Linux kernel (PREEMPT_RT)", tr. 359) — biến kernel thành preemptible gần như mọi nơi. ⚠️ Sách 2015 lấy patch qua §"Getting the PREEMPT_RT patches" (tr. 362) vì **còn ngoài cây**; 🆕 nay các phần chính đã **mainline (~6.12)**:
 - **Spinlock → sleeping lock (rt_mutex)** trong hầu hết kernel: đoạn giữ lock không còn tắt preemption → task RT chen được;
 - **Hầu hết IRQ handler → threaded** (kernel thread có priority — RT task quan trọng hơn cả "ngắt" thường);
 - Priority inheritance rộng rãi; tick/timer độ phân giải cao.
@@ -140,7 +140,7 @@ sự kiện phần cứng → [IRQ latency: ngắt bị mask bao lâu]
 
 **Checklist ứng dụng RT trên Linux** (đây là phần dùng hằng ngày):
 1. `SCHED_FIFO` priority hợp lý (**không phải 99** — chừa chỗ cho threaded IRQ quan trọng hơn; và cẩn thận RT throttling `sched_rt_runtime_us`);
-2. **`mlockall(MCL_CURRENT|MCL_FUTURE)`** + pre-fault stack/heap (chạm trước các trang) — cấm page fault trong đường RT;
+2. **`mlockall(MCL_CURRENT|MCL_FUTURE)`** + pre-fault stack/heap (chạm trước các trang) — cấm page fault trong đường RT (§"Avoiding page faults in a real-time application", tr. 364);
 3. Mutex dùng **PI** (`PTHREAD_PRIO_INHERIT`) — chống priority inversion;
 4. **Cấm** trong vòng RT: malloc (khóa + có thể mmap/page fault), I/O đồng bộ, log ra flash, syscall không chặn trên xác định — pre-allocate tất cả, giao tiếp với phần non-RT qua **lock-free ring buffer**;
 5. Cách ly: `isolcpus`/`cpuset` + IRQ affinity dồn core khác + `nohz_full` — core RT sạch nhiễu;

@@ -1,13 +1,15 @@
-# MELP — Driver Interface, Init & Power Management (ch. 11–15) 🎯
+# MELP — Driver Interface, Init & Power Management (ch. 8–9 + Power 🆕) 🎯
 
-> Thuộc [MELP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
-> Ch. 12 (prototyping với breakout board) chỉ lấy vài ý — phần "tay to" của nó nằm luôn trong cụm 1.
+> Thuộc [MELP](README.md). **Nguồn: đã đối chiếu PDF** (1st ed 2015). Trong bản 2015: **ch. 8 = Device Drivers** (tr. 197), **ch. 9 = Starting up – the init program** (tr. 229). Số trang `(tr. X)` theo bản PDF này.
+> ⚠️ **Ranh giới sách/🆕:** (1) sách 2015 dạy char driver **cơ bản** — các API hiện đại trong khung platform driver dưới đây (**`devm_*` managed resources, `request_threaded_irq`, `-EPROBE_DEFER`, `libgpiod`, `of_match_table`/DT matching kiểu mới**) phần lớn là **🆕**; (2) **1st ed KHÔNG có chương Power Management** → **toàn bộ Cụm 3 (cpufreq/cpuidle/runtime PM/suspend) là 🆕** (3rd ed 2021 mới thêm chương "Managing Power"). Giữ vì giá trị phỏng vấn cao.
 
 ---
 
-## Cụm 1 — Giao tiếp driver từ userspace & viết module (ch. 11–12) 🎯
+## Cụm 1 — Giao tiếp driver từ userspace & viết module (ch. 8, tr. 197) 🎯
 
 ### Nội dung chính
+
+> ⚠️ Sách 2015 (ch. 8) trình bày **char device interface** (tr. 216), **platform data** (tr. 223), **linking hardware với driver qua DT** (tr. 224) ở mức nền. Khung platform driver dưới đây dùng **API hiện đại (🆕):** `devm_*`, `request_threaded_irq`, `-EPROBE_DEFER`, `of_match_table`, `libgpiod`.
 
 **Bốn cửa từ userspace vào kernel/phần cứng** — chọn đúng cửa là câu hỏi thiết kế:
 
@@ -81,11 +83,11 @@ module_platform_driver(mydev_driver);
 
 ---
 
-## Cụm 2 — Init: PID 1 và các dòng họ (ch. 13–14)
+## Cụm 2 — Init: PID 1 và các dòng họ (ch. 9, tr. 229)
 
 ### Nội dung chính
 
-Ba lựa chọn init và trade-off (câu hỏi chọn-và-biện-luận):
+Ba lựa chọn init và trade-off (câu hỏi chọn-và-biện-luận) — sách trình bày đúng ba dòng này: **BusyBox init** (tr. 231), **System V init** (tr. 233), **systemd** (tr. 239):
 
 | | BusyBox init | System V | systemd |
 |---|---|---|---|
@@ -120,7 +122,9 @@ Ba lựa chọn init và trade-off (câu hỏi chọn-và-biện-luận):
 
 ---
 
-## Cụm 3 — Power Management (ch. 15)
+## Cụm 3 — Power Management (🆕 — ngoài sách 1st ed 2015)
+
+> 🆕 **Toàn bộ cụm này là bổ sung ngoài sách:** MELP **1st edition (2015) KHÔNG có chương Power Management** (3rd ed 2021 mới thêm chương "Managing Power"). Giữ lại vì là mảng phỏng vấn BSP giá trị — nhưng cần biết đây là kiến thức PM Linux hiện đại, không phải nội dung sách bản này.
 
 ### Nội dung chính
 

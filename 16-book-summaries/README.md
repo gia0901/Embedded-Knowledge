@@ -108,8 +108,8 @@
 | Sách | Trạng thái | Ghi chú |
 |------|-----------|---------|
 | Effective Modern C++ — Scott Meyers | ✅ Xong; **đã đối chiếu PDF** | Đủ 8 cụm / 42 items; mỗi Item neo số trang thật (trang sách = trang PDF − 18) + trích nguyên văn "câu đắt" của Meyers, dịch kèm |
-| Operating Systems: Three Easy Pieces (OSTEP) — Arpaci-Dusseau | ✅ Xong (chưa đối chiếu PDF) | Thư mục `ostep/`: README + 4 file (CPU, Memory, Concurrency, Persistence) |
-| Mastering Embedded Linux Programming — Simmonds (**1st ed 2015** — PDF người học) | ✅ Xong; **ch. 3–4 đã đối chiếu sâu toàn văn** | Thư mục `melp/`: README + 6 file; `bootloader-kernel.md` đối chiếu sâu + số trang thật; các file khác kiến thức + mục lục, đánh dấu 🆕 phần ngoài sách |
+| Operating Systems: Three Easy Pieces (OSTEP) — Arpaci-Dusseau | ✅ Xong; **đã đối chiếu PDF** | Thư mục `ostep/`: README + 4 file (CPU, Memory, Concurrency, Persistence). Số chương verify khớp PDF v1.01; neo theo **§chương.mục** (OSTEP đánh trang lại mỗi chương) + trích nguyên văn "THE CRUX" mỗi cụm |
+| Mastering Embedded Linux Programming — Simmonds (**1st ed 2015** — PDF người học) | ✅ Xong; **cả 6 file đã đối chiếu PDF** | Thư mục `melp/`: README + 6 file; `bootloader-kernel.md` đối chiếu sâu toàn văn; 5 file còn lại đã neo số trang thật + sửa số chương (bản cũ ghi nhầm chương của 3rd ed) + đánh dấu 🆕 rõ phần ngoài sách 2015 (Yocto hiện đại, OTA A/B, Power Management, PREEMPT_RT mainline) |
 | Linux Kernel Development — Robert Love (3rd ed) | ✅ Xong (đối chiếu mục lục + số trang PDF) | Thư mục `lkd/`: README + 6 file; mỗi cụm có mục "⚠️ Đã thay đổi so với sách" cập nhật kernel ~6.x |
 | LDD3 / Bootlin materials | ⬜ Chưa bắt đầu | Ưu tiên 3 (BSP): đọc chọn lọc char driver, interrupt, DMA; Bootlin slides miễn phí cập nhật hơn |
 | The C++ Programmer's Mindset — Sam Morley (Packt 2025) | 🟡 Đang viết | Thư mục `cpp-mindset/`: sách MỚI (sau cutoff) → đọc 100% từ PDF; **Phần 1 (ch. 1–6) ✅ xong**, còn ch. 7–15 (dự án + scale/GPU/perf) |

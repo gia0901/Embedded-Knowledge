@@ -1,7 +1,7 @@
 # OSTEP — Phần I: Virtualization (CPU) (ch. 4–10)
 
-> Thuộc [OSTEP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
-> Crux của phần này: *làm sao tạo ảo giác mỗi process có CPU riêng, trong khi CPU vật lý chỉ có vài cái — mà vẫn giữ hiệu năng và giữ quyền kiểm soát?*
+> Thuộc [OSTEP](README.md). **Nguồn: đọc trực tiếp PDF** (v1.01, ostep.org). OSTEP đánh số trang lại mỗi chương → trích theo **§chương.mục**; số chương đã đối chiếu PDF.
+> Crux của phần này (§4, THE CRUX) — nguyên văn: *"How can the OS provide the illusion of a nearly-endless supply of said CPUs?"* — **làm sao tạo ảo giác gần như vô hạn CPU** trong khi chỉ có vài CPU vật lý, mà vẫn giữ hiệu năng và quyền kiểm soát?
 
 ---
 
@@ -25,7 +25,7 @@
 
 Insight quan trọng: process **BLOCKED không tốn CPU** — chính nhờ chuyển sang blocked khi chờ I/O mà OS overlap được I/O với tính toán của process khác. OS lưu mỗi process trong **PCB (process control block)** — chứa register context (để khôi phục khi context switch), state, PID, danh sách file mở...
 
-**Process API của UNIX — bộ ba `fork()/exec()/wait()` (ch. 5):**
+**Process API của UNIX — bộ ba `fork()/exec()/wait()` (§5).** Crux §5 (THE CRUX): *"What interfaces should the OS present for process creation and control?"*
 
 ```c
 pid_t rc = fork();               // NHÂN ĐÔI process hiện tại
@@ -97,7 +97,7 @@ if (fork() == 0) {
 
 ### Nội dung chính
 
-**Crux:** chạy nhanh → phải chạy **trực tiếp trên CPU thật** (direct execution); nhưng chạy trực tiếp thì OS làm sao (1) **ngăn process làm bậy**, (2) **lấy lại CPU** để chia cho process khác? Giải pháp = direct execution + **giới hạn** (limited) bằng hai cơ chế phần cứng.
+**Crux (§6, THE CRUX)** — nguyên văn: *"How to efficiently virtualize the CPU with control?"* và tách thành hai câu con: *"How To Perform Restricted Operations"* (§6.2) + *"How To Regain Control Of The CPU"* (§6.3). Tức: chạy nhanh → phải chạy **trực tiếp trên CPU thật** (direct execution); nhưng chạy trực tiếp thì OS làm sao (1) **ngăn process làm bậy**, (2) **lấy lại CPU** để chia cho process khác? Giải pháp = direct execution + **giới hạn** (limited) bằng hai cơ chế phần cứng.
 
 **Cơ chế 1 — hai mode CPU + trap.** CPU có **user mode** (lệnh đặc quyền bị cấm: truy cập I/O, sửa bảng trang...) và **kernel mode** (làm được tất). Process chạy user mode; cần việc đặc quyền → **system call**:
 
@@ -176,7 +176,9 @@ Câu hỏi kinh điển sách nêu: *interrupt đang xử lý mà interrupt khá
 
 ### Nội dung chính
 
-**Hai họ metric xung đột (ch. 7):**
+**Crux (§7, THE CRUX)** — nguyên văn: *"How should we develop a basic framework for thinking about scheduling policies? What are the key assumptions? What metrics are important?"* Điểm khởi đầu là hai metric xung đột.
+
+**Hai họ metric xung đột (§7.3–7.4):**
 - **Turnaround time** = T_hoànthành − T_đến — đo hiệu quả cho batch/throughput.
 - **Response time** = T_lầnđầuchạy − T_đến — đo tương tác (interactive).
 
@@ -270,7 +272,7 @@ MLFQ xấp xỉ SJF **không cần tiên tri** — nó *quan sát hành vi* (dù
 
 ### Nội dung chính
 
-Đa CPU đặt thêm hai vấn đề mà scheduler đơn CPU không có:
+**Crux (§10, THE CRUX):** *"How to schedule jobs on multiple CPUs? … How can we take the lessons learned in single-CPU scheduling and apply them?"* Đa CPU đặt thêm hai vấn đề mà scheduler đơn CPU không có:
 
 1. **Cache coherence & affinity:** mỗi CPU có cache riêng; process chạy trên CPU A đã "làm nóng" cache A — schedule nó sang CPU B là chạy nguội (mọi truy cập bắn xuống memory). Phần cứng lo **coherence** (giao thức bus snooping/MESI — cache các CPU thấy giá trị nhất quán), nhưng **affinity** (giữ process ở CPU quen) là việc của scheduler.
 2. **Đồng bộ chính scheduler:** hàng đợi chung là cấu trúc dữ liệu bị nhiều CPU truy cập → cần lock → nghẽn khi nhiều core.

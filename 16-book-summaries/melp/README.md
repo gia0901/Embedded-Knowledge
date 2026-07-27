@@ -1,6 +1,6 @@
 # Mastering Embedded Linux Programming — Chris Simmonds (1st edition, 2015)
 
-> **Nguồn summary:** ⚠️ **PDF của người học là 1st edition (2015, 14 chương)** — không phải 3rd edition (2021) như giả định ban đầu. Trạng thái đối chiếu từng file ghi trong bảng dưới; số trang `(tr. X)` trong các file **đã đối chiếu** là theo đúng bản PDF này (`/home/gia/Desktop/Books/Mastering Embedded Linux Programming.pdf`).
+> **Nguồn summary: đã đối chiếu PDF toàn bộ 6 file** — PDF của người học là **1st edition (2015, 14 chương)**, không phải 3rd edition (2021). Mọi số trang `(tr. X)` theo đúng bản PDF này (`/home/gia/Desktop/Books/Mastering Embedded Linux Programming.pdf`). Số chương trong các file đã sửa khớp 1st ed; nội dung vượt ra ngoài sách 2015 (Yocto hiện đại, OTA A/B, Power Management, PREEMPT_RT mainline...) được đánh **🆕** rõ trong từng file.
 > **Vì sao đọc cuốn này:** "giáo trình BSP" sát nhất — đi trọn chuỗi toolchain → bootloader → kernel → rootfs → build system → storage → driver → init → debug/RT, đúng phạm vi công việc và phỏng vấn của vị trí **Embedded Software Engineer (BSP)**.
 > **Quy ước trong các file:** nội dung không đánh dấu = có trong sách; **🆕 = bổ sung ngoài sách** (kiến thức hiện đại 2015 chưa có — TF-A/secure boot, FIT chi tiết, EPROBE_DEFER, earlycon, OTA framework, Yocto hiện đại...); **⚠️ = sách lỗi thời ở điểm đó.**
 
@@ -30,12 +30,12 @@ Xây một hệ Embedded Linux từ con số 0 quanh **bốn thành phần** (tr
 
 | File | Chương 1st ed (trang) | 🎯 BSP | Trạng thái đối chiếu |
 |------|----------------------|--------|----------------------|
-| [toolchain-rootfs.md](toolchain-rootfs.md) | 1 (tr. 1), 2 Toolchains (tr. 13), 5 Root Filesystem (tr. 95) | 🎯 | Kiến thức + mục lục |
+| [toolchain-rootfs.md](toolchain-rootfs.md) | 1 (tr. 1), 2 Toolchains (tr. 13), 5 Root Filesystem (tr. 95) | 🎯 | ✅ **Đã đối chiếu PDF** (neo trang + ⚠️ musl/eglibc) |
 | [bootloader-kernel.md](bootloader-kernel.md) | **3 Bootloaders + Device Tree (tr. 41), 4 Kernel (tr. 69)** | 🎯🎯 | ✅ **ĐÃ ĐỐI CHIẾU SÂU toàn văn** |
-| [build-systems.md](build-systems.md) | 6 Build System: Buildroot + Yocto (tr. 129) | 🎯 | Kiến thức + mục lục (Yocto trong file theo bản hiện đại — sách 2015 đã cũ nhiều ở chương này) |
-| [storage-update.md](storage-update.md) | 7 Storage Strategy (tr. 159; "Updating in the field" chỉ có tr. 192–195) | 🎯🎯 | Kiến thức + mục lục; phần OTA/A-B framework chủ yếu là 🆕 ngoài sách (1st ed nói rất ngắn) |
-| [drivers-init-power.md](drivers-init-power.md) | 8 Device Drivers (tr. 197), 9 Init (tr. 229); **power: 1st ed KHÔNG có chương này** → phần power là 🆕 | 🎯 | Kiến thức + mục lục |
-| [debug-realtime.md](debug-realtime.md) | 10 Processes/Threads (tr. 247), 11 Memory (tr. 273), 12 GDB (tr. 295), 13 Profiling/Tracing, 14 Real-Time | RT 🎯 | Kiến thức + mục lục |
+| [build-systems.md](build-systems.md) | 6 Build System: Buildroot + Yocto (tr. 129; Yocto tr. 141) | 🎯 | ✅ **Đã đối chiếu PDF**; chi tiết Yocto hiện đại đánh 🆕 rõ (sách 2015 rất ngắn) |
+| [storage-update.md](storage-update.md) | 7 Storage Strategy (tr. 159; "Updating in the field" chỉ có tr. 192–195) | 🎯🎯 | ✅ **Đã đối chiếu PDF**; storage neo tr. 159–191, cụm update phần lớn 🆕 (1st ed nói rất ngắn) |
+| [drivers-init-power.md](drivers-init-power.md) | 8 Device Drivers (tr. 197), 9 Init (tr. 229); **power: 1st ed KHÔNG có chương này** → phần power là 🆕 | 🎯 | ✅ **Đã đối chiếu PDF**; init neo tr. 231/233/239, power = 🆕 toàn bộ |
+| [debug-realtime.md](debug-realtime.md) | 10 Processes/Threads (tr. 247), 11 Memory (tr. 273), 12 GDB (tr. 295), 13 Profiling/Tracing (tr. 323), 14 Real-Time (tr. 353) | RT 🎯 | ✅ **Đã đối chiếu PDF**; sửa số chương (bản cũ ghi nhầm 16–21 của 3rd ed) |
 
 > Ghi chú edition: 3rd edition (2021) thêm hẳn các chương Yocto sâu, "Updating Software in the Field" (OTA đầy đủ), "Managing Power" — nội dung tương ứng trong các file trên vẫn giữ (giá trị phỏng vấn cao) nhưng được hiểu là 🆕 so với PDF 1st ed đang có. Nếu sau này có PDF 3rd ed, chỉ cần đối chiếu bổ sung các file đó.
 

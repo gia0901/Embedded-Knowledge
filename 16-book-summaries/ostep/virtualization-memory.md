@@ -1,7 +1,7 @@
 # OSTEP — Phần I: Virtualization (Memory) (ch. 13–24)
 
-> Thuộc [OSTEP](README.md). **Nguồn:** kiến thức Claude, chưa đối chiếu PDF.
-> Crux của phần này: *làm sao cho mỗi process ảo giác "toàn bộ bộ nhớ là của mình, liền mạch từ 0" — trong khi RAM vật lý chung, ít, và phân mảnh — mà mỗi truy cập vẫn nhanh?*
+> Thuộc [OSTEP](README.md). **Nguồn: đọc trực tiếp PDF** (v1.01, ostep.org). OSTEP đánh số trang lại mỗi chương → trích theo **§chương.mục**; số chương đã đối chiếu PDF.
+> Crux của phần này (§13, THE CRUX) — nguyên văn: *"How can the OS build this abstraction of a private, potentially large address space for multiple running processes (all sharing memory) on top of a single, physical memory?"* — mỗi process ảo giác **address space riêng, liền mạch từ 0**, trong khi RAM vật lý chung/ít/phân mảnh, mà mỗi truy cập vẫn nhanh (§15, THE CRUX: *"How to efficiently and flexibly virtualize memory?"*).
 
 ---
 
@@ -85,7 +85,7 @@
 
 ### Nội dung chính
 
-Vấn đề của mọi allocator kích thước biến thiên (malloc, OS quản lý segment): quản lý **free list** thế nào để nhanh + ít phân mảnh.
+**Crux (§17, THE CRUX):** *"How should free space be managed, when satisfying variable-sized requests?"* Vấn đề của mọi allocator kích thước biến thiên (malloc, OS quản lý segment): quản lý **free list** thế nào để nhanh + ít phân mảnh.
 
 **Cơ chế nền:**
 - **Splitting**: cấp 1 byte từ khối 10 byte → cắt đôi, trả 1, giữ 9.
@@ -129,7 +129,7 @@ Nâng cao: **segregated lists** (mỗi size phổ biến một list riêng — s
 
 ### Nội dung chính
 
-**Paging (ch. 18):** chia address space ảo thành **page** kích thước cố định (4KB điển hình), RAM vật lý thành **page frame** cùng cỡ; ánh xạ page → frame **tùy ý** qua **page table** (mỗi process một bảng). Hết external fragmentation (mọi khối bằng nhau), cấp phát đơn giản (free list các frame), address space thưa thớt thoải mái.
+**Paging (§18):** chia address space ảo thành **page** kích thước cố định (4KB điển hình), RAM vật lý thành **page frame** cùng cỡ; ánh xạ page → frame **tùy ý** qua **page table** (mỗi process một bảng). Hết external fragmentation (mọi khối bằng nhau), cấp phát đơn giản (free list các frame), address space thưa thớt thoải mái.
 
 **Dịch địa chỉ:** virtual address = [**VPN** (virtual page number) | **offset**]:
 
@@ -150,7 +150,7 @@ PA:                     [ PFN        ][ offset ]
 
 Vấn đề sinh đôi của paging: (1) bảng **to** (2²⁰ entry × 4B = 4MB *mỗi process* cho 32-bit — cụm 5 xử lý); (2) **chậm** — mỗi truy cập bộ nhớ cần thêm ≥1 lần đọc page table trong RAM → TLB xử lý.
 
-**TLB (ch. 19) — cache của phép dịch địa chỉ, nằm trong MMU.** "Address translation cache": giữ các cặp VPN→PFN mới dùng:
+**TLB (§19) — cache của phép dịch địa chỉ, nằm trong MMU.** Crux §19 (THE CRUX): *"How can we speed up address translation, and generally avoid the extra memory reference that paging seems to require?"* — "Address translation cache" giữ các cặp VPN→PFN mới dùng:
 
 ```
 truy cập VA → tách VPN → tra TLB
@@ -221,7 +221,7 @@ truy cập VA → tách VPN → tra TLB
 
 ### Nội dung chính
 
-**Crux:** bảng phẳng 32-bit = 4MB/process bất kể dùng bao nhiêu — đại đa số address space **trống** mà vẫn tốn entry. Các hướng:
+**Crux (§20, THE CRUX)** — nguyên văn: *"Simple array-based page tables (linear page tables) are too big… How can we make page tables smaller?"* Bảng phẳng 32-bit = 4MB/process bất kể dùng bao nhiêu — đại đa số address space **trống** mà vẫn tốn entry. Các hướng:
 
 - **Kết hợp segmentation** (bounds cho từng đoạn bảng) — nửa vời, kế thừa vấn đề segmentation.
 - **Multi-level page table** — giải pháp thắng cuộc: chặt bảng thành các **trang của bảng**, thêm **page directory** trỏ tới chúng; vùng address space trống → directory entry invalid → **cả trang bảng con không tồn tại**:
@@ -269,7 +269,9 @@ VA: [ PD index ][ PT index ][ offset ]
 
 ### Nội dung chính
 
-**Cơ chế (ch. 21):** muốn ảo giác "bộ nhớ lớn hơn RAM" → dùng đĩa làm tầng dưới (**swap space**). PTE có **present bit**: trang thuộc process nhưng đang ở đĩa → present=0 + PTE chứa **địa chỉ trên swap**. Truy cập trang vắng mặt:
+**Crux (§21, THE CRUX):** *"How can the OS make use of a larger, slower device to transparently provide the illusion of a large virtual address space?"*
+
+**Cơ chế (§21):** muốn ảo giác "bộ nhớ lớn hơn RAM" → dùng đĩa làm tầng dưới (**swap space**). PTE có **present bit**: trang thuộc process nhưng đang ở đĩa → present=0 + PTE chứa **địa chỉ trên swap**. Truy cập trang vắng mặt:
 
 ```
 truy cập VA → TLB miss → walk → PTE: present = 0
