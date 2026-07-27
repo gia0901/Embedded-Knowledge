@@ -112,7 +112,7 @@
 | Mastering Embedded Linux Programming — Simmonds (**1st ed 2015** — PDF người học) | ✅ Xong; **cả 6 file đã đối chiếu PDF** | Thư mục `melp/`: README + 6 file; `bootloader-kernel.md` đối chiếu sâu toàn văn; 5 file còn lại đã neo số trang thật + sửa số chương (bản cũ ghi nhầm chương của 3rd ed) + đánh dấu 🆕 rõ phần ngoài sách 2015 (Yocto hiện đại, OTA A/B, Power Management, PREEMPT_RT mainline) |
 | Linux Kernel Development — Robert Love (3rd ed) | ✅ Xong (đối chiếu mục lục + số trang PDF) | Thư mục `lkd/`: README + 6 file; mỗi cụm có mục "⚠️ Đã thay đổi so với sách" cập nhật kernel ~6.x |
 | LDD3 / Bootlin materials | ⬜ Chưa bắt đầu | Ưu tiên 3 (BSP): đọc chọn lọc char driver, interrupt, DMA; Bootlin slides miễn phí cập nhật hơn |
-| The C++ Programmer's Mindset — Sam Morley (Packt 2025) | 🟡 Đang viết | Thư mục `cpp-mindset/`: sách MỚI (sau cutoff) → đọc 100% từ PDF; **Phần 1 (ch. 1–6) ✅ xong**, còn ch. 7–15 (dự án + scale/GPU/perf) |
+| The C++ Programmer's Mindset — Sam Morley (Packt 2025) | ✅ **Xong** | Thư mục `cpp-mindset/`: sách MỚI (sau cutoff) → đọc 100% từ PDF. **Cả 15 chương xong** — Phần 1 (ch. 1–6, 6 file) + dự án Rubber Duckies (ch. 7–12, `project-rubber-duckies.md`) + Scale/GPU/Profiling (ch. 13–15, `scale-gpu-profiling.md`) |
 | C++ Concurrency in Action — Anthony Williams (2nd ed 2019) | ✅ **Xong** | Thư mục `cpp-concurrency/`: **cả 11 chương** đọc sâu toàn văn từ PDF (offset trang xác minh). **Giá trị riêng: ch. 5 memory model/ordering + ch. 7 lock-free (hazard pointer, ABA) — repo chưa có ở đâu; đã lấp gap "memory model & lock-free".** Đầu tư nặng nhất ch. 5, 7 |
 | The Linux Programming Interface — Michael Kerrisk | ⬜ Chưa bắt đầu | Lùi ưu tiên (userspace API — ít trúng BSP); giá trị dài hạn vẫn giữ |
 
