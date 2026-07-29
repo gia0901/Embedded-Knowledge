@@ -31,9 +31,9 @@ Ký hiệu trong checklist: `- [ ]` chưa ôn · `- [x]` đã ôn vững · **�
 
 ## Tài liệu dùng chung cho cả hai hướng
 
-- **Tự kiểm tra:** [technical_round/02_question_bank.md](../technical_round/02_question_bank.md) (nền chung C++/system/bus/debug), [04_bsp_question_bank.md](../technical_round/04_bsp_question_bank.md) (chuyên sâu BSP), [11-interview-questions/](../../11-interview-questions/) (đáp án ẩn, phân độ khó).
+- **Tự kiểm tra + phỏng vấn thử:** [mock-interview/](../mock-interview/) — **ngân hàng câu hỏi duy nhất** [bank/](../mock-interview/bank/) (mọi câu C++/OS/Linux/BSP/debug/DSA/design/network/behavioral, đáp án ẩn, phân độ khó, ID ổn định) + phiên phỏng vấn thử tương tác (`/mock`). Các bank cũ (`technical_round/02,04,03`, `11-interview-questions/`) đã **gộp về đây**.
 - **Lý thuyết cốt lõi:** [technical_round/01_theory.md](../technical_round/01_theory.md).
-- **Behavioral (STAR) + câu hỏi ngược + "vì sao rời công ty cũ":** [technical_round/03_behavior.md](../technical_round/03_behavior.md) — dùng cho vòng HR/behavioral của **mọi** vị trí (company-agnostic).
+- **Behavioral (STAR) + câu hỏi ngược + "vì sao rời công ty cũ":** [bank/behavioral.md](../mock-interview/bank/behavioral.md) — dùng cho vòng HR/behavioral của **mọi** vị trí (company-agnostic).
 
 ## Backlog
 
@@ -47,7 +47,7 @@ Không cứng nhắc — điều chỉnh theo quỹ thời gian. Một tuần sp
 
 | Buổi | Việc |
 |------|------|
-| 3–4 buổi đọc/hiểu | Đi các mục 🎯 của tuần đó (đọc summary + tự kiểm tra question bank) |
-| 1 buổi cuối tuần | **Mock interview**: tự nói to đáp án các câu ⭐/🎯, hoặc nhờ người hỏi; đối chiếu [11-interview-questions](../../11-interview-questions/) |
+| 3–4 buổi đọc/hiểu | Đi các mục 🎯 của tuần đó (đọc summary + tự kiểm tra qua [bank/](../mock-interview/bank/)) |
+| 1 buổi cuối tuần | **Mock interview tương tác**: gõ `/mock` (type `comprehensive` giả lập vòng thật) — xem lịch [mock-interview/daily-plan.md](../mock-interview/daily-plan.md) |
 | Xuyên suốt | Luyện **DSA** song song (vài bài LeetCode/tuần theo pattern — [13-dsa](../../13-dsa/)) |
 | Khi phát hiện lỗ hổng | Ghi vào [gap-register.md](gap-register.md), không dừng mạch ôn để lấp ngay |

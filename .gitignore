@@ -1,0 +1,7 @@
+# Mock interview coding practice — nháp cá nhân, không commit (chừa README)
+15_prep/mock-interview/coding-arena/*
+!15_prep/mock-interview/coding-arena/README.md
+
+# OS / editor cruft
+.DS_Store
+*.swp

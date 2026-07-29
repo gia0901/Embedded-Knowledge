@@ -33,11 +33,11 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 | 08 | [Embedded Systems](08-embedded-systems/) | SoC/bus, boot process, RTOS vs Linux, constraints | ✅ |
 | 09 | [Debugging](09-debugging/) | mindset, gdb, valgrind/strace/perf, sanitizers | ✅ |
 | 10 | [Thinking](10-thinking/) | problem solving, system design (embedded) | ✅ |
-| 11 | [Interview Questions](11-interview-questions/) | câu hỏi theo độ khó, đáp án ẩn | ✅ |
+| 11 | [Interview Questions](11-interview-questions/) | ➡️ con trỏ → đã gộp về [mock-interview/bank/](15_prep/mock-interview/bank/) | ➡️ |
 | 12 | [Design Patterns](12-design-patterns/) | SOLID, creational/structural/behavioral | ✅ |
 | 13 | [DSA](13-dsa/) | Big-O, cấu trúc dữ liệu, pattern giải thuật | ✅ |
 | 14 | [Networking](14-networking/) | TCP/IP, socket, HTTP/TLS/MQTT | ✅ |
-| 15 | [Prep](15_prep/) | chiến lược ôn theo vị trí (study-plans) + technical round (lý thuyết, question bank, behavioral) | 🟡 |
+| 15 | [Prep](15_prep/) | study-plans (chiến lược ôn) + **[mock-interview](15_prep/mock-interview/)** (phỏng vấn thử `/mock` + ngân hàng câu hỏi duy nhất) + technical round (lý thuyết) | 🟡 |
 | 16 | [Book Summaries](16-book-summaries/) | tóm tắt sách chuyên ngành (quy ước riêng trong README topic) | 🟡 |
 | 00 | [Glossary](00-glossary.md) | tra cứu nhanh thuật ngữ EN | ✅ |
 
@@ -52,7 +52,7 @@ Kế hoạch ôn được tổ chức theo **2 hướng nghề nghiệp đã ch�
 
 Mỗi kế hoạch có **hai tầng**: 🏃 *sprint* (sát phỏng vấn, chỉ mục 🎯) + 📚 *nền tảng* (dài hơi, phủ toàn diện) — ánh xạ thẳng sang topic + book summary + question bank. Backlog "thiếu gì" nằm ở **[gap-register.md](15_prep/study-plans/gap-register.md)**.
 
-> **Tài liệu ôn & tự kiểm tra dùng chung** cho cả hai hướng: [11-interview-questions/](11-interview-questions/) (đáp án ẩn, phân độ khó) và [15_prep/technical_round/](15_prep/) (lý thuyết cốt lõi, question bank C++/BSP, behavioral STAR). Luyện **DSA** ([13-dsa/](13-dsa/)) song song xuyên suốt.
+> **Tự kiểm tra & phỏng vấn thử dùng chung** cho cả hai hướng: **[15_prep/mock-interview/](15_prep/mock-interview/)** — ngân hàng câu hỏi **duy nhất** ([bank/](15_prep/mock-interview/bank/), đáp án ẩn, phân độ khó, ID ổn định) + phiên phỏng vấn thử tương tác (`/mock`, có track theo job/phần/sách + nhiều loại phiên). Lý thuyết cốt lõi: [15_prep/technical_round/01_theory.md](15_prep/technical_round/01_theory.md). Luyện **DSA** ([13-dsa/](13-dsa/)) song song xuyên suốt.
 
 ---
 

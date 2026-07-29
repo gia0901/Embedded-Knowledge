@@ -1,54 +1,29 @@
-# 11 — Interview Questions
+# 11 — Interview Questions → đã gộp vào ngân hàng duy nhất
 
-Tổng hợp câu hỏi phỏng vấn theo chủ đề và độ khó, **kèm đáp án đầy đủ nhưng ẩn đi** để bạn tự tư duy trước khi tham khảo.
+> ⚠️ **Nội dung câu hỏi đã chuyển.** Toàn bộ câu hỏi của topic này (và của `15_prep/technical_round`) đã được **gộp về một ngân hàng câu hỏi duy nhất**: [15_prep/mock-interview/bank/](../15_prep/mock-interview/bank/). Các file dưới đây giờ chỉ là **con trỏ** trỏ về bank — mọi câu hỏi sống ở một chỗ, dùng chung cho tự ôn lẫn phỏng vấn thử.
 
-## 🗺️ Bức tranh tổng thể
+## Vì sao gộp
 
-> **Sợi chỉ đỏ:** Topic này là nơi **kiểm chứng** mọi topic khác. Các file chia theo chủ đề cho tiện ôn, nhưng câu hỏi **giá trị nhất là câu nối nhiều topic** — đó là lúc lộ ra bạn *hiểu hệ thống* hay chỉ *thuộc phần*.
+Trước đây câu hỏi nằm rải rác ở topic 11 (theo chủ đề) và `technical_round` (theo vòng). Để có **một nguồn chân lý**, tránh trùng lặp, và phục vụ [mock interview](../15_prep/mock-interview/) (interviewer rút câu + thêm câu mới vào cùng một nơi), tất cả đã gộp về `bank/` với **ID ổn định** (`CPP-001`, `OS-005`, `BSP-002`…).
 
-```mermaid
-flowchart LR
-    K["<b>01–14</b><br/>kiến thức"]
-    V["<b>11</b><br/>kiểm chứng<br/><i>câu xuyên-topic<br/>= thước đo Senior</i>"]
-    R["quay lại<br/>topic gốc"]
-    K -->|"tự trả lời"| V -->|"yếu chỗ nào"| R
-    R -. "ôn lại" .-> K
-```
+Các nguyên tắc cũ vẫn giữ nguyên trong bank: đáp án ẩn trong `<details>` (tự trả lời trước), phân mức **🟢 cơ bản → 🟡 trung bình → 🟠 khó → 🔴 senior**, câu **giá trị nhất là câu xuyên-topic** (nối nhiều mảng = thước đo senior).
 
-- **Mức độ khó tăng dần đo độ sâu:** 🟢 nhớ khái niệm → 🟡 hiểu cơ chế & so sánh → 🟠 đào bản chất → 🔴 đánh đổi/thiết kế/tình huống. Câu 🔴 hầu như luôn nối nhiều topic.
-- **Ví dụ câu xuyên-topic** (xem thêm [OVERVIEW.md](../OVERVIEW.md)): *"context switch process vì sao tốn?"* (OS+memory), *"C++ ABI vì sao không ổn định?"* (C+++shared lib), *"crash ở field debug sao?"* (debug+embedded).
-- **Dùng đúng cách:** đừng đọc đáp án để "biết thêm" — hãy **tự trả lời thành lời trước**, vì phỏng vấn đo khả năng *diễn đạt* chứ không chỉ *nhận ra*.
+## Bản đồ chuyển hướng
 
-## Cách dùng (quan trọng)
+| File cũ (con trỏ) | Domain trong bank | File bank |
+|---|---|---|
+| [cpp.md](cpp.md) | `CPP` | [bank/cpp.md](../15_prep/mock-interview/bank/cpp.md) |
+| [operating-system.md](operating-system.md) | `OS` | [bank/os.md](../15_prep/mock-interview/bank/os.md) |
+| [linux.md](linux.md) | `LNX` | [bank/linux-sysprog.md](../15_prep/mock-interview/bank/linux-sysprog.md) |
+| [drivers.md](drivers.md) | `DRV`, `BUS`, `BSP` | [bank/drivers-embedded.md](../15_prep/mock-interview/bank/drivers-embedded.md), [bank/bsp.md](../15_prep/mock-interview/bank/bsp.md) |
+| [debugging.md](debugging.md) | `DBG` | [bank/debugging.md](../15_prep/mock-interview/bank/debugging.md) |
+| [design-patterns.md](design-patterns.md) | `DP` | [bank/design-patterns.md](../15_prep/mock-interview/bank/design-patterns.md) |
+| [dsa.md](dsa.md) | `DSA`, `COD` | [bank/dsa.md](../15_prep/mock-interview/bank/dsa.md), [bank/coding.md](../15_prep/mock-interview/bank/coding.md) |
+| [networking.md](networking.md) | `NET` | [bank/networking.md](../15_prep/mock-interview/bank/networking.md) |
+| [system-design.md](system-design.md) | `SD` | [bank/system-design.md](../15_prep/mock-interview/bank/system-design.md) |
 
-1. Đọc câu hỏi, **tự trả lời** (nói thành lời hoặc viết ra) — đừng mở đáp án ngay.
-2. Mở `<details>` để đối chiếu. So sánh: mình thiếu gì? sai chỗ nào? bản chất đã nắm chưa?
-3. Câu nào còn yếu → quay lại tài liệu nền tảng tương ứng (có link).
-4. Lý tưởng: nhờ Claude **review câu trả lời của bạn** trước khi xem đáp án mẫu (xem vai trò trong [CLAUDE.md](../CLAUDE.md)).
+## Cách dùng
 
-> Đáp án ở đây cô đọng theo kiểu "trả lời phỏng vấn". Giải thích sâu hơn nằm trong tài liệu nền tảng — mỗi file câu hỏi đều link về topic gốc.
-
-## Phân loại độ khó
-
-| Mức | Ý nghĩa | Kỳ vọng |
-|-----|---------|---------|
-| 🟢 **Cơ bản** | Khái niệm nền tảng | Middle phải trả lời trôi chảy |
-| 🟡 **Trung bình** | Hiểu cơ chế + so sánh/lựa chọn | Middle+ cần nắm vững |
-| 🟠 **Khó** | Đào sâu bản chất, tình huống | Hướng Senior |
-| 🔴 **Senior** | Đánh đổi, thiết kế, kinh nghiệm | Phân biệt Senior |
-
-## Bộ câu hỏi theo chủ đề
-
-| File | Chủ đề | Topic gốc |
-|------|--------|-----------|
-| [cpp.md](cpp.md) | C/C++ & Modern C++ | [01](../01-cpp-fundamentals/), [02](../02-modern-cpp/) |
-| [operating-system.md](operating-system.md) | Hệ điều hành | [03](../03-operating-system/) |
-| [linux.md](linux.md) | Linux system programming | [04](../04-linux-system-programming/) |
-| [drivers.md](drivers.md) | Driver, device tree, embedded | [05](../05-drivers-device-tree/), [08](../08-embedded-systems/) |
-| [debugging.md](debugging.md) | Debugging & tools | [09](../09-debugging/) |
-| [design-patterns.md](design-patterns.md) | Design patterns & SOLID | [12](../12-design-patterns/) |
-| [dsa.md](dsa.md) | Cấu trúc dữ liệu & giải thuật | [13](../13-dsa/) |
-| [networking.md](networking.md) | Mạng (TCP/IP, socket) | [14](../14-networking/) |
-| [system-design.md](system-design.md) | Tư duy & thiết kế hệ thống | [10](../10-thinking/) |
-
-> **Lưu ý:** mỗi tài liệu nền tảng (topic 01–10) cũng đã có phần "Câu hỏi phỏng vấn liên quan" ở cuối. File ở đây bổ sung thêm câu hỏi **xuyên chủ đề, theo độ khó, và dạng tình huống** mà phỏng vấn hay dùng.
+- **Tự ôn (che đáp án):** mở thẳng file bank tương ứng ở trên.
+- **Phỏng vấn thử:** dùng [mock interview](../15_prep/mock-interview/) — gõ `/mock` hoặc "chạy mock interview".
+- Nhờ Claude **review câu trả lời của bạn** trước khi xem đáp án mẫu (xem vai trò trong [CLAUDE.md](../CLAUDE.md)).

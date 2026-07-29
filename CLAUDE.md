@@ -128,17 +128,9 @@ Embedded-Interview/
 │   ├── problem-solving.md        # phương pháp giải quyết vấn đề
 │   └── system-design.md          # thiết kế hệ thống hướng Embedded Linux
 │
-├── 11-interview-questions/       # Câu hỏi phỏng vấn (đáp án ẩn)
-│   ├── README.md                 # cách dùng, phân loại theo độ khó
-│   ├── cpp.md
-│   ├── operating-system.md
-│   ├── linux.md
-│   ├── drivers.md
-│   ├── debugging.md
-│   ├── design-patterns.md
-│   ├── dsa.md
-│   ├── networking.md
-│   └── system-design.md
+├── 11-interview-questions/       # ⚠️ CON TRỎ → câu hỏi đã gộp về 15_prep/mock-interview/bank/
+│   ├── README.md                 # bản đồ chuyển hướng sang bank
+│   └── *.md                      # mỗi file trỏ tới domain tương ứng trong bank
 │
 ├── 12-design-patterns/           # Mẫu thiết kế (bổ sung)
 │   ├── solid-principles.md       # SOLID — nền tảng
@@ -156,7 +148,8 @@ Embedded-Interview/
 │
 ├── 15_prep/                      # Chuẩn bị phỏng vấn thực tế
 │   ├── study-plans/              # ⭐ Chiến lược ôn theo 2 vị trí: BSP & C++ (sprint + nền tảng) + gap-register
-│   └── technical_round/          # Lý thuyết cốt lõi, question bank (C++/BSP), behavioral STAR
+│   ├── mock-interview/           # ⭐ Phỏng vấn thử tương tác (/mock) + NGÂN HÀNG CÂU HỎI DUY NHẤT (bank/) + sessions/weak-register/daily-plan/coding-arena
+│   └── technical_round/          # Lý thuyết cốt lõi (01_theory); 02/03/04 nay là con trỏ → bank/
 │
 ├── 16-book-summaries/            # Tóm tắt sách chuyên ngành theo cụm chủ đề
 │   └── README.md                 # ⚠️ QUY ƯỚC RIÊNG của topic này — đọc trước khi viết/sửa file trong đó
@@ -172,12 +165,12 @@ Embedded-Interview/
 
 ---
 
-## 6. Topic Interview Questions — quy ước riêng
+## 6. Câu hỏi phỏng vấn & Mock interview — quy ước riêng
 
-- Phân loại theo **độ khó**: `Cơ bản` → `Trung bình` → `Khó` → `Mở rộng/Senior`.
-- Mỗi câu: đề bài rõ ràng → (tuỳ chọn) gợi ý → **đáp án đầy đủ ẩn trong `<details>`**.
-- Đáp án phải đủ sâu để học được bản chất, không chỉ trả lời cụt.
-- Liên kết ngược về tài liệu nền tảng tương ứng để tra cứu khi cần.
+- **Ngân hàng câu hỏi DUY NHẤT:** mọi câu hỏi sống ở `15_prep/mock-interview/bank/` (chia file theo domain, **ID ổn định** `CPP-001`…, `BSP-002`…). `11-interview-questions/` và `technical_round/02,03,04` nay chỉ là **con trỏ** trỏ vào bank — **không tạo bank thứ hai**, câu mới luôn thêm vào bank.
+- Mỗi câu: dòng metadata (`#### <ID> · level · type [· ⭐] [· 🏗️]`) → đề bài in đậm → **đáp án ẩn trong `<details>`**; phân độ khó 🟢🟡🟠🔴; link ngược tài liệu nền tảng.
+- **Mock interview (`/mock`):** Claude đóng vai **interviewer** — đọc `mock-interview/config.md`, hỏi từng câu theo track+type, **không chấm giữa chừng** (được đào sâu/follow-up), review ở cuối, rồi cập nhật `sessions/` + `weak-register.md` + thêm câu mới vào `bank/`. Câu yếu được hỏi lại (không có luật "đúng rồi thôi"). Chi tiết: [15_prep/mock-interview/README.md](15_prep/mock-interview/README.md).
+- **Vai trò khi user tự ôn:** nếu user nhờ **review câu trả lời** (ngoài phiên `/mock`), đối chiếu bank, chỉ ra thiếu/sai/lệch, chấm 0–4, link ôn lại — không chỉ đọc đáp án mẫu.
 
 ---
 
@@ -197,13 +190,13 @@ Embedded-Interview/
 | 08 Embedded systems | ✅ Xong | architecture, boot-process, rtos-vs-linux, constraints |
 | 09 Debugging | ✅ Xong | mindset, gdb, tools, memory-bugs, kernel-debugging |
 | 10 Thinking | ✅ Xong | problem-solving, system-design |
-| 11 Interview questions | ✅ Xong | cpp, operating-system, linux, drivers, debugging, design-patterns, dsa, networking, system-design |
+| 11 Interview questions | ➡️ Con trỏ | Câu hỏi đã **gộp về `15_prep/mock-interview/bank/`** (ngân hàng duy nhất); các file ở đây chỉ redirect sang domain tương ứng |
 | 12 Design patterns | ✅ Xong | solid-principles, creational, structural, behavioral (bổ sung) |
 | 13 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns (bổ sung) |
 | 14 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
-| 15 Prep | 🟡 Đang dùng | **study-plans/** (chiến lược ôn theo vị trí BSP & C++ + gap-register); technical_round (01 lý thuyết, 02 question bank, 03 behavioral, 04 bsp question bank) |
-| 16 Book summaries | 🟡 Đang viết | Quy ước xong; tiến độ chi tiết từng cuốn xem `16-book-summaries/README.md` |
+| 15 Prep | 🟡 Đang dùng | **study-plans/** (chiến lược ôn BSP & C++ + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/daily-plan/coding-arena); technical_round (01 lý thuyết; 02/03/04 nay là con trỏ → bank/) |
+| 16 Book summaries | 🟡 Đang viết | **6 cuốn đã xong + đối chiếu PDF** (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); còn 2 cuốn backlog ⬜ chưa bắt đầu (LDD3/Bootlin, The Linux Programming Interface). Tiến độ chi tiết từng cuốn xem `16-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu
 
