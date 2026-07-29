@@ -193,5 +193,89 @@ Hai object giữ `shared_ptr` lẫn nhau → strong_count không bao giờ về 
 Khi exception ném, **stack unwinding** gọi destructor của mọi object đã khởi tạo trên đường thoát → tài nguyên (mutex, file, memory) tự nhả, không leak dù thoát hàm theo đường bất thường. Đây là lý do C++ không cần `finally`.
 </details>
 
+#### CPP-028 · 🟢 · concept · [→ oop](../../../01-cpp-fundamentals/oop.md)
+**`enum` và `enum class` khác nhau? Vì sao ưu tiên `enum class`?**
+<details><summary>Đáp án</summary>
+
+`enum` cũ: tên hằng "rò" ra scope bao ngoài (dễ đụng tên), **ngầm chuyển sang int** (dễ so sánh nhầm hai enum khác loại), kiểu nền không kiểm soát. `enum class` (scoped): tên nằm trong scope enum (`Color::Red`), **không ngầm chuyển sang số** (phải `static_cast`), chỉ định được kiểu nền (`enum class E : uint8_t` — hữu ích embedded để cố định kích thước). Ưu tiên `enum class` cho an toàn kiểu + kiểm soát layout.
+</details>
+
+#### CPP-029 · 🟡 · concept · [→ move-semantics](../../../02-modern-cpp/move-semantics.md)
+**`emplace_back` khác `push_back` thế nào? Khi nào thật sự lợi?**
+<details><summary>Đáp án</summary>
+
+`push_back(x)` tạo/nhận một object rồi copy/move vào container. `emplace_back(args...)` **dựng object tại chỗ** trong bộ nhớ container từ đối số constructor (perfect forwarding) → tránh một object tạm. Lợi rõ khi object đắt và bạn đang truyền **đối số constructor** (`v.emplace_back(1, "a")`). Nếu đã có sẵn object thì `push_back(std::move(x))` tương đương. Bẫy: `emplace_back` bỏ qua `explicit`/ép kiểu ngầm nên có thể tạo object ngoài ý muốn; không nhanh hơn nếu chỉ truyền một object đã dựng.
+</details>
+
+#### CPP-030 · 🟡 · concept · [→ complexity-and-structures](../../../13-dsa/complexity-and-structures.md)
+**`std::vector`: phân biệt `size` và `capacity`; `reserve` để làm gì; iterator invalidation là gì?**
+<details><summary>Đáp án</summary>
+
+`size` = số phần tử đang có; `capacity` = số chỗ đã cấp (≥ size). Khi `size` chạm `capacity`, push_back cấp vùng mới (thường gấp đôi) + move toàn bộ. `reserve(n)` cấp trước capacity để tránh reallocate lặp (biết trước số lượng → 1 lần cấp). **Iterator/pointer/reference invalidation:** khi vector reallocate (hoặc chèn/xóa), mọi iterator/con trỏ vào phần tử cũ **trở nên vô hiệu** (trỏ bộ nhớ đã giải phóng) — dùng tiếp là UB. Đây là bug kinh điển khi giữ con trỏ vào phần tử rồi push_back thêm.
+</details>
+
+#### CPP-031 · 🟡 · concept · [→ oop](../../../01-cpp-fundamentals/oop.md)
+**`const` member function nghĩa là gì? `mutable` dùng khi nào?**
+<details><summary>Đáp án</summary>
+
+Hàm thành viên `const` cam kết **không sửa trạng thái quan sát được** của object (`this` là con trỏ tới const) → gọi được trên object const, và là một phần của const-correctness (biên dịch chặn sửa nhầm). `mutable` cho phép một data member **vẫn sửa được trong hàm const** — dùng cho trạng thái *không thuộc giá trị logic* của object: cache/memo, mutex bảo vệ (khóa mutex trong hàm `const` getter thread-safe), bộ đếm thống kê.
+</details>
+
+#### CPP-032 · 🟡 · concept · [→ oop](../../../01-cpp-fundamentals/oop.md)
+**`explicit` để làm gì? Nêu một bug do implicit conversion.**
+<details><summary>Đáp án</summary>
+
+`explicit` chặn **chuyển đổi ngầm** qua constructor một-đối-số (và conversion operator). Không có nó, `Widget w = 42;` hoặc gọi `f(Widget)` bằng `f(42)` sẽ ngầm tạo `Widget(42)` — dễ ngoài ý muốn. Ví dụ bug kinh điển: `std::vector<int> v(10)` (10 phần tử) vs `v = 10` bị chặn nhờ explicit; hoặc một hàm nhận `String` bị gọi nhầm với con số. Quy tắc: ctor một đối số **mặc định để `explicit`** trừ khi thật sự muốn cho chuyển ngầm.
+</details>
+
+#### CPP-033 · 🟡 · concept · [→ memory-model](../../../01-cpp-fundamentals/memory-model.md)
+**`new`/`delete` khác `malloc`/`free` thế nào?**
+<details><summary>Đáp án</summary>
+
+`malloc`/`free` chỉ cấp/nhả **bộ nhớ thô**, không gọi ctor/dtor, trả `void*`, báo lỗi bằng `NULL`. `new` cấp bộ nhớ **rồi gọi constructor**, trả đúng kiểu, ném `std::bad_alloc` khi thất bại; `delete` gọi **destructor** rồi nhả. Không được trộn (`free` một con trỏ `new`, hay `delete` một con trỏ `malloc`) → UB. Còn `new[]`/`delete[]` phải đi cặp. Trong C++ hiện đại: hầu như không gọi `new`/`delete` trực tiếp — dùng smart pointer/container.
+</details>
+
+#### CPP-034 · 🟠 · concept · [→ oop](../../../01-cpp-fundamentals/oop.md)
+**`dynamic_cast` khác `static_cast` thế nào? RTTI là gì, chi phí ra sao?**
+<details><summary>Đáp án</summary>
+
+`static_cast`: ép kiểu **lúc compile**, không kiểm tra runtime — nhanh, nhưng downcast sai kiểu là UB. `dynamic_cast`: downcast trong cây kế thừa **có kiểm tra runtime** qua **RTTI** (Run-Time Type Information, đọc từ vtable) — trả `nullptr` (con trỏ) hoặc ném `std::bad_cast` (reference) nếu kiểu thực không khớp; chỉ dùng được với class **đa hình** (có virtual). Chi phí: tra RTTI lúc runtime (chậm hơn), tăng kích thước binary. Embedded/hot path thường tránh; nhiều dự án build `-fno-rtti`. Cần rẽ theo kiểu con thường xét lại thiết kế (virtual dispatch / `std::variant`+`visit`).
+</details>
+
+#### CPP-035 · 🟠 · concept · [→ oop](../../../01-cpp-fundamentals/oop.md)
+**Vì sao KHÔNG nên gọi hàm virtual trong constructor/destructor?**
+<details><summary>Đáp án</summary>
+
+Trong ctor/dtor của Base, object **chưa/đã không còn là** Derived: vptr trỏ vtable của **Base** tại thời điểm đó → lời gọi virtual chạy phiên bản **Base**, không phải override của Derived, kể cả khi bạn đang tạo/hủy một Derived. Không phải bug cú pháp mà là ngữ nghĩa "object được xây từ base lên, hủy từ derived xuống". Nếu logic cần hành vi Derived lúc khởi tạo → dùng hàm init gọi sau khi construct xong, hoặc factory + two-phase init.
+</details>
+
+#### CPP-036 · 🟠 · concept · [→ memory-model](../../../01-cpp-fundamentals/memory-model.md)
+**Undefined behavior là gì? Kể vài ví dụ và vì sao nó nguy hiểm hơn "chỉ là bug".**
+<details><summary>Đáp án</summary>
+
+UB = tình huống chuẩn C++ **không định nghĩa hành vi** → compiler được phép giả định nó *không bao giờ xảy ra* và tối ưu dựa trên giả định đó. Ví dụ: đọc biến chưa khởi tạo, truy cập ngoài mảng, dereference nullptr/dangling, signed overflow, data race, dùng object sau khi hủy, vi phạm strict aliasing. Nguy hiểm vì: (1) có thể "chạy đúng" lúc dev rồi hỏng ở production/optimizer khác (Heisenbug); (2) optimizer có thể **xóa cả nhánh kiểm tra** (vd bỏ `if (p==null)` sau khi đã deref `p`) → lỗi lan xa nguồn. Phòng: bật `-fsanitize=undefined,address`, `-Wall -Wextra`, tránh cấu trúc UB ngay từ thiết kế.
+</details>
+
+#### CPP-037 · 🟡 · concept · [→ 02-modern-cpp](../../../02-modern-cpp/)
+**`std::string_view` lợi gì? Bẫy nguy hiểm nhất?**
+<details><summary>Đáp án</summary>
+
+`string_view` là **cửa sổ chỉ-đọc** (con trỏ + độ dài) vào chuỗi ký tự có sẵn — truyền tham số chuỗi **không copy, không cấp phát**, nhận được cả `std::string`, C-string, buffer (rất hợp embedded/parse). Bẫy chí mạng: nó **không sở hữu** dữ liệu → nếu chuỗi gốc bị hủy/đổi (vd view vào một `std::string` tạm, hoặc trả `string_view` trỏ vào biến local) → **dangling**, UB. Quy tắc: dùng cho tham số sống ngắn; **không lưu lại** string_view vượt vòng đời nguồn; cẩn thận `string_view` không đảm bảo kết thúc `'\0'` (không truyền thẳng vào API C mong C-string).
+</details>
+
+#### CPP-038 · 🟠 · concept · ⭐ · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Alignment và padding là gì? `alignas`/`alignof` dùng khi nào? (góc embedded)**
+<details><summary>Đáp án</summary>
+
+Mỗi kiểu có **alignment** (địa chỉ phải chia hết cho N) do phần cứng yêu cầu/tối ưu truy cập. Compiler chèn **padding** giữa/sau member để mỗi member đúng alignment → `sizeof(struct)` lớn hơn tổng member; **thứ tự khai báo member ảnh hưởng kích thước** (sắp từ lớn→nhỏ giảm padding). `alignof(T)` truy vấn; `alignas(N)` ép alignment mạnh hơn — dùng cho: buffer DMA (thường cần căn cache line 64B), tránh **false sharing** (đệm biến giữa các core ra 2 cache line), MMIO/struct ánh xạ phần cứng, SIMD. Embedded còn quan tâm: đọc dữ liệu chưa căn lề (misaligned) có thể **fault** trên ARM cũ, và struct trao đổi qua wire cần `#pragma pack`/serialize thủ công vì layout không portable.
+</details>
+
+#### CPP-039 · 🔴 · concept · [→ templates](../../../01-cpp-fundamentals/templates.md)
+**SFINAE là gì? C++20 concepts thay thế nó ra sao?**
+<details><summary>Đáp án</summary>
+
+**SFINAE** ("Substitution Failure Is Not An Error"): khi thay kiểu vào template mà tạo ra kiểu không hợp lệ ở phần chữ ký, overload đó **bị loại khỏi tập chọn lặng lẽ** thay vì lỗi biên dịch — dùng (qua `std::enable_if`, `void_t`, decltype) để **bật/tắt overload theo tính chất kiểu** (vd chỉ nhận kiểu số học). Nhược: cú pháp khó đọc, thông báo lỗi khủng khiếp. **Concepts (C++20)** làm cùng việc nhưng khai báo *ràng buộc* rõ ràng, đọc được (`template<std::integral T>` hoặc `requires`), thông báo lỗi gọn ("T không thỏa concept X"), và chọn overload theo mức ràng buộc chặt hơn. Concepts là cách hiện đại thay cho phần lớn SFINAE.
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

@@ -130,5 +130,61 @@ Mặc định `mq_send` block; `O_NONBLOCK` trả `EAGAIN`. Nhưng nếu chỉ *
 Pipe/FIFO: byte stream đơn giản, 1 chiều. Message queue: có ranh giới message + priority. Shared memory: nhanh nhất, tự đồng bộ. Socket: liên máy/mạng. Signal: báo sự kiện, ít dữ liệu. Chọn theo: tốc độ vs ranh giới message vs phạm vi (cùng máy/khác máy).
 </details>
 
+#### LNX-019 · 🟢 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
+**`mmap` là gì? Kể vài công dụng.**
+<details><summary>Đáp án</summary>
+
+`mmap` ánh xạ một vùng vào không gian địa chỉ process, trả con trỏ để truy cập như bộ nhớ thường (kernel lo demand-paging). Công dụng: (1) **map file** — đọc/ghi file qua con trỏ, không cần read/write, hệ tự đồng bộ qua page cache (nhanh cho truy cập ngẫu nhiên file lớn); (2) **anonymous mapping** — cấp vùng nhớ lớn (nền của malloc cho khối lớn); (3) **shared memory** giữa process (`MAP_SHARED`); (4) map **MMIO/`/dev/mem`** để chọc thanh ghi từ userspace (bring-up). Đồng bộ file: `msync`.
+</details>
+
+#### LNX-020 · 🟡 · concept · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
+**Pipe và FIFO (named pipe) khác nhau thế nào?**
+<details><summary>Đáp án</summary>
+
+Cả hai là byte stream một chiều. **Pipe** (`pipe()`) ẩn danh — chỉ dùng được giữa các process **có quan hệ** (chia sẻ fd qua fork), sống theo fd, đó là cách shell nối `a | b`. **FIFO** (`mkfifo`) có **tên trên filesystem** → hai process **không quan hệ** cũng mở được qua đường dẫn. Chung: ghi vào pipe đầy thì block (hoặc EAGAIN nếu nonblock); ghi khi không còn reader → `SIGPIPE`/`EPIPE`; ghi ≤ `PIPE_BUF` là atomic.
+</details>
+
+#### LNX-021 · 🟡 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
+**`dup`/`dup2` để làm gì? Shell hiện thực `cmd > file` thế nào?**
+<details><summary>Đáp án</summary>
+
+`dup2(oldfd, newfd)` làm `newfd` trỏ tới **cùng open file description** với `oldfd` (đóng newfd nếu đang mở). Shell làm `cmd > file`: sau `fork`, trong con `open("file")` được fd f → `dup2(f, STDOUT_FILENO)` (fd 1 giờ trỏ file) → `close(f)` → `exec(cmd)`. Chương trình cứ ghi stdout như thường nhưng dữ liệu vào file. Cùng cơ chế cho `2>&1` (dup2 fd2 về fd1) và pipe (`dup2` đầu pipe vào stdin/stdout).
+</details>
+
+#### LNX-022 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**Các trạng thái process trong Linux? `D` state nghĩa là gì và vì sao đáng ngại?**
+<details><summary>Đáp án</summary>
+
+`R` running/runnable, `S` sleep ngắt được (chờ sự kiện, nhận signal), `D` **uninterruptible sleep** (chờ I/O, *không* nhận signal), `T` stopped, `Z` zombie. **`D` state**: process kẹt trong syscall I/O ở kernel không thể bị đánh thức/kill (kể cả `kill -9`) tới khi I/O xong — nếu I/O treo (NFS chết, disk hỏng) process **kẹt vĩnh viễn**, load average tăng vọt dù CPU rảnh. Thấy nhiều process `D` = nghi tầng storage/driver. Xem cột STAT trong `ps`, `/proc/<pid>/stack` để biết kẹt ở đâu.
+</details>
+
+#### LNX-023 · 🟡 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
+**`/proc` và `/sys` là gì, khác nhau thế nào?**
+<details><summary>Đáp án</summary>
+
+Cả hai là **virtual filesystem** (nội dung sinh bởi kernel lúc đọc, không nằm trên disk) — "everything is a file" áp cho trạng thái kernel. `/proc`: thông tin **process** (`/proc/<pid>/…`: maps, fd, status, cmdline) + nhiều thông tin hệ thống lịch sử (`/proc/meminfo`, `/proc/interrupts`, `/proc/cpuinfo`). `/sys` (sysfs): mô hình **thiết bị/driver** có cấu trúc (device model — bus/device/driver/class), một giá trị/file, dùng để đọc & cấu hình driver (gpio, pwm, cpufreq). Đại khái: `/proc` cũ + tạp, `/sys` mới + có cấu trúc cho device.
+</details>
+
+#### LNX-024 · 🟠 · concept · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
+**Namespaces và cgroups là gì? Vì sao là nền tảng của container?**
+<details><summary>Đáp án</summary>
+
+**Namespaces** = *cô lập tầm nhìn*: mỗi loại (pid, mount, net, uts, ipc, user) cho process một "vũ trụ" riêng — pid namespace khiến process thấy mình là PID 1 và không thấy process ngoài; net namespace cho stack mạng riêng. **cgroups** = *giới hạn & hạch toán tài nguyên*: đặt trần CPU/RAM/IO cho một nhóm process (memory limit + OOM cục bộ, cpu quota). Container = **namespaces (cô lập) + cgroups (giới hạn) + rootfs riêng** — không phải máy ảo, vẫn chung kernel host. Docker/LXC/systemd-nspawn đều dựng trên hai cơ chế này.
+</details>
+
+#### LNX-025 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**Cách tạo một daemon đúng? systemd làm nhẹ việc này ra sao?**
+<details><summary>Đáp án</summary>
+
+Daemon "cổ điển" (double-fork): `fork` + parent thoát (con thành orphan, không phải leader), `setsid` (tách khỏi terminal, thành session leader), fork lần 2 (chắc chắn không giành lại tty), `chdir("/")`, đặt `umask`, đóng/redirect stdin/out/err về `/dev/null`, xử lý `SIGTERM` để tắt sạch. **Với systemd**: hầu hết việc trên là thừa — viết service kiểu `Type=simple` **chạy foreground**, systemd lo tách session, log (journald), restart (`Restart=on-failure`), phụ thuộc thứ tự (`After=`), sandbox, watchdog (`WatchdogSec`). Chỉ cần chương trình chạy tiền cảnh + xử lý SIGTERM. Đây là chuẩn hiện đại trên embedded Linux.
+</details>
+
+#### LNX-026 · 🟠 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
+**Đọc/ghi file qua `mmap` lợi/hại gì so với `read`/`write`? Vai trò `msync`.**
+<details><summary>Đáp án</summary>
+
+`mmap` truy cập file như mảng bộ nhớ → **không copy user↔kernel mỗi lần** (read/write copy qua buffer), tốt cho **truy cập ngẫu nhiên** file lớn và chia sẻ giữa process; code gọn (con trỏ thay vì lseek+read). Hại: chi phí thiết lập mapping + page fault mỗi trang lần đầu chạm (kém cho quét tuần tự một lần — read tuần tự + readahead thắng); lỗi I/O biến thành **SIGBUS** khó xử; không hợp file nhỏ/streaming; ghi phải `msync` (đẩy trang bẩn xuống disk) để đảm bảo độ bền, và cẩn thận khi file bị truncate dưới chân mapping. Chọn theo mẫu truy cập: ngẫu nhiên/chia sẻ → mmap; tuần tự/streaming/nhỏ → read/write.
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

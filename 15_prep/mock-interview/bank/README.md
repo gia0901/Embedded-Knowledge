@@ -48,9 +48,9 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 
 | Domain | Dải ID đã dùng |
 |---|---|
-| CPP | 001–027 |
+| CPP | 001–039 |
 | OS | 001–019 |
-| LNX | 001–018 |
+| LNX | 001–026 |
 | DRV | 001–018 |
 | BUS | 001–004 |
 | BSP | 001–027 |
