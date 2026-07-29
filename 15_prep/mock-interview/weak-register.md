@@ -11,7 +11,8 @@
 
 | ID | Câu (tóm tắt) | Track | Lần gặp | Điểm gần nhất | Ghi chú lỗ hổng |
 |----|---------------|-------|---------|----------------|-----------------|
-| _(trống — chưa có phiên nào. Sổ sẽ tự đầy sau phiên mock đầu tiên.)_ | | | | | |
+| OS-003 | deadlock — 4 điều kiện Coffman + cách phá | cpp-system, bsp | 1 | 0 | không trả lời được; nhớ: mutual exclusion / hold-and-wait / no-preemption / circular wait; phá bằng lock ordering |
+| CPP-020 | Rule of 0/3/5 | cpp-system, modern-cpp | 1 | 2 | nhầm copy↔move; Rule of 3 = {dtor, copy ctor, copy assign}, Rule of 5 thêm move ctor + move assign |
 
 ## Đã khắc phục (lưu vết — gỡ khỏi bảng trên khi ≥3 điểm hai lần)
 
