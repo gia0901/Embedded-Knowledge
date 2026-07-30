@@ -16,6 +16,7 @@
 | `LNX` | [linux-sysprog.md](linux-sysprog.md) | Linux system programming (fd/syscall/IPC/epoll/signal) | [04](../../../04-linux-system-programming/) |
 | `DRV` | [drivers-embedded.md](drivers-embedded.md) | Driver, device tree, embedded (general) | [05](../../../05-drivers-device-tree/), [08](../../../08-embedded-systems/) |
 | `BUS` | [drivers-embedded.md](drivers-embedded.md#bus) | I2C/SPI/UART | [08](../../../08-embedded-systems/) |
+| `EMB` | [embedded-fundamentals.md](embedded-fundamentals.md) | Embedded SW nền tảng: C/thanh ghi, bộ nhớ bare-metal/startup, ngắt, RTOS, firmware, số học/độ tin cậy, low-power, debug HW | [08](../../../08-embedded-systems/) |
 | `BSP` | [bsp.md](bsp.md) | BSP chuyên sâu: boot/DT probe/IRQ/DMA/flash/OTA/Yocto/power/RT/bring-up | [16 melp](../../../16-book-summaries/melp/) |
 | `DBG` | [debugging.md](debugging.md) | Debugging & tools | [09](../../../09-debugging/) |
 | `DP` | [design-patterns.md](design-patterns.md) | Design patterns & SOLID | [12](../../../12-design-patterns/) |
@@ -48,11 +49,12 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 
 | Domain | Dải ID đã dùng |
 |---|---|
-| CPP | 001–039 |
+| CPP | 001–051 (040–051 = track `emc`, neo theo Item) |
 | OS | 001–019 |
 | LNX | 001–026 |
 | DRV | 001–018 |
 | BUS | 001–004 |
+| EMB | 001–032 |
 | BSP | 001–027 |
 | DBG | 001–019 |
 | DP | 001–013 |

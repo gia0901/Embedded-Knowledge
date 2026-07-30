@@ -278,4 +278,93 @@ Mỗi kiểu có **alignment** (địa chỉ phải chia hết cho N) do phần 
 </details>
 
 ---
+## Từ *Effective Modern C++* (Scott Meyers) — track `emc`
+
+> Neo theo **Item** của sách; link nguồn tới bản summary [effective-modern-cpp.md](../../../16-book-summaries/effective-modern-cpp.md) để đào sâu.
+
+#### CPP-040 · 🟠 · concept · ⭐ · [→ EMC Item 1–2](../../../16-book-summaries/effective-modern-cpp.md)
+**`auto` suy luận kiểu theo quy tắc nào? `auto&&` là gì?**
+<details><summary>Đáp án</summary>
+
+`auto` dùng **cùng quy tắc suy luận với template** (trừ một ngoại lệ): (1) khai báo là `auto` (by value) → **bỏ ref/const/volatile top-level** (`const int& → int`); (2) `auto&`/`const auto&` → giữ, không bỏ const; (3) `auto&&` = **universal reference** → bám value category của biểu thức (lvalue→lvalue ref, rvalue→rvalue ref, reference collapsing). Ngoại lệ duy nhất so với template: `auto x = {1,2,3}` suy ra `std::initializer_list<int>` (template thì fail). Hệ quả thực dụng: `for (auto x : v)` copy; `for (const auto& x : v)` mượn; `for (auto&& x : v)` forward được (đúng cho generic).
+</details>
+
+#### CPP-041 · 🟠 · concept · [→ EMC Item 5–6](../../../16-book-summaries/effective-modern-cpp.md)
+**`auto` lợi gì? Khi nào nó "phản chủ" với proxy type (vd `vector<bool>`)?**
+<details><summary>Đáp án</summary>
+
+Lợi: buộc khởi tạo, tránh chuyển kiểu ngầm/thu hẹp ngoài ý, gõ gọn, tự đúng khi kiểu đổi (vd `size_t` thay vì `int` cho `.size()`). Bẫy **invisible proxy type**: `std::vector<bool>::operator[]` trả một **proxy** (`reference` giả), không phải `bool&`. `auto b = v[i];` → `b` bắt lấy proxy, không phải `bool`; khi vector bị hủy/đổi, proxy **dangling** → dùng `b` là UB. Cách chữa: **explicitly typed initializer idiom** — `auto b = static_cast<bool>(v[i]);` (ép về kiểu thật ngay). Bài học: cẩn thận `auto` với các API trả proxy (expression templates, `bitset::reference`…).
+</details>
+
+#### CPP-042 · 🟠 · concept · [→ EMC Item 7](../../../16-book-summaries/effective-modern-cpp.md)
+**Khởi tạo bằng `{}` khác `()` thế nào? `std::initializer_list` gây bất ngờ gì?**
+<details><summary>Đáp án</summary>
+
+`{}` (braced/uniform init): dùng được ở mọi ngữ cảnh, **cấm narrowing** (`int x{2.5};` lỗi biên dịch — tốt cho an toàn), và tránh **most vexing parse** (`Widget w();` bị hiểu là khai báo hàm; `Widget w{};` thì không). Bất ngờ: nếu class có constructor nhận `std::initializer_list`, **`{}` sẽ ưu tiên gọi nó** kể cả khi constructor khác khớp hơn — `std::vector<int> v{10, 2}` tạo vector **{10, 2}** (2 phần tử) chứ không phải 10 phần tử giá trị 2 (`v(10, 2)`). Quy tắc: biết class bạn dùng có ctor initializer_list không; chọn `{}` vs `()` có chủ đích.
+</details>
+
+#### CPP-043 · 🟡 · concept · [→ EMC Item 8](../../../16-book-summaries/effective-modern-cpp.md)
+**Vì sao dùng `nullptr` thay cho `0`/`NULL`?**
+<details><summary>Đáp án</summary>
+
+`0` là int, `NULL` thường là `0`/`0L` (kiểu integer) → khi overload có cả `f(int)` và `f(void*)`, truyền `NULL` gọi nhầm `f(int)`, không phải bản con trỏ. `nullptr` có kiểu riêng `std::nullptr_t`, chuyển ngầm sang **mọi kiểu con trỏ nhưng không sang integer** → chọn đúng overload con trỏ, và làm code template (suy luận kiểu) đúng ý. Cũng rõ nghĩa hơn khi đọc. Luôn dùng `nullptr`.
+</details>
+
+#### CPP-044 · 🟡 · concept · [→ EMC Item 9](../../../16-book-summaries/effective-modern-cpp.md)
+**`using` (alias declaration) hơn `typedef` chỗ nào?**
+<details><summary>Đáp án</summary>
+
+`using Vec = std::vector<int>;` tương đương `typedef` cho ca thường, nhưng đọc xuôi hơn và — quan trọng — hỗ trợ **alias template**: `template<class T> using MyVec = std::vector<T, MyAlloc<T>>;` (typedef không làm template được). Alias template dùng thẳng không cần `::type`; còn nếu dùng traits kiểu cũ phải `typename SomeTrait<T>::type`. C++11 alias template là nền của các `_t` trong chuẩn (`std::enable_if_t`, `std::remove_reference_t`). Ưu tiên `using`.
+</details>
+
+#### CPP-045 · 🟡 · concept · [→ EMC Item 11](../../../16-book-summaries/effective-modern-cpp.md)
+**`= delete` khác cách cũ (khai báo private không định nghĩa) thế nào?**
+<details><summary>Đáp án</summary>
+
+Cách cũ (C++98) cấm copy: khai báo copy ctor/assign **private + không định nghĩa** → dùng nhầm chỉ lỗi lúc **link** (hoặc runtime với friend/member), thông báo mơ hồ. `= delete` (C++11): hàm **tồn tại nhưng bị xóa** → mọi lời gọi lỗi ngay lúc **compile**, rõ ràng; đặt `public` để thông báo lỗi đẹp hơn. Còn mạnh hơn: `delete` được cho **hàm bất kỳ** (không chỉ special members) và **template instantiation cụ thể** — vd cấm gọi một overload với kiểu nhất định (`void f(char) = delete;` chặn ép ngầm). Luôn dùng `= delete`.
+</details>
+
+#### CPP-046 · 🟡 · concept · [→ EMC Item 12](../../../16-book-summaries/effective-modern-cpp.md)
+**`override` (và `final`) để làm gì? Vì sao nên viết?**
+<details><summary>Đáp án</summary>
+
+Không viết `override`, một hàm định "override" mà **lệch chữ ký** (sai const, sai kiểu tham số, quên là hàm base không virtual) sẽ âm thầm tạo **hàm mới** thay vì override → đa hình không chạy như mong, không báo lỗi. `override` bảo compiler **kiểm tra**: nếu không thực sự override một virtual của base → lỗi biên dịch. `final` chặn override tiếp (trên hàm) hoặc kế thừa tiếp (trên class), và cho compiler tối ưu devirtualize. Luôn đánh `override` cho hàm override — rẻ, bắt bug sớm.
+</details>
+
+#### CPP-047 · 🟠 · concept · ⭐ · [→ EMC Item 21](../../../16-book-summaries/effective-modern-cpp.md)
+**Vì sao ưu tiên `make_unique`/`make_shared` thay vì `new` trực tiếp?**
+<details><summary>Đáp án</summary>
+
+(1) **Exception safety:** `f(std::shared_ptr<T>(new T), g())` — nếu `new T` xong, `g()` ném *trước khi* shared_ptr được dựng → leak. `make_shared` gói lại thành một bước, không hở. (2) **Ít lặp code + không viết `new`** (đúng tinh thần không raw new). (3) `make_shared` cấp **một lần** cho cả object + control block (thay vì 2 lần với `new`) → nhanh hơn, ít phân mảnh. Ngoại lệ **không** dùng make: cần custom deleter; cần truyền braced-init-list; với `make_shared`, object + control block chung một khối nên `weak_ptr` còn sống thì **bộ nhớ object chưa được nhả** (cân nhắc khi object lớn + weak_ptr sống lâu); và không dùng được khi ctor cần là private.
+</details>
+
+#### CPP-048 · 🟠 · concept · [→ EMC Item 17](../../../16-book-summaries/effective-modern-cpp.md)
+**Compiler tự sinh special member function khi nào? Điều gì chặn sinh move?**
+<details><summary>Đáp án</summary>
+
+Mặc định compiler sinh: default ctor (nếu không khai ctor nào), copy ctor, copy assign, destructor, và (C++11) move ctor + move assign. Nhưng có ràng buộc chéo: **khai báo bất kỳ move nào → copy bị xóa**; **khai báo copy hoặc destructor → move KHÔNG được sinh** (fall back sang copy!) — đây là lý do một class có destructor thủ công tự nhiên "mất" move, âm thầm copy thay vì move (mất hiệu năng). Rule of Five/Rule of Zero sinh ra chính vì mạng lưới quy tắc này. Muốn giữ đủ: `= default` tường minh cả 5 (hoặc dùng Rule of Zero — không viết cái nào). *(Liên quan [CPP-020](cpp.md).)*
+</details>
+
+#### CPP-049 · 🟠 · concept · [→ EMC Item 29](../../../16-book-summaries/effective-modern-cpp.md)
+**Move có phải luôn rẻ hơn copy? Kể ca move không giúp gì.**
+<details><summary>Đáp án</summary>
+
+Không. Move chỉ rẻ khi object **sở hữu tài nguyên trỏ gián tiếp** (heap buffer) để "cướp" con trỏ. Ca move ≈ copy: (1) kiểu chứa dữ liệu **tại chỗ** như `std::array<T,N>` — move vẫn phải move từng phần tử, O(n); (2) `std::string` với **SSO** (small string optimization) — chuỗi ngắn nằm trong object, move = copy; (3) kiểu **không có move** (chỉ copy) hoặc move không `noexcept` (container sẽ copy). Bài học: đừng giả định `std::move` luôn cho tốc độ; với kiểu không rõ hoặc generic, move có thể không nhanh hơn — đo khi quan trọng.
+</details>
+
+#### CPP-050 · 🔴 · concept · [→ EMC Item 41](../../../16-book-summaries/effective-modern-cpp.md)
+**Khi nào nên nhận tham số **by value** thay vì overload lvalue/rvalue hay universal ref?**
+<details><summary>Đáp án</summary>
+
+Với tham số **copyable, rẻ để move, và luôn được copy/lưu lại** (vd setter `void setName(std::string n) { name_ = std::move(n); }`): nhận **by value** rồi `std::move` vào đích. Lý do: một hàm phục vụ cả lvalue (copy vào tham số) lẫn rvalue (move vào tham số) mà chỉ viết **một** overload, gọn hơn cặp `const&`/`&&` và tránh phình template của universal ref. Đánh đổi: tốn thêm *một* move so với overload tối ưu; **không** áp cho kiểu move đắt (như `std::array`), kiểu chỉ-copy, hay khi không thực sự lưu lại tham số (chỉ đọc → dùng `const&`). Cân nhắc theo "copyable + cheap-to-move + sink parameter".
+</details>
+
+#### CPP-051 · 🟠 · concept · [→ EMC Item 35](../../../16-book-summaries/effective-modern-cpp.md)
+**`std::async` (task-based) hơn tự tạo `std::thread` (thread-based) ở điểm nào? Lưu ý `std::launch`?**
+<details><summary>Đáp án</summary>
+
+`std::async` trả `std::future` và để runtime lo: (1) **lấy giá trị trả về / lan truyền exception** qua future (thread thô không có kênh này — exception thoát thread = `std::terminate`); (2) **quản lý số thread / oversubscription** (có thể chạy trên thread pool, hoặc chạy đồng bộ khi tài nguyên cạn) thay vì bạn tự cân; (3) không phải lo `join`/`detach`. Lưu ý `std::launch`: mặc định là `async | deferred` → có thể **chạy hoãn** (chỉ chạy khi `.get()`), khiến code phụ thuộc "chạy song song ngay" sai. Muốn chắc song song: `std::async(std::launch::async, f)`. Task-based hợp khi cần *kết quả tính toán*; thread-based chỉ khi cần điều khiển thread mức thấp (affinity, priority, RT).
+</details>
+
+---
 ⬅️ [Bank index](README.md)

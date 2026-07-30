@@ -9,7 +9,7 @@
 
 | Track | Domain rút câu | Ghi chú |
 |---|---|---|
-| **`bsp`** ⭐ | `BSP`, `DRV`, `BUS`, `OS`(mem/sched/sync), `LNX`(ipc/signal/io), `DBG`, `SD`(embedded) | Embedded Linux / BSP Engineer — **ưu tiên 1**. Nghiêng kernel/phần cứng/bring-up. |
+| **`bsp`** ⭐ | `BSP`, `DRV`, `BUS`, `EMB`, `OS`(mem/sched/sync), `LNX`(ipc/signal/io), `DBG`, `SD`(embedded) | Embedded Linux / BSP Engineer — **ưu tiên 1**. Nghiêng kernel/phần cứng/bring-up (kèm nền embedded chung). |
 | **`cpp-system`** | `CPP`, `OS`(concurrency/sync), `DP`, `DBG`, `SD`(abi/lib), `DSA`, `LNX`(basics) | System Software / C++ Engineer. Nghiêng ngôn ngữ/ABI/concurrency. |
 
 > Hai track dùng chung nhiều nền (OS, debug, DSA). Ứng tuyển cả hai → chạy track sắp phỏng vấn trước; phần chung tự khớp.
@@ -21,6 +21,7 @@
 | `modern-cpp` | `CPP` | [01](../../01-cpp-fundamentals/), [02](../../02-modern-cpp/) |
 | `os` | `OS` | [03](../../03-operating-system/) |
 | `linux-sysprog` | `LNX` | [04](../../04-linux-system-programming/) |
+| `embedded` | `EMB`, `BUS` | Embedded SW **nói chung** (bare-metal/MCU/RTOS/firmware, độc lập Linux) — [08](../../08-embedded-systems/) |
 | `drivers-dt` | `DRV`, `BSP`(B), `BUS` | [05](../../05-drivers-device-tree/), [08](../../08-embedded-systems/) |
 | `debugging` | `DBG` | [09](../../09-debugging/) |
 | `dsa` | `DSA`, `COD` | [13](../../13-dsa/) |

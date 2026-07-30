@@ -26,7 +26,7 @@ Một phiên = **1 track** (hỏi về mảng nào) × **1 interview type** (hì
 
 ### Track — hỏi về mảng nào (chi tiết: [tracks.md](tracks.md))
 - **Theo công việc:** `bsp` (Embedded Linux/BSP) · `cpp-system` (C++ System SW).
-- **Theo phần:** `modern-cpp` · `os` · `linux-sysprog` · `drivers-dt` · `debugging` · `dsa` · `design-patterns` · `networking` · `system-design` · `behavioral`.
+- **Theo phần:** `modern-cpp` · `os` · `linux-sysprog` · `embedded` (bare-metal/MCU/RTOS/firmware) · `drivers-dt` · `debugging` · `dsa` · `design-patterns` · `networking` · `system-design` · `behavioral`.
 - **Theo sách đã summary:** `emc` · `cpp-concurrency` · `melp` · `ostep` · `lkd` · `cpp-mindset`.
 
 ### Interview type — hình thức (chi tiết: [interview-types.md](interview-types.md))
