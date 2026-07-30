@@ -1,8 +1,18 @@
 # EMB — Embedded Software nền tảng (bare-metal / MCU / RTOS / firmware)
 
 > Domain `EMB`. Kiến thức nền của Embedded Software **nói chung** — không giả định có Linux/MMU/kernel; bổ trợ cho `DRV`/`BUS`/`BSP` (tầng Linux) và là nền để hiểu sâu chính BSP. Track dùng: `embedded`, `bsp`.
-> Nguồn: [08-embedded-systems](../../../08-embedded-systems/). Một số câu là kiến thức nền chung (🆕 so với repo) — link 08 để đọc thêm.
 > 🏗️ = câu thiết kế/tình huống.
+>
+> **Tài liệu học nền** (đọc sâu ngoài đáp án bank) — [08-embedded-systems](../../../08-embedded-systems/):
+
+| Mảng (câu) | Tài liệu học |
+|---|---|
+| A. C & thanh ghi + F. Số học/độ tin cậy (001–004, 024–027) | [bare-metal-c.md](../../../08-embedded-systems/bare-metal-c.md) |
+| B. Bộ nhớ bare-metal & startup (005–008) | [memory-and-startup.md](../../../08-embedded-systems/memory-and-startup.md) |
+| C. Ngắt bare-metal + hard fault (009–013, 032) | [interrupts-bare-metal.md](../../../08-embedded-systems/interrupts-bare-metal.md) |
+| D. RTOS + E. Kiến trúc firmware (014–023) | [rtos-programming.md](../../../08-embedded-systems/rtos-programming.md) |
+| G. Low-power (028–029) | [constraints.md §3](../../../08-embedded-systems/constraints.md) |
+| H. Debug phần cứng (030–031) | [hardware-debug.md](../../../08-embedded-systems/hardware-debug.md) |
 
 ---
 

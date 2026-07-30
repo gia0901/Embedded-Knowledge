@@ -16,6 +16,7 @@
 | **Power management** | 🟠 | 🟡 | [melp/drivers-init-power](../../16-book-summaries/melp/drivers-init-power.md) cụm 3 | Chưa có topic doc. 4 tầng (cpufreq/cpuidle/runtime PM/system suspend), wakeup source, OPP, DVFS. |
 | **Secure boot / TF-A chiều sâu** | 🟠 | 🟡 | [melp/bootloader-kernel](../../16-book-summaries/melp/bootloader-kernel.md) (🆕 phần bổ sung) | Mới ở mức khái niệm. Cần: chain of trust chi tiết, BL1–BL33, eFuse/OTP, verified boot của U-Boot (FIT + khóa), anti-rollback. |
 | **Bus protocol chiều sâu (I2C/SPI/UART)** | 🟠 | 🟡 | [02_question_bank Q31–34](../technical_round/02_question_bank.md), [11/drivers](../../11-interview-questions/drivers.md) | Có so sánh mức khái niệm; thiếu timing/điện: CPOL/CPHA waveform, clock stretching, START/STOP, arbitration, flow control, tốc độ. |
+| **Bare-metal / MCU / RTOS fundamentals** | 🔴 | ✅ **đã lấp** | [08-embedded-systems](../../08-embedded-systems/): [bare-metal-c](../../08-embedded-systems/bare-metal-c.md), [memory-and-startup](../../08-embedded-systems/memory-and-startup.md), [interrupts-bare-metal](../../08-embedded-systems/interrupts-bare-metal.md), [rtos-programming](../../08-embedded-systems/rtos-programming.md), [hardware-debug](../../08-embedded-systems/hardware-debug.md) + bank [EMB](../mock-interview/bank/embedded-fundamentals.md) | Trước đây topic 08 chỉ có góc SoC/Linux; nay đủ nền Embedded SW chung: C/thanh ghi, startup/linker, ISR bare-metal, RTOS programming, debug HW. |
 | **LDD3 / Bootlin summary** | 🟠 | ⬜ | — (trong hàng đợi sách) | Char driver, ioctl, interrupt, DMA từ góc viết driver thật. Đã lên kế hoạch (xem [16/README](../../16-book-summaries/README.md)). |
 | **pinctrl / clock / regulator framework** | 🟢 | 🟡 | [melp/bootloader-kernel](../../16-book-summaries/melp/bootloader-kernel.md) (nhắc pinctrl) | Chi tiết framework: consumer/provider, clk_get/prepare/enable, regulator_get. |
 | **Device model kernel sâu (kobject/sysfs/uevent)** | 🟢 | 🟡 | [lkd/modules-debug](../../16-book-summaries/lkd/06-modules-debug.md) cụm 1 | Có khung; có thể đào sâu thêm cho vị trí driver-heavy. |
@@ -40,7 +41,7 @@
 | Chủ đề | Ưu tiên | Trạng thái | Hiện có ở đâu | Ghi chú |
 |--------|---------|-----------|---------------|---------|
 | **Behavioral / STAR stories** | 🟠 | 🟡 | [03_behavior](../technical_round/03_behavior.md) | Kiểm tra đã đủ câu chuyện STAR chưa (conflict, failure, leadership, khó khăn kỹ thuật). |
-| **Mock interview scaffolding** | 🟢 | ⬜ | — | Có thể thêm bộ "đề mock" gồm 5–6 câu trộn cho một buổi tập nói. |
+| **Mock interview scaffolding** | 🟢 | ✅ **đã lấp** | [15_prep/mock-interview/](../mock-interview/) | Module phỏng vấn thử tương tác (`/mock`) + ngân hàng câu hỏi duy nhất (bank/) + track/type/sessions/weak-register/daily-plan/coding-arena. |
 | **System design practice (embedded)** | 🟠 | 🟡 | [10/system-design](../../10-thinking/system-design.md), [11/system-design](../../11-interview-questions/system-design.md) | Có khung; nên thêm 2–3 bài tập system design nhúng đã giải mẫu (vd: thiết kế firmware update, data pipeline sensor). |
 
 ---

@@ -22,6 +22,8 @@ flowchart LR
 
 ## Tài liệu trong topic
 
+**Tầng tổng quan (SoC / hệ):**
+
 | # | File | Nội dung | Trạng thái |
 |---|------|----------|-----------|
 | 1 | [architecture.md](architecture.md) | SoC, MCU vs MPU, bus (I2C/SPI/UART), memory-mapped I/O, register, DMA, interrupt | ✅ |
@@ -29,9 +31,20 @@ flowchart LR
 | 3 | [rtos-vs-linux.md](rtos-vs-linux.md) | RTOS vs Linux, hard/soft realtime, determinism, khi nào chọn cái nào | ✅ |
 | 4 | [constraints.md](constraints.md) | ràng buộc bộ nhớ/năng lượng/realtime, tối ưu, watchdog, no-heap, kỹ thuật thực tế | ✅ |
 
+**Tầng bare-metal / MCU / firmware** (nền Embedded SW nói chung, độc lập Linux):
+
+| # | File | Nội dung | Trạng thái |
+|---|------|----------|-----------|
+| 5 | [bare-metal-c.md](bare-metal-c.md) | C cho embedded: stdint/promotion, bit manipulation, truy cập thanh ghi (volatile/bitfield), fixed-point, integer overflow, CRC, MISRA | ✅ |
+| 6 | [memory-and-startup.md](memory-and-startup.md) | `.text/.data/.bss/.rodata`, **startup/crt0** (trước main), **linker script**, stack/heap MCU, MPU | ✅ |
+| 7 | [interrupts-bare-metal.md](interrupts-bare-metal.md) | ISR rules, vector table/NVIC, **chia sẻ dữ liệu ISR↔main** (critical section), latency, reentrancy, hard fault | ✅ |
+| 8 | [rtos-programming.md](rtos-programming.md) | scheduler, primitive (sem/mutex/queue/event), **ISR→task FromISR**, stack sizing, RMS, tickless, kiến trúc firmware, bootloader | ✅ |
+| 9 | [hardware-debug.md](hardware-debug.md) | JTAG vs SWD, semihosting, printf-UART / **GPIO+scope**, chiến lược debug không-debugger | ✅ |
+
 ## Thứ tự đọc gợi ý
-`architecture` → `boot-process` → `rtos-vs-linux` → `constraints`.
+- **Hệ / Linux embedded:** `architecture` → `boot-process` → `rtos-vs-linux` → `constraints`.
+- **Bare-metal / MCU:** `bare-metal-c` → `memory-and-startup` → `interrupts-bare-metal` → `rtos-programming` → `hardware-debug`.
 
 ## Liên kết
 - Nền tảng OS: [03-operating-system/](../03-operating-system/) · Driver: [05-drivers-device-tree/](../05-drivers-device-tree/)
-- Câu hỏi phỏng vấn: [11-interview-questions/drivers.md](../11-interview-questions/drivers.md)
+- Câu hỏi phỏng vấn: bank [EMB (embedded-fundamentals)](../15_prep/mock-interview/bank/embedded-fundamentals.md) + [DRV/BSP](../15_prep/mock-interview/bank/) — hoặc chạy `/mock` track `embedded`/`bsp`.
