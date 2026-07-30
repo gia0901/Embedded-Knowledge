@@ -36,8 +36,11 @@
 
 **Bước 3 — Review (chỉ sau khi phiên kết thúc).** Với **từng câu**:
 - Đáp án chuẩn (đối chiếu bank), **ứng viên thiếu/sai/lệch chỗ nào**, điểm 0–4 (§4).
+- **Với câu điểm ≤ 3 (trích dẫn tại chỗ để ôn nhanh — BẮT BUỘC):** trích **thẳng đoạn liên quan**:
+  1. **Từ bank**: câu ID + đoạn đáp án chuẩn đúng vào chỗ ứng viên thiếu (blockquote).
+  2. **Từ tài liệu gốc**: mở file topic mà câu link tới, **trích nguyên văn mục/đoạn liên quan** (blockquote + đường dẫn `file.md` có neo mục nếu có). Không diễn giải chung chung — dán đúng đoạn cần đọc để không phải cuộn tìm.
 - Câu coding: review code trong coding-arena (đúng, độ phức tạp, edge case, style), nêu bản mẫu nếu cần.
-- Tổng kết: điểm mạnh, 2–3 lỗ hổng ưu tiên, link tài liệu ôn lại (dùng link nguồn của mỗi câu trong bank).
+- Tổng kết: điểm mạnh, 2–3 lỗ hổng ưu tiên, mỗi lỗ hổng kèm **link tài liệu + mục cụ thể** (không chỉ link file trống).
 
 **Bước 4 — Cập nhật bộ nhớ (BẮT BUỘC, sau review).**
 - Ghi **1 file log** vào [sessions/](sessions/) theo mẫu [sessions/README.md](sessions/README.md): ngày, track, type, danh sách câu (ID) + điểm + ghi chú.

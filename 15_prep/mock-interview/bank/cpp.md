@@ -201,10 +201,48 @@ Khi exception ném, **stack unwinding** gọi destructor của mọi object đã
 </details>
 
 #### CPP-029 · 🟡 · concept · [→ move-semantics](../../../02-modern-cpp/move-semantics.md)
-**`emplace_back` khác `push_back` thế nào? Khi nào thật sự lợi?**
+**`emplace_back` khác `push_back` thế nào? Khi nào emplace KHÔNG lợi, khi nào push_back tốt hơn?**
 <details><summary>Đáp án</summary>
 
-`push_back(x)` tạo/nhận một object rồi copy/move vào container. `emplace_back(args...)` **dựng object tại chỗ** trong bộ nhớ container từ đối số constructor (perfect forwarding) → tránh một object tạm. Lợi rõ khi object đắt và bạn đang truyền **đối số constructor** (`v.emplace_back(1, "a")`). Nếu đã có sẵn object thì `push_back(std::move(x))` tương đương. Bẫy: `emplace_back` bỏ qua `explicit`/ép kiểu ngầm nên có thể tạo object ngoài ý muốn; không nhanh hơn nếu chỉ truyền một object đã dựng.
+**Khác biệt cốt lõi:** `push_back` nhận một **object đã dựng** rồi copy/move nó vào container. `emplace_back` nhận **đối số của constructor**, forward (perfect forwarding) vào để **dựng object thẳng trong bộ nhớ container** — bỏ qua bước tạo object tạm.
+
+```cpp
+struct Foo { Foo(int, const std::string&); };
+std::vector<Foo> v;
+v.push_back(Foo(1, "a"));   // dựng temporary Foo -> move vào vector
+v.emplace_back(1, "a");     // dựng thẳng trong vector, KHÔNG có temporary
+```
+
+**Bốn tình huống:**
+
+1. **emplace LỢI** — khi truyền **đối số constructor** của object đắt (như trên): tiết kiệm một lần dựng + move temporary.
+
+2. **HÒA (emplace không nhanh hơn)** — khi bạn đã có sẵn một object: cả hai đều phải copy/move nó, không có temporary nào để tiết kiệm.
+   ```cpp
+   Foo f(1, "a");
+   v.push_back(f);              // copy f
+   v.emplace_back(f);           // cũng copy f — y hệt
+   v.push_back(std::move(f));   // move
+   v.emplace_back(std::move(f));// cũng move — y hệt
+   ```
+   Trường hợp này chọn `push_back` cho **rõ ý** hơn.
+
+3. **push_back AN TOÀN/ĐÚNG Ý hơn** — vì `emplace_back` dựng qua **direct-initialization** nên **bỏ qua `explicit`** và ép kiểu "ngầm" mà push_back sẽ chặn:
+   ```cpp
+   std::vector<std::vector<int>> vv;
+   vv.emplace_back(10);   // ✅ compile: gọi vector(size_t)=10 phần tử — thường NGOÀI Ý MUỐN!
+   vv.push_back(10);      // ❌ compile error: chặn vì vector(size_t) là explicit — an toàn hơn
+   ```
+   `emplace` "quá dễ dãi" có thể lặng lẽ dựng nhầm object. Với resource-owning: `v.emplace_back(new T)` compile được (ctor `unique_ptr(T*)` là explicit) nhưng dễ **leak nếu reallocate ném** giữa chừng — ưu tiên `push_back(std::make_unique<T>())`.
+
+4. **push_back BẮT BUỘC** — với **braced-init-list** `{...}`: emplace không suy được kiểu từ `{}`.
+   ```cpp
+   std::vector<std::vector<int>> vv;
+   vv.push_back({1, 2, 3});    // ✅ ok: {1,2,3} là initializer_list<int>
+   vv.emplace_back({1, 2, 3}); // ❌ compile error: không suy được kiểu đối số
+   ```
+
+**Chốt:** mặc định dùng `push_back` cho **rõ ràng + an toàn kiểu**; dùng `emplace_back` khi thật sự truyền **đối số constructor** của object đắt để tránh temporary. Đừng "emplace mọi nơi" — nó không luôn nhanh hơn và có thể che lỗi ép kiểu.
 </details>
 
 #### CPP-030 · 🟡 · concept · [→ complexity-and-structures](../../../13-dsa/complexity-and-structures.md)

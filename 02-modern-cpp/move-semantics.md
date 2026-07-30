@@ -117,6 +117,32 @@ std::vector<std::string> v;
 v.emplace_back("hello");   // construct tại chỗ, không tạo temporary rồi move
 ```
 
+### 5.1. `emplace_back` vs `push_back` — không phải "cứ emplace là nhanh"
+
+**Khác biệt cốt lõi:** `push_back` nhận một **object đã dựng** rồi copy/move vào container; `emplace_back` nhận **đối số của constructor**, forward vào để **dựng thẳng trong bộ nhớ container** — bỏ qua object tạm.
+
+```cpp
+struct Foo { Foo(int, const std::string&); };
+std::vector<Foo> v;
+v.push_back(Foo(1, "a"));   // dựng temporary Foo -> move vào vector
+v.emplace_back(1, "a");     // dựng thẳng trong vector, KHÔNG temporary
+```
+
+Nhưng emplace **không luôn** lợi — bốn tình huống:
+
+1. **emplace lợi** — truyền **đối số constructor** của object đắt (ví dụ trên): tiết kiệm một lần dựng + move temporary.
+2. **Hòa** — đã có sẵn object: `push_back(x)`/`emplace_back(x)` đều copy `x`; `push_back(std::move(x))`/`emplace_back(std::move(x))` đều move — **y hệt**. Chọn `push_back` cho rõ ý.
+3. **push_back an toàn hơn** — emplace dùng *direct-initialization* nên **bỏ qua `explicit`**, dễ lặng lẽ dựng nhầm object:
+   ```cpp
+   std::vector<std::vector<int>> vv;
+   vv.emplace_back(10);   // ✅ compile: vector(size_t) -> 10 phần tử, thường NGOÀI Ý
+   vv.push_back(10);      // ❌ error: chặn vì vector(size_t) là explicit — an toàn hơn
+   ```
+   Với resource-owning: `v.emplace_back(new T)` compile được nhưng dễ **leak nếu reallocate ném** giữa chừng → ưu tiên `push_back(std::make_unique<T>())`.
+4. **push_back bắt buộc** — với braced-init-list: `vv.push_back({1,2,3})` ✅ (là `initializer_list`), còn `vv.emplace_back({1,2,3})` ❌ (không suy được kiểu đối số từ `{}`).
+
+**Chốt:** mặc định `push_back` (rõ + an toàn kiểu); dùng `emplace_back` khi thật sự truyền **đối số constructor** của object đắt. "emplace mọi nơi" là quan niệm sai — không luôn nhanh hơn và có thể che lỗi ép kiểu.
+
 ---
 
 ## 6. Copy elision & RVO — đừng phá nó

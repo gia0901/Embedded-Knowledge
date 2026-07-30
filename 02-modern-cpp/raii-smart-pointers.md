@@ -117,20 +117,103 @@ if (auto sp = node.prev.lock()) {   // sp là shared_ptr hoặc nullptr
 
 ## 6. Rule of 0 / 3 / 5
 
-**Special member functions:** destructor, copy ctor, copy assignment, move ctor, move assignment.
+**5 special member functions:** destructor, copy ctor, copy assignment, move ctor, move assignment.
 
-- **Rule of 3** (C++98): nếu cần tự viết 1 trong {destructor, copy ctor, copy assignment} thì thường cần viết cả 3 (vì class quản lý tài nguyên thô).
-- **Rule of 5** (C++11): thêm move ctor + move assignment để hỗ trợ move semantics.
-- **Rule of 0** (khuyến nghị): **thiết kế để không phải viết cái nào** — dùng member là RAII type (`vector`, `string`, smart pointer) thì compiler tự sinh đúng. Đây là mục tiêu nên hướng tới.
+Tóm tắt định hướng trước khi vào chi tiết:
+
+| Quy tắc | Nói về điều gì | Khi nào áp |
+|---|---|---|
+| **Rule of 3** | **ĐÚNG/SAI** — tránh leak, double-free, aliasing | class ôm tài nguyên thô, cần copy |
+| **Rule of 5** | **NHANH/CHẬM** — thêm đường move O(1) thay vì copy O(n) | như trên + quan tâm hiệu năng |
+| **Rule of 0** | **không phải viết gì** — để RAII member lo | mặc định nên hướng tới |
+
+### 6.1. Rule of 3 — vì sao là "bộ ba bất khả phân"
+
+Cả 3 hàm chỉ là **3 mặt của MỘT việc: quản lý sở hữu một tài nguyên thô**. Cần tùy biến bất kỳ cái nào ⟹ class đang sở hữu tài nguyên (con trỏ heap, file handle…) mà bản mặc định của compiler xử lý sai ⟹ **cả 3 đều sai theo**.
 
 ```cpp
-// Rule of 0: không cần viết destructor/copy/move — các member tự lo
+class Buffer {
+    char*  data;
+    size_t size;
+public:
+    Buffer(size_t n) : data(new char[n]), size(n) {}
+    ~Buffer() { delete[] data; }               // (1) có tài nguyên riêng -> phải giải phóng
+};
+```
+
+**Vì sao viết copy → phải có destructor?**
+Bạn chỉ viết copy ctor khi bản mặc định *sai*. Copy mặc định là **shallow** — chép `data = other.data` (chép con trỏ, không chép mảng). Viết copy ctor riêng nghĩa là muốn **deep copy** (`new` mảng mới). Nhưng hễ copy có `new` → mỗi object **tự sở hữu** một mảng → **bắt buộc `delete`** ở đâu đó → cần destructor. Nói ngược lại: nếu class **không cần destructor** (không sở hữu gì) thì copy mặc định đã đúng → chẳng có lý do viết copy ctor. Vậy "cần copy riêng" ⟺ "sở hữu tài nguyên" ⟺ "cần destructor".
+
+**Vì sao viết copy ctor → phải viết copy assignment?**
+Hai hàm cùng làm "biến object này thành bản sao của object kia": copy ctor dựng object *mới*; copy assign thay nội dung object *đã tồn tại*. Nếu deep-copy ở ctor nhưng để **copy assign mặc định** (shallow):
+
+```cpp
+Buffer a(10), b(20);
+a = b;   // copy assign MẶC ĐỊNH: a.data = b.data (chép con trỏ!)
+```
+→ (1) mảng gốc 10 byte của `a` không ai giải phóng = **leak**; (2) `a.data` và `b.data` trỏ **cùng mảng** → khi cả hai hủy = **double free** (UB), sửa `a` cũng đổi `b` (aliasing). Cùng "bệnh sở hữu con trỏ thô" khiến cả hai phải tự viết. Bản đúng của copy assign (copy-and-swap, an toàn self-assignment):
+
+```cpp
+    Buffer(const Buffer& o) : data(new char[o.size]), size(o.size) {
+        std::copy(o.data, o.data + o.size, data);          // deep copy, O(n)
+    }
+    Buffer& operator=(const Buffer& o) {                   // copy-and-swap
+        if (this != &o) { Buffer tmp(o); std::swap(data, tmp.data); std::swap(size, tmp.size); }
+        return *this;   // tmp mang tài nguyên cũ ra scope -> tự dtor
+    }
+```
+
+### 6.2. Rule of 5 — thêm đường "cướp tài nguyên" O(1)
+
+Khác biệt tư duy: **Rule of 3 đã đủ ĐÚNG.** Rule of 5 chỉ thêm hiệu năng — thay vì deep-copy mỗi lần đáng ra move được, ta **cướp con trỏ + để nguồn rỗng**, O(1).
+
+```cpp
+    Buffer(Buffer&& o) noexcept : data(o.data), size(o.size) {
+        o.data = nullptr;   // nguồn thôi sở hữu -> ~Buffer của nó: delete[] nullptr = an toàn no-op
+        o.size = 0;         // nguồn ở trạng thái HỢP LỆ nhưng rỗng (dùng lại được)
+    }
+    Buffer& operator=(Buffer&& o) noexcept {
+        if (this != &o) {
+            delete[] data;                  // (1) giải phóng tài nguyên CŨ của mình trước
+            data = o.data; size = o.size;   // (2) cướp con trỏ của nguồn
+            o.data = nullptr; o.size = 0;   // (3) để nguồn rỗng
+        }
+        return *this;
+    }
+```
+
+Tinh thần move ctor gói trong 3 dòng: **chép con trỏ → null nguồn**. Quên null nguồn → cả `this` lẫn `o` trỏ cùng mảng → **double free** khi cả hai hủy.
+
+**Cái bẫy hay bị hỏi** — vì sao "viết Rule of 3 thì nên viết luôn Rule of 5":
+> Chỉ cần bạn **khai báo destructor (hoặc copy ops)**, compiler **NGỪNG tự sinh move** ctor/assign. Class "mất" move một cách âm thầm → mọi thao tác đáng ra move **rơi về copy**.
+
+Nên một `Buffer` chỉ có Rule of 3, khi bỏ vào `std::vector` và vector reallocate, sẽ **deep-copy từng phần tử** thay vì move — đúng nhưng chậm, không cảnh báo. Viết thêm move (Rule of 5) để khôi phục đường nhanh.
+
+Hai điểm cộng điểm:
+- **`noexcept` cho move gần như bắt buộc:** `std::vector` chỉ dùng move khi reallocate *nếu* move ctor `noexcept` (giữ strong exception guarantee); quên `noexcept` → nó lại âm thầm copy.
+- **move assign có 3 việc** copy ctor không có: giải phóng tài nguyên cũ, cướp, null nguồn — cộng an toàn **self-move**.
+
+### 6.3. Rule of 0 — đích đến
+
+Nếu member là **RAII type**, chúng tự lo copy/move/hủy đúng → class **không sở hữu tài nguyên thô nào** → compiler sinh **cả 5** vừa đúng vừa hiệu quả → bạn **không viết dòng nào**:
+
+```cpp
+// Rule of 0: các member tự lo -> copy/move/dtor đều đúng + nhanh, miễn phí
 class Config {
     std::string name_;
     std::vector<int> values_;
     std::unique_ptr<Impl> impl_;   // move-only → Config tự thành move-only
 };
+
+// Buffer ở trên viết lại theo Rule of 0:
+class Buffer {
+    std::vector<char> data;        // vector tự copy (deep) / move (steal) / hủy
+public:
+    explicit Buffer(size_t n) : data(n) {}
+};
 ```
+
+**Thứ tự tư duy chuẩn:** ưu tiên **Rule of 0**; chỉ khi buộc phải ôm tài nguyên thô (wrap C API, OS handle, MMIO…) mới rơi vào **Rule of 5** — và khi đó viết **đủ cả 5 + `noexcept`** cho move. Rule of 3 "trần" chỉ còn hợp lý khi thật sự không muốn/không cần move.
 
 ---
 
