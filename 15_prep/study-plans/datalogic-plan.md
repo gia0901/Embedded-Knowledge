@@ -52,12 +52,14 @@
 
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
-| 1 | - [ ] [driver-basics](../../05-drivers-device-tree/driver-basics.md), [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md) | `/mock daily track drivers-dt` |
+| 1 | - [ ] [driver-basics](../../05-drivers-device-tree/driver-basics.md), [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md) · *bổ đệm* [bare-metal-c](../../08-embedded-systems/bare-metal-c.md) phần `volatile`/register/bit-manip ([EMB-A](../mock-interview/bank/embedded-fundamentals.md)) — nền cho MMIO `readl/writel` | `/mock daily track drivers-dt` |
 | 2 | - [ ] 🎯 [device-tree](../../05-drivers-device-tree/device-tree.md) + [BSP-006…009](../mock-interview/bank/bsp.md) (probe, EPROBE_DEFER, pinctrl) | `/mock by-level 🟠 track bsp` |
 | 3 | - [ ] 🎯 **[pci-usb-drivers](../../05-drivers-device-tree/pci-usb-drivers.md)** (PCI config/BAR/MSI, USB descriptor/URB/gadget) | `/mock ... track drivers-dt` (DRV-019…027) |
-| 4 | - [ ] [interrupt/DMA](../mock-interview/bank/bsp.md) (BSP-010…013: threaded IRQ, coherent vs streaming DMA) | `/mock deep-dive track bsp` |
+| 4 | - [ ] [interrupt/DMA](../mock-interview/bank/bsp.md) (BSP-010…013: threaded IRQ, coherent vs streaming DMA) · *bổ đệm* [interrupts-bare-metal](../../08-embedded-systems/interrupts-bare-metal.md) khái niệm ISR ([EMB-C](../mock-interview/bank/embedded-fundamentals.md)): không sleep trong ISR, critical section, reentrancy — chuyển thẳng sang top-half/bottom-half kernel | `/mock deep-dive track bsp` |
 | 5 | - [ ] [lkd](../../16-book-summaries/lkd/) cụm driver/interrupt (đọc thêm) | `/mock comprehensive track drivers-dt` |
 | CN | Ôn lại | `/mock weak-review` |
+
+> **Phạm vi `embedded-fundamentals` (EMB) cho JD này:** chỉ ôn **A** (C/thanh ghi/`volatile`/bit-manip) + **C** (khái niệm ISR) như *đệm* cho buổi 1 & 4 ở trên — vì chúng chuyển thẳng sang MMIO driver + kernel IRQ. **Hoãn** B (startup/linker chi tiết), **D (RTOS)**, F/G/H (CRC/MISRA, low-power, JTAG/SWD): JD là Embedded **Linux** (có MMU, không RTOS/bare-metal firmware) nên các phần này là "nice-to-have" ghi điểm nếu bị hỏi lan, không phải câu loại. Full EMB để dành cho hồ sơ BSP tổng quát ([bsp-plan](bsp-plan.md)).
 
 ## Tuần 4 — Yocto/CI + Design + Behavioral + tổng duyệt
 
