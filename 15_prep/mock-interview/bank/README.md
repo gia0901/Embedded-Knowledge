@@ -18,6 +18,7 @@
 | `BUS` | [drivers-embedded.md](drivers-embedded.md#bus) | I2C/SPI/UART | [08](../../../08-embedded-systems/) |
 | `EMB` | [embedded-fundamentals.md](embedded-fundamentals.md) | Embedded SW nền tảng: C/thanh ghi, bộ nhớ bare-metal/startup, ngắt, RTOS, firmware, số học/độ tin cậy, low-power, debug HW | [08](../../../08-embedded-systems/) |
 | `BSP` | [bsp.md](bsp.md) | BSP chuyên sâu: boot/DT probe/IRQ/DMA/flash/OTA/Yocto/power/RT/bring-up | [16 melp](../../../16-book-summaries/melp/) |
+| `BLD` | [build-systems.md](build-systems.md) | CMake, Yocto, cross-compile, CI | [06](../../../06-build-systems/) |
 | `DBG` | [debugging.md](debugging.md) | Debugging & tools | [09](../../../09-debugging/) |
 | `DP` | [design-patterns.md](design-patterns.md) | Design patterns & SOLID | [12](../../../12-design-patterns/) |
 | `DSA` | [dsa.md](dsa.md) | Cấu trúc dữ liệu & giải thuật | [13](../../../13-dsa/) |
@@ -52,10 +53,11 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 | CPP | 001–051 (040–051 = track `emc`, neo theo Item) |
 | OS | 001–019 |
 | LNX | 001–026 |
-| DRV | 001–018 |
+| DRV | 001–027 (019–027 = PCI/USB) |
 | BUS | 001–004 |
 | EMB | 001–032 |
 | BSP | 001–027 |
+| BLD | 001–010 (CMake/Yocto/CI) |
 | DBG | 001–019 |
 | DP | 001–013 |
 | DSA | 001–012 |

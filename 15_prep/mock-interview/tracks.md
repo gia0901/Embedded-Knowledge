@@ -9,8 +9,8 @@
 
 | Track | Domain rút câu | Ghi chú |
 |---|---|---|
-| **`bsp`** ⭐ | `BSP`, `DRV`, `BUS`, `EMB`, `OS`(mem/sched/sync), `LNX`(ipc/signal/io), `DBG`, `SD`(embedded) | Embedded Linux / BSP Engineer — **ưu tiên 1**. Nghiêng kernel/phần cứng/bring-up (kèm nền embedded chung). |
-| **`cpp-system`** | `CPP`, `OS`(concurrency/sync), `DP`, `DBG`, `SD`(abi/lib), `DSA`, `LNX`(basics) | System Software / C++ Engineer. Nghiêng ngôn ngữ/ABI/concurrency. |
+| **`bsp`** ⭐ | `BSP`, `DRV`(gồm PCI/USB), `BUS`, `EMB`, `BLD`, `OS`(mem/sched/sync), `LNX`(ipc/signal/io), `DBG`, `SD`(embedded) | Embedded Linux / BSP Engineer — **ưu tiên 1**. Nghiêng kernel/phần cứng/bring-up + Yocto (kèm nền embedded chung). |
+| **`cpp-system`** | `CPP`, `OS`(concurrency/sync), `DP`, `DBG`, `SD`(abi/lib), `DSA`, `LNX`(basics), `BLD`(CMake) | System Software / C++ Engineer. Nghiêng ngôn ngữ/ABI/concurrency. |
 
 > Hai track dùng chung nhiều nền (OS, debug, DSA). Ứng tuyển cả hai → chạy track sắp phỏng vấn trước; phần chung tự khớp.
 
@@ -22,7 +22,8 @@
 | `os` | `OS` | [03](../../03-operating-system/) |
 | `linux-sysprog` | `LNX` | [04](../../04-linux-system-programming/) |
 | `embedded` | `EMB`, `BUS` | Embedded SW **nói chung** (bare-metal/MCU/RTOS/firmware, độc lập Linux) — [08](../../08-embedded-systems/) |
-| `drivers-dt` | `DRV`, `BSP`(B), `BUS` | [05](../../05-drivers-device-tree/), [08](../../08-embedded-systems/) |
+| `drivers-dt` | `DRV`(gồm PCI/USB), `BSP`(B), `BUS` | [05](../../05-drivers-device-tree/), [08](../../08-embedded-systems/) |
+| `build-systems` | `BLD` | CMake, Yocto, cross-compile, CI — [06](../../06-build-systems/) |
 | `debugging` | `DBG` | [09](../../09-debugging/) |
 | `dsa` | `DSA`, `COD` | [13](../../13-dsa/) |
 | `design-patterns` | `DP` | [12](../../12-design-patterns/) |
@@ -44,6 +45,12 @@ Track sách rút câu **2 nguồn**: (1) câu trong bank có **link nguồn tớ
 | `cpp-mindset` | `DSA`, `CPP`, `SD` | [cpp-mindset/](../../16-book-summaries/cpp-mindset/) |
 
 ---
+
+## D. Theo JD cụ thể
+
+| Track | Domain rút câu | JD |
+|---|---|---|
+| `datalogic` | `CPP`(C++17), `LNX`, `DBG`, `DRV`(I2C/SPI + PCI/USB), `BSP`(kernel/Yocto), `BLD`, `SD`, `BEH`(lead/review) | Embedded Linux Engineer @ Datalogic — xem [datalogic-plan](../study-plans/datalogic-plan.md) |
 
 ## Mix / all
 

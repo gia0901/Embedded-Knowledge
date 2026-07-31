@@ -131,6 +131,72 @@ A/B: ghi bản mới vào slot không dùng, boot thử; nếu hỏng thì bootl
 </details>
 
 ---
+## PCI / USB drivers
+
+#### DRV-019 · 🟡 · concept · ⭐ · [→ pci-usb-drivers §1](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**Vì sao PCI/USB không cần khai trong device tree như I2C/SPI?**
+<details><summary>Đáp án</summary>
+
+PCI/USB **tự liệt kê** (self-enumerating): PCI có **configuration space** (Vendor/Device ID, class, BAR) kernel quét lúc boot rồi gán địa chỉ; USB có **descriptor** host đọc khi cắm. Kernel biết thiết bị *là gì* và *ở đâu* mà không cần khai. I2C/SPI **không discoverable** — bus không có cơ chế hỏi "ai đang cắm ở địa chỉ này" → phải khai trong **device tree** (compatible + reg). Đây là lý do gốc DT tồn tại cho embedded bus.
+</details>
+
+#### DRV-020 · 🟠 · concept · [→ pci-usb-drivers §1.2](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**Một PCI driver probe làm những gì? BAR là gì?**
+<details><summary>Đáp án</summary>
+
+Driver khai `pci_driver` với `id_table` (Vendor/Device ID) + `MODULE_DEVICE_TABLE(pci,…)`; kernel match ID quét được → gọi `probe(pdev)`. Trong probe: `pci_enable_device` → `pci_request_regions` (xin quyền BAR) → `pci_iomap(pdev, bar, 0)` map **BAR** thành MMIO → `pci_set_master` (cho phép DMA) → `dma_set_mask` → xin IRQ → đăng ký subsystem. **BAR** (Base Address Register, trong config space) khai thiết bị cần vùng địa chỉ (MMIO/IO) kích thước bao nhiêu; kernel/firmware gán địa chỉ, driver `ioremap` để chạm thanh ghi. Ưu tiên `pcim_*`/`devm_*` để tự dọn.
+</details>
+
+#### DRV-021 · 🟠 · concept · ⭐ · [→ pci-usb-drivers §1.3](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**INTx vs MSI/MSI-X trên PCI khác nhau thế nào?**
+<details><summary>Đáp án</summary>
+
+**INTx** (legacy): 4 đường ngắt **level-triggered, chia sẻ** giữa nhiều thiết bị → handler phải kiểm tra "ngắt của mình không", chia sẻ gây latency. **MSI/MSI-X** (message-signaled): thiết bị **ghi một message vào bộ nhớ** thay vì kéo dây IRQ → **không chia sẻ**, mỗi vector riêng (MSI-X tới 2048 vector), giống edge-triggered, latency thấp, cho phép định tuyến ngắt tới core cụ thể. Hiện đại nên dùng MSI-X. API: `pci_alloc_irq_vectors(...PCI_IRQ_MSIX|MSI|INTX)` + `pci_irq_vector()`.
+</details>
+
+#### DRV-022 · 🟠 · concept · [→ pci-usb-drivers §1.4](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**DMA trên PCI hoạt động thế nào? Vai trò `pci_set_master`?**
+<details><summary>Đáp án</summary>
+
+PCI device là **bus master** — tự đọc/ghi RAM không cần CPU; `pci_set_master()` bật khả năng đó. Driver dùng cùng DMA API: `dma_alloc_coherent` (descriptor ring, uncached) + `dma_map_single/sg` (payload streaming, kernel flush/invalidate cache); `dma_set_mask_and_coherent` khai độ rộng địa chỉ device chịu được (32/64-bit) để kernel cấp buffer trong tầm. PCIe thường qua **IOMMU** (dịch + bảo vệ địa chỉ). Vẫn phải lo cache maintenance nếu hệ không coherent. *(Nền DMA: [BSP-011](bsp.md).)*
+</details>
+
+#### DRV-023 · 🟡 · concept · ⭐ · [→ pci-usb-drivers §2.1](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**Kiến trúc USB: descriptor và transfer types?**
+<details><summary>Đáp án</summary>
+
+USB **host-centric** (thiết bị chỉ nói khi host hỏi), host controller = xHCI (USB3)/EHCI. Descriptor phân cấp: **Device** (VID/PID, class) → **Configuration** → **Interface** (một chức năng — driver bind ở mức *interface*) → **Endpoint** (kênh dữ liệu một chiều). **Transfer types** theo endpoint: **Control** (setup/điều khiển), **Bulk** (dữ liệu lớn, tin cậy — storage/máy in), **Interrupt** (nhỏ, định kỳ, độ trễ giới hạn — chuột/bàn phím), **Isochronous** (đúng nhịp, không đảm bảo — audio/video).
+</details>
+
+#### DRV-024 · 🟡 · concept · [→ pci-usb-drivers §2.2](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**USB enumeration diễn ra thế nào? Driver match theo gì?**
+<details><summary>Đáp án</summary>
+
+Cắm vào → host phát hiện (pull-up), **reset**, gán **address**, đọc descriptor, chọn configuration, rồi **match driver** theo **VID/PID** (driver riêng) hoặc theo **class** (HID, Mass Storage, CDC → driver class dùng chung, cắm là chạy không cần driver riêng). Sau đó driver dùng endpoint trao đổi. Đây là lý do chuột/USB stick "cắm là nhận" — dùng class driver có sẵn.
+</details>
+
+#### DRV-025 · 🟠 · concept · [→ pci-usb-drivers §2.3](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**USB host driver viết thế nào? URB là gì?**
+<details><summary>Đáp án</summary>
+
+Khai `usb_driver` với `id_table`; bind ở mức **interface** (`probe(intf, id)`). Giao tiếp qua **URB** (USB Request Block) = mô tả một lần truyền tới một endpoint: `usb_submit_urb()` **bất đồng bộ** → xong thì callback chạy (hợp streaming, phải re-submit cho interrupt-in). Bản **đồng bộ** tiện hơn cho trao đổi đơn giản: `usb_control_msg()`, `usb_bulk_msg()` (block tới khi xong/timeout). `disconnect()` khi rút.
+</details>
+
+#### DRV-026 · 🟠 · concept · ⭐ · [→ pci-usb-drivers §2.4](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**USB gadget là gì? Khi nào dùng?**
+<details><summary>Đáp án</summary>
+
+Khi board embedded của bạn đóng vai **USB device** (cắm vào PC), không phải host. Dùng **USB gadget framework** + driver **UDC** (USB Device Controller). Chọn **function**: `g_serial`/CDC-ACM (cổng COM ảo — hay dùng cho console/debug), `g_mass_storage` (ổ USB), `g_ether` (mạng qua USB), HID; ghép nhiều function qua **configfs** (composite gadget). OTG/dual-role: board vừa host vừa device tùy chiều cắm. Phân biệt rõ **host driver** (điều khiển thiết bị cắm vào) vs **gadget** (làm cho mình thành thiết bị) là điểm hay bị hỏi.
+</details>
+
+#### DRV-027 · 🟡 · concept · [→ pci-usb-drivers §2.5](../../../05-drivers-device-tree/pci-usb-drivers.md)
+**Debug một vấn đề USB thế nào?**
+<details><summary>Đáp án</summary>
+
+`lsusb` / `lsusb -t` (cây thiết bị + driver nào bind), `dmesg` (enumerate/reset/disconnect, lỗi cấp nguồn), **`usbmon`** + Wireshark (bắt gói USB thật — xem transfer nào fail), `/sys/kernel/debug/usb`. Lỗi hay gặp: sai endpoint/direction, quên re-submit URB interrupt-in, thiếu quyền (cần **udev rule**), UDC/gadget không match, thiếu dòng điện (hub). Nguyên tắc: xác nhận enumerate được trước (lsusb), rồi mới soi transfer (usbmon).
+</details>
+
+---
 <a id="bus"></a>
 ## BUS — Bus Protocols (I2C / SPI / UART)
 

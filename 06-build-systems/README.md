@@ -27,6 +27,7 @@ flowchart LR
 | 1 | [makefile.md](makefile.md) | quá trình build (preprocess→compile→assemble→link), rule/target/dependency, biến, incremental build | ✅ |
 | 2 | [cmake.md](cmake.md) | meta-build, target-based modern CMake, find_package, generator, vì sao dùng | ✅ |
 | 3 | [cross-compilation.md](cross-compilation.md) | host/build/target, toolchain, sysroot, CMake toolchain file, Yocto/Buildroot | ✅ |
+| 4 | [yocto.md](yocto.md) | Yocto Project: BitBake, recipe/layer/bbappend, machine/BSP layer, sstate, devtool, SDK, CVE/license | ✅ |
 
 ## Thứ tự đọc gợi ý
 `makefile` (hiểu quá trình build) → `cmake` → `cross-compilation`.

@@ -30,6 +30,7 @@ flowchart LR
 | 1 | [driver-basics.md](driver-basics.md) | char/block/net driver, module, file_operations, đăng ký, interrupt vs polling | ✅ |
 | 2 | [kernel-userspace.md](kernel-userspace.md) | ranh giới user/kernel, syscall, ioctl, sysfs/procfs, copy_to/from_user, mmap | ✅ |
 | 3 | [device-tree.md](device-tree.md) | vì sao có device tree, cú pháp DTS, node/property, binding, so với ACPI | ✅ |
+| 4 | [pci-usb-drivers.md](pci-usb-drivers.md) | bus tự liệt kê: PCI (config space/BAR/MSI-X, pci_driver), USB (descriptor/URB/gadget), so với I2C/SPI | ✅ |
 
 ## Thứ tự đọc gợi ý
 `driver-basics` → `kernel-userspace` → `device-tree`.

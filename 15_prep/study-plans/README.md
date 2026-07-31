@@ -26,6 +26,7 @@ Ký hiệu trong checklist: `- [ ]` chưa ôn · `- [x]` đã ôn vững · **�
 |--------|----------|-----------|
 | **Embedded SW Engineer (BSP)** | [bsp-plan.md](bsp-plan.md) | boot/U-Boot, device tree/probe, kernel internals, interrupt/DMA, storage/OTA, real-time |
 | **System Software / C++ Engineer** | [cpp-systemsw-plan.md](cpp-systemsw-plan.md) | modern C++, ABI/shared library, concurrency, design pattern, OS fundamentals |
+| 🎯 **Embedded Linux Engineer @ Datalogic** (JD cụ thể) | [datalogic-plan.md](datalogic-plan.md) | 4 tuần (dùng được cho 2 tuần nước rút): C++17, Linux sysprog+debug, kernel/driver I2C/SPI + **PCI/USB**, **Yocto**/CMake/CI, design + lead/review |
 
 > Hai vị trí **dùng chung nhiều phần nền** (OS, concurrency, debug, DSA). Kế hoạch BSP nghiêng về kernel/phần cứng; kế hoạch C++ nghiêng về ngôn ngữ/ABI. Nếu ứng tuyển cả hai, đi tầng sprint của vị trí sắp phỏng vấn trước, phần chung tự khớp.
 
