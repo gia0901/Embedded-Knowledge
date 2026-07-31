@@ -37,6 +37,8 @@ Một phiên = **1 track** (hỏi về mảng nào) × **1 interview type** (hì
 - `coding` — làm bài code (viết vào [coding-arena/](coding-arena/)).
 - `deep-dive` — 5 câu khó/tình huống 1 mảng.
 - `weak-review` — hỏi lại các câu bạn còn yếu.
+- `retention` — hỏi lại các câu **đã trả lời tốt** để kiểm tra độ nhớ theo thời gian.
+- `full-review` — kiểm tra **toàn diện**: trộn mọi câu đã từng hỏi (yếu + tốt).
 
 ---
 

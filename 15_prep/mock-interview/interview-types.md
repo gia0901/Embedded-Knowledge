@@ -9,7 +9,7 @@
 Đa dạng, nhẹ, giữ nhịp mỗi ngày. Cơ cấu:
 - 2 câu **rapid** 🟢 (phản xạ nhanh, đáp án 1–2 câu).
 - 3 câu **concept** 🟡 (giải thích cơ chế, so sánh).
-- 1 câu **revisit** — lấy từ [weak-register.md](weak-register.md) đúng track (nếu trống thì 1 câu 🟠).
+- 1 câu **revisit** — từ [weak-register.md](weak-register.md) (ưu tiên), hoặc nếu trống thì **câu retention** (câu đã trả lời tốt, đã lâu chưa hỏi lại — đọc [sessions/](sessions/)).
 - Track: mặc định `bsp`; hoặc `all` để trộn. Theo lịch [daily-plan.md](daily-plan.md) nếu có.
 
 ## `rapid` — Phản xạ nhanh · 12 câu · ~15′
@@ -21,7 +21,7 @@ Mô phỏng một vòng phỏng vấn kỹ thuật đầy đủ trên **1 track 
 - ~5 câu 🟡 (cơ chế, so sánh — có follow-up).
 - ~3 câu 🟠🔴 **design/tình huống** (🏗️ — chấm theo khung, đào sâu nhiều).
 - ~2 câu **coding** (viết vào [coding-arena/](coding-arena/)).
-- ~1–2 câu **revisit** từ weak-register + câu xuyên-topic (nối nhiều mảng — thước đo senior).
+- ~1–2 câu **revisit** từ weak-register + **câu retention** (câu tốt cũ, kiểm tra độ nhớ) + câu xuyên-topic (nối nhiều mảng — thước đo senior).
 - Kết: review chi tiết + chấm tổng + 3 lỗ hổng ưu tiên.
 
 ## `by-level` — Luyện đúng 1 mức khó · 10 câu
@@ -36,6 +36,12 @@ Interviewer ra 3 bài (theo track — DSA, C++ implement, driver skeleton, C low
 ## `weak-review` — Ôn lại câu yếu · toàn bộ weak-register
 Hỏi lại **mọi câu** trong [weak-register.md](weak-register.md) (lọc theo track nếu nêu) tới khi trả lời vững. Trả lời đạt ≥ 3 điểm hai lần → interviewer gỡ khỏi sổ. Chạy định kỳ (cuối tuần theo [daily-plan.md](daily-plan.md)).
 
+## `retention` — Kiểm tra độ nhớ · câu đã trả lời tốt · ~8 câu
+Hỏi lại các câu **đã từng trả lời TỐT** (≥3) trong [sessions/](sessions/), ưu tiên câu **đã lâu chưa hỏi lại** — kiểm tra kiến thức có còn vững theo thời gian (spaced review). "Đúng rồi" không loại câu khỏi vùng hỏi. Câu nào tụt điểm → quay lại weak-register.
+
+## `full-review` — Kiểm tra toàn diện · mọi câu đã hỏi
+Trộn **toàn bộ** câu đã từng hỏi (yếu + tốt, mọi track/level) từ [sessions/](sessions/) — quét rộng để tìm chỗ hổng ẩn. Số câu linh hoạt (mặc định ~12); ứng viên gõ "xong" khi muốn dừng. Hợp giai đoạn nước rút.
+
 ---
 
 ## Bảng tra nhanh
@@ -49,3 +55,5 @@ Hỏi lại **mọi câu** trong [weak-register.md](weak-register.md) (lọc the
 | `coding` | 3 | code | luyện live-coding |
 | `deep-dive` | 5 | 🟠🔴 design | luyện tư duy senior |
 | `weak-review` | biến thiên | câu đã sai | củng cố |
+| `retention` | ~8 | câu đã trả lời tốt | kiểm tra độ nhớ theo thời gian |
+| `full-review` | ~12 | mọi câu đã hỏi | quét rộng, nước rút |

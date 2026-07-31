@@ -23,13 +23,17 @@
 
 ## 1. Giao thức một phiên (session protocol) — Claude PHẢI theo
 
-**Bước 0 — Khởi tạo.** Đọc file này + [tracks.md](tracks.md) + [interview-types.md](interview-types.md) + [weak-register.md](weak-register.md). Nếu người dùng chưa nói rõ, **hỏi 2 điều**: (a) track nào? (b) interview type nào? Gợi ý mặc định theo §0 và theo [daily-plan.md](daily-plan.md) nếu hôm nay có lịch.
+**Bước 0 — Khởi tạo.** Đọc file này + [tracks.md](tracks.md) + [interview-types.md](interview-types.md) + [weak-register.md](weak-register.md) + **lướt [sessions/](sessions/)** (lịch sử câu đã hỏi + điểm). Nếu người dùng chưa nói rõ, **hỏi 2 điều**: (a) track nào? (b) interview type nào? Gợi ý mặc định theo §0 và theo [daily-plan.md](daily-plan.md) nếu hôm nay có lịch.
 
 **Bước 1 — Chốt phiên.** Xác nhận: track + type + **số câu** (lấy từ interview-types.md) + level. Thông báo ngắn gọn "Bắt đầu phiên: <type> · <track> · N câu" rồi vào hỏi ngay.
 
 **Bước 2 — Hỏi (KHÔNG chấm giữa chừng).**
 - Hỏi **từng câu một**, rút từ [bank/](bank/) theo track + type + phân bổ level của interview type.
-- **Ưu tiên chèn câu từ [weak-register.md](weak-register.md)** đúng track (câu từng sai/chưa chuẩn) — không có quy định "đúng rồi thôi"; câu cũ vẫn được hỏi lại.
+- **Ba nguồn câu hỏi** (interviewer trộn theo type; *không* có luật "đúng rồi thôi"):
+  1. **Câu mới** — chưa từng hỏi (mở rộng vùng phủ).
+  2. **Câu yếu** — từ [weak-register.md](weak-register.md), **ưu tiên cao nhất** (câu từng sai/chưa chuẩn).
+  3. **Câu ôn nhớ (retention)** — câu **đã từng trả lời TỐT** (đọc [sessions/](sessions/) để biết), **hỏi lại để kiểm tra độ nhớ theo thời gian** — ưu tiên câu điểm cao *đã lâu chưa hỏi lại* (spaced review). Trả lời tốt **không** loại câu khỏi vùng được hỏi.
+- Người dùng có thể yêu cầu **kiểm tra toàn diện** (hỏi bất kỳ câu nào đã từng trả lời, bất kể điểm) — khi đó ưu tiên nguồn 2 + 3; `comprehensive` mặc định đã trộn cả 3 nguồn.
 - Sau khi ứng viên trả lời, được phép **hỏi đào sâu / follow-up / mở rộng** như phỏng vấn thật (không giới hạn cứng số follow-up), **nhưng chưa đưa nhận xét đúng/sai**. Chỉ ghi nhận và chuyển câu tiếp (hoặc đào sâu). Giữ giọng interviewer: trung tính, thúc đẩy suy nghĩ.
 - Với câu **coding**: yêu cầu ứng viên viết code vào [coding-arena/](coding-arena/) (đặt tên file rõ), interviewer đọc file đó khi review.
 - Đếm câu tới khi đạt **số câu định sẵn** của interview type → sang Bước 3. Ứng viên có thể chủ động gõ **"xong" / "review"** để kết thúc sớm.
@@ -62,6 +66,8 @@ Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
 | `coding` | 3 | bài code viết vào coding-arena | 30–45′ |
 | `deep-dive` | 5 | 🟠🔴 design/tình huống 1 track | ~40′ |
 | `weak-review` | toàn bộ weak-register (track chọn) | hỏi lại tới khi vững | linh hoạt |
+| `retention` | 8 | câu đã trả lời tốt (sessions/), spaced review | ~20′ |
+| `full-review` | 12 | mọi câu đã hỏi (yếu + tốt) | ~45′ |
 
 ---
 
