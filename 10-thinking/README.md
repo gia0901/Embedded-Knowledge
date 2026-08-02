@@ -23,7 +23,7 @@ flowchart LR
 | # | File | Nội dung | Trạng thái |
 |---|------|----------|-----------|
 | 1 | [problem-solving.md](problem-solving.md) | tiếp cận vấn đề có hệ thống, làm rõ yêu cầu, chia nhỏ, đánh đổi, first principles | ✅ |
-| 2 | [system-design.md](system-design.md) | quy trình thiết kế, requirement, kiến trúc, đánh đổi, design embedded thực tế | ✅ |
+| 2 | [system-design.md](system-design.md) | quy trình thiết kế, hộp đồ nghề + template, **3 ví dụ giải mẫu** (sensor, OTA, máy quét mã vạch), đánh đổi/failure | ✅ |
 
 ## Thứ tự đọc gợi ý
 `problem-solving` → `system-design`.

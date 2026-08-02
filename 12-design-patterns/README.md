@@ -24,8 +24,8 @@ flowchart TD
 | # | File | Nội dung | Trạng thái |
 |---|------|----------|-----------|
 | 1 | [solid-principles.md](solid-principles.md) | 5 nguyên lý SOLID — nền tảng để hiểu vì sao cần pattern | ✅ |
-| 2 | [creational.md](creational.md) | Singleton, Factory, Builder — tạo object | ✅ |
-| 3 | [structural.md](structural.md) | Adapter, Bridge/Pimpl, Facade, Proxy — cấu trúc object | ✅ |
+| 2 | [creational.md](creational.md) | Singleton (+ *vì sao Meyers thread-safe*), Factory, Builder, Object Pool — tạo object | ✅ |
+| 3 | [structural.md](structural.md) | Adapter, Bridge/Pimpl, Facade, Proxy, Decorator — cấu trúc object | ✅ |
 | 4 | [behavioral.md](behavioral.md) | Strategy, Observer, State, Command — hành vi & tương tác | ✅ |
 
 ## Thứ tự đọc gợi ý

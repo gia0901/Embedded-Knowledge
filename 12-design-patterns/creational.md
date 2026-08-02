@@ -33,6 +33,44 @@ private:
 - **Cảnh báo (rất hay được hỏi):** Singleton là **global state trá hình** → tạo coupling ẩn, khó test (không thay được bằng mock), khó kiểm soát thứ tự khởi tạo/hủy (static init order fiasco). Lạm dụng là anti-pattern.
 - **Khi nào dùng:** thật sự chỉ được phép có một (vd quản lý một tài nguyên phần cứng duy nhất). Cân nhắc thay bằng **dependency injection** (truyền instance vào) để dễ test.
 
+### Vì sao Meyers' Singleton thread-safe? (câu hỏi kinh điển)
+
+Mấu chốt nằm ở dòng `static Logger inst;` — một **local static có khởi tạo động**. Chuẩn C++11 (§[stmt.dcl]) **bắt buộc**: *nếu nhiều luồng cùng vào khai báo này lần đầu, chỉ một luồng chạy khởi tạo, các luồng còn lại phải **chờ** cho tới khi khởi tạo xong.* Đây là bảo đảm của **ngôn ngữ**, không phải may mắn.
+
+Compiler hiện thực bằng một **guard variable** ẩn (Itanium ABI: `__cxa_guard_acquire/release`) — thực chất một cờ atomic gắn với biến static:
+
+```cpp
+// Compiler sinh code ĐẠI Ý cho `static Logger inst;`:
+if ((guard.load(acquire) & 1) == 0) {     // fast path: đã init chưa? (chỉ 1 atomic load)
+    if (__cxa_guard_acquire(&guard)) {     // luồng đầu tiên giành quyền (khóa)
+        new (&inst) Logger();              //   chạy constructor đúng MỘT lần
+        __cxa_guard_release(&guard);       //   set cờ + release → luồng khác thấy object đã dựng xong
+    }                                      // luồng khác tới cùng lúc: BLOCK ở đây tới khi release
+}
+return inst;
+```
+
+- **Sau lần đầu**, mọi lời gọi chỉ là **một atomic load** (`guard & 1`) rồi return — gần như free, không khóa. Nên gọi `instance()` triệu lần vẫn rẻ.
+- Thuật ngữ hay gặp: cơ chế này gọi là **"magic statics"**.
+
+**Đối chiếu — vì sao *double-checked locking* tự viết trước C++11 lại SAI:**
+
+```cpp
+// ❌ Kiểu cũ, HỎNG trước C++11:
+if (!inst) {                      // check 1 (không khóa)
+    lock(mtx);
+    if (!inst) inst = new Logger();   // check 2 (đã khóa)
+    unlock(mtx);
+}
+```
+Lỗi: `inst = new Logger()` gồm 3 việc — *(1) cấp phát, (2) chạy constructor, (3) gán con trỏ vào `inst`*. Trước C++11 **không có memory model**, compiler/CPU được phép **sắp xếp lại** thành 1→3→2: `inst` thành non-null **trước khi** constructor chạy xong. Luồng khác thấy `inst != null` ở check 1 (không khóa) → dùng ngay một object **dựng dở** → UB.
+
+C++11 sửa gốc rễ bằng cách cấp **memory model + `std::atomic`**: giờ *có thể* viết DCLP đúng (dùng `atomic` với acquire/release), **nhưng** đơn giản hơn nhiều là để magic statics lo — nên trong C++11+ **đừng tự viết DCLP nữa**.
+
+> ⚠️ **Chỉ thread-safe phần *khởi tạo*, không phải phần *dùng*.** Sau khi có `inst`, nếu các method của nó (vd `log()`) sửa trạng thái chung, bạn **vẫn phải tự** đồng bộ (mutex) bên trong — magic statics không bảo vệ điều đó.
+>
+> 💡 *Embedded:* một số compiler cho tắt guard bằng `-fno-threadsafe-statics` để bỏ chi phí atomic — nhưng khi đó init **không còn** thread-safe, chỉ dùng nếu chắc chắn single-thread lúc khởi tạo.
+
 ---
 
 ## 2. Factory — tách việc tạo object
@@ -77,14 +115,70 @@ auto req = HttpRequest::Builder("http://api")
                .build();
 ```
 
+Bộ khung Builder — mỗi setter trả `*this` để **nối chuỗi (fluent)**, `build()` chốt lại (và có thể validate):
+
+```cpp
+class HttpRequest {
+    std::string url_, method_ = "GET";
+    int timeout_ = 60, retries_ = 0;
+    HttpRequest() = default;                 // chỉ Builder được tạo
+public:
+    class Builder {
+        HttpRequest r_;
+    public:
+        explicit Builder(std::string url) { r_.url_ = std::move(url); }
+        Builder& method(std::string m)  { r_.method_  = std::move(m); return *this; }
+        Builder& timeout(int s)         { r_.timeout_ = s;            return *this; }
+        Builder& retries(int n)         { r_.retries_ = n;            return *this; }
+        HttpRequest build() {
+            if (r_.url_.empty()) throw std::invalid_argument("url required"); // validate tập trung
+            return std::move(r_);
+        }
+    };
+};
+```
+
 - Code dễ đọc (mỗi tham số có tên), bỏ qua được tham số optional, có thể validate trong `build()`.
-- C++ hiện đại đôi khi thay bằng **struct tham số + designated initializers** (C++20): `HttpRequest{.url="...", .timeout=30}` — gọn hơn cho trường hợp đơn giản.
+- C++ hiện đại đôi khi thay bằng **struct tham số + designated initializers** (C++20): `HttpRequest{.url="...", .timeout=30}` — gọn hơn cho trường hợp đơn giản. Builder vẫn hơn khi cần **validate tập trung**, tạo **immutable object**, hoặc quá trình dựng có logic nhiều bước.
 
 ---
 
 ## 4. Object Pool (đáng nhắc cho embedded)
 
 Tái sử dụng một tập object cấp phát sẵn thay vì tạo/hủy liên tục → tránh fragmentation và chi phí cấp phát động. Rất phù hợp embedded/realtime ([constraints](../08-embedded-systems/constraints.md)): cấp phát tĩnh một pool, "mượn"/"trả" object thay vì `new`/`delete`.
+
+**Ý tưởng cốt lõi:** giữ sẵn một mảng slot + danh sách "slot rảnh". `acquire()` lấy một slot rảnh, `release()` trả về — cả hai **O(1), không chạm heap**:
+
+```cpp
+template <typename T, std::size_t N>
+class ObjectPool {
+    alignas(T) unsigned char storage_[N * sizeof(T)];  // vùng nhớ tĩnh, KHÔNG heap
+    std::array<T*, N>  free_;      // stack các slot đang rảnh
+    std::size_t        freeCount_ = 0;
+public:
+    ObjectPool() {
+        for (std::size_t i = 0; i < N; ++i)            // ban đầu mọi slot đều rảnh
+            free_[freeCount_++] = reinterpret_cast<T*>(storage_) + i;
+    }
+
+    template <typename... Args>
+    T* acquire(Args&&... args) {                       // "mượn" + dựng tại chỗ
+        if (freeCount_ == 0) return nullptr;           // pool cạn → tất định, không throw bad_alloc
+        T* slot = free_[--freeCount_];
+        return new (slot) T(std::forward<Args>(args)...);  // placement new: dựng ngay trên slot
+    }
+
+    void release(T* p) {                               // "trả" + hủy
+        if (!p) return;
+        p->~T();                                       // gọi destructor tường minh (placement new ⇒ tự hủy)
+        free_[freeCount_++] = p;                       // slot lại rảnh
+    }
+};
+// ObjectPool<Packet, 32> pool;  auto* pkt = pool.acquire(...);  ... ;  pool.release(pkt);
+```
+
+- **Vì sao hợp embedded:** footprint biết trước lúc biên dịch (mảng tĩnh), thời gian mượn/trả **tất định** (O(1), không đi qua allocator), và khi cạn thì trả `nullptr` thay vì `bad_alloc` bất định — hợp hệ chạy lâu dài/realtime.
+- **Điểm tinh tế:** dùng **placement new** (dựng object trên vùng nhớ có sẵn) nên phải **gọi destructor tường minh** trong `release` — khác `delete` thông thường. Bản production thường bọc con trỏ trả về trong RAII handle (custom deleter gọi `release`) để tránh quên trả, và thêm mutex nếu đa luồng.
 
 ---
 

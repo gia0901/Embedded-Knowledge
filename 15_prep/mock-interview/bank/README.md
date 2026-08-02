@@ -59,10 +59,10 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 | BSP | 001–027 |
 | BLD | 001–010 (CMake/Yocto/CI) |
 | DBG | 001–019 |
-| DP | 001–013 |
+| DP | 001–016 (014 = Meyers thread-safe/DCLP, 015 = object pool, 016 = decorator) |
 | DSA | 001–012 |
 | NET | 001–012 |
-| SD | 001–011 |
+| SD | 001–016 (012 = OTA, 013 = barcode scanner, 014 = UART framing, 015 = driver subsystem, 016 = memory tất định) |
 | BEH | 001–009 |
 | COD | 001–010 |
 

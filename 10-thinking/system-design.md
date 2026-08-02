@@ -75,7 +75,38 @@ Thành phần X chết thì sao? mất điện giữa chừng? dữ liệu hỏn
 
 ---
 
-## 5. Ví dụ áp dụng: "Thiết kế phần mềm thu thập dữ liệu sensor trên thiết bị nhúng Linux"
+## 5. Hộp đồ nghề thiết kế embedded (khối tái dùng)
+
+Hầu hết bài design embedded ráp lại từ **một số khối lặp đi lặp lại**. Nhớ sẵn "hộp đồ nghề" này để không thiết kế lại từ số 0 mỗi lần — gặp bài chỉ việc chọn khối phù hợp và giải thích *vì sao*.
+
+| Vấn đề gặp phải | Khối giải quyết (chọn theo ràng buộc) |
+|---|---|
+| **Nối producer nhanh ↔ consumer chậm** (ISR/DMA → xử lý) | **Ring buffer** (SPSC lock-free nếu 1–1), double-buffering; có *backpressure*/drop-policy khi đầy |
+| **Mô hình đồng thời** | 1 **event loop** (đơn giản, tất định) · **thread theo vai trò** · **RTOS task** + priority. Ưu tiên *message passing* hơn shared mutable ([sync-primitives](../03-operating-system/sync-primitives.md)) |
+| **Lưu trữ trên flash** | Chống mòn (**wear leveling**), ghi **atomic/journaling** chống mất điện, gom **batch** giảm số lần ghi, log-structured |
+| **Giao tiếp/nhận gói** | **Framing** (độ dài hoặc delimiter) + **CRC/checksum** + sequence/ack + **state machine** reassembly ([networking](../14-networking/)) |
+| **Cập nhật firmware** | **A/B partition** + rollback + **chữ ký/hash** verify + xác nhận health sau boot ([boot-process](../08-embedded-systems/boot-process.md)) |
+| **Độ tin cậy / không người trực** | **Watchdog**, **fail to safe state**, timeout ở *mọi* chỗ chờ, xử lý brownout/mất điện |
+| **Bộ nhớ tất định** | Cấp phát **tĩnh/pool** ([object pool](../12-design-patterns/creational.md)), tính *budget* RAM trước, **không cấp phát động sau init** |
+| **Test được** | **HAL** tách logic khỏi phần cứng, inject phụ thuộc, build trên host chạy ASan/TSan |
+
+**Template rút gọn (đọc lướt trước khi vào phòng):**
+```
+① Hỏi:   chức năng? + phi chức năng (RAM/flash/điện/latency/realtime/tin cậy?) + scope
+② Số:    RAM? flash? CPU/FPU? nguồn? tần suất dữ liệu? deadline? → chốt ràng buộc
+③ Vẽ:    3–6 component + luồng dữ liệu; mỗi khối 1 trách nhiệm; interface giữa chúng
+④ Đào:   1–2 chỗ khó nhất (đồng bộ? realtime? mất điện?) — thiết kế chi tiết
+⑤ Đổi:   mỗi quyết định lớn: phương án khác? vì sao chọn? hy sinh gì?
+⑥ Hỏng:  component chết? mất điện? mất mạng? dữ liệu hỏng? update? → fail-safe
+```
+
+---
+
+## 6. Ví dụ giải mẫu
+
+> Ba bài dưới đây là **mẫu tư duy** — đọc để thấy cách ráp "hộp đồ nghề" §5 theo quy trình §2. Thêm nhiều **prompt để tự-test** (đáp án ẩn) ở [bank SD](../../15_prep/mock-interview/bank/system-design.md); luyện bằng `/mock type design track system-design`.
+
+### 6.1 "Thiết kế phần mềm thu thập dữ liệu sensor trên thiết bị nhúng Linux"
 
 Phác cách tiếp cận (không phải đáp án duy nhất):
 - **Requirements**: đọc N sensor qua I2C/SPI ở tần số bao nhiêu? lưu local? gửi server? mất dữ liệu chấp nhận được không? realtime cứng không?
@@ -86,6 +117,30 @@ Phác cách tiếp cận (không phải đáp án duy nhất):
 - **Failure**: mất điện giữa lúc ghi (atomic write/journaling), mất mạng (buffer + retry), sensor lỗi (timeout, đánh dấu, không treo hệ), treo (watchdog reset).
 
 > Cách trình bày này quan trọng hơn "đáp án": cho thấy bạn làm rõ → chia phần → đào sâu chỗ khó → nêu đánh đổi → lường lỗi.
+
+### 6.2 "Thiết kế hệ thống cập nhật firmware (OTA) an toàn"
+
+Bài "whole system" rất hay gặp cho Embedded Linux (Datalogic JD ghi rõ "design entire systems"). Chìa khoá: **không được brick thiết bị dù mất điện giữa chừng**.
+
+- **Requirements**: nguồn ảnh update (mạng OTA / USB / thẻ nhớ)? kích thước ảnh? cho phép downtime bao lâu? cần ký số (chống ảnh giả)? tần suất cập nhật? có phải cập nhật cả bootloader/kernel không?
+- **Constraints**: flash có đủ **2 slot** không? RAM đủ để verify hash/chữ ký? nguồn có ổn định (nguy cơ mất điện khi ghi)? bootloader có kiểm soát được việc chọn slot không?
+- **High-level**: *Downloader* (kéo ảnh, resume được) → *Verifier* (kiểm **hash + chữ ký** trước khi tin) → *Writer* (ghi vào **slot B** trong khi **slot A** đang chạy) → *Bootloader* (cờ "thử slot B") → *Health-check sau boot* (OK → **commit**; lỗi → **rollback** về A).
+- **Deep dive**: **A/B partition** + cờ trong bootloader (`boot_next`, `try_count`); chuyển slot là thao tác **atomic** (đổi một cờ, không ghi đè đang chạy); chỉ mark slot bootable **sau khi** verify chữ ký; **anti-rollback** bằng version counter (chặn hạ cấp về bản có lỗ hổng). Xem [boot-process](../08-embedded-systems/boot-process.md), [melp/bootloader-kernel](../../16-book-summaries/melp/bootloader-kernel.md).
+- **Trade-offs**: **A/B** (tốn gấp đôi flash, nhưng an toàn tuyệt đối) vs **in-place + recovery partition** (tiết kiệm flash, rủi ro hơn); **ký số** (an toàn, cần quản lý khóa) vs chỉ **CRC** (chống hỏng nhưng không chống giả mạo).
+- **Failure**: mất điện khi ghi slot B → B hỏng nhưng **A vẫn boot** (chưa chuyển cờ); ảnh mới boot lỗi → watchdog + `try_count` hết → bootloader **tự rollback** về A; ảnh giả mạo → **chặn ở Verifier**.
+
+### 6.3 "Thiết kế kiến trúc phần mềm cho một máy quét mã vạch" (whole product)
+
+Đúng chất Datalogic (máy quét công nghiệp). Đây là bài "cả sản phẩm" — thể hiện khả năng chia hệ lớn thành pipeline.
+
+- **Requirements**: nguồn ảnh (camera/CCD)? loại mã (1D/2D)? **latency mục tiêu** từ lúc bấm trigger tới khi ra kết quả (vd < 100ms)? output đi đâu (USB-HID như bàn phím / serial / mạng)? điều kiện ánh sáng? hoạt động offline?
+- **Constraints**: CPU có **NEON/DSP** để tăng tốc decode? RAM cho frame buffer? cầm tay chạy pin (điện) hay cắm? độ phân giải × fps → băng thông dữ liệu.
+- **High-level**: *Trigger/Illumination* → *Image capture* (V4L2/camera driver, **DMA**) → *Preprocess* (binarize, khử nhiễu) → *Decode* (định vị + giải mã theo symbology) → *Output formatter* (HID/serial) → *Config/Management* (bật/tắt symbology, cập nhật firmware).
+- **Deep dive**: **pipeline đồng thời** — capture (ISR/DMA) đẩy frame vào **ring buffer**, một **decode thread** nặng CPU/NEON lấy ra xử lý → dùng khối "ring buffer producer/consumer" §5; **zero-copy** frame (chia sẻ buffer DMA, không copy) để giữ latency; phân bổ **budget latency** trigger→result cho từng tầng.
+- **Trade-offs**: decode **1 frame** (nhanh, có thể trượt) vs **gộp nhiều frame** (chính xác hơn, tăng latency); xử lý **on-device** vs offload; **polling** camera vs **interrupt+DMA** (tiết kiệm CPU/điện — chọn cái sau).
+- **Failure**: decode fail → thử frame kế, hết timeout → **beep báo lỗi**; buffer overrun → **drop frame cũ nhất** (giữ realtime); ánh sáng kém → auto-exposure + bật illumination. Liên hệ [architecture](../08-embedded-systems/architecture.md) (MMIO/DMA), [drivers](../05-drivers-device-tree/).
+
+> Chung cho cả ba: **cùng một quy trình 6 bước + cùng hộp đồ nghề** §5 — chỉ đổi bài toán. Người phỏng vấn đánh giá *cách bạn đi*, không phải bạn thuộc kiến trúc mẫu.
 
 ---
 

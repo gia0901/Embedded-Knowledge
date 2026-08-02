@@ -15,7 +15,7 @@
 **Singleton là gì? Cách hiện đại trong C++?**
 <details><summary>Đáp án</summary>
 
-Đảm bảo một class chỉ có một instance + điểm truy cập toàn cục. C++11+ dùng Meyers' Singleton: `static` local trong hàm `instance()` — khởi tạo lazy, thread-safe theo chuẩn.
+Đảm bảo một class chỉ có một instance + điểm truy cập toàn cục. C++11+ dùng Meyers' Singleton: `static` local trong hàm `instance()` — khởi tạo **lazy** (chỉ dựng lần gọi đầu) và **thread-safe theo chuẩn** (compiler sinh guard variable, xem [DP-014](#dp-014--concept---creational)). Cấm copy (`= delete`), constructor private.
 </details>
 
 #### DP-003 · 🟢 · concept · [→ README](../../../12-design-patterns/README.md)
@@ -93,6 +93,31 @@ Khi vấn đề đơn giản và code ổn định, không có nhu cầu thay đ
 <details><summary>Đáp án</summary>
 
 Kết hợp Factory + (thường) Strategy/Bridge với cơ chế nạp động: định nghĩa interface abstract cho plugin (`IPlugin` với pure virtual); mỗi plugin là shared library export hàm factory `extern "C"` (tránh name mangling) trả về con trỏ tới interface. Chương trình chính dùng `dlopen`/`dlsym` nạp `.so` lúc runtime, lấy factory, gọi qua interface — không cần biết class cụ thể lúc build (Open/Closed). Chú ý: ownership rõ ràng (plugin tạo thì plugin hủy, hoặc trả unique_ptr), không để exception/kiểu C++ vượt biên nếu cần ổn định ABI, và quản lý vòng đời `.so` (không dlclose khi còn object sống).
+</details>
+
+#### DP-014 · 🔴 · concept · ⭐ · [→ creational §Vì sao Meyers thread-safe](../../../12-design-patterns/creational.md)
+**Vì sao Meyers' Singleton thread-safe? Double-checked locking tự viết trước C++11 sai ở đâu?**
+<details><summary>Đáp án</summary>
+
+**Vì sao thread-safe:** dòng `static T inst;` là local static khởi tạo động; chuẩn C++11 (§[stmt.dcl]) **bắt buộc** — nếu nhiều luồng cùng vào lần đầu, chỉ một luồng chạy khởi tạo, các luồng khác **chờ** tới khi xong. Compiler hiện thực bằng **guard variable** ẩn (Itanium ABI `__cxa_guard_acquire/release`): luồng đầu giành quyền chạy constructor một lần rồi release (set cờ atomic); luồng khác tới cùng lúc bị block tới khi release. Sau lần đầu, mỗi lần gọi chỉ là **một atomic load** (fast path, không khóa) → gần như free. Tên gọi: "magic statics".
+
+**Vì sao DCLP cũ sai:** `inst = new T()` gồm 3 bước — cấp phát, chạy constructor, gán con trỏ. Trước C++11 **không có memory model**, compiler/CPU được sắp xếp lại thành gán-con-trỏ **trước khi** constructor xong → luồng khác thấy `inst != null` ở check-không-khóa và dùng ngay object **dựng dở** → UB. C++11 sửa gốc bằng memory model + `std::atomic` (giờ *có thể* viết DCLP đúng với acquire/release), nhưng đơn giản hơn là để magic statics lo → **đừng tự viết DCLP nữa**.
+
+**Bẫy:** chỉ thread-safe phần *khởi tạo*, không phải phần *dùng* — method sửa trạng thái chung vẫn cần mutex riêng. (Embedded: `-fno-threadsafe-statics` tắt guard để bỏ chi phí atomic, nhưng mất luôn bảo đảm này.)
+</details>
+
+#### DP-015 · 🟠 · concept · 🏗️ · [→ creational §Object Pool](../../../12-design-patterns/creational.md), [constraints](../../../08-embedded-systems/constraints.md)
+**Object Pool là gì? Vì sao hợp embedded? Điểm tinh tế khi hiện thực?**
+<details><summary>Đáp án</summary>
+
+Cấp phát sẵn một tập object cố định + danh sách slot rảnh; `acquire()` mượn một slot, `release()` trả — cả hai **O(1), không chạm heap**. Hợp embedded vì: footprint biết trước lúc biên dịch (mảng tĩnh), thời gian mượn/trả **tất định** (không đi qua allocator → tránh fragmentation và độ trễ bất định của malloc), khi cạn trả `nullptr` thay vì `bad_alloc`. Điểm tinh tế: thường dùng **placement new** để dựng object trên vùng nhớ có sẵn → phải **gọi destructor tường minh** (`p->~T()`) trong `release`, khác `delete` thường; bản production bọc con trỏ trong RAII handle (custom deleter tự gọi `release`) để khỏi quên trả, thêm mutex nếu đa luồng.
+</details>
+
+#### DP-016 · 🟡 · concept · [→ structural §Decorator](../../../12-design-patterns/structural.md)
+**Decorator pattern là gì? Khác Proxy thế nào?**
+<details><summary>Đáp án</summary>
+
+Decorator thêm hành vi cho object **động, từng lớp** bằng cách bọc nó trong các decorator **cùng interface**, có thể **xếp chồng** nhiều lớp (vd file ← nén ← mã hóa) — tránh bùng nổ lớp con cho mọi tổ hợp tính năng (`EncryptedCompressedStream`...). Mỗi decorator vừa *là* interface đó vừa *giữ* một con trỏ tới object được bọc để ủy nhiệm. Khác Proxy: cả hai đều bọc và cùng interface, nhưng **Proxy kiểm soát *truy cập*** tới một object (lazy load, quyền, cache) — thường một lớp; **Decorator thêm *chức năng*** và thiết kế để **chồng nhiều lớp**. Trong C++ có thể thay bằng template/composition khi tập tính năng biết lúc compile.
 </details>
 
 ---

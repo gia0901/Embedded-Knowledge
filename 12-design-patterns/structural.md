@@ -108,9 +108,43 @@ public:
 
 ---
 
-## 5. Decorator (điểm danh nhanh)
+## 5. Decorator — thêm hành vi từng lớp
 
-Thêm hành vi cho object **động, từng lớp**, mà không sửa class gốc — bằng cách bọc object trong các "decorator" cùng interface (vd thêm buffering/compression cho một stream). Tránh bùng nổ lớp con cho mọi tổ hợp tính năng. Trong C++ đôi khi thay bằng template/composition.
+Thêm hành vi cho object **động, từng lớp**, mà không sửa class gốc — bằng cách bọc object trong các "decorator" **cùng interface**. Điểm khác Proxy: Proxy *kiểm soát truy cập* tới một object, Decorator *thêm chức năng* và có thể **xếp chồng** nhiều lớp.
+
+```cpp
+struct IStream { virtual void write(const std::string&) = 0; virtual ~IStream() = default; };
+
+class FileStream : public IStream {                    // object gốc
+    void write(const std::string& s) override { /* ghi ra file */ }
+};
+
+// Decorator cơ sở: vừa LÀ IStream, vừa GIỮ một IStream để ủy nhiệm
+class StreamDecorator : public IStream {
+protected:
+    std::unique_ptr<IStream> wrapped_;
+public:
+    explicit StreamDecorator(std::unique_ptr<IStream> s) : wrapped_(std::move(s)) {}
+};
+
+class CompressStream : public StreamDecorator {
+    using StreamDecorator::StreamDecorator;
+    void write(const std::string& s) override { wrapped_->write(compress(s)); }  // thêm 1 lớp
+};
+class EncryptStream : public StreamDecorator {
+    using StreamDecorator::StreamDecorator;
+    void write(const std::string& s) override { wrapped_->write(encrypt(s)); }   // thêm lớp nữa
+};
+
+// Xếp chồng động: file ← nén ← mã hóa
+std::unique_ptr<IStream> s =
+    std::make_unique<EncryptStream>(
+        std::make_unique<CompressStream>(
+            std::make_unique<FileStream>()));
+s->write("data");   // encrypt → compress → ghi file
+```
+
+Tránh **bùng nổ lớp con** cho mọi tổ hợp tính năng (`EncryptedCompressedFileStream`, `CompressedFileStream`...) — chỉ cần ghép các decorator. Trong C++ đôi khi thay bằng template/composition khi tập tính năng biết lúc compile.
 
 ---
 

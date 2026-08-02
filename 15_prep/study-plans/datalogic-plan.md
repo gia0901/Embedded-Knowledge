@@ -68,7 +68,7 @@
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
 | 1 | - [ ] 🎯 **[yocto](../../06-build-systems/yocto.md)** (recipe, layer/bbappend, sstate, devtool, SDK) + [BSP-017…019](../mock-interview/bank/bsp.md) | `/mock ... track build-systems` (BLD-004…010) |
-| 2 | - [ ] [system-design](../../10-thinking/system-design.md) + [07-shared-libraries](../../07-shared-libraries/) (ABI, API design) | `/mock deep-dive track system-design` |
+| 2 | - [ ] 🎯 [system-design](../../10-thinking/system-design.md) §5 hộp đồ nghề + §6 ví dụ giải mẫu (**OTA**, **máy quét mã vạch** — đúng chất Datalogic) + [07-shared-libraries](../../07-shared-libraries/) (ABI, API design) | `/mock deep-dive track system-design` (SD-012…016) |
 | 3 | - [ ] 🎯 **Behavioral cho JD**: [BEH](../mock-interview/bank/behavioral.md) + phần "lead junior / code review" (§ dưới) | `/mock ... track behavioral` |
 | 4 | Tổng duyệt vòng thật | `/mock comprehensive track datalogic` (16 câu) |
 | 5 | Kiểm tra toàn diện | `/mock full-review` (quét mọi câu đã hỏi) |
