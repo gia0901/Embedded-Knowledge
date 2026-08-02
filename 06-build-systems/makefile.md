@@ -164,6 +164,18 @@ Make dựa trên đồ thị phụ thuộc của các rule (`target: prerequisit
 <details><summary>5) Khác biệt giữa khai báo (declaration) và định nghĩa (definition)? ODR là gì?</summary>
 
 Khai báo cho compiler biết một thực thể tồn tại và chữ ký của nó (vd prototype hàm, `extern int x;`) — thường đặt trong header để nhiều TU dùng chung. Định nghĩa cung cấp nội dung thực tế (thân hàm, cấp phát biến) — đặt trong `.cpp`. ODR (One Definition Rule) quy định mỗi entity (hàm non-inline, biến) chỉ được có **đúng một định nghĩa** trong toàn chương trình; vi phạm gây lỗi multiple definition khi link. Đó là lý do header chỉ nên chứa khai báo (trừ `inline`/`template`/`constexpr` được phép định nghĩa trong header vì có ngoại lệ ODR).
+
+**Ví dụ ngoại lệ ODR với `inline`:**
+```cpp
+// util.h — SAI: định nghĩa thường trong header
+int square(int x) { return x * x; }        // a.cpp và b.cpp cùng include
+// → link: multiple definition of `square(int)'  (mỗi TU một bản)
+
+// util.h — ĐÚNG: thêm inline
+inline int square(int x) { return x * x; } // inline = giấy phép ODR
+// → linker gộp các bản trùng ở mọi TU thành một, không lỗi
+```
+Ngược lại nếu khai báo `inline` ở header nhưng giấu định nghĩa trong `.cpp`, TU gọi không thấy thân hàm → `undefined reference` (hàm `inline` phải được định nghĩa ở *mọi* TU dùng tới). Cùng cơ chế này giải thích vì sao **template** cũng phải để định nghĩa trong header — chi tiết truy vết từng bước: [01/templates.md §6](../01-cpp-fundamentals/templates.md).
 </details>
 
 <details><summary>6) Khi nào dùng Makefile viết tay, khi nào dùng CMake?</summary>

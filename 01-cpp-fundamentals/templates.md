@@ -109,7 +109,30 @@ struct TypeName<bool> { static const char* get() { return "bool"; } };
 
 Compiler chỉ sinh code cho một instantiation khi nó **thấy đầy đủ định nghĩa** template tại điểm sử dụng. Nếu tách định nghĩa vào `.cpp`, các translation unit khác chỉ thấy khai báo → lỗi **linker** (undefined reference).
 
+**Ví dụ cụ thể — tách định nghĩa ra `.cpp` sẽ hỏng:**
+```cpp
+// max.h
+template <typename T> T my_max(T a, T b);            // chỉ KHAI BÁO
+// max.cpp
+template <typename T> T my_max(T a, T b) { return a > b ? a : b; }  // định nghĩa
+// main.cpp
+#include "max.h"
+int main() { return my_max(3, 7); }                  // dùng my_max<int>
+```
+- Compile `main.cpp`: chỉ thấy khai báo → ghi lại tham chiếu `my_max<int>` chưa giải quyết, **không sinh code**.
+- Compile `max.cpp`: thấy định nghĩa nhưng **không ai gọi** với kiểu cụ thể → không instantiate bản `int` nào → `max.o` không chứa `my_max<int>`.
+- Link: không `.o` nào có `my_max<int>` → `undefined reference to my_max<int>(int, int)` — **lỗi link, không phải compile**.
+
+Đặt định nghĩa trong header thì mỗi TU include đều thấy *cả định nghĩa lẫn chỗ dùng* → tự instantiate `my_max<int>` tại chỗ. Nhiều TU cùng sinh bản `int` **không** gây *multiple definition*: template instantiation có **ngoại lệ ODR**, linker gộp các bản trùng thành một.
+
 → **Quy ước:** đặt cả khai báo lẫn định nghĩa template trong header (`.h`/`.hpp`). (Có kỹ thuật *explicit instantiation* để tách, nhưng hiếm dùng và phải biết trước danh sách kiểu.)
+
+**Cùng lý do đó áp cho hàm `inline`.** `inline` không chỉ là "gợi ý thay lời gọi bằng thân hàm" mà còn là **giấy phép ODR**: cho phép cùng một định nghĩa xuất hiện ở nhiều TU. Hệ quả hai đầu đối xứng:
+- Định nghĩa hàm **thường** (không `inline`) trong header → mỗi TU include có một bản → link báo **`multiple definition`**.
+- Khai báo `inline` ở header nhưng định nghĩa giấu trong `.cpp` → TU gọi không thấy thân, mà hàm `inline` phải được định nghĩa ở *mọi* TU dùng tới → **`undefined reference`**.
+- Đúng: `inline` **kèm** định nghĩa, cùng nằm trong header → mọi TU thấy thân hàm, và `inline` bảo linker gộp các bản trùng thành một.
+
+> **Một câu cốt lõi:** compiler chỉ nhìn thấy **một TU tại một thời điểm**, nên thứ gì cần "sinh code" (template) hay "thay tại chỗ" (`inline`) ở *mỗi* nơi dùng thì định nghĩa phải **theo header vào từng TU**; `template`/`inline` là hai cơ chế được chuẩn cấp ngoại lệ ODR để định nghĩa trùng ở nhiều TU không xung đột.
 
 Hệ quả: template làm tăng thời gian biên dịch và kích thước binary (code bloat — mỗi kiểu một bản code).
 
