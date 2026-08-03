@@ -1,5 +1,7 @@
 # 📅 Daily Plan — Mock interview 4 tuần sprint (~5 buổi/tuần)
 
+> ⚠️ **ĐANG CHẠY PLAN JD-CỤ THỂ:** [datalogic-plan.md](../study-plans/datalogic-plan.md) (xem §📍 Tiến độ ở đó để resume). File này là **lịch mock tổng quát** (BSP-first) — dùng làm *dự phòng / tham khảo nhịp*, **không** phải plan đang thực thi. Nếu đang ôn cho Datalogic, theo plan kia.
+
 > Lịch **mock interview** cho đợt phỏng vấn 1–2 tháng tới. Cường độ: **sprint 4 tuần, ~5 buổi/tuần**. Ưu tiên **BSP (track ưu tiên 1)**, xen C++ system, nền chung (OS/DSA/debug), và behavioral. Bổ trợ cho lịch đọc [../study-plans/](../study-plans/) — plan kia cho *đọc/hiểu*, plan này cho *kiểm tra dạng phỏng vấn*.
 > Mỗi dòng = một phiên: gõ `/mock` rồi chọn (hoặc nói thẳng `mock <type> track <track>`). Cuối mỗi tuần có buổi **`weak-review`** để đóng lỗ hổng tích lũy.
 

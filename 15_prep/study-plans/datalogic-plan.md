@@ -1,7 +1,41 @@
 # 🎯 Datalogic — Embedded Linux Engineer (C++17, Linux) · Plan 4 tuần
 
 > Kế hoạch ôn **nhắm đúng JD** [Embedded Linux Engineer @ Datalogic Việt Nam](https://itviec.com/it-jobs/embedded-linux-engineer-c-linux-datalogic-viet-nam-2835). Dùng chung cả **4 tuần** (nền vững) lẫn **2 tuần** (nước rút — **gộp đôi khối lượng mỗi ngày**: làm 2 buổi/ngày thay vì 1).
-> Không phải kiến thức mới — mọi mục **link tới tài liệu + bank câu hỏi** sẵn có. Ký hiệu: `- [ ]` chưa xong · `- [x]` xong · 🎯 xác suất gặp cao · 🎤 phiên mock.
+> Không phải kiến thức mới — mọi mục **link tới tài liệu + bank câu hỏi** sẵn có. Ký hiệu: `- [ ]` chưa xong · `- [x]` xong · 🎯 xác suất gặp cao · 🎤 phiên mock · 🔁 ôn lặp lại.
+
+---
+
+## 📍 Tiến độ hiện tại — **RESUME Ở ĐÂY** (nguồn tracking DUY NHẤT, cập nhật mỗi buổi)
+
+> **Conversation mới đọc block này TRƯỚC TIÊN** để biết đang ở đâu và làm gì tiếp. Đây là plan **đang chạy** — ưu tiên hơn [daily-plan](../mock-interview/daily-plan.md) (lịch mock BSP tổng quát) và các plan role khác.
+
+- **Plan đang chạy:** 🎯 Datalogic (file này) · bắt đầu **2026-08-03**.
+- **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **buổi kế tiếp = Buổi 2**.
+- **Buổi gần nhất:** Buổi 1 — `rapid track cpp-system` — **3.25/4** ([log](../mock-interview/sessions/2026-08-03--rapid--cpp-system.md)).
+- **▶️ LÀM TIẾP:** `/mock by-level 🟡 track modern-cpp` — ôn trước theo cột **Đọc/Hiểu Tuần 1 Buổi 2** (EMC Items + pool CPP-040…051).
+- **Sổ yếu hiện tại:** CPP-009, OS-007 (mới) · OS-003, DP-002 (đang chờ gỡ, cần 1 lần ≥3 nữa) → xem [weak-register](../mock-interview/weak-register.md); chèn `/mock weak-review` khi muốn vá.
+
+**Checklist buổi (tick `[x]` khi xong — đây là "đang dang dở đến đâu"):**
+- **Tuần 1** (C++17): `[x]` B1 · `[ ]` B2 · `[ ]` B3 · `[ ]` B4 · `[ ]` B5 · `[ ]` CN
+- **Tuần 2** (Linux sysprog+debug): `[ ]` toàn bộ (chưa tới)
+- **Tuần 3** (kernel/drivers): `[ ]` toàn bộ
+- **Tuần 4** (Yocto/design/behavioral): `[ ]` toàn bộ
+
+> **Quy tắc cập nhật (cho Claude):** sau mỗi phiên mock thuộc plan này → (1) tick buổi tương ứng ở trên, (2) sửa 4 dòng "Vị trí / Buổi gần nhất / LÀM TIẾP / Sổ yếu", (3) ghi log `sessions/` như thường. Không cần sửa file nào khác — mọi nơi khác chỉ trỏ về block này.
+
+---
+
+## Hai nguyên tắc xuyên suốt (đọc trước)
+
+**① Ưu tiên TƯ DUY, không phải cú pháp.** Đặc biệt với **build system (Yocto/CMake/CI)**: phỏng vấn hỏi *"layer/bbappend để làm gì", "sstate giải quyết gì", "DEPENDS vs RDEPENDS", "vì sao CMake target-based"* — tức **mental model** (vấn đề → kiến trúc → đánh đổi), **không** bắt viết recipe/CMakeLists chính xác. Đọc để *hiểu bức tranh*, cú pháp chỉ tra khi ngồi máy. Nguyên tắc này áp cho mọi mảng: nói được *bản chất & khi nào dùng* quan trọng hơn nhớ flag.
+
+**② Xen kẽ + lặp lại ngắt quãng (chống quên tuần cũ).** Theme tuần chỉ định *trọng tâm học MỚI* — không có nghĩa bỏ tuần trước. Hai cơ chế kéo kiến thức cũ quay lại:
+- **🔁 Khởi động trộn (~5–10') mỗi buổi:** trước khi vào chủ đề mới, chạy nhanh `/mock weak-review` (câu yếu) hoặc `/mock retention track datalogic` (câu tuần trước, đã trả lời tốt — spaced review). Trộn domain là *cố ý*: phỏng vấn thật cũng hỏi ngẫu nhiên.
+- **🔁 Cuối tuần ôn DỒN TÍCH (tăng dần):** CN mỗi tuần quét *tất cả* các tuần đã học, không chỉ tuần vừa rồi — xem cột "CN" trong từng bảng.
+
+**③ Đọc/Hiểu liệt kê ĐẦY ĐỦ để ôn TRƯỚC; mock cứ để NGẪU NHIÊN.** Cột "Đọc/Hiểu" mỗi buổi nêu **cụ thể** doc (mục) + **pool câu hỏi bank** liên quan — đây là phần *chuẩn bị*, đọc kỹ trước khi vào mock. Mock thì **được phép hỏi ngẫu nhiên/lệch chủ đề trong ngày** (rút từ track rộng + weak-register + retention) — đó là **cố ý**, để luyện *phản ứng* như phỏng vấn thật (câu đến bất ngờ, trộn mảng). Không ép test chỉ trong phạm vi vừa đọc. Việc bị hỏi trúng chỗ chưa ôn là *tín hiệu* để ghi vào weak-register và ôn bù, không phải lỗi của plan.
+
+> Nhờ đó cuối 4 tuần, kiến thức Tuần 1 đã được gặp lại ≥3 lần (khởi động + các buổi CN + tổng duyệt) thay vì học một lần rồi quên.
 
 ---
 
@@ -13,7 +47,7 @@
 | **Linux userspace + debug** 🎯 | [04-linux-system-programming](../../04-linux-system-programming/), [09-debugging](../../09-debugging/) | `LNX-*`, `DBG-*` |
 | **Kernel space** | [05-drivers-device-tree](../../05-drivers-device-tree/), [lkd](../../16-book-summaries/lkd/) | `DRV-*`, `BSP-B` |
 | **Drivers I2C/SPI/PCI/USB** 🎯 | [driver-basics](../../05-drivers-device-tree/driver-basics.md), [pci-usb-drivers](../../05-drivers-device-tree/pci-usb-drivers.md) | `BUS-*`, `DRV-019…027` |
-| **Yocto + CMake/CI** | [yocto](../../06-build-systems/yocto.md), [cmake](../../06-build-systems/cmake.md), [cross-compilation](../../06-build-systems/cross-compilation.md) | `BLD-*`, `BSP-017…019` |
+| **Yocto + CMake/CI** *(học TƯ DUY, không cú pháp — xem nguyên tắc ①)* | [yocto](../../06-build-systems/yocto.md), [cmake](../../06-build-systems/cmake.md), [cross-compilation](../../06-build-systems/cross-compilation.md) | `BLD-*`, `BSP-017…019` |
 | **Design subsystem + lead + code review** | [10/system-design](../../10-thinking/system-design.md), [07-shared-libraries](../../07-shared-libraries/) | `SD-*`, `BEH-*` |
 
 **Track mock riêng cho JD:** `/mock ... track datalogic` (trộn đúng các domain trên).
@@ -22,52 +56,52 @@
 
 ## Tuần 1 — C++17 & Modern C++ (+ CMake)
 
-*Trọng tâm JD "C++17". Vá nền ngôn ngữ trước.*
+*Trọng tâm JD "C++17". Vá nền ngôn ngữ trước.* 🔁 Tuần đầu chưa có gì để trộn — cứ học sâu.
 
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
-| 1 | - [ ] [raii-smart-pointers](../../02-modern-cpp/raii-smart-pointers.md) §6 (Rule 0/3/5), [move-semantics](../../02-modern-cpp/move-semantics.md) | `/mock rapid track cpp-system` |
-| 2 | - [ ] 🎯 EMC items nền: [effective-modern-cpp](../../16-book-summaries/effective-modern-cpp.md) (auto, nullptr, override, make_unique, special members) | `/mock by-level 🟡 track modern-cpp` |
-| 3 | - [ ] [concurrency](../../02-modern-cpp/concurrency.md) (atomic, memory order, mutex) + [OS sync](../../03-operating-system/sync-primitives.md) | `/mock daily track cpp-system` |
-| 4 | - [ ] [cmake](../../06-build-systems/cmake.md) (target-based, PUBLIC/PRIVATE, toolchain file) | `/mock ... track build-systems` (BLD-001…003) |
+| 1 | - [x] [raii-smart-pointers](../../02-modern-cpp/raii-smart-pointers.md) §6 (Rule 0/3/5) + smart pointer (unique/shared/weak, cyclic ref); [move-semantics](../../02-modern-cpp/move-semantics.md) (rvalue ref, `std::move`, perfect forwarding, emplace vs push_back). **Chạm nhanh:** [oop](../../01-cpp-fundamentals/oop.md) (struct/class, virtual/vtable), [memory-model](../../01-cpp-fundamentals/memory-model.md) (stack/heap). **Pool bank ôn trước:** CPP-001…008, 020, 024…029 | ✅ `rapid cpp-system` 3.25/4 (2026-08-03) |
+| 2 | - [ ] 🎯 EMC items nền: [effective-modern-cpp](../../16-book-summaries/effective-modern-cpp.md) — auto (Item 1–2), braced-init (7), nullptr (8), using vs typedef (9), `=delete` (11), override/final (12), make_unique (21), special-member generation (17). **Pool bank:** CPP-040…051, CPP-046 | `/mock by-level 🟡 track modern-cpp` |
+| 3 | - [ ] [concurrency](../../02-modern-cpp/concurrency.md) (thread, atomic, memory_order, mutex, lock_guard/unique_lock) + [OS sync-primitives](../../03-operating-system/sync-primitives.md) (mutex vs semaphore + **ownership/priority inheritance**, spinlock, deadlock 4 Coffman). **Pool bank:** CPP-018/019/022/024; OS-003/004/006/007/012 | `/mock daily track cpp-system` |
+| 4 | - [ ] [cmake](../../06-build-systems/cmake.md) — **tư duy target-based** (PUBLIC/PRIVATE/INTERFACE *nghĩa là gì*, toolchain file *giải quyết gì*), cú pháp tra sau | `/mock ... track build-systems` (BLD-001…003) |
 | 5 | Coding: viết vào [coding-arena/](../mock-interview/coding-arena/) | `/mock coding track dsa` (reverse list, ring buffer, two-sum) |
-| CN | Ôn lại | `/mock weak-review` |
+| CN | 🔁 Ôn dồn tích **T1** | `/mock weak-review` + `/mock comprehensive track cpp-system` |
 
 ## Tuần 2 — Linux system programming (userspace + debug) 🎯
 
-*Đúng chỗ bạn muốn tập trung ("Familiar with Linux userspace + debugging").*
+*Đúng chỗ bạn muốn tập trung ("Familiar with Linux userspace + debugging").* 🔁 **Khởi động mỗi buổi:** `/mock retention track cpp-system` (kéo C++ Tuần 1 quay lại).
 
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
-| 1 | - [ ] [file-io](../../04-linux-system-programming/file-io.md), [processes-signals](../../04-linux-system-programming/processes-signals.md) | `/mock rapid track linux-sysprog` |
-| 2 | - [ ] 🎯 [io-multiplexing](../../04-linux-system-programming/io-multiplexing.md) (epoll, LT/ET, event loop), [ipc-linux](../../04-linux-system-programming/ipc-linux.md) | `/mock by-level 🟠 track linux-sysprog` |
-| 3 | - [ ] 🎯 [09-debugging](../../09-debugging/): gdb, strace, perf, ASan/TSan, core dump | `/mock daily track debugging` |
-| 4 | - [ ] [gdb](../../09-debugging/gdb.md) sâu (breakpoint/watch/bt/remote gdbserver) — điểm yếu cần vá | `/mock deep-dive track debugging` |
+| 1 | - [ ] [file-io](../../04-linux-system-programming/file-io.md) (fd, syscall, blocking/non-blocking, `O_NONBLOCK`), [processes-signals](../../04-linux-system-programming/processes-signals.md) (fork/exec/wait, zombie, signal handler async-safe). **Pool bank:** LNX-001…012 | `/mock rapid track linux-sysprog` |
+| 2 | - [ ] 🎯 [io-multiplexing](../../04-linux-system-programming/io-multiplexing.md) (select/poll/epoll, **LT vs ET**, event loop) + [ipc-linux](../../04-linux-system-programming/ipc-linux.md) (pipe, shm, mq, socket, so sánh). **Pool bank:** LNX-013…026 | `/mock by-level 🟠 track linux-sysprog` |
+| 3 | - [ ] 🎯 [09-debugging](../../09-debugging/): [gdb](../../09-debugging/gdb.md), [tools](../../09-debugging/tools.md) (strace/ltrace/perf), [memory-bugs](../../09-debugging/memory-bugs.md) (ASan/TSan/Valgrind), core dump. **Pool bank:** DBG-001…011, 017/018 | `/mock daily track debugging` |
+| 4 | - [ ] [gdb](../../09-debugging/gdb.md) sâu (breakpoint/watchpoint/`bt`/frame, remote **gdbserver**, core dump post-mortem) — điểm yếu cần vá. **Pool bank:** DBG-009/010, 012…016 | `/mock deep-dive track debugging` |
 | 5 | Coding: bài low-level C | `/mock coding track cpp-system` (memcpy/strlen, endianness) |
-| CN | Ôn lại | `/mock weak-review` |
+| CN | 🔁 Ôn dồn tích **T1+T2** | `/mock weak-review` + `/mock comprehensive track datalogic` (trộn C++ + Linux + debug) |
 
 ## Tuần 3 — Kernel & drivers (I2C/SPI + PCI/USB) 🎯
 
-*Trụ kernel + drivers của JD. Vùng bạn mạnh (kernel/DT) + lấp PCI/USB.*
+*Trụ kernel + drivers của JD. Vùng bạn mạnh (kernel/DT) + lấp PCI/USB.* 🔁 **Khởi động mỗi buổi:** `/mock retention track linux-sysprog` + `weak-review` (kéo Linux/debug Tuần 2 quay lại).
 
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
 | 1 | - [ ] [driver-basics](../../05-drivers-device-tree/driver-basics.md), [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md) · *bổ đệm* [bare-metal-c](../../08-embedded-systems/bare-metal-c.md) phần `volatile`/register/bit-manip ([EMB-A](../mock-interview/bank/embedded-fundamentals.md)) — nền cho MMIO `readl/writel` | `/mock daily track drivers-dt` |
-| 2 | - [ ] 🎯 [device-tree](../../05-drivers-device-tree/device-tree.md) + [BSP-006…009](../mock-interview/bank/bsp.md) (probe, EPROBE_DEFER, pinctrl) | `/mock by-level 🟠 track bsp` |
+| 2 | - [ ] 🎯 [device-tree](../../05-drivers-device-tree/device-tree.md) (cú pháp DTS, node/property, compatible→match, binding) + [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md) ôn lại. **Pool bank:** BSP-006…009 (probe, EPROBE_DEFER, pinctrl), DRV-001…010 | `/mock by-level 🟠 track bsp` |
 | 3 | - [ ] 🎯 **[pci-usb-drivers](../../05-drivers-device-tree/pci-usb-drivers.md)** (PCI config/BAR/MSI, USB descriptor/URB/gadget) | `/mock ... track drivers-dt` (DRV-019…027) |
-| 4 | - [ ] [interrupt/DMA](../mock-interview/bank/bsp.md) (BSP-010…013: threaded IRQ, coherent vs streaming DMA) · *bổ đệm* [interrupts-bare-metal](../../08-embedded-systems/interrupts-bare-metal.md) khái niệm ISR ([EMB-C](../mock-interview/bank/embedded-fundamentals.md)): không sleep trong ISR, critical section, reentrancy — chuyển thẳng sang top-half/bottom-half kernel | `/mock deep-dive track bsp` |
+| 4 | - [ ] [interrupt/DMA](../mock-interview/bank/bsp.md) (BSP-010…013: threaded IRQ, coherent vs streaming DMA) · *bổ đệm* [interrupts-bare-metal](../../08-embedded-systems/interrupts-bare-metal.md) khái niệm ISR ([EMB-C](../mock-interview/bank/embedded-fundamentals.md)): không sleep trong ISR, critical section, reentrancy — chuyển thẳng sang top-half/bottom-half kernel. **Pool bank:** BSP-010…013, DRV-011…018 | `/mock deep-dive track bsp` |
 | 5 | - [ ] [lkd](../../16-book-summaries/lkd/) cụm driver/interrupt (đọc thêm) | `/mock comprehensive track drivers-dt` |
-| CN | Ôn lại | `/mock weak-review` |
+| CN | 🔁 Ôn dồn tích **T1+T2+T3** | `/mock weak-review` + `/mock comprehensive track datalogic` (giờ trộn cả kernel/driver) |
 
 > **Phạm vi `embedded-fundamentals` (EMB) cho JD này:** chỉ ôn **A** (C/thanh ghi/`volatile`/bit-manip) + **C** (khái niệm ISR) như *đệm* cho buổi 1 & 4 ở trên — vì chúng chuyển thẳng sang MMIO driver + kernel IRQ. **Hoãn** B (startup/linker chi tiết), **D (RTOS)**, F/G/H (CRC/MISRA, low-power, JTAG/SWD): JD là Embedded **Linux** (có MMU, không RTOS/bare-metal firmware) nên các phần này là "nice-to-have" ghi điểm nếu bị hỏi lan, không phải câu loại. Full EMB để dành cho hồ sơ BSP tổng quát ([bsp-plan](bsp-plan.md)).
 
 ## Tuần 4 — Yocto/CI + Design + Behavioral + tổng duyệt
 
-*Yocto (JD) + kỹ năng "lead/design/review" + dress rehearsal.*
+*Yocto (JD) + kỹ năng "lead/design/review" + dress rehearsal.* 🔁 **Khởi động mỗi buổi:** `/mock retention track datalogic` (trộn cả 3 tuần trước) — tuần này nghiêng hẳn về **ôn lại + tổng duyệt**.
 
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
-| 1 | - [ ] 🎯 **[yocto](../../06-build-systems/yocto.md)** (recipe, layer/bbappend, sstate, devtool, SDK) + [BSP-017…019](../mock-interview/bank/bsp.md) | `/mock ... track build-systems` (BLD-004…010) |
+| 1 | - [ ] 🎯 **[yocto](../../06-build-systems/yocto.md)** — **tư duy** (layer/bbappend *để làm gì*, sstate *giải quyết gì*, DEPENDS vs RDEPENDS, devtool/SDK), **không** học thuộc cú pháp recipe + [BSP-017…019](../mock-interview/bank/bsp.md) | `/mock ... track build-systems` (BLD-004…010) |
 | 2 | - [ ] 🎯 [system-design](../../10-thinking/system-design.md) §5 hộp đồ nghề + §6 ví dụ giải mẫu (**OTA**, **máy quét mã vạch** — đúng chất Datalogic) + [07-shared-libraries](../../07-shared-libraries/) (ABI, API design) | `/mock deep-dive track system-design` (SD-012…016) |
 | 3 | - [ ] 🎯 **Behavioral cho JD**: [BEH](../mock-interview/bank/behavioral.md) + phần "lead junior / code review" (§ dưới) | `/mock ... track behavioral` |
 | 4 | Tổng duyệt vòng thật | `/mock comprehensive track datalogic` (16 câu) |

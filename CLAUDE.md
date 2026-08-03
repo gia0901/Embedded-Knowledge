@@ -12,6 +12,8 @@
 - File này đã được hoàn thiện (không còn là bản nháp mơ hồ). Vẫn có thể tinh chỉnh khi phát sinh nhu cầu mới.
 - Xem **Mục 7 — Tiến độ** để biết tài liệu nào đã/đang/chưa viết.
 
+> 🎯 **ĐANG THỰC THI PLAN PHỎNG VẤN (Datalogic).** Conversation mới muốn tiếp tục ôn: mở **[`15_prep/study-plans/datalogic-plan.md`](15_prep/study-plans/datalogic-plan.md) → §📍 Tiến độ hiện tại** (ngay đầu file) để biết đang ở buổi nào + lệnh làm tiếp. Đó là **nguồn tracking DUY NHẤT** cho tiến độ ôn — không suy đoán từ nơi khác.
+
 ---
 
 ## 2. Về người học (background)

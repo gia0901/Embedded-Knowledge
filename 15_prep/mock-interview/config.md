@@ -23,7 +23,9 @@
 
 ## 1. Giao thức một phiên (session protocol) — Claude PHẢI theo
 
-**Bước 0 — Khởi tạo.** Đọc file này + [tracks.md](tracks.md) + [interview-types.md](interview-types.md) + [weak-register.md](weak-register.md) + **lướt [sessions/](sessions/)** (lịch sử câu đã hỏi + điểm). Nếu người dùng chưa nói rõ, **hỏi 2 điều**: (a) track nào? (b) interview type nào? Gợi ý mặc định theo §0 và theo [daily-plan.md](daily-plan.md) nếu hôm nay có lịch.
+**Bước 0 — Khởi tạo.** Đọc file này + [tracks.md](tracks.md) + [interview-types.md](interview-types.md) + [weak-register.md](weak-register.md) + **lướt [sessions/](sessions/)** (lịch sử câu đã hỏi + điểm).
+- **Nếu đang chạy plan JD** (mặc định hiện tại): mở [datalogic-plan.md](../study-plans/datalogic-plan.md) **§📍 Tiến độ hiện tại** (đầu file) → nó cho biết **buổi kế tiếp + lệnh mock chính xác**. **Đề xuất thẳng buổi đó** thay vì hỏi lại từ đầu; sau phiên, cập nhật block §📍 đó (tick buổi + 4 dòng trạng thái). Ưu tiên plan này hơn [daily-plan.md](daily-plan.md).
+- Nếu **không** theo plan JD (ôn tự do): nếu người dùng chưa nói rõ, **hỏi 2 điều**: (a) track nào? (b) interview type nào? Gợi ý mặc định theo §0 và theo [daily-plan.md](daily-plan.md) nếu hôm nay có lịch.
 
 **Bước 1 — Chốt phiên.** Xác nhận: track + type + **số câu** (lấy từ interview-types.md) + level. Thông báo ngắn gọn "Bắt đầu phiên: <type> · <track> · N câu" rồi vào hỏi ngay.
 
