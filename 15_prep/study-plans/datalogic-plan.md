@@ -10,13 +10,13 @@
 > **Conversation mới đọc block này TRƯỚC TIÊN** để biết đang ở đâu và làm gì tiếp. Đây là plan **đang chạy** — ưu tiên hơn [daily-plan](../mock-interview/daily-plan.md) (lịch mock BSP tổng quát) và các plan role khác.
 
 - **Plan đang chạy:** 🎯 Datalogic (file này) · bắt đầu **2026-08-03**.
-- **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **buổi kế tiếp = Buổi 2**.
-- **Buổi gần nhất:** Buổi 1 — `rapid track cpp-system` — **3.25/4** ([log](../mock-interview/sessions/2026-08-03--rapid--cpp-system.md)).
-- **▶️ LÀM TIẾP:** `/mock by-level 🟡 track modern-cpp` — ôn trước theo cột **Đọc/Hiểu Tuần 1 Buổi 2** (EMC Items + pool CPP-040…051).
-- **Sổ yếu hiện tại:** CPP-009, OS-007 (mới) · OS-003, DP-002 (đang chờ gỡ, cần 1 lần ≥3 nữa) → xem [weak-register](../mock-interview/weak-register.md); chèn `/mock weak-review` khi muốn vá.
+- **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **buổi kế tiếp = Buổi 3**.
+- **Buổi gần nhất:** Buổi 2 — `by-level 🟡 track modern-cpp` — **3.3/4** ([log](../mock-interview/sessions/2026-08-03--by-level--modern-cpp.md)). *(B1: rapid 3.25/4)*
+- **▶️ LÀM TIẾP:** `/mock daily track cpp-system` (Tuần 1 Buổi 3 — concurrency + OS sync) — ôn trước theo cột **Đọc/Hiểu Tuần 1 Buổi 3** (pool CPP-018/019/022 + OS-003…012).
+- **Sổ yếu hiện tại:** CPP-045, CPP-032 (mới) · OS-007 · CPP-009, OS-003, DP-002 (đang chờ gỡ, cần 1 lần ≥3 nữa) → xem [weak-register](../mock-interview/weak-register.md); chèn `/mock weak-review` khi muốn vá.
 
 **Checklist buổi (tick `[x]` khi xong — đây là "đang dang dở đến đâu"):**
-- **Tuần 1** (C++17): `[x]` B1 · `[ ]` B2 · `[ ]` B3 · `[ ]` B4 · `[ ]` B5 · `[ ]` CN
+- **Tuần 1** (C++17): `[x]` B1 · `[x]` B2 · `[ ]` B3 · `[ ]` B4 · `[ ]` B5 · `[ ]` CN
 - **Tuần 2** (Linux sysprog+debug): `[ ]` toàn bộ (chưa tới)
 - **Tuần 3** (kernel/drivers): `[ ]` toàn bộ
 - **Tuần 4** (Yocto/design/behavioral): `[ ]` toàn bộ
@@ -61,7 +61,7 @@
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
 | 1 | - [x] [raii-smart-pointers](../../02-modern-cpp/raii-smart-pointers.md) §6 (Rule 0/3/5) + smart pointer (unique/shared/weak, cyclic ref); [move-semantics](../../02-modern-cpp/move-semantics.md) (rvalue ref, `std::move`, perfect forwarding, emplace vs push_back). **Chạm nhanh:** [oop](../../01-cpp-fundamentals/oop.md) (struct/class, virtual/vtable), [memory-model](../../01-cpp-fundamentals/memory-model.md) (stack/heap). **Pool bank ôn trước:** CPP-001…008, 020, 024…029 | ✅ `rapid cpp-system` 3.25/4 (2026-08-03) |
-| 2 | - [ ] 🎯 EMC items nền: [effective-modern-cpp](../../16-book-summaries/effective-modern-cpp.md) — auto (Item 1–2), braced-init (7), nullptr (8), using vs typedef (9), `=delete` (11), override/final (12), make_unique (21), special-member generation (17). **Pool bank:** CPP-040…051, CPP-046 | `/mock by-level 🟡 track modern-cpp` |
+| 2 | - [x] 🎯 EMC items nền: [effective-modern-cpp](../../16-book-summaries/effective-modern-cpp.md) — auto (Item 1–2), braced-init (7), nullptr (8), using vs typedef (9), `=delete` (11), override/final (12), make_unique (21), special-member generation (17). **Pool bank:** CPP-040…051, CPP-046 | ✅ `by-level 🟡 modern-cpp` 3.3/4 (2026-08-03) |
 | 3 | - [ ] [concurrency](../../02-modern-cpp/concurrency.md) (thread, atomic, memory_order, mutex, lock_guard/unique_lock) + [OS sync-primitives](../../03-operating-system/sync-primitives.md) (mutex vs semaphore + **ownership/priority inheritance**, spinlock, deadlock 4 Coffman). **Pool bank:** CPP-018/019/022/024; OS-003/004/006/007/012 | `/mock daily track cpp-system` |
 | 4 | - [ ] [cmake](../../06-build-systems/cmake.md) — **tư duy target-based** (PUBLIC/PRIVATE/INTERFACE *nghĩa là gì*, toolchain file *giải quyết gì*), cú pháp tra sau | `/mock ... track build-systems` (BLD-001…003) |
 | 5 | Coding: viết vào [coding-arena/](../mock-interview/coding-arena/) | `/mock coding track dsa` (reverse list, ring buffer, two-sum) |

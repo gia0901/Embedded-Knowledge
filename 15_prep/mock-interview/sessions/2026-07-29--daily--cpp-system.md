@@ -3,15 +3,30 @@
 - **Level:** mid-level · **Số câu:** 6 · **Thời lượng:** ~15 phút
 - **Điểm trung bình:** 3.0 / 4
 
-## Kết quả từng câu
-| ID | Câu (tóm tắt) | Tự đánh giá | Điểm | Ghi chú (thiếu gì / lỗ hổng) |
-|----|---------------|-------------|------|------------------------------|
-| CPP-028 | enum vs enum class | ok | 3 | thiếu: enum class chỉ định kiểu nền (uint8_t) — góc embedded |
-| CPP-003 | const int* / int* const / const int* const | lúng túng câu giữa | 3 | `int* const` nói ngược: KHÔNG đổi nơi trỏ, đổi được *p |
-| CPP-029 | emplace_back vs push_back | chưa chắc | 2 | bản chất = dựng tại chỗ từ ĐỐI SỐ ctor, không phải rvalue; bẫy bỏ qua explicit |
-| CPP-044 | using alias vs typedef | ok | 3 | trúng alias template; diễn đạt "typedef không alias kiểu" hơi sai |
-| OS-007 | mutex vs semaphore | ok | 3 | thiếu priority inheritance; khung mutex-thread/sem-process chưa chính xác |
-| CPP-020 | Rule of 0/3/5 (revisit) | ok | 4 | ✅ lần này chuẩn (trước 2) — tiến bộ |
+## Kết quả từng câu (nhìn nhanh)
+| ID | Câu (tóm tắt) | Điểm | Ghi chú ngắn |
+|----|---------------|------|--------------|
+| CPP-028 | enum vs enum class | 3 | thiếu: enum class chỉ định kiểu nền (uint8_t) — góc embedded |
+| CPP-003 | const int* / int* const / … | 3 | `int* const` nói ngược: KHÔNG đổi nơi trỏ, đổi được `*p` |
+| CPP-029 | emplace_back vs push_back | 2 | dựng tại chỗ từ **đối số ctor**; bẫy bỏ qua explicit |
+| CPP-044 | using alias vs typedef | 3 | trúng alias template; "typedef không alias kiểu" hơi sai |
+| OS-007 | mutex vs semaphore | 3 | thiếu priority inheritance; khung mutex/sem chưa chính xác |
+| CPP-020 | Rule of 0/3/5 (revisit) | 4 | ✅ lần này chuẩn (trước 2) — tiến bộ |
+
+## 🔎 Chi tiết ôn — câu điểm ≤ 3
+> *(Retrofit 2026-08-03 theo format mới; log gốc chỉ có bảng.)*
+
+### CPP-029 — emplace_back vs push_back (điểm 2)
+- **Thiếu/sai:** hiểu là "nhận rvalue"; đúng là **nhận đối số của constructor** rồi forward dựng thẳng. Chưa nêu bẫy bỏ qua `explicit`.
+- **Bank:** > "`push_back` nhận một **object đã dựng** rồi copy/move vào container. `emplace_back` nhận **đối số của constructor**, forward vào để **dựng object thẳng trong bộ nhớ container** — bỏ qua bước tạo object tạm." Bẫy: > "`emplace_back` dựng qua **direct-initialization** nên **bỏ qua `explicit`**... `vv.emplace_back(10)` ✅ gọi vector(size_t)=10 phần tử — thường NGOÀI Ý MUỐN; `vv.push_back(10)` ❌ bị chặn — an toàn hơn."
+- **Tài liệu:** [move-semantics.md §5.1](../../../02-modern-cpp/move-semantics.md) (emplace vs push_back, 4 tình huống).
+- **Chốt:** mặc định `push_back` (rõ + an toàn kiểu); `emplace_back` chỉ khi thật sự truyền **đối số ctor** của object đắt. *(Sau đó lên 4 → gỡ khỏi weak 2026-08-03.)*
+
+### Câu điểm 3 (gọn)
+- **CPP-003:** `int* const` = **con trỏ hằng** (không đổi *nơi trỏ*, đổi được `*p`); `const int*` = trỏ tới hằng. Đọc từ phải sang.
+- **CPP-028:** enum class thêm — **chỉ định kiểu nền** (`: uint8_t`) để kiểm soát kích thước, hợp embedded.
+- **CPP-044:** alias template đúng; nhưng typedef **vẫn** alias kiểu được cho ca thường — nó chỉ *không* template hoá được.
+- **OS-007:** thiếu **priority inheritance** (lý do RTOS chọn mutex, không phải binary semaphore); ownership = ai lock nấy unlock. *(Xem chi tiết đầy đủ ở log 2026-08-03 rapid.)*
 
 ## Tổng kết
 - **Điểm mạnh:** const/alias/enum/Rule-of-0-3-5 nắm được; diễn đạt gọn.

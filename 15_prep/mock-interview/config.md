@@ -49,7 +49,7 @@
 - Tổng kết: điểm mạnh, 2–3 lỗ hổng ưu tiên, mỗi lỗ hổng kèm **link tài liệu + mục cụ thể** (không chỉ link file trống).
 
 **Bước 4 — Cập nhật bộ nhớ (BẮT BUỘC, sau review).**
-- Ghi **1 file log** vào [sessions/](sessions/) theo mẫu [sessions/README.md](sessions/README.md): ngày, track, type, danh sách câu (ID) + điểm + ghi chú.
+- Ghi **1 file log** vào [sessions/](sessions/) theo mẫu [sessions/README.md](sessions/README.md): ngày, track, type, bảng câu (ID + điểm + ghi chú ngắn) **và mục 🔎 "Chi tiết ôn"** — **persist nguyên văn** phần review Bước 3 cho câu ≤3 (thiếu gì + trích bank + trích tài liệu gốc + câu chốt). Log phải **tự chứa** để mở lại là ôn được, không cần đọc lại hội thoại.
 - Cập nhật [weak-register.md](weak-register.md): thêm câu điểm ≤ 2, gỡ/hạ câu đã trả lời vững (≥ 3) qua ≥ 2 lần.
 - **Đồng bộ ngân hàng:** nếu trong phiên interviewer đặt câu **chưa có trong [bank/](bank/)** (câu tự phát/mở rộng), **thêm câu đó vào đúng file bank** (gán ID kế tiếp, metadata, đáp án) — xem §3. Đây là cơ chế giữ bank luôn là nguồn duy nhất và lớn dần theo thực chiến.
 

@@ -18,6 +18,26 @@
 | DBG-001 | -g / -O0 | ok | 3 | đúng bản chất symbol + tắt optimize |
 | BLD-001 | CMake / modern | ok | 4 | meta-build + target-based (tránh biến global) — tư duy chuẩn |
 
+## 🔎 Chi tiết ôn — câu điểm ≤ 3
+
+### CPP-009 — template ở header (điểm 2)
+- **Thiếu/sai:** nói "runtime" trước khi tự sửa; dùng từ "inline" (đúng là *instantiation*).
+- **Bank:** > "Template được compiler instantiate thành code chuyên biệt cho từng kiểu lúc **biên dịch** (không chi phí runtime). Định nghĩa phải ở header vì compiler cần thấy toàn bộ định nghĩa tại điểm sử dụng để sinh code; tách vào .cpp → các TU khác chỉ có khai báo → lỗi linker."
+- **Tài liệu:** > "Compiler chỉ sinh code cho một instantiation khi nó **thấy đầy đủ định nghĩa** template tại điểm sử dụng." ([templates.md §6](../../../01-cpp-fundamentals/templates.md))
+- **Chốt:** compile-time *instantiation* (không phải inline, không phải runtime); thiếu định nghĩa ở TU → **linker undefined reference**.
+
+### OS-007 — mutex vs semaphore (điểm 2)
+- **Thiếu/sai:** nêu được "đếm/signaling" nhưng trượt **ownership** + **priority inheritance** ("chưa rõ" priority inversion).
+- **Bank:** > "Mutex có ownership (ai lock thì chính nó unlock)... Semaphore là bộ đếm wait/signal **không ownership**... Dùng binary semaphore thay mutex làm **mất priority inheritance** và dễ lỗi."
+- **Tài liệu:** > "Mutex là cơ chế khóa có **ownership**: thread nào lock thì **chính nó phải unlock**... Semaphore... không có ownership — bất kỳ thread nào cũng có thể signal." ([sync-primitives.md:146](../../../03-operating-system/sync-primitives.md#L146)); > "dùng binary semaphore thay mutex... mất priority inheritance" ([:74](../../../03-operating-system/sync-primitives.md#L74))
+- **Chốt:** mutex = *lock có chủ*; semaphore = *đếm/báo hiệu không chủ*. **Priority inheritance**: task giữ mutex được nâng tạm ưu tiên để nhả nhanh → tránh priority inversion; semaphore không có.
+
+### OS-005 — context switch (điểm 3)
+- **Thiếu/sai:** gọi "flush data cache" — chính xác là đổi **page table** + **flush TLB**.
+- **Bank:** > "Switch giữa hai process còn phải đổi không gian địa chỉ (**đổi page table**) và thường **flush TLB**, làm cache/TLB lạnh → đắt. Thread cùng process dùng chung address space nên bỏ qua bước này."
+- **Chốt:** thuật ngữ đúng = "đổi page table + flush TLB", không phải data cache.
+
+## Tổng kết
 - **Điểm mạnh:** modern C++ (RAII/move/emplace/override), SOLID, CMake tư duy rất chắc; deadlock tiến bộ lớn (0→3).
 - **Lỗ hổng ưu tiên:**
   1. Template = **compile-time instantiation** (CPP-009) — nói nhầm runtime.

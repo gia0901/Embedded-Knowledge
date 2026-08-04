@@ -11,7 +11,9 @@
 
 | ID | Câu (tóm tắt) | Track | Lần gặp | Điểm gần nhất | Ghi chú lỗ hổng |
 |----|---------------|-------|---------|----------------|-----------------|
-| CPP-009 | template ở header — compile-time | cpp-system, modern-cpp | 1 | 2 | **nói "runtime" trước khi sửa**; phản xạ đúng = *instantiation lúc compile*; def ở header vì mỗi TU cần thấy đủ định nghĩa (không thì linker undefined reference) |
+| CPP-045 | `=delete` vs private cũ | cpp-system, modern-cpp | 1 | 2 | hiểu sai "sinh code tối ưu"; đúng = hàm **bị xóa**, lỗi lúc **compile** (private cũ = link), áp cho **hàm bất kỳ** không chỉ special members |
+| CPP-032 | explicit / implicit conversion | cpp-system, modern-cpp | 1 | 2 | ví dụ đầu sai (copy ≠ conversion); đúng = chặn convert ngầm qua ctor 1-đối-số; ctor 1-đối-số mặc định nên `explicit` |
+| CPP-009 | template ở header — compile-time | cpp-system, modern-cpp | 2 | 2, 3 | 🔼 lần 2 đạt 3 — **cần thêm 1 lần ≥3 nữa**. Đúng = *instantiation lúc compile*; def ở header vì mỗi TU cần thấy đủ định nghĩa |
 | OS-007 | mutex vs semaphore | cpp-system, bsp | 1 | 2 | thiếu **ownership** (ai lock nấy unlock; semaphore ai signal cũng được) + **priority inheritance** (binary semaphore thay mutex mất nó → priority inversion) |
 | OS-003 | deadlock — 4 điều kiện Coffman + cách phá | cpp-system, bsp | 2 | 0, 3 | 🔼 lần 2 đạt 3 (đủ 4 điều kiện + lock ordering) — **cần thêm 1 lần ≥3 nữa** để gỡ |
 | DP-002 | Singleton hiện đại (Meyers static-local) | cpp-system, design-patterns | 2 | 2, 3 | 🔼 lần 2 đạt 3 — **cần thêm 1 lần ≥3 nữa**. Bổ sung: tên cơ chế = **guard variable**; nhớ private ctor + copy `=delete` |
