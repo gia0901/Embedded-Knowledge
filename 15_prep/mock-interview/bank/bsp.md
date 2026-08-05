@@ -11,7 +11,36 @@
 **HAL là gì, giải quyết vấn đề gì?**
 <details><summary>Đáp án</summary>
 
-Lớp trừu tượng giữa ứng dụng và phần cứng, cho interface ổn định. Đổi chipset chỉ thay implementation HAL, tầng trên không đổi. Cách làm OOP: interface base + lớp dẫn xuất theo từng chipset; hỗ trợ chip mới chỉ cần lớp dẫn xuất mới → giảm chi phí porting. *(Testability qua HAL: [DP-011](design-patterns.md).)*
+**HAL (Hardware Abstraction Layer)** = lớp giữa ứng dụng và phần cứng, phơi ra **interface ổn định** theo *chức năng* ("đọc nhiệt độ", "gửi frame") thay vì theo *chip* ("ghi thanh ghi 0x40 của ADC XYZ").
+
+**Vấn đề nó giải — chi phí đổi phần cứng.** Không có HAL, chi tiết chip rò rỉ khắp codebase; đổi chipset (EOL, thiếu hàng, hạ giá thành) phải sửa **mọi nơi**. Có HAL, ranh giới thay đổi bị **khoanh vùng**: chỉ viết một implementation mới.
+
+```
+┌─────────────── Application / business logic ─────────────┐   ← không đổi
+├──────────── HAL interface (thuần chức năng) ─────────────┤   ← hợp đồng ổn định
+│  SensorX impl │ SensorY impl │ MockSensor (unit test) │      ← chỉ tầng này thay
+└────────────── thanh ghi / driver / SoC ──────────────────┘
+```
+
+```cpp
+class ITempSensor {                       // interface ổn định
+public:
+    virtual ~ITempSensor() = default;
+    virtual float readCelsius() = 0;
+};
+class Bmp280 : public ITempSensor { … };  // chipset A
+class Sht31  : public ITempSensor { … };  // chipset B — đổi chip = thêm 1 class
+class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần phần cứng
+```
+
+**Ba lợi ích, và lợi ích thứ ba mới là thứ interviewer muốn nghe:**
+1. **Portability** — đổi chipset/SoC chỉ thay implementation.
+2. **Phân chia công việc** — team app và team BSP làm song song sau khi chốt interface.
+3. ⭐ **Testability** — cắm mock vào chỗ phần cứng → **unit test chạy trên host, trong CI**, không cần board. Đây thường là giá trị lớn nhất trong thực tế ([SD-007](system-design.md), [DP-011](design-patterns.md)).
+
+**Đánh đổi (nên chủ động nêu):** thêm một lớp gián tiếp — với virtual thì tốn vptr + chặn inline; trên MCU chật có thể thay bằng **template/CRTP** hoặc con trỏ hàm trong struct (kiểu C, như `struct file_operations` của Linux). Và HAL **quá tổng quát** sẽ hoặc là mẫu số chung nghèo nàn, hoặc rò rỉ chi tiết chip qua interface — thiết kế theo *ca sử dụng thật*, đừng cố phủ mọi khả năng của chip.
+
+**Chốt:** *"HAL đóng băng cái *làm gì*, cô lập cái *làm thế nào*. Đo chất lượng một HAL bằng câu hỏi: đổi chipset thì phải sửa bao nhiêu file — và có test được khi không có board không?"*
 </details>
 
 #### BSP-002 · 🟠 · concept · ⭐ · [→ melp/bootloader-kernel](../../../16-book-summaries/melp/bootloader-kernel.md)

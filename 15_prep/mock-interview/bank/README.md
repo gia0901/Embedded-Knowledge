@@ -42,6 +42,34 @@
 - **⭐** = xác suất gặp cao với JD (BSP / C++ system). **🏗️** = câu mở/tình huống, chấm theo khung. **🎤 ngày** = câu được thêm từ một phiên mock.
 - **→ nguồn** = link tài liệu để ôn lại (dùng khi review).
 
+## ✍️ Tiêu chí viết đáp án (áp cho câu mới **và** khi sửa câu cũ)
+
+> **Nguyên tắc:** đáp án phải **tự giải nén được sau 2 tuần**. Nén quá tay thì đọc lại chỉ thấy các từ khoá đúng mà không dựng lại được lập luận — vô dụng đúng lúc cần. Nhưng cũng **không giãn đều mọi câu**: độ dài phải theo level.
+
+**Độ dài:**
+
+| Level | Giới hạn | Tính chất |
+|---|---|---|
+| 🟢 | **30–60 từ**, 1 đoạn, không bảng | **Trần cứng.** Đây là nguồn cho phiên `rapid` (12 câu/15′, đáp án 1–2 câu) — giãn ra là **phá** công dụng đó |
+| 🟡 *nhẹ* (định nghĩa, so sánh 1 chiều) | ~1 đoạn + tối đa 1 bảng | Đủ nêu cơ chế + một so sánh |
+| 🟡 *nặng cơ chế* · 🟠 · 🔴 | **Không có trần từ** — vừa **một màn hình** là được | Viết đủ để hiểu, dừng khi hết ý. Dùng khung 5 phần dưới |
+
+> ⚠️ **Đã thử trần cứng 250 từ cho 🟠🔴 và BỎ** (2026-08-05). Lý do: khi cắt cho vừa số, bản rút gọn *đọc lủng củng, mất mạch* — đúng cái bệnh mà tiêu chí này sinh ra để chữa. Vài chục từ không phải chi phí đáng kể, còn mạch lạc thì có. **Đừng tái lập trần từ cho nhóm này.**
+>
+> Thay bằng **kiểm tra chức năng** — mỗi phần phải có việc của nó. Xoá phần nào mà đáp án *không mất gì* thì phần đó thừa. Dấu hiệu thật sự cần cắt: lặp ý đã nói ở phần trên · giải thích kiến thức nền không liên quan tới câu hỏi · liệt kê cho đủ thay vì cho đúng · sa đà chi tiết API mà interviewer không hỏi. **Dài vì nhiều ý ≠ dài dòng.**
+
+**Khung 5 phần cho câu 🟠🔴 (và 🟡 nặng cơ chế)** — mẫu tham chiếu: **[OS-012](os.md)** (condition variable), [CPP-052](cpp.md) (shared_ptr 3 tầng).
+
+1. **Cơ chế trước** — thứ gì thực sự xảy ra, đánh số bước nếu là quy trình. Hiểu bước máy chạy thì tự suy ra phần còn lại.
+2. **"Vì sao" tách tầng nông / sâu** — hầu hết câu có một lý do ai cũng nói được và một lý do thật sự phân biệt ứng viên. Nêu **cả hai**, gắn nhãn rõ.
+3. **Bảng phân biệt các ca** — khi đáp án có ≥3 trường hợp / mức / lựa chọn, dùng **bảng** thay vì câu văn liệt kê. Quét mắt được khi ôn.
+4. **Code ngắn khi API dễ viết nhầm** — đặt dạng **đúng và sai cạnh nhau**, comment `// ✅ / // ❌`. Vài dòng, không phải chương trình chạy được.
+5. **Bẫy + câu chốt** — nêu thẳng **hiểu lầm phổ biến** (vd *"count là atomic nên shared_ptr an toàn"*), rồi một dòng **Chốt:** bật ra được ngay khi bị hỏi thật.
+
+**Bắt buộc:** đối chiếu tài liệu topic gốc khi viết/sửa, **không viết từ trí nhớ** — nếu không bank sẽ trôi lệch khỏi [01–14](../../../). Link `→ nguồn` phải trỏ đúng mục đã dùng.
+
+**Không** làm: nhồi mọi thứ biết được; lặp lại nguyên văn tài liệu gốc (bank là *bản rút gọn có cấu trúc*, không phải bản sao); giãn câu 🟢.
+
 ## Cách phiên dùng bank
 
 Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) × **type/level** ([../interview-types.md](../interview-types.md)), ưu tiên chèn câu trong [../weak-register.md](../weak-register.md). "Rapid-fire" = rút câu `concept` 🟢🟡. Xem giao thức đầy đủ trong [../config.md](../config.md).
@@ -50,7 +78,7 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 
 | Domain | Dải ID đã dùng |
 |---|---|
-| CPP | 001–051 (040–051 = track `emc`, neo theo Item) |
+| CPP | 001–052 (040–051 = track `emc`, neo theo Item; 052 = shared_ptr 3 tầng thread-safety) |
 | OS | 001–019 |
 | LNX | 001–026 |
 | DRV | 001–027 (019–027 = PCI/USB) |

@@ -43,7 +43,34 @@ MCU: RAM/flash on-chip (KB–MB), thường không MMU, chạy bare-metal/RTOS, 
 **Vì sao driver không được dereference con trỏ user trực tiếp? (`copy_from_user`/`copy_to_user`)**
 <details><summary>Đáp án</summary>
 
-Con trỏ user thuộc address space user, có thể không hợp lệ, trỏ vào kernel (tấn công), hoặc bị swap (fault). Dereference trực tiếp gây oops hoặc lỗ hổng bảo mật. Phải dùng `copy_from_user`/`copy_to_user` (xác thực vùng, xử lý fault an toàn khi chép qua ranh giới user↔kernel, trả `-EFAULT` nếu sai).
+**Nguyên tắc nền: con trỏ từ user là *dữ liệu không tin được*, không phải địa chỉ.** Bốn lý do, hai về đúng đắn và hai về bảo mật:
+
+| | Vấn đề | Hậu quả nếu deref thẳng |
+|---|---|---|
+| 1 | Địa chỉ **không hợp lệ** (chưa map, đã `munmap`) | **Kernel oops** — sập cả hệ thống, không phải chỉ crash 1 process |
+| 2 | Page **bị swap ra / chưa fault-in** | Page fault trong ngữ cảnh không xử lý được |
+| 3 | 🔒 User cố tình đưa **địa chỉ kernel** | Kernel tự đọc/ghi vùng của chính nó theo lệnh user → **leo thang đặc quyền** |
+| 4 | 🔒 Process khác / thời điểm khác | Con trỏ chỉ có nghĩa trong **address space** của process đó |
+
+```c
+// ❌ TUYỆT ĐỐI KHÔNG
+static ssize_t my_write(struct file *f, const char __user *ubuf, size_t len, loff_t *off) {
+    memcpy(kbuf, ubuf, len);          // deref thẳng con trỏ user -> oops / lỗ hổng
+}
+
+// ✅ Đúng
+    if (len > sizeof(kbuf)) return -EINVAL;        // ✅ luôn kiểm tra len TRƯỚC
+    if (copy_from_user(kbuf, ubuf, len))           // trả về SỐ BYTE CHƯA chép được
+        return -EFAULT;                            // ✅ khác 0 = lỗi
+```
+
+`copy_from_user`/`copy_to_user` (và `get_user`/`put_user` cho biến đơn) làm ba việc: **xác thực** vùng địa chỉ thuộc user space, **xử lý page fault an toàn** (fault-in hoặc bỏ cuộc sạch sẽ), và trả **số byte chưa chép được** thay vì nổ.
+
+**Chú thích `__user`** trên tham số không phải trang trí — nó cho **sparse** (`make C=1`) kiểm tra tĩnh và báo lỗi nếu bạn deref nhầm. Luôn giữ.
+
+**Bẫy:** (1) tưởng giá trị trả về là số byte **đã** chép — ngược lại, **0 = thành công**; (2) quên kiểm tra `len` trước khi copy → user truyền `len` khổng lồ gây tràn buffer kernel; (3) gọi `copy_*_user` trong **ngữ cảnh atomic** (spinlock/ISR) — nó **có thể ngủ** (page fault) → deadlock; (4) **TOCTOU**: copy vào kernel rồi validate, đừng validate trên bộ nhớ user rồi mới copy — user có thể đổi giữa hai bước.
+
+**Chốt:** *"Con trỏ user chỉ là một con số user đưa cho bạn. Luôn qua `copy_*_user`, luôn kiểm tra độ dài, và nhớ 0 mới là thành công."*
 </details>
 
 #### DRV-007 · 🟡 · concept · ⭐ · [→ device-tree](../../../05-drivers-device-tree/device-tree.md)
@@ -71,14 +98,70 @@ ioctl: gửi lệnh điều khiển tùy biến + struct tham số qua mã lện
 **Probe() làm gì? Device và driver match thế nào?**
 <details><summary>Đáp án</summary>
 
-Linux Device Model tách device (đến từ device tree/ACPI/bus enumeration) khỏi driver (code điều khiển). Driver khai báo match table (`of_match_table` khớp `compatible`, hoặc ID table). Khi device khớp driver, kernel gọi `probe()` — khởi tạo: ánh xạ thanh ghi (`ioremap`), xin IRQ, cấp tài nguyên, đăng ký subsystem. Tháo thì gọi `remove()`. *(Đường đi chi tiết + EPROBE_DEFER: xem [BSP-006](bsp.md).)*
+**Ý tưởng nền — Linux Device Model tách đôi:** **device** (thiết bị *tồn tại*: đến từ device tree, ACPI, hoặc bus tự liệt kê như PCI/USB) và **driver** (code *biết điều khiển* một loại thiết bị). Hai bên đăng ký độc lập với **bus**; bus lo việc **ghép đôi**.
+
+**Match theo bus — mỗi bus một cách:**
+
+| Bus | Khớp bằng | Nguồn device |
+|---|---|---|
+| Platform (I2C/SPI/MMIO on-chip) | `of_match_table` ↔ thuộc tính **`compatible`** trong DTS | **Device tree** — phải khai tay |
+| PCI | `id_table` ↔ **Vendor ID / Device ID** đọc từ config space | **Tự liệt kê** (enumeration) |
+| USB | `id_table` ↔ VID/PID / class | **Tự liệt kê** |
+
+Khớp được → bus gọi **`probe()`** của driver.
+
+```c
+static int my_probe(struct platform_device *pdev) {
+    void __iomem *base = devm_platform_ioremap_resource(pdev, 0);  // ánh xạ thanh ghi
+    if (IS_ERR(base)) return PTR_ERR(base);
+    int irq = platform_get_irq(pdev, 0);
+    ret = devm_request_irq(&pdev->dev, irq, my_isr, 0, "mydrv", priv);   // xin IRQ
+    // … cấp tài nguyên, đăng ký với subsystem (input/net/tty/…)
+    return 0;
+}
+static struct platform_driver my_drv = {
+    .probe = my_probe, .remove = my_remove,
+    .driver = { .name = "mydrv", .of_match_table = my_of_match },
+};
+```
+
+**`probe()` làm gì:** ánh xạ thanh ghi (`ioremap`), xin IRQ, cấp bộ nhớ/DMA, lấy clock/regulator/GPIO/pinctrl, rồi **đăng ký với subsystem** phù hợp để thiết bị lộ ra userspace. `remove()` làm ngược lại — hoặc dùng **`devm_*`** để kernel tự dọn (RAII cho driver, [DRV-014](drivers-embedded.md)).
+
+**Bẫy:** (1) ⭐ **`-EPROBE_DEFER`** — probe chạy khi thiết bị *phụ thuộc* (regulator, clock, GPIO controller) **chưa sẵn sàng**; đừng coi là lỗi thật, phải **trả `-EPROBE_DEFER`** để kernel thử lại sau. Đây là câu hỏi rất hay gặp ([BSP-006](bsp.md)); (2) probe **thất bại giữa chừng** phải nhả đúng thứ tự ngược — dùng `devm_*` để khỏi sót; (3) tưởng "cắm module là driver chạy" — không có device khớp thì `probe()` **không bao giờ** được gọi; kiểm bằng `/sys/bus/*/devices`, `/sys/bus/*/drivers`; (4) `compatible` trong DTS phải khớp **chuỗi**, sai một ký tự là im lặng không probe.
+
+**Chốt:** *"Device và driver đăng ký riêng, bus ghép chúng qua match table (`compatible` hoặc VID/DID). Khớp thì `probe()` chạy — và nếu phụ thuộc chưa sẵn sàng thì trả `-EPROBE_DEFER` chứ đừng báo lỗi."*
 </details>
 
 #### DRV-011 · 🟠 · concept · ⭐ · [→ driver-basics](../../../05-drivers-device-tree/driver-basics.md)
 **Top half / bottom half trong xử lý interrupt là gì?**
 <details><summary>Đáp án</summary>
 
-Interrupt handler (top half) chạy với ngắt bị tắt nên phải cực nhanh, không được ngủ. Việc nặng/có thể ngủ hoãn sang bottom half: tasklet/softirq (ngữ cảnh atomic) hoặc workqueue/threaded IRQ (ngữ cảnh process, được phép ngủ). Giữ hệ thống đáp ứng và không bỏ lỡ ngắt khác. *(Vì sao ISR không được ngủ: [BSP-010](bsp.md).)*
+**Vấn đề cần giải:** interrupt handler chạy trong **ngữ cảnh ngắt** — ngắt (ít nhất là cùng loại) đang bị chặn, **không có process context** nên **không được ngủ**. Giữ nó lâu = tăng latency cho mọi ngắt khác, có thể **mất** ngắt. Nhưng việc cần làm thì thường nặng (xử lý gói tin, cấp bộ nhớ, đọc I2C chậm).
+
+**Giải pháp: chia đôi.**
+- **Top half** (hard IRQ) — chạy **ngay**, làm **tối thiểu**: ack thiết bị (xoá cờ ngắt để nó không bắn lại), đọc dữ liệu khẩn khỏi thanh ghi, rồi **lên lịch** bottom half. Vài chục lệnh.
+- **Bottom half** — chạy **sau**, làm phần nặng, ở ngữ cảnh dễ thở hơn.
+
+**Chọn loại bottom half — tiêu chí quyết định là *có cần ngủ không*:**
+
+| Cơ chế | Ngữ cảnh | Ngủ được? | Dùng khi |
+|---|---|---|---|
+| **softirq** | atomic | ❌ | Hạ tầng kernel (mạng, block) — driver thường không tự viết |
+| **tasklet** | atomic (trên softirq) | ❌ | Việc ngắn, nhanh. *(đang bị deprecate dần)* |
+| **workqueue** | **process** | ✅ | Mặc định nên chọn: cấp bộ nhớ `GFP_KERNEL`, đọc I2C/SPI, chờ I/O |
+| **threaded IRQ** (`request_threaded_irq`) | **process** (kthread riêng) | ✅ | ⭐ Cách hiện đại: gọn, có thể chỉnh priority — hợp **real-time** |
+
+```c
+// Mẫu hiện đại: kernel tự lo top/bottom half
+request_threaded_irq(irq,
+                     my_hardirq,      // top half: ack + đọc nhanh, trả IRQ_WAKE_THREAD
+                     my_threadfn,     // bottom half: chạy trong kthread, ĐƯỢC PHÉP NGỦ
+                     IRQF_ONESHOT, "mydrv", priv);
+```
+
+**Bẫy:** (1) ⚠️ gọi hàm **có thể ngủ** trong top half — `kmalloc(GFP_KERNEL)`, `mutex_lock`, `copy_to_user`, `msleep`, đọc I2C — là bug nghiêm trọng, kernel báo *"scheduling while atomic"*; trong top half phải `GFP_ATOMIC` và **spinlock** ([OS-006](os.md)); (2) quên **ack/xoá cờ ngắt** trong top half → ngắt bắn lại vô hạn, hệ thống treo; (3) dùng tasklet cho việc cần ngủ — nó vẫn là ngữ cảnh atomic, không phải "nhẹ hơn nên an toàn hơn"; (4) chia sẻ dữ liệu giữa top half và phần còn lại phải dùng `spin_lock_irqsave` (chặn ISR trên **cùng core** tự khoá chính mình).
+
+**Chốt:** *"Top half: ack rồi biến, không được ngủ. Bottom half: làm phần nặng. Cần ngủ → workqueue hoặc threaded IRQ; không cần → tasklet/softirq."*
 </details>
 
 #### DRV-012 · 🟠 · concept · [→ architecture](../../../08-embedded-systems/architecture.md)
@@ -151,7 +234,34 @@ Driver khai `pci_driver` với `id_table` (Vendor/Device ID) + `MODULE_DEVICE_TA
 **INTx vs MSI/MSI-X trên PCI khác nhau thế nào?**
 <details><summary>Đáp án</summary>
 
-**INTx** (legacy): 4 đường ngắt **level-triggered, chia sẻ** giữa nhiều thiết bị → handler phải kiểm tra "ngắt của mình không", chia sẻ gây latency. **MSI/MSI-X** (message-signaled): thiết bị **ghi một message vào bộ nhớ** thay vì kéo dây IRQ → **không chia sẻ**, mỗi vector riêng (MSI-X tới 2048 vector), giống edge-triggered, latency thấp, cho phép định tuyến ngắt tới core cụ thể. Hiện đại nên dùng MSI-X. API: `pci_alloc_irq_vectors(...PCI_IRQ_MSIX|MSI|INTX)` + `pci_irq_vector()`.
+**Khác biệt gốc: báo ngắt bằng *dây* hay bằng *một lần ghi bộ nhớ*.**
+- **INTx** (legacy): thiết bị **kéo một đường dây vật lý** (INTA–INTD). Chỉ có 4 đường cho cả bus → **nhiều thiết bị dùng chung**, **level-triggered**.
+- **MSI/MSI-X**: thiết bị **ghi một giá trị vào một địa chỉ** đã định (thực chất là một transaction PCIe ghi bộ nhớ). Interrupt controller thấy lần ghi đó và sinh ngắt. Không có dây riêng nào cả.
+
+| | **INTx** | **MSI** | **MSI-X** |
+|---|---|---|---|
+| Cơ chế | Dây vật lý | Ghi bộ nhớ | Ghi bộ nhớ |
+| Chia sẻ | ✅ **có** — phải hỏi "của mình không?" | ❌ riêng | ❌ riêng |
+| Số vector / device | 1 (dùng chung) | tới **32**, phải liên tiếp | tới **2048**, rời rạc |
+| Kiểu | Level-triggered | Edge-like | Edge-like |
+| Định tuyến tới core | Khó | ✅ mỗi vector một CPU | ✅ |
+
+**Vì sao MSI-X quan trọng thực tế — ba lợi ích, không chỉ "nhanh hơn":**
+1. **Không chia sẻ** → handler **không phải** đọc thanh ghi status để xác nhận "ngắt này của tôi"; bỏ được một lần đọc MMIO (đắt) mỗi ngắt, và bỏ luôn lớp bug "trả `IRQ_NONE` sai".
+2. **Nhiều vector riêng** → NIC gán **mỗi queue một vector**, mỗi vector ghim vào **một core** → xử lý song song thật, không có điểm nghẽn chung.
+3. **Không còn race của level-triggered** — INTx phải ack đúng cách nếu không ngắt bắn lại vô hạn.
+
+```c
+int nvec = pci_alloc_irq_vectors(pdev, 1, want,
+                                 PCI_IRQ_MSIX | PCI_IRQ_MSI | PCI_IRQ_INTX);  // ưu tiên giảm dần
+if (nvec < 0) return nvec;
+int irq = pci_irq_vector(pdev, 0);
+request_irq(irq, my_isr, 0, "mydrv", priv);      // ✅ MSI/MSI-X: KHÔNG cần IRQF_SHARED
+```
+
+**Bẫy:** (1) vẫn truyền `IRQF_SHARED` khi dùng MSI-X — thừa, và cho thấy chưa hiểu là nó không chia sẻ; (2) code chỉ chạy đúng khi có đủ vector — `pci_alloc_irq_vectors` có thể trả **ít hơn** yêu cầu, phải xử lý; (3) quên rằng MSI-X cần **BAR** chứa bảng MSI-X được map; (4) hỏi ngược: *"vì sao thiết bị cũ vẫn dùng INTx?"* — tương thích, và một số nền tảng/ảo hoá không hỗ trợ đủ.
+
+**Chốt:** *"INTx = kéo dây, ít vector, phải chia sẻ. MSI/MSI-X = ghi một message vào bộ nhớ → mỗi nguồn ngắt một vector riêng, ghim được vào core. Hiện đại thì MSI-X."*
 </details>
 
 #### DRV-022 · 🟠 · concept · [→ pci-usb-drivers §1.4](../../../05-drivers-device-tree/pci-usb-drivers.md)

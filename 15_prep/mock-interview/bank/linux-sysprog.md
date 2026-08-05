@@ -64,28 +64,126 @@ Shared memory — hai process map cùng vùng nhớ vật lý, đọc/ghi trực
 **epoll khác select/poll thế nào? Vì sao scale tốt hơn?**
 <details><summary>Đáp án</summary>
 
-select/poll truyền toàn bộ tập fd mỗi lần gọi và kernel quét tuyến tính O(n); select còn giới hạn ~1024. epoll cho đăng ký fd một lần, kernel duy trì tập và chỉ trả về fd **đã sẵn sàng** → chi phí tỉ lệ số fd sẵn sàng (k), không phải tổng (n). Khi nhiều kết nối idle, epoll hiệu quả hơn hẳn (nền của Nginx/Redis). Chỉ có trên Linux.
+**Khác biệt gốc: *ai giữ danh sách fd*.**
+- `select`/`poll`: **stateless** — mỗi lần gọi, user phải truyền **toàn bộ** tập fd xuống kernel, kernel **quét tuyến tính tất cả** để xem cái nào sẵn sàng, rồi copy kết quả ngược lên. Làm lại từ đầu **mỗi vòng lặp**.
+- `epoll`: **stateful** — đăng ký fd **một lần** bằng `epoll_ctl`; kernel giữ tập theo dõi trong một cấu trúc bền, và khi một fd sẵn sàng thì **callback của driver đẩy nó vào danh sách ready**. `epoll_wait` chỉ việc lấy danh sách ready ra.
+
+| | `select` | `poll` | `epoll` |
+|---|---|---|---|
+| Giới hạn số fd | ~**1024** (`FD_SETSIZE`) | không | không |
+| Chi phí mỗi lần gọi | **O(n)** | **O(n)** | **O(k)** — k = số fd **sẵn sàng** |
+| Truyền tập fd mỗi lần | ✅ phải truyền lại | ✅ | ❌ đăng ký một lần |
+| Tập fd bị phá sau khi gọi | ✅ phải dựng lại | ❌ | ❌ |
+| Di động | POSIX | POSIX | **chỉ Linux** (BSD: `kqueue`) |
+
+**Vì sao chênh lệch lớn đến vậy:** với 10.000 kết nối mà chỉ 10 cái có dữ liệu, `poll` vẫn duyệt đủ 10.000 mỗi vòng; `epoll` chạm đúng 10. Đây chính là bài toán **C10K**, và là lý do Nginx/Redis/libuv đều dựng trên epoll.
+
+**Bẫy:** (1) nói "epoll nhanh hơn" mà không nêu điều kiện — với **ít fd** (vài chục) `poll` có thể **nhanh hơn** vì không tốn syscall `epoll_ctl` và cấu trúc kernel; ưu thế chỉ xuất hiện khi **n lớn và phần lớn idle**; (2) quên `epoll` **không di động** — code cần chạy trên BSD/macOS phải trừu tượng hoá (libevent/libuv); (3) sau `fork`, epoll instance được kế thừa và **chia sẻ** — hai process cùng `epoll_wait` một fd sinh thundering herd (dùng `EPOLLEXCLUSIVE`).
+
+**Chốt:** *"select/poll hỏi lại toàn bộ danh sách mỗi lần; epoll đăng ký một lần rồi chỉ nhận về cái đã sẵn sàng. Chi phí đi từ O(tổng số fd) xuống O(số fd có việc)."*
 </details>
 
 #### LNX-010 · 🟠 · concept · [→ io-multiplexing](../../../04-linux-system-programming/io-multiplexing.md)
 **Level-triggered và edge-triggered khác nhau? ET cần lưu ý gì?**
 <details><summary>Đáp án</summary>
 
-LT (mặc định): báo liên tục chừng nào fd còn dữ liệu chưa đọc — dễ đúng. ET (`EPOLLET`): chỉ báo một lần khi trạng thái chuyển sang sẵn sàng — phải dùng fd non-blocking và đọc/ghi tới khi `EAGAIN` để vét cạn, nếu không "treo" sự kiện. ET hiệu năng cao hơn nhưng dễ sai.
+**Ẩn dụ điện tử đúng nguyên nghĩa:** LT báo theo **mức** (còn dữ liệu là còn báo), ET báo theo **sườn** (chỉ báo lúc **chuyển trạng thái** từ "không có" sang "có").
+
+| | **Level-triggered** (mặc định) | **Edge-triggered** (`EPOLLET`) |
+|---|---|---|
+| Khi nào báo | **Mỗi lần** `epoll_wait` nếu buffer còn dữ liệu | **Một lần duy nhất** khi dữ liệu mới đến |
+| Đọc chưa hết thì | Lần sau vẫn được báo lại → an toàn | **Không báo lại** → dữ liệu kẹt, kết nối "treo" |
+| fd non-blocking | Nên có | **Bắt buộc** |
+| Độ khó | Dễ đúng | Dễ sai |
+
+```c
+// ✅ Mẫu ET BẮT BUỘC: vét cạn tới khi EAGAIN
+for (;;) {
+    ssize_t n = read(fd, buf, sizeof buf);
+    if (n > 0)  { handle(buf, n); continue; }        // còn -> đọc tiếp
+    if (n == 0) { close(fd); break; }                 // peer đóng
+    if (errno == EAGAIN || errno == EWOULDBLOCK) break;   // ✅ đã cạn, thoát đúng chỗ
+    if (errno == EINTR) continue;
+    perror("read"); break;
+}
+```
+
+**Vì sao ET *bắt buộc* non-blocking:** vòng lặp trên phải chạy tới khi hết dữ liệu. Nếu fd là **blocking**, lần `read` cuối (khi đã cạn) sẽ **treo cả thread** — event loop đứng hình, mọi kết nối khác chết theo. Non-blocking mới trả `EAGAIN` để bạn thoát.
+
+**Khi nào chọn ET:** giảm số lần `epoll_wait` quay lại cho cùng một fd → có ý nghĩa ở tải rất cao, hoặc khi dùng chung một epoll cho nhiều thread (LT gây **thundering herd**: mọi thread cùng được báo). Còn lại: **mặc định LT**, đúng trước rồi mới tối ưu.
+
+**Bẫy:** (1) quên vét cạn → bug "kết nối im lặng sau vài request", cực khó lần vì phụ thuộc kích thước dữ liệu; (2) chỉ vét cạn phía `read` mà quên phía `write` (`EPOLLOUT` cũng edge); (3) một fd "cạn" không có nghĩa các fd khác cũng vậy — vẫn phải duyệt hết mảng `epoll_wait` trả về.
+
+**Chốt:** *"LT = 'còn hàng là còn nhắc'. ET = 'chỉ báo lúc hàng vừa tới, không nhắc lại' → bắt buộc non-blocking + đọc tới `EAGAIN`."*
 </details>
 
 #### LNX-011 · 🟠 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
 **Vì sao trong signal handler chỉ được gọi hàm async-signal-safe?**
 <details><summary>Đáp án</summary>
 
-Handler chạy bất đồng bộ, có thể chen vào giữa bất kỳ hàm không reentrant nào (vd `malloc`/`printf` đang giữ khóa nội bộ). Gọi lại hàm đó trong handler có thể deadlock/corruption (UB). Chỉ gọi hàm async-signal-safe (`write`, `_exit`). Pattern an toàn: handler chỉ set `volatile sig_atomic_t` flag, xử lý ở main loop; hoặc dùng `signalfd`.
+**Cơ chế:** signal handler **chen ngang** luồng chính tại một điểm **bất kỳ** — kể cả **giữa chừng** một hàm thư viện. Nó không phải một thread khác; nó chạy **trên cùng thread**, mượn stack của nó.
+
+Kịch bản chết người:
+
+```
+main:    malloc(…)  ──► đã lấy khoá heap, đang sửa dở free-list
+           ↓ SIGALRM chen vào
+handler: printf(…)  ──► printf gọi malloc  ──► xin CÙNG khoá heap
+                        khoá đang do main giữ, mà main KHÔNG chạy được (đang bị chen)
+                        → DEADLOCK, hoặc free-list dở dang → HEAP CORRUPTION
+```
+
+Không phải chuyện lý thuyết: `printf`, `malloc`, `free`, `syslog` đều **không reentrant** vì giữ trạng thái toàn cục + khoá. Do đó POSIX chỉ đảm bảo một danh sách hàm **async-signal-safe**: `write`, `_exit`, `signal`, `sigaction`, `kill`, `read`… (không có `printf`).
+
+**Mẫu an toàn — handler làm ít nhất có thể:**
+
+```c
+volatile sig_atomic_t g_stop = 0;      // ✅ sig_atomic_t: ghi nguyên tử, volatile: không bị tối ưu
+
+void handler(int sig) { g_stop = 1; }  // ✅ chỉ đặt cờ, không làm gì khác
+
+int main(void) {
+    while (!g_stop) { do_work(); }     // ✅ xử lý THẬT ở main loop
+}
+```
+
+**Hai lựa chọn tốt hơn nữa** (đưa signal về mô hình event loop, hợp kiến trúc server/daemon):
+- **`signalfd`** — nhận signal qua **fd**, đọc bằng `read()`, cắm thẳng vào `epoll`. Không cần handler.
+- **self-pipe trick** — handler chỉ `write(pipefd, "x", 1)` (`write` là async-signal-safe), main loop đọc từ pipe. Cách di động khi không có `signalfd`.
+
+**Bẫy:** (1) dùng `int` thay `sig_atomic_t` cho cờ — không đảm bảo ghi nguyên tử; thiếu `volatile` → compiler cache biến vào thanh ghi, vòng lặp không bao giờ thấy cờ đổi; (2) `printf` gỡ lỗi trong handler — "chạy được" phần lớn thời gian, rồi treo ngẫu nhiên; dùng `write(2, msg, len)`; (3) handler **phải bảo toàn `errno`** (lưu đầu, khôi phục cuối) — nếu không nó ghi đè `errno` của main; (4) `SIGKILL`/`SIGSTOP` **không** bắt/chặn được.
+
+**Chốt:** *"Handler chen vào giữa chương trình trên cùng thread — gọi hàm không reentrant là tự khoá chính mình. Chỉ set cờ, hoặc chuyển signal thành fd (`signalfd`/self-pipe) rồi xử lý ở main loop."*
 </details>
 
 #### LNX-012 · 🟠 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
 **Điều gì xảy ra với fd qua fork và exec?**
 <details><summary>Đáp án</summary>
 
-Qua fork, con kế thừa bản sao bảng fd, các fd cha/con trỏ tới cùng open file description (chung offset). Qua exec, fd giữ nguyên, trừ khi đánh dấu close-on-exec (`O_CLOEXEC`) thì tự đóng. Đặt CLOEXEC là thực hành tốt để tránh rò fd vào tiến trình con.
+**Phải tách hai tầng thì mới trả lời đúng:**
+- **File descriptor** = số nguyên trong **bảng fd riêng của mỗi process**.
+- **Open file description** = cấu trúc trong **kernel**, giữ **offset**, cờ trạng thái, và trỏ tới inode. Nhiều fd (nhiều process) có thể trỏ về **cùng một** description.
+
+| | `fork` | `exec` |
+|---|---|---|
+| Bảng fd | Con **copy** bảng fd của cha | **Giữ nguyên** — không phải chương trình mới thì reset |
+| Trỏ tới đâu | fd cha & con trỏ về **cùng open file description** | như trước |
+| **Offset** | **Dùng chung** — con `read` thì offset của cha cũng dịch | như trước |
+| Ngoại lệ | — | fd có cờ **close-on-exec** (`O_CLOEXEC`/`FD_CLOEXEC`) **tự đóng** |
+
+**Hệ quả thực tế của "chung offset":** cha và con cùng ghi vào một file đã mở trước `fork` sẽ **nối tiếp** nhau, không đè lên nhau — đó là lý do shell redirect (`cmd > file`) hoạt động đúng khi có nhiều process. Ngược lại, nếu mỗi bên `open()` riêng thì có **hai** description, **hai** offset độc lập → ghi đè nhau.
+
+```c
+int fd = open("f.txt", O_RDWR | O_CLOEXEC);   // ✅ mặc định nên có O_CLOEXEC
+// fork() -> con vẫn có fd, chung offset
+// exec() -> fd TỰ ĐÓNG nhờ O_CLOEXEC
+```
+
+**Vì sao `O_CLOEXEC` là mặc định nên dùng:** không có nó, **mọi** fd đang mở (socket, file cấu hình chứa secret, fd của thư viện khác) đều **rò sang chương trình con** — vừa là lỗ hổng bảo mật, vừa giữ tài nguyên không giải phóng (port vẫn bị chiếm dù server chính đã đóng). Trong chương trình **đa luồng**, còn phải dùng `O_CLOEXEC` **ngay trong `open()`** thay vì `fcntl` sau đó, vì giữa hai lời gọi có thể có thread khác `fork`.
+
+**Bẫy:** (1) tưởng `fork` copy cả offset thành hai bản độc lập — **sai**, chung offset; (2) tưởng `exec` đóng hết fd — **sai**, giữ nguyên trừ CLOEXEC (đây chính là cách stdin/stdout/stderr sống sót qua exec); (3) sau `fork`, quên đóng **đầu không dùng của pipe** ở cả hai phía → `read` không bao giờ thấy EOF, treo vĩnh viễn.
+
+**Chốt:** *"`fork` copy bảng fd nhưng dùng chung offset; `exec` giữ nguyên fd trừ khi có `O_CLOEXEC`. Cứ mở fd là đặt `O_CLOEXEC`, trừ khi cố ý muốn truyền sang con."*
 </details>
 
 #### LNX-013 · 🔴 · design · ⭐ · [→ io-multiplexing](../../../04-linux-system-programming/io-multiplexing.md)

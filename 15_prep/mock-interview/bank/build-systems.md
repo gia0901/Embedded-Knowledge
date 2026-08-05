@@ -22,7 +22,41 @@ Chỉ **phạm vi lan truyền usage requirement** (include dir, define, link) s
 **Cross-compile với CMake làm thế nào? Toolchain file chứa gì?**
 <details><summary>Đáp án</summary>
 
-Truyền **toolchain file** (`cmake -DCMAKE_TOOLCHAIN_FILE=arm.cmake`) khai target khác host: `CMAKE_SYSTEM_NAME` (Linux), `CMAKE_SYSTEM_PROCESSOR` (aarch64), `CMAKE_C/CXX_COMPILER` (cross gcc), `CMAKE_SYSROOT` (rootfs target — nơi tìm headers/lib), và `CMAKE_FIND_ROOT_PATH_MODE_*` (bắt `find_*` tìm trong sysroot, không dính host). Điểm gốc mọi rắc rối cross-compile: **"cái này đến từ host hay sysroot?"**. Với Yocto, SDK sinh sẵn toolchain file + environment (`source environment-setup-*`). *(Lỗi "not found" khi chạy: [BSP-019](bsp.md).)*
+**Vấn đề gốc của mọi cross-compile — một câu hỏi duy nhất, lặp lại ở mọi bước: "thứ này đến từ *host* hay từ *target sysroot*?"** Compiler, header, thư viện, công cụ phụ trợ, kết quả `find_package` — mỗi thứ đều có thể lấy nhầm bên, và nhầm thì lỗi hoặc là "wrong architecture" lúc link, hoặc tệ hơn: **build sạch nhưng crash trên board**.
+
+**Cách làm:** không sửa `CMakeLists.txt`, mà truyền **toolchain file** lúc configure — giữ project không biết gì về target cụ thể.
+
+```bash
+cmake -B build -DCMAKE_TOOLCHAIN_FILE=arm-toolchain.cmake
+```
+
+```cmake
+# arm-toolchain.cmake
+set(CMAKE_SYSTEM_NAME      Linux)          # ⭐ đặt biến này = báo CMake "đang cross-compile"
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
+
+set(CMAKE_C_COMPILER   aarch64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+set(CMAKE_SYSROOT      /path/to/target-sysroot)   # header + lib CỦA TARGET
+
+# Chặn find_* lôi nhầm đồ của host:
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BEFORE)  # chương trình: chạy trên HOST -> lấy host
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)    # thư viện: CHỈ trong sysroot
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)    # header:   CHỈ trong sysroot
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+```
+
+| Thành phần | Vai trò |
+|---|---|
+| `CMAKE_SYSTEM_NAME` | Bật chế độ cross (`CMAKE_CROSSCOMPILING` = TRUE) — thiếu nó thì mọi thứ khác vô nghĩa |
+| `CMAKE_SYSROOT` | Cây `/usr` của board: nơi tìm header/lib **của target** |
+| `CMAKE_FIND_ROOT_PATH_MODE_*` | ⭐ Tách "công cụ chạy trên host" khỏi "thư viện link cho target". `PROGRAM` phải lấy **host** (protoc, flex…), `LIBRARY/INCLUDE` phải **ONLY** sysroot |
+
+**Với Yocto:** không tự viết — SDK sinh sẵn toolchain file + môi trường, chỉ cần `source environment-setup-<arch>-poky-linux` rồi cmake bình thường.
+
+**Bẫy:** (1) quên `CMAKE_SYSTEM_NAME` → CMake tưởng build native, `try_run()` và mọi kiểm tra tính năng chạy trên host cho kết quả **sai**; (2) `find_package` lấy `.so` của host → link "thành công" rồi lỗi kiến trúc; đó chính là lý do có `FIND_ROOT_PATH_MODE`; (3) **cache CMake cũ** — đổi toolchain file phải **xoá thư mục build**, không thì nó giữ compiler cũ; (4) chạy trên board báo `not found` dù file có thật → thường là thiếu **dynamic loader**/lib đúng ABI, kiểm bằng `file` và `readelf -l` ([BSP-019](bsp.md)); (5) chương trình sinh code chạy lúc build (code generator) phải build **cho host**, không phải target — dấu hiệu cần chia hai bước build.
+
+**Chốt:** *"Toolchain file trả lời 'host hay sysroot?' một lần cho toàn dự án: compiler + sysroot + `FIND_ROOT_PATH_MODE`. Project không cần biết mình đang được cross-compile."*
 </details>
 
 #### BLD-004 · 🟡 · concept · [→ yocto §2](../../../06-build-systems/yocto.md)
@@ -36,7 +70,39 @@ Công thức build **một package**: `SRC_URI` (nguồn: git/tarball/file + pat
 **Layer và `.bbappend` là gì? Vì sao không sửa recipe gốc?**
 <details><summary>Đáp án</summary>
 
-**Layer (`meta-*`)** = tập recipe + conf có priority (BSP layer, distro layer, app layer), bật trong `bblayers.conf`. **`.bbappend`** = file mở rộng/sửa một recipe của layer khác (thêm patch, config) **mà không đụng file gốc**. Nguyên tắc vàng: mọi tùy biến ở **layer riêng của bạn** qua bbappend/patch — **không sửa poky/vendor layer** (mất khi cập nhật, phá tái lập). Cũng không sửa `tmp/work` (bị nghiền build sau). Giữ vậy để nâng cấp vendor BSP không mất tùy biến.
+**Layer (`meta-*`)** = một tập recipe + conf đóng gói theo mối quan tâm, có **priority**, bật trong `bblayers.conf`:
+
+| Loại layer | Ai giữ | Ví dụ |
+|---|---|---|
+| **BSP layer** (`meta-<board>`) | Vendor SoC (NXP/TI/ST) | kernel + u-boot bbappend, machine conf, firmware |
+| **Distro layer** | Tổ chức bạn | chính sách chung: init system, libc, feature |
+| **App/software layer** (`meta-<sản phẩm>`) | **Bạn** | recipe ứng dụng + **mọi tuỳ biến** |
+
+**`.bbappend`** = file mở rộng/sửa một recipe **thuộc layer khác** mà **không đụng vào file gốc**. Tên phải khớp recipe (`linux-imx_%.bbappend` — `%` khớp mọi version).
+
+```
+meta-myproduct/
+└── recipes-kernel/linux/
+    ├── linux-imx_%.bbappend        # ⭐ mở rộng recipe kernel của vendor
+    └── linux-imx/
+        ├── 0001-add-my-driver.patch
+        └── my-feature.cfg          # config fragment: bật CONFIG_*
+```
+```bitbake
+# linux-imx_%.bbappend
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
+SRC_URI += "file://0001-add-my-driver.patch \
+            file://my-feature.cfg"
+```
+
+**Vì sao tuyệt đối không sửa recipe gốc — ba lý do, lý do (3) mới là lý do thật:**
+1. **Mất khi cập nhật** — vendor phát hành BSP mới, bạn `git pull`/thay layer → tuỳ biến bay sạch hoặc xung đột.
+2. **Không tái lập được** — người khác clone repo không có sửa đổi của bạn; build của bạn ≠ build của CI.
+3. ⭐ **Không tách được "cái của mình" khỏi "cái của vendor"** — khi nâng cấp BSP (hoặc lên kernel mới), bạn cần trả lời *"tôi đã đổi những gì?"*. Với bbappend, câu trả lời là **một danh sách patch tường minh** trong layer của bạn. Với sửa trực tiếp, bạn phải `diff` cả cây và đoán.
+
+**Bẫy:** (1) ⚠️ sửa trong **`tmp/work/...`** để "thử nhanh" rồi quên — bị **nghiền sạch** lần build sau, và nhiều giờ debug đi theo; muốn thử nhanh thì dùng **`devtool modify <recipe>`** rồi **`devtool finish`** để đẩy thành bbappend/patch; (2) bbappend **không khớp version** recipe → BitBake **âm thầm bỏ qua** (dùng `%` hoặc kiểm bằng `bitbake-layers show-appends`); (3) quên `FILESEXTRAPATHS:prepend` → không tìm thấy file patch; (4) sửa `local.conf` thay vì layer — tiện nhưng cũng không tái lập được cho team/CI.
+
+**Chốt:** *"Layer là đơn vị đóng gói và chia trách nhiệm; bbappend là cách sửa đồ của người khác mà không chạm vào nó. Mọi tuỳ biến nằm trong layer của bạn — để nâng cấp BSP vendor không xoá mất công sức."*
 </details>
 
 #### BLD-006 · 🟠 · concept · [→ yocto §3](../../../06-build-systems/yocto.md)
