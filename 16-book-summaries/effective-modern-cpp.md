@@ -1362,13 +1362,24 @@ auto fut = std::async(doAsyncWork);   // task-based: fut.get() trả về kết 
                                       // HOẶC ném lại exception của task — xử lý được
 ```
 
-`std::thread` bắt bạn tự đối mặt: **oversubscription** (nhiều software thread hơn hardware → context switch, cache thrashing), **load balancing**, và **resource exhaustion** (`std::system_error` khi hết thread — kể cả khi hàm là `noexcept`). `std::async` (default policy) được phép "không tạo thread mới" — chạy deferred trên thread gọi `get()` → tự giảm oversubscription. Vẫn cần `std::thread` trực tiếp khi: cần API của thread bên dưới (`native_handle()` → `pthread_setaffinity_np`, priority — nhu cầu thật của embedded/realtime), cần tự quản lý oversubscription cho app đặc thù, hoặc implement công nghệ threading riêng (thread pool).
+`std::thread` bắt bạn tự đối mặt: **oversubscription** (nhiều software thread hơn hardware → context switch, cache thrashing), **load balancing**, và **resource exhaustion** — hết software thread thì **constructor của `std::thread` ném `std::system_error`**. Chi tiết đáng nhớ: điều này xảy ra **kể cả khi hàm bạn định chạy là `noexcept`** — vì người ném là *constructor của `std::thread`*, không phải hàm của bạn. Nói cách khác `noexcept` trên task **không** làm việc tạo thread trở nên an toàn; chỗ này hay bị hiểu nhầm. `std::async` (default policy) được phép "không tạo thread mới" — chạy deferred trên thread gọi `get()` → tự giảm oversubscription. Vẫn cần `std::thread` trực tiếp khi: cần API của thread bên dưới (`native_handle()` → `pthread_setaffinity_np`, priority — nhu cầu thật của embedded/realtime), cần tự quản lý oversubscription cho app đặc thù, hoặc implement công nghệ threading riêng (thread pool).
 
 **Item 36 (tr. 245) — Chỉ định `std::launch::async` nếu cần bất đồng bộ thật.** Default policy = `async | deferred` — hệ thống tự chọn:
 - `std::launch::async` — chạy trên **thread khác**, bắt đầu ngay.
 - `std::launch::deferred` — **không chạy** cho tới khi `get()/wait()`, chạy **đồng bộ trên thread gọi get**; không bao giờ gọi get → **không bao giờ chạy**.
 
-Hệ quả của default: không đoán được có concurrent hay không → bug với `thread_local` (chạy trên thread nào?), và **treo vô hạn** với vòng lặp polling:
+Hệ quả của default: **bạn không biết task chạy trên thread nào — hay có chạy hay không.** Hai bug cụ thể sinh ra từ đó.
+
+**Bug 1 — `thread_local` trỏ nhầm kho.** Biến `thread_local` có **một bản riêng cho mỗi thread**. Nếu policy chọn `async`, task chạy trên thread mới → nó đọc/ghi bản `thread_local` **của thread mới đó**. Nếu policy chọn `deferred`, task chạy **trên chính thread gọi `get()`** → nó dùng bản `thread_local` **của thread gọi**. Cùng một dòng code, hai kho dữ liệu khác nhau, và bạn **không kiểm soát được** chuyện đó — chỉ biết lúc chạy:
+
+```cpp
+thread_local int tlsCounter = 0;
+auto fut = std::async(f);   // f có tăng tlsCounter
+fut.get();
+// tlsCounter ở thread này đã đổi hay chưa? -> TÙY policy runtime chọn. Không đoán được.
+```
+
+**Bug 2 — treo vô hạn** với vòng lặp polling:
 
 ```cpp
 auto fut = std::async(f);                        // default policy
@@ -1386,40 +1397,99 @@ if (fut.wait_for(0s) == std::future_status::deferred) {
 
 Quy tắc: dùng default khi (task không cần chạy concurrent thật, không đụng `thread_local`, chấp nhận có thể không bao giờ chạy nếu không get); ngược lại viết rõ `std::async(std::launch::async, f)`.
 
-**Item 37 (tr. 250) — `std::thread` phải unjoinable trên mọi đường ra khỏi scope.** Destructor của một `std::thread` **joinable** → gọi `std::terminate` (*"execution of the program is terminated"*, tr. 251). Lý do thiết kế: hai lựa chọn còn lại đều tệ hơn — implicit `join` (chờ ngầm → treo khó hiểu), implicit `detach` (thread tiếp tục ghi vào stack frame đã chết → UB kinh dị). Chuẩn chọn "chết to, chết rõ".
+**Item 37 (tr. 250) — `std::thread` phải unjoinable trên mọi đường ra khỏi scope.**
+
+**Trước hết: joinable nghĩa là gì?** Cả Item xoay quanh từ này nên phải định nghĩa trước. Một `std::thread` là **joinable** khi nó **tương ứng với một luồng thực thi đang/sắp chạy** — kể cả thread đã chạy xong nhưng chưa ai `join`. Ngược lại, nó **unjoinable** trong đúng 4 trường hợp (tr. 250):
+
+| Trạng thái unjoinable | Vì sao |
+|---|---|
+| **Default-constructed** (`std::thread t;`) | Không có hàm nào để chạy → không gắn với luồng nào |
+| **Đã bị move-from** | Luồng đã chuyển quyền sở hữu sang object khác |
+| **Đã `join()`** | Luồng kết thúc, object không còn tương ứng với luồng nào |
+| **Đã `detach()`** | Object cắt đứt liên hệ với luồng (luồng vẫn chạy tiếp độc lập) |
+
+**Quy tắc:** destructor của một `std::thread` **còn joinable** → gọi **`std::terminate`** — *"execution of the program is terminated"* (tr. 251). Không phải leak, không phải chờ: **cả chương trình chết**.
+
+**Vì sao chuẩn chọn cách khắc nghiệt vậy?** Vì hai lựa chọn còn lại đều **tệ hơn**:
+
+- **Implicit `join`** — destructor lặng lẽ chờ thread xong. Nghe hợp lý, nhưng nghĩa là một hàm *tưởng như* return ngay lại **treo vô thời hạn**, ở một dòng không hề có chữ "wait" nào. Bug hiệu năng cực khó lần.
+- **Implicit `detach`** — destructor cắt dây, thread chạy tiếp. Vấn đề: thread thường **tham chiếu tới biến local của scope vừa chết**:
+
+```cpp
+void doWork() {
+    int localData = 42;
+    std::thread t([&localData]{        // ⚠️ capture theo THAM CHIẾU
+        std::this_thread::sleep_for(1s);
+        localData *= 2;                // 💥 ghi vào stack frame ĐÃ CHẾT
+    });
+    return;   // nếu chuẩn chọn detach ngầm: t chạy tiếp, localData không còn tồn tại
+}             // -> ghi đè lên stack frame của hàm khác. UB im lặng, corrupt ngẫu nhiên.
+```
+
+Giữa "treo khó hiểu" và "corrupt im lặng", chuẩn chọn **"chết to, chết rõ"**: `std::terminate` ngay tại chỗ, không ai lỡ bỏ qua.
+
+**Bug xảy ra thế nào trong thực tế** — không ai cố tình quên `join`; nó lọt qua **đường ra bất ngờ**:
 
 ```cpp
 void doWork() {
     std::thread t(task);
-    ...
-    if (conditionFails()) return;   // ⚠️ t joinable khi hủy → std::terminate!
-    t.join();
+    if (!validate(input))  return;      // ⚠️ đường ra sớm — t còn joinable → std::terminate
+    auto r = mayThrow();                // ⚠️ exception cũng là một đường ra → std::terminate
+    t.join();                           // ✅ chỉ chạy khi mọi thứ suôn sẻ
 }
 ```
 
-Fix chuẩn: **RAII guard** — mọi đường ra đều xử lý:
+Đây chính là bài toán mà RAII sinh ra để giải (so sánh: `lock_guard` với mutex) — nhưng `std::thread` **không** tự làm, vì chuẩn không thể đoán bạn muốn `join` hay `detach`.
+
+**Fix chuẩn: RAII guard, để *bạn* chọn hành vi một lần:**
 
 ```cpp
 class ThreadRAII {
 public:
-    enum class DtorAction { join, detach };
+    enum class DtorAction { join, detach };     // bắt người dùng nói rõ ý định
     ThreadRAII(std::thread&& t, DtorAction a) : action(a), t(std::move(t)) {}
+
     ~ThreadRAII() {
-        if (t.joinable()) {                     // check trước — join/detach trên
-            if (action == DtorAction::join) t.join();   // unjoinable là UB
-            else t.detach();
+        if (t.joinable()) {                          // ⚠️ PHẢI check trước: gọi join/detach
+            if (action == DtorAction::join) t.join();//    trên thread ĐÃ unjoinable sẽ ném
+            else                            t.detach();//  std::system_error (invalid_argument)
         }
     }
-    ThreadRAII(ThreadRAII&&) = default;         // dtor tự viết → move phải khai lại (Item 17)
-    ThreadRAII& operator=(ThreadRAII&&) = default;
-    std::thread& get() { return t; }
+
+    ThreadRAII(ThreadRAII&&) = default;         // tự viết dtor → compiler NGỪNG sinh move
+    ThreadRAII& operator=(ThreadRAII&&) = default;   // phải khai lại (Item 17)
+
+    std::thread& get() { return t; }            // để caller vẫn join() thủ công được,
+                                                // hoặc lấy native_handle() đặt priority/affinity
 private:
-    DtorAction action;
-    std::thread t;                              // khai CUỐI danh sách member — init sau cùng
+    DtorAction  action;
+    std::thread t;     // ⭐ khai CUỐI danh sách member — KHÔNG phải tùy tiện:
+                       // member khởi tạo theo THỨ TỰ KHAI BÁO, mà thread bắt đầu chạy
+                       // NGAY khi được khởi tạo. Nếu khai t trước, luồng có thể đọc
+                       // các member phía sau khi chúng CHƯA được khởi tạo → UB.
 };
 ```
 
-(C++20 thêm `std::jthread` — chính là ý tưởng này vào chuẩn, kèm stop token.)
+Dùng: `ThreadRAII t(std::thread(task), ThreadRAII::DtorAction::join);` — mọi đường ra (return sớm, exception) đều được dọn.
+
+**Vì sao wrapper này thoát được `std::terminate`** — nằm ở **thứ tự hủy**, đáng nói rõ vì đây là cơ chế chung của mọi RAII wrapper:
+
+```
+~ThreadRAII() được gọi
+  ① THÂN destructor chạy TRƯỚC  →  t.join() / t.detach()  →  t thành unjoinable
+  ② thân xong mới tới destructor của các MEMBER (ngược thứ tự khai báo)
+  ③ ~std::thread() chạy trên t  →  kiểm tra joinable() → FALSE → KHÔNG terminate ✅
+```
+
+Quy tắc nền: **thân destructor luôn chạy xong trước khi destructor của member bắt đầu.** `ThreadRAII` không *ngăn* `~std::thread()` kiểm tra `joinable()` — nó chỉ **kịp làm điều kiện đó thành false** trước khi bị kiểm tra. Nhiều người tưởng wrapper "chặn" `std::terminate`; thực ra nó chỉ **đi trước một bước**.
+
+🆕 **Hệ quả: nếu thân destructor ném exception trước khi kịp `join()`** thì có **hai** đường cùng dẫn tới `std::terminate`:
+1. Member vẫn bị hủy khi unwind → `~std::thread()` thấy `joinable() == true` → terminate **ngay tại đó**.
+2. Kể cả `t` đã unjoinable: từ C++11 destructor **mặc định `noexcept`**, exception thoát khỏi hàm `noexcept` → terminate.
+
+Mà `t.join()` **tự nó có thể ném** `std::system_error` (vd `resource_deadlock_would_occur` khi thread tự join chính nó) — tức code dọn dẹp trong destructor cũng là code có thể ném. Bản `ThreadRAII` ở trên (đúng như sách) gọi trần cho gọn; code production nên bọc `try { … } catch (...) {}` và ghi log, chấp nhận nuốt lỗi còn hơn giết cả tiến trình.
+
+> 🆕 **C++20 đưa ý tưởng này vào chuẩn: `std::jthread`** — destructor tự `join` (và có `stop_token` để yêu cầu thread dừng hợp tác). Có `std::jthread` thì không cần tự viết `ThreadRAII` nữa; nhưng hiểu Item này vẫn cần, vì code cũ đầy `std::thread` trần và vì `jthread` chọn sẵn `join` — nếu bạn muốn `detach` thì vẫn phải tự lo.
 
 **Item 38 (tr. 258) — Destructor của future: thường không block, TRỪ một trường hợp.** Future là một đầu của **kênh caller ↔ callee**; kết quả callee nằm trong **shared state** (heap):
 
@@ -1433,8 +1503,16 @@ private:
 ```
 
 - Quy tắc thường: dtor của future chỉ hủy member + giảm ref count shared state. **Không join, không chờ.**
-- **Ngoại lệ:** future là cái **cuối cùng** trỏ tới shared state của task chạy qua **`std::async` với policy `async`** (task chưa xong) → dtor **block đến khi task chạy xong** (implicit join). Hệ quả thực tế: vứt future của std::async đi không "fire-and-forget" được — nó chờ!
+- **Ngoại lệ — cần thoả ĐỦ 4 điều kiện cùng lúc:** future là cái **① cuối cùng** trỏ tới shared state, của task chạy qua **② `std::async`**, với **③ policy `async`** (không phải deferred), và **④ task chưa chạy xong** → dtor **block đến khi task xong** (implicit join). Hệ quả: vứt future của `std::async` đi **không** "fire-and-forget" được — nó chờ!
 - Future từ `std::promise`/`std::packaged_task` không có hành vi đặc biệt này (nhưng chú ý: bạn vẫn phải quản lý thread chạy packaged_task theo Item 37).
+
+**Vì sao lại có cái ngoại lệ kỳ quặc này?** Cùng một thế lưỡng nan của Item 37, chỉ khác chỗ đứng. Shared state của một task `std::async` gắn với một **thread mà runtime tạo ra** — không ai khác cầm nó. Khi future cuối cùng chết:
+- **Không chờ** → thread đó thành mồ côi, vẫn đang ghi vào shared state **vừa bị giải phóng** → UB, đúng bài toán "detach ngầm" của Item 37.
+- **Chờ** → hành vi bất ngờ nhưng **an toàn**.
+
+Ở Item 37 chuẩn chọn `std::terminate` vì `std::thread` là object **bạn** tạo, bạn phải chịu trách nhiệm. Ở đây thread do **runtime** tạo, bạn không có cách nào join nó → chuẩn không thể bắt lỗi bạn, nên chọn phương án an toàn: **chờ ngầm**. Cùng một nguyên tắc "không được để thread mồ côi động vào bộ nhớ đã chết", hai lời giải khác nhau vì ai là chủ sở hữu khác nhau.
+
+⚠️ **Và đây là phần khó chịu nhất: không có cách nào hỏi được.** Chuẩn **không cung cấp API** nào để một `std::future` nói cho bạn biết "destructor của tôi có block không". Nhìn vào một biến `std::future<T> fut` bạn **không thể** biết — phải lần ngược xem nó sinh ra từ đâu. Đó là lý do lời khuyên thực dụng là: **thấy `std::async` thì mặc định coi như future đó có thể chặn**, và đừng bao giờ coi việc vứt nó đi là miễn phí.
 
 **Item 39 (tr. 262) — Giao tiếp sự kiện one-shot: void future gọn hơn condvar/flag.** So sánh các cách thread A báo "sự kiện xảy ra" cho thread B:
 
@@ -1446,11 +1524,20 @@ private:
 | **`std::promise<void>` + future** | Gọn, không cần mutex, không spurious/lost wakeup |
 
 ```cpp
-std::promise<void> p;
-// thread chờ:
-p.get_future().wait();       // block thật (không poll), dậy đúng một lần
-// thread báo:
-p.set_value();               // "sự kiện xảy ra"
+std::promise<void> p;                    // dùng chung, sống lâu hơn cả hai thread
+
+// ⚠️ get_future() CHỈ gọi được MỘT lần cho mỗi promise
+//    (gọi lần hai -> ném std::future_error). Lấy future ra TRƯỚC khi thả thread.
+std::future<void> fut = p.get_future();
+
+std::thread worker([&p]{
+    doSetupWork();
+    p.set_value();          // ── "sự kiện đã xảy ra" (báo MỘT lần duy nhất)
+});
+
+fut.wait();                 // ── bên chờ: block THẬT (không busy-wait), dậy đúng một lần
+proceedAfterEvent();        // chắc chắn chạy sau doSetupWork()
+worker.join();              // (Item 37: vẫn phải join!)
 ```
 
 Giới hạn phải nêu: **one-shot** — promise set một lần duy nhất, không tái sử dụng; có cấp phát heap (shared state). Sự kiện lặp lại nhiều lần → quay về condvar + predicate. Use case đẹp trong sách: tạo thread ở trạng thái "treo" chờ lệnh xuất phát (suspend rồi thả), kết hợp `std::shared_future` để thả **nhiều** thread cùng lúc.
@@ -1543,6 +1630,25 @@ void process() {
   Chuẩn chọn (3): lỗi lập trình thì phải lộ, không được âm thầm.
 - Pattern đúng: **RAII guard** — object bọc `std::thread`, destructor kiểm tra `joinable()` rồi join (hoặc detach) theo chính sách khai báo lúc tạo → mọi đường ra (return sớm, exception) đều được xử lý. C++20 chuẩn hóa thành `std::jthread` (auto-join + `std::stop_token` để yêu cầu dừng).
 - Ý ăn điểm: nhắc case ngược — gọi `join()`/`detach()` trên thread **đã** unjoinable cũng là lỗi (ném `system_error`), nên guard phải check `joinable()` trước; và default-constructed/moved-from thread là unjoinable.
+
+</details>
+
+**Câu 5 (Item 39):** Thread A cần báo cho thread B "khởi tạo xong, bắt đầu đi". Bạn dùng cơ chế nào? Nêu đánh đổi.
+
+<details><summary>Đáp án</summary>
+
+Đây là **sự kiện one-shot** (báo đúng một lần, không lặp) — nhận diện đúng dạng bài trước khi chọn công cụ:
+
+| Cách | Đánh đổi |
+|---|---|
+| `std::condition_variable` | Đúng nhưng **nặng đồ nghề**: cần mutex đi kèm, cần predicate chống **spurious wakeup**, và phải tự lo **lost wakeup** (A `notify` trước khi B kịp `wait` → tín hiệu bay mất, B chờ mãi) |
+| `std::atomic<bool>` + polling | Không mất event, nhưng B **busy-wait đốt CPU**; trên embedded/pin yếu là không chấp nhận được |
+| condvar + flag kết hợp | Đúng, nhưng rườm rà và dễ viết sai — chính là thứ Item 39 muốn thay |
+| ⭐ **`std::promise<void>` + `future::wait()`** | Gọn nhất: **không mutex, không predicate, không lost wakeup** (promise nhớ trạng thái — set trước khi wait vẫn đúng), block thật chứ không poll |
+
+- **Giới hạn phải nêu chủ động** (đây là chỗ phân biệt hiểu thật): promise **set đúng một lần** — set lần hai ném `std::future_error`, và future `wait()` xong không tái sử dụng được. **Sự kiện lặp lại nhiều lần → quay về condvar + predicate.** Ngoài ra shared state có **cấp phát heap** — cân nhắc trên hệ cấm heap sau init.
+- Thả **nhiều** thread cùng lúc bằng một tín hiệu → `std::shared_future<void>` (copy được, mỗi thread giữ một bản), không phải `std::future`.
+- **Bẫy khi trả lời:** (1) quên `get_future()` chỉ gọi được **một lần** cho mỗi promise; (2) nói "dùng condvar cho chắc" mà không nêu lost wakeup — chính lost wakeup là lý do promise/future gọn hơn ở ca one-shot; (3) quên `std::thread` vẫn phải join (Item 37).
 
 </details>
 

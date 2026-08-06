@@ -459,33 +459,73 @@ head.compare_exchange_strong(expected, newNode);   // CAS
 **Memory order là gì? Mặc định nên dùng cái nào và vì sao thận trọng?**
 <details><summary>Đáp án</summary>
 
-**Vấn đề gốc: atomic đảm bảo *tính nguyên tử*, không đảm bảo *thứ tự nhìn thấy*.** Hai chuyện khác nhau.
+**Vấn đề gốc: `atomic` đảm bảo *tính nguyên tử*, không đảm bảo *thứ tự nhìn thấy*.** Hai chuyện khác nhau — memory order là phần lo chuyện thứ hai.
 
 **Ai reorder — hai tầng, đừng chỉ nói compiler:**
 1. **Compiler** — sắp xếp lại lệnh khi tối ưu.
 2. **CPU** — out-of-order execution, **store buffer** (ghi nằm đệm trong core một lúc mới lộ ra cho core khác), cache coherence có độ trễ.
 
-Cả hai được phép làm vậy vì chúng chỉ bảo toàn ngữ nghĩa **trong một thread**. Đa thread mới lộ: thread khác quan sát thấy thứ tự ghi **khác** thứ tự bạn viết trong code.
+Cả hai được phép, vì chúng chỉ cần bảo toàn ngữ nghĩa **trong một thread**. Đa thread mới lộ: thread khác quan sát thấy thứ tự ghi **khác** thứ tự bạn viết.
 
 | Mức | Đảm bảo | Chi phí | Dùng khi |
 |---|---|---|---|
-| `seq_cst` | **Mặc định**. Tồn tại **một** thứ tự tuần tự toàn cục mà **mọi** thread đều thấy giống nhau | Cao nhất (thường có full barrier / `mfence`) | Mặc định, tới khi đo thấy nghẽn |
-| `acquire` / `release` | Đồng bộ **theo cặp**: mọi ghi *trước* `release` sẽ nhìn thấy được bởi thread làm `acquire` thành công trên **cùng biến đó**. "Publish → subscribe" | Trung bình (thường free trên x86, có phí trên ARM) | Producer/consumer, flag công bố dữ liệu |
+| `seq_cst` | **Mặc định.** Tồn tại **một** thứ tự tuần tự toàn cục mà **mọi** thread đều thấy giống nhau | Cao nhất (thường full barrier / `mfence`) | Mặc định, tới khi đo thấy nghẽn |
+| `acquire` / `release` | Đồng bộ **theo cặp** — xem mục dưới | Trung bình (thường free trên x86, có phí trên ARM) | Producer/consumer, flag công bố dữ liệu |
 | `relaxed` | **Chỉ** atomicity — không ràng buộc thứ tự gì | Thấp nhất | Counter độc lập (thống kê), không ai suy luận theo nó |
 
+---
+
+### Release / acquire — mẫu "publish → subscribe"
+
 ```cpp
-// Mẫu acquire/release kinh điển — "công bố" dữ liệu qua một flag
-data = 42;                                   // ghi thường
-ready.store(true, std::memory_order_release); // ✅ mọi ghi TRƯỚC nó được công bố
+std::atomic<bool> ready{false};
+int data = 0;                 // ⚠️ biến THƯỜNG, không atomic
 
-// thread khác:
-if (ready.load(std::memory_order_acquire))   // ✅ thấy true => chắc chắn thấy data == 42
-    use(data);
-
-// ❌ Nếu cả hai dùng relaxed: thấy ready == true nhưng data vẫn có thể là rác.
+// ───── Thread A (publisher) ─────        // ───── Thread B (subscriber) ─────
+data = 42;                                 if (ready.load(memory_order_acquire)) {
+ready.store(true, memory_order_release);       use(data);      // ✅ chắc chắn thấy 42
+                                           }
+//  ▲ mọi ghi TRƯỚC release được công bố    //  ▲ thấy true ⟹ thấy mọi thứ A làm trước
 ```
 
-**Bẫy:** (1) nghĩ "đã là `atomic` thì thread khác thấy ngay và đúng thứ tự" — sai, đó là việc của memory order; (2) hạ xuống `relaxed` cho cờ *đồng bộ* vì "đo thấy nhanh hơn" — bug loại này **không reproduce được**, thường chỉ lộ trên ARM (weak memory model) chứ x86 chạy êm ru; (3) tưởng `volatile` thay được — không, xem [CPP-022](cpp.md).
+Điều được đảm bảo, phát biểu dạng **NẾU… THÌ…**:
+
+> **NẾU** B `acquire` trên **đúng biến** `ready` **VÀ đọc được đúng giá trị** A vừa `release` ghi
+> **THÌ** B thấy **mọi** ghi A làm trước `release` — **kể cả `data`, một biến không atomic**.
+
+**Đọc theo 3 ca để nhớ chắc:**
+
+| Ca | Có đồng bộ? | Kết quả |
+|---|---|---|
+| B `acquire` `ready`, **thấy `true`** | ✅ có | Thấy `data == 42`. Đúng như mong đợi |
+| B `acquire` `ready`, **thấy `false`** | ❌ không | Nhưng `if` **không chạy** → không chạm `data` → **vẫn an toàn**. Sự đúng đắn nằm ở chỗ **cờ canh cửa** |
+| B `acquire` **một biến khác** (`flag2`) | ❌ không | Không lập được cặp → `use(data)` có thể đọc rác, dù A đã `release` xong |
+
+⚠️ **`release` KHÔNG phải lệnh "flush"** đẩy dữ liệu ra cho cả thế giới. Cặp đôi lập qua **dữ liệu**, không qua **thời gian**: không phải *"A release xong rồi nên B sau đó chắc chắn thấy"*, mà là *"B **nhìn thấy giá trị** của A ⟹ B thấy luôn mọi thứ A làm trước đó"*. Quan hệ này tên là **synchronizes-with**.
+
+**Mỗi bên chỉ dựng NỬA hàng rào — phải đủ cả hai:**
+
+```
+Thread A                              Thread B
+  data = 42                             ┌── acquire ───────────  ⛔ đọc phía sau
+  ⛔ ghi phía trên ───┐ không trượt      │   if (ready)              không trượt LÊN
+  ready = true (rel)  │ xuống dưới       │       use(data)   ✅
+                      └──── nhìn thấy ───┘
+```
+
+Vì thế **đổi `acquire` thành `relaxed` là hỏng, dù đọc đúng biến và thấy `true`**:
+
+```cpp
+if (ready.load(memory_order_relaxed))   // thấy true, nhưng KHÔNG lập cặp đồng bộ
+    use(data);                          // ❌ data vẫn có thể là rác
+```
+`relaxed` chỉ hứa `ready` không bị đọc rách. Không có `acquire`, CPU của B được tự do đọc `data` **trước** khi đọc `ready` → lấy về giá trị cũ.
+
+**Ba điều kiện, thiếu một là mất đồng bộ:** ① nhãn phải có ở **cả hai đầu** · ② phải **cùng một biến atomic** · ③ phải **đọc thấy giá trị đã release**.
+
+---
+
+**Bẫy:** (1) nghĩ "đã là `atomic` thì thread khác thấy ngay và đúng thứ tự" — sai, đó là việc của memory order; (2) hạ `relaxed` cho cờ *đồng bộ* vì "đo thấy nhanh hơn" — bug loại này **không reproduce được**; (3) ⭐ code sai kiểu trên **vẫn chạy đúng trên x86** (memory model mạnh, không reorder load–load) rồi **chết trên ARM** (weak memory model) — đúng lớp bug nguy hiểm nhất cho embedded; (4) tưởng `volatile` thay được — không, xem [CPP-022](cpp.md).
 
 **Chốt (câu trả lời an toàn):** *"CPU và compiler đều reorder; single-thread không thấy, đa thread thì lộ. Ba mức: seq_cst / acquire-release / relaxed. Em mặc định `seq_cst` và chỉ hạ khi đã profile — sai ở đây tạo bug không tái hiện được."* Thái độ thận trọng ở câu cuối là thứ interviewer chấm, không phải việc thuộc tên.
 </details>
