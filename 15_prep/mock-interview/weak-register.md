@@ -11,14 +11,10 @@
 
 | ID | Câu (tóm tắt) | Track | Lần gặp | Điểm gần nhất | Ghi chú lỗ hổng |
 |----|---------------|-------|---------|----------------|-----------------|
-| CPP-019 | memory order — 3 mức + vì sao thận trọng | cpp-system, modern-cpp | 2 | 1, 2 | 🔼 đã kể đủ 3 mức + mặc định `seq_cst`. **Còn thiếu (ưu tiên cao nhất sổ):** (a) release/acquire — ✅ *(2026-08-06, ngoài phiên: đã giải thích đúng cả 3 ca — thấy true / thấy false / acquire biến khác)*. **Phiên sau đừng hỏi lại mức cơ bản này**, hỏi thẳng mức cao: *"B dùng `relaxed` trên đúng biến và thấy true thì sao?"* (đáp: không đảm bảo — nhãn phải có ở **cả hai đầu**; `release` chỉ dựng nửa hàng rào) và *"vì sao bug này chạy đúng trên x86 nhưng chết trên ARM?"*; (b) định nghĩa bị ngược (memory order là **ràng buộc** reorder, không phải bản thân reorder); (c) `relaxed` **vẫn atomic**, chỉ không hứa thứ tự; (d) **CPU cũng reorder**, không chỉ compiler |
-| CPP-024 | shared_ptr thread-safe (3 tầng) | cpp-system, modern-cpp | 2 | 4, 2 | 🔽 **tụt từ 4** — tưởng "ghi đồng thời cùng 1 instance `p = other` là an toàn vì count atomic". Đúng = control block ✅ / **instance ❌** / payload ❌. Xem [CPP-052](bank/cpp.md) |
-| CPP-045 | `=delete` vs private cũ | cpp-system, modern-cpp | 1 | 2 | hiểu sai "sinh code tối ưu"; đúng = hàm **bị xóa**, lỗi lúc **compile** (private cũ = link), áp cho **hàm bất kỳ** không chỉ special members |
-| CPP-032 | explicit / implicit conversion | cpp-system, modern-cpp | 1 | 2 | ví dụ đầu sai (copy ≠ conversion); đúng = chặn convert ngầm qua ctor 1-đối-số; ctor 1-đối-số mặc định nên `explicit` |
-| CPP-009 | template ở header — compile-time | cpp-system, modern-cpp | 2 | 2, 3 | 🔼 lần 2 đạt 3 — **cần thêm 1 lần ≥3 nữa**. Đúng = *instantiation lúc compile*; def ở header vì mỗi TU cần thấy đủ định nghĩa |
-| OS-007 | mutex vs semaphore | cpp-system, bsp | 2 | 2, 4 | 🔼 lần 2 đạt **4** (ownership + priority inheritance + cơ chế nâng priority + recursive) — **cần thêm 1 lần ≥3 nữa** để gỡ. Còn thiếu: phân vai *bảo vệ* (mutex) vs *báo hiệu bất đối xứng* (semaphore, ISR give → task take) |
-| OS-003 | deadlock — 4 điều kiện Coffman + cách phá | cpp-system, bsp | 2 | 0, 3 | 🔼 lần 2 đạt 3 (đủ 4 điều kiện + lock ordering) — **cần thêm 1 lần ≥3 nữa** để gỡ |
-| DP-002 | Singleton hiện đại (Meyers static-local) | cpp-system, design-patterns | 2 | 2, 3 | 🔼 lần 2 đạt 3 — **cần thêm 1 lần ≥3 nữa**. Bổ sung: tên cơ chế = **guard variable**; nhớ private ctor + copy `=delete` |
+| CPP-019 | memory order — 3 mức + vì sao thận trọng | cpp-system, modern-cpp | 3 | 2, 3 | 🔼 **1/2 lần ≥3.** Đã vững: 3 mức, mặc định, release/acquire (3 ca), ca `relaxed` (nhãn phải có ở **cả hai đầu**), x86 vs ARM. Còn **một chỗ chỉnh khung tư duy**: nói *"`data=42` chưa được chạy"* → đúng phải là **B chưa NHÌN THẤY** (store buffer / B tự đảo 2 lệnh đọc) — *visibility*, không phải *execution*. Lần sau hỏi mức thiết kế: *"khi nào bạn CHỌN acquire/release thay vì seq_cst?"* |
+| CPP-024 | shared_ptr thread-safe (3 tầng) | cpp-system, modern-cpp | 3 | 2, 4 | 🔼 **1/2 lần ≥3** — phục hồi sau cú tụt, tự nêu được cơ chế tầng 2 (giảm count cũ → đổi 2 con trỏ → tăng count mới). Lần sau hỏi: *cách sửa* (`atomic<shared_ptr>` C++20 / `atomic_load-store` / mỗi thread giữ copy riêng) |
+| CPP-045 | `=delete` vs private cũ | cpp-system, modern-cpp | 2 | 2, 4 | 🔼 **1/2 lần ≥3** — đủ 3 tầng (compile vs link · message rõ · áp cho hàm bất kỳ + ví dụ template). Chỉ cần 1 lần ≥3 nữa |
+| CPP-032 | explicit / implicit conversion | cpp-system, modern-cpp | 2 | 2, 4 | 🔼 **1/2 lần ≥3** — ví dụ `vector<int> a = 10` chuẩn, nêu đúng hậu quả. Chỉ cần 1 lần ≥3 nữa |
 
 ## Đã khắc phục (lưu vết — gỡ khỏi bảng trên khi ≥3 điểm hai lần)
 
@@ -26,3 +22,9 @@
 |----|-----|---------|
 | CPP-020 | Rule of 0/3/5 | 2026-07-29 (điểm 2 → 4 → 4, đạt ≥3 hai lần liên tiếp) |
 | CPP-029 | emplace_back vs push_back | 2026-08-03 (điểm 2 → 4 → 4, đạt ≥3 hai lần liên tiếp) |
+| CPP-009 | template ở header — compile-time | 2026-08-07 (2 → 3 → **4**; nói thẳng *instantiation lúc compile* + linker error, trả lời được cả explicit instantiation) |
+| DP-002 | Singleton hiện đại (Meyers static-local) | 2026-08-07 (2 → 3 → **4**; lazy + thread-safe **chỉ ở khởi tạo** + copy `=delete`) |
+| OS-003 | deadlock — 4 điều kiện Coffman | 2026-08-07 (0 → 3 → **4**; đủ 4 điều kiện, nêu đúng "phải thoả ĐỒNG THỜI", lock ordering + try_lock timeout) |
+| OS-007 | mutex vs semaphore | 2026-08-07 (2 → 4 → **4**; mục đích + ownership + priority inheritance kèm cơ chế) |
+
+> **Ghi chú calibration (2026-08-07):** tên gọi nội bộ của compiler (vd *guard variable* ở DP-002) **không** tính là lỗ hổng — chỉ là "biết thì tốt". Tiêu chí giữ một câu trong sổ: **cơ chế giải thích được một lớp bug sẽ gặp trong công việc**, không phải thuật ngữ thuộc lòng.

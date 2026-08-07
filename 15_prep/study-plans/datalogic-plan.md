@@ -11,9 +11,9 @@
 
 - **Plan đang chạy:** 🎯 Datalogic (file này) · bắt đầu **2026-08-03**.
 - **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **buổi kế tiếp = Buổi 5**.
-- **Buổi gần nhất:** Buổi 4 — `daily track build-systems` (CMake + Yocto) — **3.17/4** ([log](../mock-interview/sessions/2026-08-06--daily--build-systems.md)). *(B1: 3.25 · B2: 3.3 · B3: 2.83)*
-- **▶️ LÀM TIẾP:** `/mock coding track dsa` (Tuần 1 Buổi 5 — reverse list, ring buffer, two-sum) — viết code vào [coding-arena/](../mock-interview/coding-arena/). ⚠️ Chèn `/mock weak-review` **trước** để vá **CPP-019** (2 phiên liên tiếp chưa đạt 3 — điểm 1 rồi 2).
-- **Sổ yếu hiện tại:** **CPP-019 (1,2 — nặng nhất, đã hỏi 2 lần)**, CPP-024 (tụt 4→2) · CPP-045, CPP-032 · CPP-009, OS-003, DP-002, OS-007 (đang chờ gỡ, cần 1 lần ≥3 nữa) → xem [weak-register](../mock-interview/weak-register.md).
+- **Buổi gần nhất:** `weak-review` toàn sổ — **3.88/4**, cao nhất từ đầu plan ([log](../mock-interview/sessions/2026-08-07--weak-review--all.md)). **Sổ yếu co 8 → 4 câu.** *(B1: 3.25 · B2: 3.3 · B3: 2.83 · B4: 3.17)*
+- **▶️ LÀM TIẾP:** `/mock coding track dsa` (Tuần 1 Buổi 5 — reverse list, ring buffer, two-sum) — viết code vào [coding-arena/](../mock-interview/coding-arena/).
+- **Sổ yếu hiện tại (4 câu, TẤT CẢ đều ở 1/2 lần ≥3):** CPP-019, CPP-024, CPP-045, CPP-032 — mỗi câu chỉ cần **một** lần ≥3 nữa là sổ sạch. Chèn vào phiên CN → xem [weak-register](../mock-interview/weak-register.md).
 
 **Checklist buổi (tick `[x]` khi xong — đây là "đang dang dở đến đâu"):**
 - **Tuần 1** (C++17): `[x]` B1 · `[x]` B2 · `[x]` B3 · `[x]` B4 · `[ ]` B5 · `[ ]` CN
