@@ -10,6 +10,28 @@
 - **Cooperative**: task chạy tới khi **tự nhường** (yield/block) → đơn giản, ít cần bảo vệ dữ liệu (không bị chen bất ngờ), nhưng **một task tham lam treo cả hệ**, latency phụ thuộc task khác → khó đảm bảo real-time.
 - **Preemptive**: scheduler **cướp CPU** theo priority/tick → task ưu tiên cao chạy ngay, tất định hơn, hợp real-time; đổi lại phải **bảo vệ dữ liệu chia sẻ** (bị chen bất cứ lúc nào) + chi phí context switch.
 
+Cùng một tải, hai scheduler cho kết quả khác hẳn về **thời điểm** task quan trọng được chạy:
+
+```
+  Task_HIGH cần chạy ngay khi sự kiện tới (deadline 5ms)
+  Task_LOW  đang chạy một phép tính dài 40ms
+
+ ❌ COOPERATIVE
+   Task_LOW  ████████████████████████████████████████│Task_HIGH ███
+                                                     ▲
+   sự kiện ──┘ (t=5ms)                          t=40ms: LOW mới tự nhường
+                                                 → HIGH trễ 35ms → TRƯỢT DEADLINE
+
+ ✅ PREEMPTIVE
+   Task_LOW  █████│                       ┌─────────────────────────
+   Task_HIGH      │███████████████████████│
+                  ▲
+   sự kiện ───────┘ (t=5ms) → scheduler CƯỚP CPU ngay → HIGH chạy đúng hạn ✅
+                             LOW chạy tiếp phần còn lại sau
+```
+
+Cái giá của preemptive: `Task_LOW` bị chen **bất cứ lúc nào**, kể cả giữa lúc đang sửa dở dữ liệu chia sẻ → **bắt buộc** phải bảo vệ (§2). Cooperative không cần vì bạn biết chính xác điểm nào có thể bị nhường.
+
 RTOS phổ biến (FreeRTOS, Zephyr) mặc định **preemptive theo priority**. **Time slicing** (round-robin) chỉ áp cho task **cùng priority**; task priority cao hơn luôn preempt.
 
 ## 2. Primitive đồng bộ — dùng cái nào khi nào
@@ -45,9 +67,32 @@ Mỗi task có **stack riêng** (cấp khi tạo task) → tổng RAM = Σ stack
 
 **RMS**: gán **priority tĩnh theo tần suất** — task chu kỳ ngắn (tần số cao) → priority cao hơn; tối ưu cho task chu kỳ, deadline = chu kỳ, preemptive.
 
-**Hệ có kịp deadline không?** Không chỉ nhìn CPU trung bình:
-- Điều kiện đủ (Liu & Layland): tổng utilization ΣCᵢ/Tᵢ ≤ n(2^{1/n}−1) (→ ~0.69 khi n lớn) thì chắc chắn kịp.
-- Vượt ngưỡng → phân tích **response-time** từng task: worst-case = thời gian chạy của nó + **preemption từ task ưu tiên cao** + **blocking** (priority inversion) + jitter.
+**Hệ có kịp deadline không?** Không chỉ nhìn CPU trung bình. Ví dụ có số cụ thể:
+
+| Task | C (thời gian chạy) | T (chu kỳ) | U = C/T | Priority theo RMS |
+|---|---|---|---|---|
+| τ₁ đọc sensor | 1 ms | 5 ms | 0.20 | **cao nhất** (T ngắn nhất) |
+| τ₂ điều khiển | 2 ms | 10 ms | 0.20 | trung bình |
+| τ₃ gửi log | 8 ms | 40 ms | 0.20 | thấp nhất |
+| | | **ΣU** | **0.60** | |
+
+- **Ngưỡng Liu & Layland** với n=3: `3 × (2^(1/3) − 1)` = **0.779**.
+- ΣU = 0.60 ≤ 0.779 → ✅ **chắc chắn kịp deadline**, không cần phân tích thêm.
+
+Nhưng nếu τ₃ tăng lên 16 ms (U₃ = 0.40, ΣU = 0.80 > 0.779) → **chưa kết luận được là trượt**; ngưỡng chỉ là *điều kiện đủ*, không phải điều kiện cần. Lúc này phải phân tích **response-time** từng task:
+
+```
+  R = C + Σ (preemption từ mọi task ưu tiên CAO hơn) + B (blocking)
+              ▲                                          ▲
+    số lần task ưu tiên cao chen vào trong           thời gian bị task ưu tiên
+    khoảng R, mỗi lần tốn C của nó                   THẤP giữ mutex (§2)
+
+  Ví dụ τ₂: R₂ = C₂ + ⌈R₂/T₁⌉ × C₁ + B₂
+              = 2  + ⌈R₂/5⌉ × 1   + B₂     (giải lặp tới khi hội tụ)
+  Kịp deadline khi  R₂ ≤ T₂ = 10 ms.
+```
+
+⚠️ **Hai khoản người ta hay quên** và cũng là hai khoản làm hệ trượt deadline trong thực tế: **blocking** (B — task ưu tiên cao chờ mutex do task thấp giữ, xem priority inversion) và **jitter** (thời điểm sự kiện tới không đều).
 
 Ý phải nêu khi phỏng vấn: đo bằng công cụ, **chừa biên**, tính cả blocking & jitter. Deadline > chu kỳ hoặc task rời rạc → cân nhắc EDF (deadline-based).
 

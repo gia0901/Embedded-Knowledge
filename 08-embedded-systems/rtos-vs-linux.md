@@ -13,7 +13,41 @@
 
 Realtime **≠ tốc độ cao**. Realtime = **tính tất định về thời gian**: hệ thống đảm bảo hoàn thành tác vụ trong một **deadline** xác định, một cách *có thể dự đoán được* mọi lúc. Một hệ chạy chậm nhưng luôn đáp ứng trong 10ms "realtime" hơn một hệ thường nhanh nhưng thỉnh thoảng trễ 200ms.
 
-Chỉ số quan trọng: **worst-case latency** và **jitter** (độ dao động của thời gian đáp ứng), không phải throughput trung bình.
+Chỉ số quan trọng: **worst-case latency** và **jitter** (độ dao động của thời gian đáp ứng), không phải throughput trung bình. Vẽ phân bố latency ra là thấy ngay vì sao "trung bình" đánh lừa:
+
+```
+  số lần
+  đo được
+    ▲
+    │     ██                      Linux thường (không PREEMPT_RT)
+    │    ████                     trung bình: 20 µs  ← nhìn rất đẹp
+    │   ██████                    worst-case: 8000 µs ← nhưng ĐUÔI kéo dài
+    │  ████████ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█
+    └──┴───────┴──────────────────────────────────────────────────┴──► latency
+      10µs    50µs                                              8ms
+                                                          ▲
+                                             CHÍNH CÁI ĐUÔI NÀY giết bạn
+                                             (deadline 1ms → trượt, dù 99.99% lần đo đều đạt)
+
+    │      ██                     RTOS (hoặc Linux PREEMPT_RT + tuning)
+    │     ████                    trung bình: 30 µs  ← CHẬM HƠN trung bình!
+    │     ████                    worst-case: 80 µs  ← nhưng CÓ CHẶN TRÊN
+    │    ██████│
+    └────┴─────┴──────────────────────────────────────────────────────► latency
+       20µs   80µs ◄── hết. Không có đuôi.
+```
+
+> **Hệ thứ hai "realtime" hơn dù trung bình chậm hơn.** Realtime không đo bằng *nhanh bao nhiêu* mà bằng *chậm nhất là bao nhiêu, và con số đó có chặn không*.
+
+Đo thật trên Linux bằng `cyclictest` — nhìn cột **Max**, không phải Avg:
+
+```bash
+# chạy tối thiểu vài giờ; ép tải nặng song song để ép ra worst-case
+sudo cyclictest -t1 -p 80 -i 1000 -m -D 4h
+# T: 0 ( 1234) P:80 I:1000 C: 14400000 Min:  8 Act: 12 Avg: 14 Max:  67
+#                                            ▲                    ▲
+#                                    đẹp nhưng vô nghĩa      SỐ DUY NHẤT ĐÁNG TIN
+```
 
 | Loại | Hậu quả lỡ deadline | Ví dụ |
 |------|---------------------|-------|

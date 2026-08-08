@@ -36,7 +36,35 @@ flowchart TD
 
 - **Boot ROM**: cố định trong silicon (mask ROM), không thể sửa. Quyết định **boot từ đâu** (eMMC/SD/NAND/SPI/UART/USB) dựa trên chân cấu hình (boot strap pins) hoặc eFuse. Là gốc của **secure boot** (chứa khóa/chuỗi tin cậy).
 - **SPL (giai đoạn 1)**: rất nhỏ để vừa SRAM on-chip (vì DRAM chưa khởi tạo). Việc quan trọng nhất: **cấu hình DRAM controller** để có RAM ngoài, rồi nạp U-Boot vào đó.
-- **U-Boot**: bootloader "mạnh", có shell, biến môi trường, lệnh (`bootm`, `tftp`, `mmc read`...). Nạp kernel/DTB/initramfs, dựng **bootargs** (vd `console=`, `root=`), rồi bàn giao cho kernel. Có thể boot qua mạng (TFTP/NFS) cho phát triển.
+- **U-Boot**: bootloader "mạnh", có shell, biến môi trường, lệnh (`bootm`, `tftp`, `mmc read`...). Nạp kernel/DTB/initramfs, dựng **bootargs**, rồi bàn giao cho kernel.
+
+```bash
+# --- Một phiên U-Boot thật (gõ ở console serial, nhấn phím bất kỳ để dừng autoboot) ---
+=> printenv bootargs                     # xem tham số sẽ truyền cho kernel
+=> setenv bootargs 'console=ttyS0,115200 root=/dev/mmcblk0p2 rootwait rw'
+=> load mmc 0:1 ${kernel_addr_r} zImage  # nạp kernel từ SD vào DRAM
+=> load mmc 0:1 ${fdt_addr_r} board.dtb  # nạp device tree
+=> bootz ${kernel_addr_r} - ${fdt_addr_r}   # bàn giao: kernel, (initrd bỏ trống), DTB
+=> saveenv                               # ghi biến môi trường xuống flash
+
+# --- Boot qua MẠNG: cách phát triển kernel/rootfs nhanh nhất, không phải rút thẻ SD ---
+=> setenv serverip 192.168.1.10
+=> tftp ${kernel_addr_r} zImage          # kéo kernel từ máy dev qua TFTP
+=> setenv bootargs 'console=ttyS0,115200 root=/dev/nfs rw nfsroot=192.168.1.10:/srv/rootfs ip=dhcp'
+=> bootz ${kernel_addr_r} - ${fdt_addr_r}
+```
+
+**Giải mã `bootargs`** — đây là chuỗi hay phải sửa nhất khi bring-up, và cũng là chỗ hay sai:
+
+| Tham số | Nghĩa | Sai thì bị gì |
+|---|---|---|
+| `console=ttyS0,115200` | Kernel in log ra UART nào, baud bao nhiêu | **Màn hình đen** — kernel chạy bình thường nhưng bạn không thấy gì |
+| `root=/dev/mmcblk0p2` | Phân vùng chứa rootfs | `Kernel panic - not syncing: VFS: Unable to mount root fs` |
+| `rootwait` | Chờ thiết bị lưu trữ xuất hiện rồi mới mount | Thiếu → panic vì eMMC/USB **chưa kịp** enumerate |
+| `rw` / `ro` | Mount rootfs đọc-ghi hay chỉ-đọc | `ro` là chuẩn cho sản phẩm (chống hỏng khi mất điện) |
+| `ip=dhcp` | Cấu hình mạng sớm (cho NFS root) | NFS root không mount được |
+
+> 💡 **Kỹ thuật phát triển chuẩn:** TFTP kernel + NFS rootfs. Sửa code trên máy dev → `make` → reset board → chạy bản mới **trong vài giây**, không phải flash lại thẻ. Đây là câu trả lời tốt cho *"quy trình phát triển BSP của bạn thế nào?"*.
 - **Kernel**: tự giải nén, khởi tạo lõi (memory, scheduler), parse **DTB** để biết phần cứng, nạp driver, rồi mount **rootfs** (chỉ định bởi `root=`) và exec `/sbin/init`.
 - **init (PID 1)**: tiến trình userspace đầu tiên, cha của mọi tiến trình; khởi động service theo cấu hình. Trên embedded nhỏ thường là **BusyBox init**; hệ lớn dùng **systemd**.
 

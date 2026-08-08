@@ -23,7 +23,33 @@ int buffer[256];           // .bss   (256*4 byte RAM, không tốn flash)
 static int state;          // .bss
 ```
 
-Hiểu bản đồ này để: đọc **map file**, tính footprint flash/RAM riêng biệt, và biết **vì sao biến global chưa khởi tạo vẫn là 0** (nhờ startup zero `.bss`). Stack và heap cũng ở RAM.
+**Bản đồ hai vùng — và đường đi của `.data` lúc khởi động:**
+
+```
+        FLASH (không mất khi tắt nguồn)          RAM (mất khi tắt nguồn)
+   ┌──────────────────────────────┐         ┌──────────────────────────────┐
+   │  .isr_vector  (vector table) │         │                              │ ← đỉnh RAM
+   ├──────────────────────────────┤         │   ▼ ▼ ▼   STACK   ▼ ▼ ▼      │   (SP bắt đầu)
+   │  .text        (mã lệnh)      │         │      mọc XUỐNG                │
+   ├──────────────────────────────┤         │                              │
+   │  .rodata      (const, chuỗi) │         │        ⚠️ vùng nguy hiểm      │
+   ├──────────────────────────────┤         │        (không có guard page!) │
+   │                              │         │                              │
+   │  giá trị khởi tạo của .data  │──┐      │   ▲ ▲ ▲   HEAP   ▲ ▲ ▲       │
+   │  (bản sao chờ nạp)           │  │      │      mọc LÊN                  │
+   └──────────────────────────────┘  │      ├──────────────────────────────┤
+                                     │      │  .bss   (zero lúc startup)   │
+                    ① copy lúc reset │      ├──────────────────────────────┤
+                                     └─────►│  .data  (biến thật ở đây)    │
+                                            └──────────────────────────────┘
+
+  ⇒ `.data` tốn CẢ flash (giữ giá trị ban đầu) LẪN RAM (biến khi chạy).
+  ⇒ `.bss`  chỉ tốn RAM — không có gì để lưu, chỉ cần zero lúc khởi động.
+```
+
+Hiểu bản đồ này để: đọc **map file**, tính footprint flash/RAM riêng biệt, và biết **vì sao biến global chưa khởi tạo vẫn là 0** (nhờ startup zero `.bss`).
+
+> 💡 Mẹo tiết kiệm RAM đọc ra ngay từ hình: đổi `char msg[] = "hi";` (`.data` — tốn cả hai) thành `const char msg[] = "hi";` (`.rodata` — **chỉ flash**). Với bảng tra cứu lớn, đây là khác biệt hàng KB RAM.
 
 ## 2. Chuyện gì xảy ra TRƯỚC `main()` (startup / crt0)
 
@@ -78,11 +104,60 @@ RAM ít + **không MMU** → **không có guard page**:
 - **Stack overflow âm thầm**: stack lớn quá đè lên `.bss`/`.data`/heap → corruption khó lần (biến "tự đổi"). Sizing = worst-case call depth + local lớn + **stack ISR** (ngắt lồng).
 - **Heap**: fragmentation + `malloc` không tất định → nhiều hệ **cấm heap sau init** (dùng tĩnh/pool).
 
+**Vì sao "âm thầm" — so sánh với PC:**
+
+```
+   PC (CÓ MMU)                          MCU (KHÔNG MMU)
+ ┌──────────────┐                     ┌──────────────┐
+ │    STACK   ▼ │                     │    STACK   ▼ │
+ ├──────────────┤                     │            ▼ │
+ │ ░ GUARD PAGE │ ← chạm vào đây      │            ▼ │  không có gì chặn
+ │ ░ (không map)│   = SEGFAULT ngay,  ├──────────────┤
+ ├──────────────┤   crash ĐÚNG CHỖ    │  .bss/.data  │ ← stack ĐÈ LÊN biến global
+ │  heap/data   │                     │  (biến của   │   → biến "tự nhiên đổi giá trị"
+ └──────────────┘                     │   bạn!)      │   → crash Ở NƠI KHÁC, LÚC KHÁC
+                                      └──────────────┘
+```
+
+Đây là lý do stack overflow trên MCU thuộc loại bug khó nhất: **triệu chứng xuất hiện xa nguyên nhân**.
+
 **Phát hiện stack overflow:**
-1. **Stack painting** — điền pattern (0xAA…) lúc init, đo mức cao nhất bị đè (high-water-mark).
-2. **Canary** — đặt word chặn cuối stack, kiểm tra định kỳ.
-3. **MPU** — đặt vùng cấm ngay dưới stack → fault khi tràn (xem §5).
-4. RTOS có hook `stack overflow check`.
+
+1. **Stack painting** — điền pattern lúc init, sau đó đo xem pattern bị ăn tới đâu:
+
+```c
+#define PAINT 0xAAAAAAAAu
+extern uint32_t _sstack, _estack;
+
+void stack_paint(void) {                      // gọi RẤT SỚM trong startup
+    for (uint32_t *p = &_sstack; p < (uint32_t*)__get_MSP() - 16; p++)
+        *p = PAINT;                            // chừa 16 word đang dùng
+}
+
+uint32_t stack_unused_bytes(void) {           // gọi lúc runtime để đo high-water-mark
+    uint32_t *p = &_sstack;
+    while (p < &_estack && *p == PAINT) p++;   // đếm phần CHƯA bị đè
+    return (uint32_t)((uint8_t*)p - (uint8_t*)&_sstack);
+}
+// -> in ra định kỳ: còn dư bao nhiêu byte. Dư < 10% là dấu hiệu phải tăng stack.
+```
+
+2. **Canary** — đặt word chặn cuối stack, kiểm tra định kỳ:
+
+```c
+extern uint32_t _sstack;
+#define CANARY 0xDEADBEEFu
+
+void canary_init(void)  { _sstack = CANARY; }
+void canary_check(void) {                          // gọi cuối mỗi vòng main loop
+    if (_sstack != CANARY) panic("STACK OVERFLOW"); // bắt SỚM, báo RÕ
+}
+```
+
+3. **MPU** — đặt vùng cấm ngay dưới stack → fault **ngay khi** tràn (xem §5). Đây là cách duy nhất bắt được **đúng thời điểm** thay vì phát hiện sau.
+4. RTOS có hook `stack overflow check` (FreeRTOS: `configCHECK_FOR_STACK_OVERFLOW`).
+
+> Ba cách đầu **phát hiện muộn** (sau khi đã đè). Chỉ MPU chặn được tại chỗ — nếu MCU có MPU, dùng nó.
 
 ## 5. MPU (Memory Protection Unit)
 

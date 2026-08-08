@@ -19,12 +19,61 @@ PC có tài nguyên gần như vô hạn so với embedded. Trên embedded, mọ
 
 RAM/flash thường tính bằng KB–MB. Vấn đề & kỹ thuật:
 
-- **Heap fragmentation**: cấp phát/giải phóng động lâu dài làm bộ nhớ phân mảnh → `malloc` thất bại dù tổng còn trống, và thời gian cấp phát **không tất định**. Nguy hiểm cho hệ chạy liên tục/realtime.
-- **Giải pháp ưu tiên:**
-  - **Cấp phát tĩnh** (biến global/`static`, buffer kích thước cố định) — biết footprint lúc biên dịch.
-  - **Stack** cho dữ liệu vòng đời ngắn (nhưng stack nhỏ — cẩn thận overflow, đệ quy, mảng lớn).
-  - **Memory pool / fixed-block allocator**: cấp phát từ pool các khối cùng kích thước → tất định, không phân mảnh.
-  - Tránh `malloc/new` trong vòng lặp nóng / sau giai đoạn init; nhiều coding standard embedded (MISRA) hạn chế cấp phát động.
+**Heap fragmentation** — vì sao `malloc` thất bại dù *tổng* bộ nhớ trống vẫn còn nhiều:
+
+```
+Heap 1KB, sau một thời gian cấp phát/giải phóng xen kẽ:
+
+ ┌────┬──────┬────┬────────┬────┬──────┬────┬──────────┐
+ │ 96 │ FREE │128 │  FREE  │ 64 │ FREE │192 │   FREE   │
+ │dùng│ 120B │dùng│  100B  │dùng│  80B │dùng│   130B   │
+ └────┴──────┴────┴────────┴────┴──────┴────┴──────────┘
+
+ Tổng FREE = 120+100+80+130 = 430 byte
+ malloc(200)  →  ❌ THẤT BẠI — không khối LIỀN NHAU nào đủ 200
+
+ Trên PC: hiếm gặp (heap lớn, có MMU dồn trang).
+ Trên MCU 64KB RAM, chạy 6 tháng không reboot: gần như CHẮC CHẮN xảy ra.
+```
+
+Cộng thêm: thời gian `malloc` **không tất định** (phải duyệt free list, độ dài thay đổi) → phá vỡ phân tích WCET của hệ realtime.
+
+**Ba lựa chọn thay thế — chọn theo vòng đời dữ liệu:**
+
+| Cách | Khi nào dùng | Ưu | Nhược |
+|---|---|---|---|
+| **Cấp phát tĩnh** (`static`/global, buffer cố định) | Dữ liệu sống suốt vòng đời chương trình | Biết footprint **lúc biên dịch**; linker báo ngay nếu không đủ RAM | Chiếm chỗ kể cả lúc không dùng; không co giãn |
+| **Stack** | Dữ liệu vòng đời ngắn, trong một hàm | Miễn phí, tự dọn, tất định | Stack MCU rất nhỏ (vài KB) — mảng lớn/đệ quy → **overflow âm thầm** (§ không có MMU) |
+| **Memory pool** (fixed-block) | Nhiều object **cùng kích thước**, cấp/thả liên tục (packet, message, sample) | **Tất định O(1)**, không phân mảnh | Phải chọn trước kích thước khối + số lượng; lãng phí nếu object nhỏ hơn khối |
+
+```c
+// Memory pool tối giản — cấp/thả O(1), KHÔNG BAO GIỜ phân mảnh
+#define POOL_N     16
+#define BLOCK_SIZE 64
+
+static uint8_t  pool[POOL_N][BLOCK_SIZE];
+static uint16_t free_list[POOL_N];      // stack các chỉ số khối rảnh
+static int      free_top = POOL_N;
+
+void pool_init(void) {
+    for (int i = 0; i < POOL_N; i++) free_list[i] = i;
+    free_top = POOL_N;
+}
+
+void *pool_alloc(void) {                 // O(1), thời gian TẤT ĐỊNH
+    if (free_top == 0) return NULL;      // hết khối — báo lỗi, không "cố tìm"
+    return pool[free_list[--free_top]];
+}
+
+void pool_free(void *p) {                // O(1)
+    int idx = ((uint8_t*)p - &pool[0][0]) / BLOCK_SIZE;
+    free_list[free_top++] = (uint16_t)idx;
+}
+```
+
+> Vì sao pool không phân mảnh: **mọi khối cùng kích thước** nên khối vừa trả luôn dùng lại được cho yêu cầu tiếp theo. Phân mảnh sinh ra từ việc trộn lẫn nhiều kích thước — bỏ điều kiện đó là bỏ luôn vấn đề.
+
+- Tránh `malloc/new` trong vòng lặp nóng / sau giai đoạn init; nhiều coding standard embedded (MISRA) hạn chế cấp phát động.
 - **Tiết kiệm flash**: `-Os` (tối ưu kích thước), loại bỏ code/feature không dùng (LTO, `--gc-sections`), tránh template/STL phình code nếu eo hẹp, dùng `const` để dữ liệu nằm ở flash (read-only) thay vì RAM.
 - Đo footprint: `size`, map file của linker, theo dõi RAM/stack high-water mark.
 
@@ -32,9 +81,41 @@ RAM/flash thường tính bằng KB–MB. Vấn đề & kỹ thuật:
 
 ## 3. Ràng buộc năng lượng
 
-Nhiều thiết bị chạy pin → phần mềm quyết định tuổi thọ:
-- **Sleep modes**: đưa CPU/peripheral vào trạng thái ngủ sâu khi rảnh, thức dậy bằng interrupt (vd RTC, GPIO). "Race to sleep": làm xong nhanh rồi ngủ.
-- **Interrupt thay polling**: polling giữ CPU bận → tốn điện; interrupt cho CPU ngủ giữa các sự kiện.
+Nhiều thiết bị chạy pin → phần mềm quyết định tuổi thọ. Vẽ dòng điện theo thời gian là thấy ngay vì sao:
+
+```
+ dòng điện
+    ▲
+10mA│ ███████████████████████████████████████  ❌ POLLING: CPU thức liên tục
+    │                                              quay vòng hỏi "có dữ liệu chưa?"
+    └──────────────────────────────────────────► t     → ~10mA TRUNG BÌNH
+
+10mA│ ██          ██          ██               ✅ INTERRUPT + SLEEP
+    │ ██          ██          ██                  thức đúng lúc có việc
+ 5µA│ ░░░░░░░░░░░░██░░░░░░░░░░██░░░░░░░░░░░░░     ngủ sâu phần còn lại
+    └──┬──────────┬──────────┬─────────────────► t     → ~50µA TRUNG BÌNH
+       ngắt       ngắt       ngắt
+                                              chênh lệch ~200 LẦN tuổi thọ pin
+```
+
+- **Sleep modes**: đưa CPU/peripheral vào trạng thái ngủ sâu khi rảnh, thức dậy bằng interrupt (vd RTC, GPIO). **"Race to sleep"**: chạy ở tần số cao để làm xong **thật nhanh** rồi ngủ sâu — thường tiết kiệm hơn chạy chậm rề rề ở tần số thấp, vì năng lượng ≈ (công suất × thời gian) và thời gian giảm mạnh hơn công suất tăng.
+- **Interrupt thay polling** — khác biệt nằm ở chỗ CPU làm gì khi *không* có việc:
+
+```c
+// ❌ Polling: CPU quay vòng, đốt điện cả khi không có gì xảy ra
+while (1) {
+    if (UART->SR & RXNE) process(UART->DR);   // 99.9% số vòng là VÔ ÍCH
+}
+
+// ✅ Interrupt + sleep: CPU ngủ, phần cứng đánh thức khi có việc thật
+while (1) {
+    __WFI();                    // Wait For Interrupt — CPU dừng clock, tụt xuống µA
+    if (flag_rx) {              // tỉnh dậy vì có ngắt
+        flag_rx = false;
+        process(rx_byte);
+    }
+}
+```
 - **Tắt peripheral & clock gating**: tắt module (ADC, UART...) và clock khi không dùng.
 - **Hạ tần số/điện áp** (DVFS) khi tải thấp.
 - Đánh đổi: hiệu năng/độ trễ vs tiết kiệm điện — thiết kế theo profile sử dụng thực tế.
@@ -44,7 +125,37 @@ Nhiều thiết bị chạy pin → phần mềm quyết định tuổi thọ:
 ## 4. Độ tin cậy & an toàn
 
 Thiết bị thường chạy không người giám sát, lâu dài, môi trường khắc nghiệt:
-- **Watchdog timer**: phần cứng đếm ngược; phần mềm phải "kick" định kỳ. Nếu hệ treo (không kick), watchdog **reset** thiết bị → tự phục hồi. Phải kick đúng chỗ (không kick mù trong khi tác vụ đã chết).
+- **Watchdog timer**: phần cứng đếm ngược; phần mềm phải "kick" định kỳ. Nếu hệ treo (không kick), watchdog **reset** thiết bị → tự phục hồi. **Kick sai chỗ là lỗi thiết kế phổ biến nhất** — watchdog vẫn được vỗ về trong khi hệ đã chết:
+
+```c
+// ❌ SAI: kick trong một timer ISR độc lập
+void TIM2_IRQHandler(void) {
+    IWDG->KR = 0xAAAA;          // kick "mù"
+}
+// -> main loop treo cứng, mọi task chết, nhưng timer ISR vẫn chạy đều
+//    -> watchdog KHÔNG BAO GIỜ reset. Thiết bị đơ vĩnh viễn ngoài field.
+
+// ✅ ĐÚNG: chỉ kick khi MỌI task quan trọng đều xác nhận còn sống
+static volatile uint32_t alive_mask = 0;
+#define TASK_SENSOR  (1u << 0)
+#define TASK_COMM    (1u << 1)
+#define TASK_CTRL    (1u << 2)
+#define ALL_TASKS    (TASK_SENSOR | TASK_COMM | TASK_CTRL)
+
+void task_sensor(void) { /* … */ alive_mask |= TASK_SENSOR; }   // mỗi task tự báo
+
+void main_loop(void) {
+    while (1) {
+        run_all_tasks();
+        if ((alive_mask & ALL_TASKS) == ALL_TASKS) {   // ✅ đủ mặt mới kick
+            IWDG->KR = 0xAAAA;
+            alive_mask = 0;                            // reset để chu kỳ sau phải báo lại
+        }
+    }
+}
+```
+
+> **Windowed watchdog**: phải kick trong một *cửa sổ* thời gian — không quá muộn **và không quá sớm**. Bắt được cả lỗi "chạy loạn quá nhanh" (vd code nhảy lạc vào vòng lặp kick liên tục), thứ mà watchdog thường bỏ sót.
 - **Xử lý lỗi không crash**: kiểm tra giá trị trả về, fail an toàn (safe state), không để một lỗi nhỏ làm sập toàn hệ. Trong hard realtime/safety, exception thường bị cấm — dùng mã lỗi.
 - **Brown-out / mất điện**: ghi dữ liệu quan trọng cẩn thận (atomic, journaling), dùng rootfs read-only + A/B partition để cập nhật an toàn ([boot-process.md](boot-process.md)).
 - **Đảm bảo realtime**: phân tích worst-case execution time (WCET), tránh thao tác không tất định (heap, page fault) trong vùng realtime, dùng `mlockall` để khóa bộ nhớ (Linux).
@@ -62,7 +173,24 @@ Thiết bị thường chạy không người giám sát, lâu dài, môi trư�
 
 ## 6. Một số kỹ thuật & lưu ý thực dụng
 
-- **Fixed-point arithmetic**: khi không có FPU, dùng số nguyên/Qm.n thay float → nhanh & tất định.
+- **Fixed-point arithmetic**: khi không có FPU, dùng số nguyên/Qm.n thay float → nhanh & tất định. Ý tưởng: đặt một "dấu phẩy ảo" ở vị trí cố định trong số nguyên.
+
+```c
+// Q16.16: 32 bit = 16 bit phần nguyên | 16 bit phần thập phân
+typedef int32_t q16_t;
+#define Q16_SHIFT 16
+#define TO_Q16(x)   ((q16_t)((x) * (1 << Q16_SHIFT)))   // 1.5  -> 0x0001_8000
+#define FROM_Q16(x) ((float)(x) / (1 << Q16_SHIFT))
+
+q16_t q16_add(q16_t a, q16_t b) { return a + b; }        // ✅ cộng/trừ: y như số nguyên
+
+q16_t q16_mul(q16_t a, q16_t b) {
+    // ⚠️ BẪY: a*b tràn 32 bit ngay với số vừa phải -> PHẢI qua trung gian 64 bit
+    return (q16_t)(((int64_t)a * b) >> Q16_SHIFT);
+}
+```
+
+> Đánh đổi: nhanh và **tất định** (không có FPU emulation hàng trăm chu kỳ), nhưng **tự quản scale** và phải canh **overflow khi nhân**. Có FPU (Cortex-M4F/M7) hoặc tính toán ít → cứ dùng `float`. Không FPU + tính nhiều trong vòng lặp nóng → fixed-point.
 - **Bit manipulation & lookup table**: tiết kiệm CPU/RAM cho phép tính lặp lại.
 - **`volatile`** cho biến chia sẻ với ISR/phần cứng; nhưng `volatile` **không** thay thế đồng bộ đa luồng (không atomic) — đừng nhầm.
 - **Alignment & packing**: `struct` packing ảnh hưởng kích thước & tốc độ truy cập; lệch alignment có thể fault trên một số kiến trúc.

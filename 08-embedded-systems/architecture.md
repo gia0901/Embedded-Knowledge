@@ -42,14 +42,58 @@ Peripheral phơi bày các **thanh ghi (register)** (control, status, data). Hai
 - **Port-mapped I/O** (x86 cũ): không gian I/O riêng, lệnh `in`/`out`.
 - **Memory-mapped I/O** (ARM/embedded, phổ biến): thanh ghi peripheral được gán vào **không gian địa chỉ bộ nhớ** → đọc/ghi địa chỉ đó như đọc/ghi RAM, nhưng thực ra điều khiển phần cứng.
 
+**Bản đồ không gian địa chỉ** — mấu chốt của MMIO là *cùng một* không gian địa chỉ chứa cả bộ nhớ thật lẫn thanh ghi phần cứng:
+
+```
+0xFFFF_FFFF ┌────────────────────────┐
+            │  Cortex-M system regs  │  SCB, NVIC, SysTick…
+0xE000_0000 ├────────────────────────┤
+            │                        │
+            │      (không dùng)      │
+            │                        │
+0x4002_0000 ├────────────────────────┤ ◄── GPIOA_BASE
+            │  GPIOA  ┌────────────┐ │       +0x00 MODER   (chế độ chân)
+            │         │ thanh ghi  │ │       +0x14 ODR     (output data)
+            │         └────────────┘ │       +0x10 IDR     (input data)
+0x4000_0000 ├────────────────────────┤ ◄── vùng PERIPHERAL bắt đầu
+            │                        │
+0x2000_0000 ├────────────────────────┤ ◄── SRAM (bộ nhớ THẬT)
+            │   .data .bss  heap ↓   │
+            │            stack ↑     │
+0x0800_0000 ├────────────────────────┤ ◄── FLASH (code + hằng số)
+            │  vector table, .text   │
+0x0000_0000 └────────────────────────┘
+
+  Ghi vào 0x2000_1234  →  đổi một byte trong RAM.        (vô hại)
+  Ghi vào 0x4002_0014  →  ĐIỆN ÁP TRÊN CHÂN CHIP ĐỔI.    (có side effect vật lý!)
+  Cú pháp C giống hệt nhau — chỉ địa chỉ khác.
+```
+
+Đó là lý do compiler **không được phép** đối xử với hai chỗ này như nhau, và cũng là lý do `volatile` tồn tại.
+
 ```c
-// Bật một bit trong control register của GPIO (địa chỉ ví dụ)
+// Cách 1: macro cho từng thanh ghi (đơn giản, hay gặp trong code cũ)
 #define GPIO_BASE   0x40020000u
 #define GPIO_ODR    (*(volatile uint32_t*)(GPIO_BASE + 0x14))
 
 GPIO_ODR |=  (1u << 5);   // set chân 5 lên cao
 GPIO_ODR &= ~(1u << 5);   // kéo chân 5 xuống thấp
+
+// Cách 2: struct đặt tại base — rõ ràng hơn, chuẩn của vendor HAL
+typedef struct {
+    volatile uint32_t MODER;    // +0x00
+    volatile uint32_t OTYPER;   // +0x04
+    volatile uint32_t OSPEEDR;  // +0x08
+    volatile uint32_t PUPDR;    // +0x0C
+    volatile const uint32_t IDR;// +0x10  ⭐ const volatile: thanh ghi CHỈ ĐỌC
+    volatile uint32_t ODR;      // +0x14
+} GPIO_TypeDef;
+
+#define GPIOA ((GPIO_TypeDef*)0x40020000u)
+GPIOA->ODR |= (1u << 5);        // trình biên dịch tự tính offset — khó sai hơn
 ```
+
+> ⚠️ **`GPIO_ODR |= x` là read-modify-write** — ba thao tác, **không nguyên tử**. Nếu một ISR cũng đụng thanh ghi đó → mất cập nhật. Nhiều SoC vì thế có thanh ghi **BSRR** (set/reset riêng, ghi 1 để tác động) cho phép đổi bit **không cần đọc trước** — dùng nó thay vì RMW khi có thể.
 
 **`volatile` bắt buộc**: giá trị thanh ghi có thể đổi do phần cứng (vd status register), và việc *ghi* có **side effect** (kích hoạt hành động). `volatile` cấm compiler tối ưu bỏ/đổi thứ tự/đọc-cache các truy cập đó. Với thứ tự giữa nhiều thanh ghi và bộ nhớ, cần thêm **memory barrier** (`__DMB`/`dmb`) vì CPU có thể reorder.
 
@@ -74,17 +118,82 @@ GPIO_ODR &= ~(1u << 5);   // kéo chân 5 xuống thấp
 ## 5. Interrupt & DMA — không bắt CPU chờ/copy
 
 - **Interrupt** (đã bàn ở [05/driver-basics](../05-drivers-device-tree/driver-basics.md)): peripheral báo sự kiện thay vì CPU polling → tiết kiệm CPU, đáp ứng nhanh, cho phép CPU ngủ tiết kiệm điện giữa các sự kiện.
-- **DMA** (Direct Memory Access): một controller chuyên dụng **chuyển dữ liệu giữa peripheral và RAM mà không cần CPU** can thiệp từng byte. CPU chỉ cấu hình (nguồn, đích, kích thước) rồi làm việc khác; DMA xong thì phát interrupt.
+- **DMA** (Direct Memory Access): một controller chuyên dụng **chuyển dữ liệu giữa peripheral và RAM mà không cần CPU** can thiệp từng byte:
+
+```
+ ❌ KHÔNG DMA — CPU khuân từng byte
+    ┌─────┐  đọc   ┌────────┐   ghi   ┌─────┐
+    │ CPU │◄───────│ UART   │────────►│ RAM │      CPU bận 100% suốt quá trình,
+    └─────┘        └────────┘         └─────┘      1000 byte = 1000 vòng lặp
+
+ ✅ CÓ DMA — CPU chỉ ra lệnh rồi đi làm việc khác
+    ┌─────┐ ①cấu hình  ┌─────────┐
+    │ CPU │───────────►│   DMA   │                 ① CPU: nguồn, đích, số byte, GO
+    └─────┘            │controller│                ② DMA tự chuyển, CPU RẢNH
+       ▲               └────┬────┘                 ③ xong → DMA bắn ngắt báo CPU
+       │ ③ ngắt "xong"      │ ② chuyển thẳng
+       │                    ▼
+       │              ┌────────┐   ┌─────┐
+       └──────────────│ UART   │──►│ RAM │
+                      └────────┘   └─────┘
+```
+
   - Quan trọng cho throughput cao (audio, video, network, ADC tốc độ cao).
-  - **Cache coherency**: DMA ghi thẳng RAM, không qua cache CPU → phải **flush/invalidate cache** để CPU và DMA thấy dữ liệu nhất quán (xem [03/memory-management](../03-operating-system/memory-management.md)).
-  - **Alignment & vùng nhớ**: buffer DMA thường cần căn lề và nằm ở vùng nhớ phù hợp (non-cacheable hoặc được quản lý cache đúng).
+  - ⚠️ **Cache coherency — cái bẫy lớn nhất của DMA.** DMA đọc/ghi **thẳng RAM**, không đi qua cache của CPU:
+
+```
+ Ca 1: DMA GHI vào RAM (peripheral → RAM), CPU đọc sau
+   RAM  : [ dữ liệu MỚI do DMA ghi ]
+   cache: [ dữ liệu CŨ từ lần đọc trước ]   ← CPU đọc trúng cache → thấy dữ liệu CŨ ❌
+   ⟹ trước khi đọc phải INVALIDATE cache (vứt bản cũ, buộc nạp lại từ RAM)
+
+ Ca 2: CPU GHI vào buffer, rồi bảo DMA gửi đi (RAM → peripheral)
+   cache: [ dữ liệu MỚI CPU vừa ghi ]  ← còn nằm trong cache, chưa xuống RAM
+   RAM  : [ dữ liệu CŨ ]                 ← DMA đọc chỗ này → gửi đi dữ liệu CŨ ❌
+   ⟹ trước khi khởi động DMA phải FLUSH (clean) cache xuống RAM
+```
+
+  > Quy tắc nhớ: **CPU sắp đọc dữ liệu DMA vừa ghi → invalidate. CPU vừa ghi, DMA sắp đọc → flush.** Trên Linux, API `dma_map_single()/dma_unmap_single()` với đúng **hướng** (`DMA_FROM_DEVICE`/`DMA_TO_DEVICE`) đã lo việc này — và đó là lý do **không được đụng buffer trong lúc đang map** ([BSP-011](../15_prep/mock-interview/bank/bsp.md)).
+
+  - **Alignment & vùng nhớ**: buffer DMA thường phải căn lề theo **cache line** (nếu không, hai biến khác nhau nằm chung một line → flush/invalidate cái này giẫm lên cái kia), và nằm ở vùng nhớ DMA truy cập được (một số SoC có vùng RAM mà DMA controller không với tới).
 
 ---
 
 ## 6. Đặc thù cần nhớ khi lập trình embedded phần cứng
 
 - **Endianness**: thứ tự byte (little/big) ảnh hưởng khi đọc thanh ghi/giao thức nhị phân nhiều byte.
-- **Bit manipulation**: thao tác bit (`|`, `&`, `~`, `<<`) là ngôn ngữ hằng ngày để set/clear/test cờ trong thanh ghi.
+
+```c
+uint32_t x = 0x12345678;
+// little-endian (ARM, x86): byte thấp ở địa chỉ thấp
+//   addr+0: 78 | addr+1: 56 | addr+2: 34 | addr+3: 12
+// big-endian (mạng, một số MCU):
+//   addr+0: 12 | addr+1: 34 | addr+2: 56 | addr+3: 78
+
+bool is_little_endian(void) {
+    uint32_t v = 1;
+    return *(uint8_t*)&v == 1;      // byte đầu là 01 -> little
+}
+// ⚠️ Quan trọng khi: nhận gói tin mạng (network byte order = BIG endian -> ntohl),
+//    đọc file nhị phân, hoặc truyền struct giữa hai kiến trúc khác endianness.
+```
+
+- **Bit manipulation**: thao tác bit là ngôn ngữ hằng ngày khi làm việc với thanh ghi:
+
+```c
+#define BIT(n)  (1u << (n))
+
+REG |=  BIT(5);                       // SET bit 5
+REG &= ~BIT(5);                       // CLEAR bit 5
+REG ^=  BIT(5);                       // TOGGLE bit 5
+if (REG & BIT(5))     { /* … */ }     // TEST bit 5
+
+// Ghi một TRƯỜNG nhiều bit (vd 3 bit ở vị trí 4..6) — phải mask rồi mới or:
+#define FIELD_MASK   (0x7u << 4)
+REG = (REG & ~FIELD_MASK) | ((value & 0x7u) << 4);   // ⚠️ read-modify-write, xem §3
+
+// ⚠️ Dùng 1u (unsigned): 1 << 31 trên int có dấu là UB.
+```
 - **Datasheet / reference manual**: nguồn chân lý về địa chỉ thanh ghi, ý nghĩa từng bit, timing — kỹ năng đọc datasheet là bắt buộc.
 - **Fixed-point vs floating-point**: nhiều MCU không có FPU → dùng số nguyên/fixed-point để tránh phép float chậm.
 
