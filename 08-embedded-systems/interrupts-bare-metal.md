@@ -100,6 +100,8 @@ __enable_irq();
 
 ### 3.1. Ring buffer SPSC — mẫu tốt nhất khi truyền *luồng dữ liệu*
 
+> 📘 Phần này là **góc ISR/bare-metal** của ring buffer. Bản đầy đủ theo tầng (1 luồng → chính sách đầy → luồng byte → mutex+condvar → lock-free) và chỗ nó chạy trong Linux thật (`kfifo`, pipe, ALSA, `io_uring`): [13-dsa/ring-buffer.md](../13-dsa/ring-buffer.md).
+
 **Vì sao tốt hơn critical section?** Cách tắt ngắt ở trên có một chi phí ẩn: **mỗi lần main đọc dữ liệu là một lần cả hệ thống bị điếc**. Ngắt khẩn cấp đến đúng lúc đó phải chờ → đẩy **worst-case latency** lên (§4). Ring buffer SPSC bỏ hẳn chi phí đó.
 
 **Ý tưởng cốt lõi — tách quyền sở hữu, không chia sẻ quyền ghi:**

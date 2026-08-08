@@ -142,7 +142,8 @@ Embedded-Interview/
 │
 ├── 13-dsa/                       # Data Structures & Algorithms (bổ sung)
 │   ├── complexity-and-structures.md  # Big-O, container, trade-off
-│   └── algorithm-patterns.md     # two-pointer, sliding window, BFS/DFS, DP
+│   ├── algorithm-patterns.md     # two-pointer, sliding window, BFS/DFS, DP
+│   └── ring-buffer.md            # 🎯 5 tầng: 1 luồng → lock-free SPSC; kfifo/pipe/ALSA/io_uring
 │
 ├── 14-networking/                # Mạng (bổ sung)
 │   ├── tcp-ip.md                 # mô hình, TCP vs UDP, handshake
@@ -194,7 +195,7 @@ Embedded-Interview/
 | 10 Thinking | ✅ Xong | problem-solving, system-design |
 | 11 Interview questions | ➡️ Con trỏ | Câu hỏi đã **gộp về `15_prep/mock-interview/bank/`** (ngân hàng duy nhất); các file ở đây chỉ redirect sang domain tương ứng |
 | 12 Design patterns | ✅ Xong | solid-principles, creational, structural, behavioral (bổ sung) |
-| 13 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns (bổ sung) |
+| 13 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
 | 14 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
 | 15 Prep | 🟡 Đang dùng | **study-plans/** (chiến lược ôn BSP & C++ + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/daily-plan/coding-arena); technical_round (01 lý thuyết; 02/03/04 nay là con trỏ → bank/) |

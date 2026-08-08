@@ -105,7 +105,7 @@ size_t my_strlen(const char* s) {
 **Follow-up:** *khác biệt `memcpy` vs `memmove`?* → `memmove` xử lý đúng khi src/dst chồng lấn (chép lùi nếu cần); `memcpy` không đảm bảo.
 </details>
 
-#### COD-006 · 🟡 · coding · ⭐ · [→ complexity-and-structures](../../../13-dsa/complexity-and-structures.md)
+#### COD-006 · 🟡 · coding · ⭐ · [→ ring-buffer.md](../../../13-dsa/ring-buffer.md)
 **Ring Buffer.**
 <details><summary>Bản mẫu</summary>
 
@@ -120,7 +120,9 @@ public:
     bool pop(T& out){ if(empty()) return false; out=buf_[tail_]; tail_=(tail_+1)%N; return true; }
 };
 ```
-*(Follow-up: bản lock-free SPSC dùng atomic head/tail + memory order.)*
+**Hỏi ngược trước khi code** (ăn điểm nhất): *một luồng hay nhiều luồng? đầy thì từ chối hay đè cái cũ? byte stream hay phần tử?* Rồi nêu ngay cạm bẫy: `head == tail` vừa là rỗng vừa là đầy → bản trên **hy sinh 1 ô** để phân biệt (chứa được N−1).
+
+**Follow-up theo tầng** — [ring-buffer.md](../../../13-dsa/ring-buffer.md): ① chính sách khi đầy (§4) → ② luồng byte, `memcpy` hai khối khi vắt biên (§5) → ③ mutex + condvar có `close()` (§6) → ④ lock-free SPSC: chỉ số chạy tự do + mask, **hai** cặp release/acquire, `alignas(64)` chống false sharing (§7) → ⑤ nó nằm ở đâu trong Linux thật: `dmesg`, pipe, `kfifo`, ALSA, `io_uring` (§8).
 </details>
 
 #### COD-007 · 🟢 · coding · [→ algorithm-patterns](../../../13-dsa/algorithm-patterns.md)
