@@ -116,7 +116,7 @@ Tự nó **không biết** — và đó chính là mối nguy: hệ chạy êm t
 
 Chi tiết đáng nói thêm: nội dung **còn lại** trong buffer luôn liên tục (vì luôn vứt từ đầu cũ) — cái đứt quãng là **lô mà consumer gom vắt qua giai đoạn drop**. Nếu `push` là hàm public, cho nó **trả về được trạng thái drop** để caller biết ngay, đừng luôn trả `true`.
 
-Liên hệ: [DSA-013](#dsa-013) (chọn N), [COD-006](coding.md) (cài đặt).
+Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
 </details>
 
 ---

@@ -99,10 +99,27 @@ for (int i = 0; i < n; ++i)
 khởi tạo epoll, đăng ký listening socket (non-blocking)
 loop:
     n = epoll_wait(...)                 // ngủ tới khi có sự kiện
+    nếu n == -1 và errno == EINTR → gọi lại (KHÔNG phải lỗi)
     for mỗi fd sẵn sàng:
         nếu là listening socket → accept kết nối mới, đăng ký vào epoll
         nếu là client socket    → read/write non-blocking, xử lý
 ```
+
+```c
+for (;;) {
+    int n;
+    do {
+        n = epoll_wait(epfd, evlist, MAX_EVENTS, -1);
+    } while (n == -1 && errno == EINTR);   // ⚠️ BẮT BUỘC — xem ghi chú dưới
+    if (n == -1) errExit("epoll_wait");
+
+    for (int i = 0; i < n; i++) { /* xử lý evlist[i] */ }
+}
+```
+
+> ⚠️ **Vòng `EINTR` này không bỏ được.** `epoll_wait` nằm trong nhóm syscall **không bao giờ** được kernel tự khởi động lại, **kể cả khi handler cài với `SA_RESTART`** (cùng nhóm: `select`, `poll`, `sleep`, `pause`). Thiếu vòng lặp → server thoát/lỗi ngẫu nhiên mỗi khi có signal tới đúng lúc — bug rất khó tái hiện. Bảng đầy đủ: [processes-signals.md §5](processes-signals.md).
+>
+> Cần chờ fd **và** signal cùng lúc mà không có race → dùng `epoll_pwait()` (đặt signal mask nguyên tử với việc đi ngủ), hoặc kéo signal vào chính event loop bằng **`signalfd`** (§7 dưới, và [ipc-linux.md](ipc-linux.md)).
 
 ```mermaid
 flowchart TD

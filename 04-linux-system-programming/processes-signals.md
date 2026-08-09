@@ -105,7 +105,35 @@ sigaction(SIGTERM, &sa, NULL);
 ```
 
 - **`sigaction` thay vì `signal`**: `signal()` có hành vi không thống nhất giữa các hệ (có hệ reset handler về mặc định sau lần đầu). `sigaction` rõ ràng, di động, kiểm soát mask/flags.
-- `SA_RESTART`: syscall blocking bị signal ngắt sẽ tự thử lại thay vì trả `EINTR`.
+- `SA_RESTART`: syscall blocking bị signal ngắt sẽ **tự thử lại** thay vì trả `EINTR` — nhưng **chỉ với một số syscall**, xem cảnh báo ngay dưới.
+
+### ⚠️ `SA_RESTART` KHÔNG cứu được mọi syscall
+
+Đây là chỗ rất hay hiểu nhầm: đặt `SA_RESTART` rồi tưởng hết chuyện `EINTR`.
+
+| Có restart với `SA_RESTART` | **KHÔNG BAO GIỜ** restart (dù đặt cờ) |
+|---|---|
+| `wait()`, `waitpid()` | **`select()`, `pselect()`, `poll()`, `ppoll()`** |
+| `read()`, `write()`, `ioctl()` — **chỉ trên thiết bị "chậm"** (terminal, pipe, FIFO, socket) | **`epoll_wait()`, `epoll_pwait()`** |
+| `open()` khi nó có thể chặn (vd mở FIFO) | **`sleep()`, `nanosleep()`, `clock_nanosleep()`** |
+| `accept()`, `connect()`, `send()`, `recv()` | **`pause()`, `sigsuspend()`, `sigwaitinfo()`** |
+| `flock()`, `fcntl()` (đặt khoá), `sem_wait()` | `semop()`, `msgrcv()`, `msgsnd()`; `read()` từ fd inotify |
+
+⇒ **Vòng lặp `EINTR` quanh `epoll_wait`/`select`/`poll` là BẮT BUỘC**, không có cờ nào thay được:
+
+```c
+int n;
+do {
+    n = epoll_wait(epfd, evlist, MAX_EVENTS, -1);
+} while (n == -1 && errno == EINTR);      // signal cắt ngang → gọi lại, KHÔNG phải lỗi
+if (n == -1) errExit("epoll_wait");
+```
+
+Hai chi tiết đi kèm:
+- **`read()`/`write()` chỉ restart trên "thiết bị chậm"** — file trên đĩa **không** thuộc nhóm này (I/O đĩa luôn thoả mãn được qua page cache). Đó là lý do bug `EINTR` **không lộ khi test với file**, chỉ lộ khi chạy với socket/pipe thật.
+- Nếu `read()`/`write()` **đã chuyển được một phần** dữ liệu rồi mới bị cắt, nó **không** restart mà **trả về thành công với số byte đã chuyển** — thêm một nguyên nhân của partial read/write (§ file-io).
+
+> Cần chờ fd **và** signal cùng lúc mà không có race → `pselect()`/`ppoll()`/`epoll_pwait()`: chúng đặt signal mask **nguyên tử** với việc đi ngủ.
 
 ---
 
@@ -155,12 +183,39 @@ Process chạy nền không gắn terminal. Quy trình cổ điển: `fork` (cha
 Vì signal handler chạy bất đồng bộ, có thể chen vào giữa bất kỳ chỗ nào của chương trình — kể cả khi đang ở giữa một hàm không reentrant như `malloc`/`printf` (đang giữ khóa nội bộ hoặc trạng thái dở dang). Nếu handler gọi lại chính hàm đó, có thể gây deadlock hoặc hỏng dữ liệu (UB). Vì vậy chỉ được gọi các hàm async-signal-safe (như `write`, `_exit`). Pattern an toàn: handler chỉ set một cờ `volatile sig_atomic_t`, còn xử lý thật để ở main loop; hoặc dùng `signalfd` để nhận signal qua fd.
 </details>
 
-<details><summary>5) Signal nào không thể bắt hoặc chặn? Vì sao?</summary>
+<details><summary>5) <code>EINTR</code> là gì? Đặt <code>SA_RESTART</code> có giải quyết hết không?</summary>
+
+**`EINTR`** = syscall đang **chặn** thì bị signal handler cắt ngang, nên trả `-1` với `errno == EINTR`. **Không phải lỗi thật** — chỉ là "bị ngắt, chưa làm xong". Code coi mọi `-1` là lỗi sẽ **chết ngẫu nhiên** khi có signal tới đúng lúc.
+
+**`SA_RESTART` KHÔNG giải quyết hết** — đây là ý phân loại. Nhóm **không bao giờ** được restart dù đặt cờ:
+
+- **`select()`, `pselect()`, `poll()`, `ppoll()`**
+- **`epoll_wait()`, `epoll_pwait()`**
+- **`sleep()`, `nanosleep()`, `clock_nanosleep()`**
+- **`pause()`, `sigsuspend()`, `sigwaitinfo()`**
+- `semop()`, `msgrcv()`, `msgsnd()`; `read()` từ fd inotify
+
+⇒ **Vòng lặp `EINTR` quanh `epoll_wait`/`select`/`poll` là bắt buộc**, không có cờ thay thế:
+
+```c
+int n;
+do { n = epoll_wait(epfd, evlist, MAX_EVENTS, -1); }
+while (n == -1 && errno == EINTR);
+```
+
+Hai chi tiết ăn điểm thêm:
+- `read()`/`write()` chỉ restart trên **"thiết bị chậm"** (terminal, pipe, FIFO, socket). **File trên đĩa không thuộc nhóm này** → bug `EINTR` **không lộ khi test với file**, chỉ lộ khi chạy với socket/pipe thật.
+- Nếu `read()`/`write()` **đã chuyển được một phần** rồi mới bị cắt, nó **không** restart mà **trả về thành công với số byte đã chuyển**.
+
+Cần chờ fd **và** signal cùng lúc mà không có race → `pselect()`/`ppoll()`/`epoll_pwait()` đặt signal mask **nguyên tử** với việc đi ngủ; hoặc dùng **`signalfd`** để kéo signal vào chính event loop.
+</details>
+
+<details><summary>6) Signal nào không thể bắt hoặc chặn? Vì sao?</summary>
 
 `SIGKILL` (giết ngay) và `SIGSTOP` (tạm dừng) không thể bắt, chặn, hay ignore. Lý do: để hệ điều hành/quản trị viên luôn có cách dứt khoát kết thúc hoặc dừng một process bất kể nó được lập trình thế nào — nếu process có thể chặn mọi signal thì sẽ không thể kiểm soát được process treo/lỗi.
 </details>
 
-<details><summary>6) volatile sig_atomic_t là gì và vì sao cờ trong handler dùng kiểu này?</summary>
+<details><summary>7) volatile sig_atomic_t là gì và vì sao cờ trong handler dùng kiểu này?</summary>
 
 `sig_atomic_t` là kiểu được đảm bảo đọc/ghi bằng một thao tác không thể chia cắt (atomic) đối với signal — handler có thể chen vào nên cập nhật cờ không được "nửa chừng". `volatile` báo compiler rằng biến có thể thay đổi ngoài luồng thực thi bình thường (bởi handler), nên không được cache vào thanh ghi hay tối ưu bỏ việc đọc lại — main loop phải đọc giá trị mới nhất mỗi lần. Kết hợp lại cho phép truyền tín hiệu "đã nhận signal" từ handler ra main loop một cách an toàn.
 </details>

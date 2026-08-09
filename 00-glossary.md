@@ -105,24 +105,24 @@ Giải thích ngắn gọn các thuật ngữ tiếng Anh dùng xuyên suốt t�
 
 | Thuật ngữ | Giải thích ngắn | Chi tiết |
 |-----------|-----------------|----------|
-| **TCP / UDP** | Tin cậy hướng kết nối / không kết nối, nhẹ | [14](13-networking/tcp-ip.md) |
-| **Three-way handshake** | SYN → SYN-ACK → ACK thiết lập kết nối TCP | [14](13-networking/tcp-ip.md) |
-| **Socket** | Endpoint giao tiếp (TCP/UDP/Unix) | [14](13-networking/sockets-and-protocols.md) |
-| **HTTP / TLS** | Giao thức request/response / lớp mã hóa (→HTTPS) | [14](13-networking/sockets-and-protocols.md) |
-| **MQTT** | Giao thức pub/sub nhẹ cho IoT | [14](13-networking/sockets-and-protocols.md) |
-| **Flow / Congestion control** | Bảo vệ bên nhận / bảo vệ mạng | [14](13-networking/tcp-ip.md) |
+| **TCP / UDP** | Tin cậy hướng kết nối / không kết nối, nhẹ | [13](13-networking/tcp-ip.md) |
+| **Three-way handshake** | SYN → SYN-ACK → ACK thiết lập kết nối TCP | [13](13-networking/tcp-ip.md) |
+| **Socket** | Endpoint giao tiếp (TCP/UDP/Unix) | [13](13-networking/sockets-and-protocols.md) |
+| **HTTP / TLS** | Giao thức request/response / lớp mã hóa (→HTTPS) | [13](13-networking/sockets-and-protocols.md) |
+| **MQTT** | Giao thức pub/sub nhẹ cho IoT | [13](13-networking/sockets-and-protocols.md) |
+| **Flow / Congestion control** | Bảo vệ bên nhận / bảo vệ mạng | [13](13-networking/tcp-ip.md) |
 
 ## Design & Thinking
 
 | Thuật ngữ | Giải thích ngắn | Chi tiết |
 |-----------|-----------------|----------|
-| **SOLID** | 5 nguyên lý thiết kế OOP (SRP/OCP/LSP/ISP/DIP) | [12](11-design-patterns/solid-principles.md) |
-| **Design pattern** | Giải pháp tái sử dụng cho vấn đề thiết kế lặp lại | [12](11-design-patterns/README.md) |
-| **Dependency injection** | Inject implementation qua interface để dễ test | [12](11-design-patterns/solid-principles.md) |
+| **SOLID** | 5 nguyên lý thiết kế OOP (SRP/OCP/LSP/ISP/DIP) | [11](11-design-patterns/solid-principles.md) |
+| **Design pattern** | Giải pháp tái sử dụng cho vấn đề thiết kế lặp lại | [11](11-design-patterns/README.md) |
+| **Dependency injection** | Inject implementation qua interface để dễ test | [11](11-design-patterns/solid-principles.md) |
 | **First principles** | Suy luận từ nguyên lý cơ bản thay vì khuôn mẫu | [10](10-thinking/problem-solving.md) |
 | **Trade-off** | Đánh đổi giữa các mục tiêu tùy ràng buộc | [10](10-thinking/problem-solving.md) |
 | **HAL** | Hardware Abstraction Layer — tách logic khỏi phần cứng | [10](10-thinking/system-design.md) |
-| **Big-O** | Độ phức tạp time/space theo kích thước input | [13](12-dsa/complexity-and-structures.md) |
+| **Big-O** | Độ phức tạp time/space theo kích thước input | [12](12-dsa/complexity-and-structures.md) |
 
 ---
 ➡️ Về [README chính](README.md) · [CLAUDE.md](CLAUDE.md)

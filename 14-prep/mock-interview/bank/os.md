@@ -285,5 +285,51 @@ Dùng một hàng đợi chia sẻ được bảo vệ bằng mutex, cộng cond
 Trả **0 cho process con**, **PID của con cho process cha**, **-1 nếu lỗi**. Không gian địa chỉ được copy-on-write.
 </details>
 
+#### OS-020 · 🟡 · concept · ⭐ · [→ concurrency](../../../02-modern-cpp/concurrency.md)
+**Thread-safe và reentrant khác nhau thế nào?**
+<details><summary>Đáp án</summary>
+
+Hai **câu hỏi khác nhau**, và chỗ hầu hết người trả lời gộp làm một:
+- **Thread-safe:** nhiều **thread** gọi **đồng thời** có an toàn không?
+- **Reentrant:** hàm bị **cắt ngang giữa chừng** rồi được gọi lại (từ signal handler, hoặc đệ quy) có an toàn không?
+
+**Khác biệt then chốt nằm ở CÁCH đạt được:**
+- Thread-safe **được dùng khoá** — bọc mutex là xong.
+- Reentrant **KHÔNG được dùng khoá** — vì hàm bị cắt ngang khi đang giữ khoá rồi gọi lại chính nó sẽ **tự deadlock**. Reentrant chỉ đạt được bằng cách **không có trạng thái chia sẻ**.
+
+⇒ **Reentrant ⇒ thread-safe, nhưng thread-safe ⇏ reentrant.**
+
+Đây chính là lý do danh sách **async-signal-safe hẹp hơn nhiều** so với thread-safe: `printf` **là** thread-safe (glibc khoá stdio) nhưng **không** async-signal-safe — gọi từ handler khi luồng chính đang giữ khoá stdio là deadlock ([LNX-011](linux-sysprog.md)).
+
+**Nguyên nhân điển hình khiến hàm không thread-safe:** dùng **biến toàn cục/static**. Đó là lý do có họ `_r` — `strtok_r`, `localtime_r`, `getpwnam_r`: thay vì trả con trỏ tới **bộ nhớ tĩnh dùng chung**, chúng nhận **buffer do caller cấp** → hết trạng thái chia sẻ → reentrant luôn.
+</details>
+
+#### OS-021 · 🟠 · concept · [→ process-thread](../../../03-operating-system/process-thread.md)
+**Gọi `fork()` trong chương trình đa luồng thì chuyện gì xảy ra?**
+<details><summary>Đáp án</summary>
+
+**Chỉ thread gọi `fork()` tồn tại trong process con.** Mọi thread khác **biến mất** — nhưng **trạng thái chúng để lại thì vẫn nguyên**, và đó mới là vấn đề:
+
+```
+   TRƯỚC fork:  Thread A đang giữ mutex M, sửa dở một cấu trúc dữ liệu
+                Thread B gọi fork()
+        ▼
+   CON:         chỉ còn Thread B
+                M vẫn ĐANG BỊ KHOÁ — bởi một thread KHÔNG CÒN TỒN TẠI
+                → không ai nhả được → ai khoá M sẽ treo VĨNH VIỄN
+```
+
+**Hệ quả nghiêm trọng nhất:** trong con, giữa `fork()` và `exec()`, chỉ được gọi hàm **async-signal-safe**. Đặc biệt **`malloc()` có thể deadlock** — nó dùng mutex nội bộ mà một thread khác có thể đang giữ đúng lúc `fork()`. Điều này bất ngờ với nhiều người vì `malloc` trông vô hại.
+
+**Ba cách xử lý, theo thứ tự nên ưu tiên:**
+1. **`exec()` ngay sau `fork()`** — `exec` thay toàn bộ không gian nhớ nên mọi trạng thái hỏng biến mất. Đơn giản và đáng tin nhất.
+2. **`fork()` trước khi tạo thread nào** — process khởi động, `fork` hết worker cần thiết, *rồi* mỗi worker mới tạo thread của mình.
+3. `pthread_atfork()` đăng ký handler khoá/nhả mutex quanh `fork` — đúng lý thuyết nhưng **rất khó làm đủ**, nhất là với mutex nằm trong thư viện bên thứ ba.
+
+Liên quan: cũng vì vậy con nên gọi **`_exit()`** thay `exit()` — `exit()` chạy `atexit` và xả **bản sao buffer stdio của cha** → in trùng và phá tài nguyên chung.
+
+**Chốt:** *"`fork()` trong chương trình đa luồng chỉ an toàn khi con `exec()` ngay."*
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

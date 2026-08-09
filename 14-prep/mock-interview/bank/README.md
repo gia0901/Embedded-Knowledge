@@ -17,15 +17,15 @@
 | `DRV` | [drivers-embedded.md](drivers-embedded.md) | Driver, device tree, embedded (general) | [05](../../../05-drivers-device-tree/), [08](../../../08-embedded-systems/) |
 | `BUS` | [drivers-embedded.md](drivers-embedded.md#bus) | I2C/SPI/UART | [08](../../../08-embedded-systems/) |
 | `EMB` | [embedded-fundamentals.md](embedded-fundamentals.md) | Embedded SW nền tảng: C/thanh ghi, bộ nhớ bare-metal/startup, ngắt, RTOS, firmware, số học/độ tin cậy, low-power, debug HW | [08](../../../08-embedded-systems/) |
-| `BSP` | [bsp.md](bsp.md) | BSP chuyên sâu: boot/DT probe/IRQ/DMA/flash/OTA/Yocto/power/RT/bring-up | [16 melp](../../../15-book-summaries/melp/) |
+| `BSP` | [bsp.md](bsp.md) | BSP chuyên sâu: boot/DT probe/IRQ/DMA/flash/OTA/Yocto/power/RT/bring-up | [15 melp](../../../15-book-summaries/melp/) |
 | `BLD` | [build-systems.md](build-systems.md) | CMake, Yocto, cross-compile, CI | [06](../../../06-build-systems/) |
 | `DBG` | [debugging.md](debugging.md) | Debugging & tools | [09](../../../09-debugging/) |
-| `DP` | [design-patterns.md](design-patterns.md) | Design patterns & SOLID | [12](../../../11-design-patterns/) |
-| `DSA` | [dsa.md](dsa.md) | Cấu trúc dữ liệu & giải thuật | [13](../../../12-dsa/) |
-| `NET` | [networking.md](networking.md) | Networking | [14](../../../13-networking/) |
+| `DP` | [design-patterns.md](design-patterns.md) | Design patterns & SOLID | [11](../../../11-design-patterns/) |
+| `DSA` | [dsa.md](dsa.md) | Cấu trúc dữ liệu & giải thuật | [12](../../../12-dsa/) |
+| `NET` | [networking.md](networking.md) | Networking | [13](../../../13-networking/) |
 | `SD` | [system-design.md](system-design.md) | Tư duy & system design | [10](../../../10-thinking/), [07](../../../07-shared-libraries/) |
 | `BEH` | [behavioral.md](behavioral.md) | Behavioral / HR (STAR) | — |
-| `COD` | [coding.md](coding.md) | Bài coding tại chỗ | [13](../../../12-dsa/) |
+| `COD` | [coding.md](coding.md) | Bài coding tại chỗ | [12](../../../12-dsa/) |
 
 ## Quy ước metadata mỗi câu
 

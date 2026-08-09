@@ -247,6 +247,16 @@ Cả hai là byte stream một chiều. **Pipe** (`pipe()`) ẩn danh — chỉ 
 <details><summary>Đáp án</summary>
 
 `dup2(oldfd, newfd)` làm `newfd` trỏ tới **cùng open file description** với `oldfd` (đóng newfd nếu đang mở). Shell làm `cmd > file`: sau `fork`, trong con `open("file")` được fd f → `dup2(f, STDOUT_FILENO)` (fd 1 giờ trỏ file) → `close(f)` → `exec(cmd)`. Chương trình cứ ghi stdout như thường nhưng dữ liệu vào file. Cùng cơ chế cho `2>&1` (dup2 fd2 về fd1) và pipe (`dup2` đầu pipe vào stdin/stdout).
+
+**Vế hay bị bỏ sót — hệ quả của "cùng file description":**
+
+| | Chia sẻ gì | Offset |
+|---|---|---|
+| `dup`/`dup2` | cùng **file description** | **CHUNG** — ghi qua fd này, offset fd kia cũng nhảy |
+| `fork()` | cùng **file description** | **CHUNG** giữa cha và con |
+| `open()` cùng file **hai lần** | hai file description **khác nhau** | **RIÊNG**, độc lập |
+
+Đó là lý do `cmd1 >> log` và `cmd2 >> log` chạy song song không đè nhau (cùng `O_APPEND`), còn hai lần `open` không `O_APPEND` thì có. ⚠️ `FD_CLOEXEC` nằm ở **tầng fd**, không phải file description → **`dup()` không sao chép nó**.
 </details>
 
 #### LNX-022 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
@@ -282,6 +292,65 @@ Daemon "cổ điển" (double-fork): `fork` + parent thoát (con thành orphan, 
 <details><summary>Đáp án</summary>
 
 `mmap` truy cập file như mảng bộ nhớ → **không copy user↔kernel mỗi lần** (read/write copy qua buffer), tốt cho **truy cập ngẫu nhiên** file lớn và chia sẻ giữa process; code gọn (con trỏ thay vì lseek+read). Hại: chi phí thiết lập mapping + page fault mỗi trang lần đầu chạm (kém cho quét tuần tự một lần — read tuần tự + readahead thắng); lỗi I/O biến thành **SIGBUS** khó xử; không hợp file nhỏ/streaming; ghi phải `msync` (đẩy trang bẩn xuống disk) để đảm bảo độ bền, và cẩn thận khi file bị truncate dưới chân mapping. Chọn theo mẫu truy cập: ngẫu nhiên/chia sẻ → mmap; tuần tự/streaming/nhỏ → read/write.
+</details>
+
+#### LNX-027 · 🟡 · concept · ⭐ · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**`EINTR` là gì? Đặt `SA_RESTART` có giải quyết hết không?**
+<details><summary>Đáp án</summary>
+
+`EINTR` = syscall đang **chặn** thì bị signal handler cắt ngang → trả `-1` với `errno == EINTR`. **Không phải lỗi thật**, chỉ là "bị ngắt, chưa làm xong". Code coi mọi `-1` là lỗi rồi thoát sẽ **chết ngẫu nhiên** khi signal tới đúng lúc.
+
+**`SA_RESTART` KHÔNG giải quyết hết** — đây là ý phân loại. Nhóm **không bao giờ** restart dù đặt cờ:
+- **`select`, `poll`, `epoll_wait`** (và `pselect`/`ppoll`/`epoll_pwait`)
+- **`sleep`, `nanosleep`**, **`pause`, `sigsuspend`**
+- `semop`, `msgrcv`, `msgsnd`; `read()` từ fd inotify
+
+⇒ **Vòng lặp `EINTR` quanh `epoll_wait`/`select`/`poll` là bắt buộc**, không cờ nào thay được:
+```c
+int n;
+do { n = epoll_wait(epfd, ev, MAX, -1); } while (n == -1 && errno == EINTR);
+```
+
+**Hai chi tiết ăn điểm:**
+1. `read`/`write` chỉ restart trên **"thiết bị chậm"** (terminal, pipe, FIFO, socket). **File trên đĩa không thuộc nhóm này** → bug này **không lộ khi test với file**, chỉ lộ với socket/pipe thật.
+2. Nếu `read`/`write` **đã chuyển được một phần** rồi mới bị cắt thì **không** restart mà **trả về thành công với số byte đã chuyển** — thêm một nguồn của short read/write (LNX-005).
+
+Cần chờ fd **và** signal cùng lúc không race → `epoll_pwait`/`ppoll` (đặt sigmask nguyên tử), hoặc kéo signal vào event loop bằng `signalfd` (LNX-014).
+</details>
+
+#### LNX-028 · 🟡 · concept · ⭐ · [→ file-io](../../../04-linux-system-programming/file-io.md)
+**Vì sao cần `O_APPEND`? `lseek()` rồi `write()` sai ở đâu?**
+<details><summary>Đáp án</summary>
+
+Vì đó là **hai syscall**, và giữa chúng process khác chen vào được:
+```
+   A: lseek(fd,0,SEEK_END) → 1000
+                              B: lseek → 1000 ; B: write("B") → file dài 1001
+   A: write("A")          → ghi tại 1000, ĐÈ MẤT "B"
+```
+`O_APPEND` khiến kernel làm **"nhảy tới cuối rồi ghi" như MỘT thao tác nguyên tử**. Đó là lý do `>>` của shell và nhiều process cùng ghi một log file hoạt động đúng.
+
+**Cùng mẫu tư duy ở hai chỗ nữa:**
+- **`O_CREAT | O_EXCL`** — "tạo chỉ khi chưa tồn tại" nguyên tử, thay cho `open` rồi kiểm tra `ENOENT` (nền của lock file).
+- **`pread`/`pwrite`** — đọc/ghi tại offset chỉ định **không đụng offset chung**; bắt buộc khi **nhiều thread dùng chung một fd**, vì thread chia sẻ offset nên `lseek`+`read` từ hai thread giẫm lên nhau.
+
+**Chốt:** *hễ hai syscall không được để ai chen vào giữa, hãy tìm cờ hoặc syscall gộp cả hai.* Mẫu này còn sinh ra `O_CLOEXEC`, `accept4()`, `epoll_create1()`, `sigsuspend()`, `rename()`.
+</details>
+
+#### LNX-029 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**Đo khoảng thời gian / đặt timeout nên dùng clock nào? Vì sao?**
+<details><summary>Đáp án</summary>
+
+**`CLOCK_MONOTONIC`**, không phải `CLOCK_REALTIME`.
+
+- `CLOCK_REALTIME` = giờ thực theo lịch — **nhảy được**: NTP chỉnh, admin đổi giờ, đổi múi giờ/DST.
+- `CLOCK_MONOTONIC` = đếm đơn điệu từ một mốc bất kỳ (thường là lúc boot) — **không bao giờ nhảy lùi**.
+
+**Hỏng thế nào nếu chọn sai:** NTP chỉnh lùi 1 giây giữa hai lần đo → khoảng thời gian ra **số âm**, hoặc timeout chờ thêm rất lâu. Trên thiết bị nhúng **không có RTC pin**, đồng hồ **nhảy vọt** khi NTP đồng bộ lần đầu sau boot — đúng lúc các service đang khởi động với timeout.
+
+**Quy tắc:** cần *"lúc mấy giờ"* (timestamp log, mtime) → `REALTIME`; cần *"bao lâu"* (timeout, đo hiệu năng, lập lịch định kỳ) → `MONOTONIC`.
+
+Trong C++ đúng cùng nguyên tắc: **`std::chrono::steady_clock`** cho đo khoảng, `system_clock` cho thời điểm theo lịch — `steady_clock` tồn tại chính vì lý do này.
 </details>
 
 ---

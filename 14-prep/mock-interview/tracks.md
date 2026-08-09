@@ -25,9 +25,9 @@
 | `drivers-dt` | `DRV`(gồm PCI/USB), `BSP`(B), `BUS` | [05](../../05-drivers-device-tree/), [08](../../08-embedded-systems/) |
 | `build-systems` | `BLD` | CMake, Yocto, cross-compile, CI — [06](../../06-build-systems/) |
 | `debugging` | `DBG` | [09](../../09-debugging/) |
-| `dsa` | `DSA`, `COD` | [13](../../12-dsa/) |
-| `design-patterns` | `DP` | [12](../../11-design-patterns/) |
-| `networking` | `NET` | [14](../../13-networking/) |
+| `dsa` | `DSA`, `COD` | [12](../../12-dsa/) |
+| `design-patterns` | `DP` | [11](../../11-design-patterns/) |
+| `networking` | `NET` | [13](../../13-networking/) |
 | `system-design` | `SD` | [10](../../10-thinking/), [07](../../07-shared-libraries/) |
 | `behavioral` | `BEH` | HR/behavioral — mọi vị trí |
 
