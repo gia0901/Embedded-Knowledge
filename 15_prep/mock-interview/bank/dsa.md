@@ -88,5 +88,36 @@ Làm rõ trước: ràng buộc (kích thước input, miền giá trị, trùng
 Khi chạy trên hệ RAM hạn chế (embedded, MCU vài KB–MB) hoặc xử lý dữ liệu cực lớn không vừa bộ nhớ. Một thuật toán O(n) time nhưng O(n) space phụ có thể bất khả thi trên thiết bị ít RAM, trong khi bản O(n log n) time nhưng O(1) space lại chạy được. Trên embedded còn tránh cấp phát động (fragmentation, không tất định) — ưu tiên in-place hoặc bộ nhớ tĩnh có giới hạn. Phải hỏi rõ ràng buộc tài nguyên trước khi chọn thuật toán; "tốt nhất" phụ thuộc ngữ cảnh.
 </details>
 
+#### DSA-013 · 🟡 · concept · ⭐ · 🎤 2026-08-09 · [→ ring-buffer](../../../13-dsa/ring-buffer.md)
+**Ring buffer sức chứa N — bạn chọn N bằng cách nào? Cho một phép tính cụ thể.**
+<details><summary>Đáp án</summary>
+
+N **không** phải số tròn chọn cảm tính. Công thức xuất phát: **N ≥ tốc độ producer × thời gian consumer vắng mặt lâu nhất**, rồi nhân hệ số an toàn.
+
+Ví dụ: cảm biến 1000 mẫu/giây, consumer thỉnh thoảng bận 5 ms → tối thiểu `1000 × 0.005 = 5` mẫu. Chọn N = 64 hay 128 là đã dư nhiều lần; chọn 1000 (= 1 giây buffer) chỉ hợp lý nếu có **ràng buộc khác** biện minh — ví dụ consumer xử lý **theo lô 1000 mẫu**, lúc đó buffer phải chứa nổi trọn một lô.
+
+Ba thứ phải nói kèm:
+1. **Cái giá bằng RAM**: `N × sizeof(T)`. Với `T` = 128 byte và N = 1000 → **128 000 byte ≈ 125 KB** (không phải MB — sai đơn vị ở đây là lỗi chết người trên thiết bị nhúng).
+2. **Làm tròn lên luỹ thừa của 2** nếu định dùng `& (N-1)` thay `% N`, hoặc dùng chỉ số chạy tự do.
+3. **Ghi lại lý do** cạnh hằng số. "N = 1024 cho chắc" là chỗ để bug ngồi chờ: người sau không biết được tăng hay giảm.
+
+⚠️ Buffer to hơn **không** sửa được tình trạng consumer chậm hơn producer **về trung bình** — nó chỉ mua thêm thời gian cho **burst**. Nếu tốc độ trung bình không kịp, mọi N đều đầy, chỉ là sớm hay muộn.
+</details>
+
+#### DSA-014 · 🟠 · concept · ⭐ · 🎤 2026-08-09 · [→ ring-buffer](../../../13-dsa/ring-buffer.md)
+**Ring buffer chọn chính sách "đè cái cũ nhất". Consumer làm sao biết mình vừa mất dữ liệu?**
+<details><summary>Đáp án</summary>
+
+Tự nó **không biết** — và đó chính là mối nguy: hệ chạy êm trong khi dữ liệu bốc hơi. Chính sách đè cũ **bắt buộc** đi kèm cơ chế báo:
+
+1. **Một bộ đếm `dropped_count`** tăng mỗi lần đè, **đưa ra ngoài** (log định kỳ / metric / `sysfs` / trường trong struct trả về). Đây là bắt buộc, không phải tuỳ chọn. `dmesg` và `perf` đều làm — `perf` in thẳng "*n events lost*".
+2. **Không** in log ngay tại chỗ đè: ở 1000 mẫu/giây với consumer treo, đó là 1000 dòng log/giây, và nếu in trong vùng giữ khoá thì I/O chậm sẽ **chặn luôn producer**. Đếm trong critical section, xuất ngoài critical section, theo chu kỳ.
+3. **Giá trị của bộ đếm là để consumer HÀNH ĐỘNG**, không chỉ để điều tra sau: consumer đọc `dropped_count`, thấy tăng thì biết **lô đang gom dở đã có lỗ** → vứt lô đó thay vì tính toán trên dữ liệu đứt quãng.
+
+Chi tiết đáng nói thêm: nội dung **còn lại** trong buffer luôn liên tục (vì luôn vứt từ đầu cũ) — cái đứt quãng là **lô mà consumer gom vắt qua giai đoạn drop**. Nếu `push` là hàm public, cho nó **trả về được trạng thái drop** để caller biết ngay, đừng luôn trả `true`.
+
+Liên hệ: [DSA-013](#dsa-013) (chọn N), [COD-006](coding.md) (cài đặt).
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

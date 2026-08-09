@@ -10,13 +10,13 @@
 > **Conversation mới đọc block này TRƯỚC TIÊN** để biết đang ở đâu và làm gì tiếp. Đây là plan **đang chạy** — ưu tiên hơn [daily-plan](../mock-interview/daily-plan.md) (lịch mock BSP tổng quát) và các plan role khác.
 
 - **Plan đang chạy:** 🎯 Datalogic (file này) · bắt đầu **2026-08-03**.
-- **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **buổi kế tiếp = Buổi 5**.
-- **Buổi gần nhất:** `weak-review` toàn sổ — **3.88/4**, cao nhất từ đầu plan ([log](../mock-interview/sessions/2026-08-07--weak-review--all.md)). **Sổ yếu co 8 → 4 câu.** *(B1: 3.25 · B2: 3.3 · B3: 2.83 · B4: 3.17)*
-- **▶️ LÀM TIẾP:** `/mock coding track dsa` (Tuần 1 Buổi 5 — reverse list, ring buffer, two-sum) — viết code vào [coding-arena/](../mock-interview/coding-arena/).
+- **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **buổi kế tiếp = Buổi CN** (ôn dồn tích, hết Tuần 1).
+- **Buổi gần nhất:** `coding track dsa` (B5) — **3.67/4** ([log](../mock-interview/sessions/2026-08-09--coding--dsa.md)). COD-001 **4** · COD-006 **3** · COD-003 **4**. Lỗ hổng: không hỏi spec "mấy luồng?", không tổng quát hoá race sau khi vá, và cấp phát STL trong hot path. *(B1: 3.25 · B2: 3.3 · B3: 2.83 · B4: 3.17 · B5: 3.67)*
+- **▶️ LÀM TIẾP:** `/mock weak-review` (Tuần 1 Buổi CN — dọn nốt 4 câu trong sổ), rồi `/mock retention track cpp-system`. Bài tay ~15′ trước đó: **viết lại `ring_buffer.cpp`** — bỏ `unordered_map` khỏi `push()`, thêm `dropped_count_`, `empty()/full()` an toàn đa luồng.
 - **Sổ yếu hiện tại (4 câu, TẤT CẢ đều ở 1/2 lần ≥3):** CPP-019, CPP-024, CPP-045, CPP-032 — mỗi câu chỉ cần **một** lần ≥3 nữa là sổ sạch. Chèn vào phiên CN → xem [weak-register](../mock-interview/weak-register.md).
 
 **Checklist buổi (tick `[x]` khi xong — đây là "đang dang dở đến đâu"):**
-- **Tuần 1** (C++17): `[x]` B1 · `[x]` B2 · `[x]` B3 · `[x]` B4 · `[ ]` B5 · `[ ]` CN
+- **Tuần 1** (C++17): `[x]` B1 · `[x]` B2 · `[x]` B3 · `[x]` B4 · `[x]` B5 · `[ ]` CN
 - **Tuần 2** (Linux sysprog+debug): `[ ]` toàn bộ (chưa tới)
 - **Tuần 3** (kernel/drivers): `[ ]` toàn bộ
 - **Tuần 4** (Yocto/design/behavioral): `[ ]` toàn bộ

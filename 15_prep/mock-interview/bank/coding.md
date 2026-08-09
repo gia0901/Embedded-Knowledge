@@ -24,7 +24,12 @@ Node* reverse(Node* head) {
     return prev;                 // prev là head mới
 }
 ```
-**O(n) time, O(1) space.** *(Follow-up: bản đệ quy.)*
+**O(n) time, O(1) space.** — nói **cả hai**: `O(1) space` chính là điểm bản iterative thắng bản đệ quy (đệ quy tốn `O(n)` stack, và **tràn stack** với list dài — nguy hiểm thật trên embedded).
+
+**Follow-up hay bị hỏi:**
+- *Vì sao `while (cur)` chứ không phải `while (cur->next)`?* → `cur->next` bỏ sót node cuối (chưa kịp đảo) **và segfault ngay với list rỗng**.
+- *Doubly linked list thì sao?* → không cần biến `nxt` nữa: với mỗi node **swap `next` và `prev`**, rồi tiến bằng `cur = cur->prev` (vì `prev` giờ đang giữ node kế cũ). Vẫn trả về node cuối cùng thăm được.
+- *Bản đệ quy?* → `O(n)` stack, thường **không** dùng trên hệ nhúng.
 </details>
 
 #### COD-002 · 🟡 · coding · ⭐ · [→ algorithm-patterns](../../../13-dsa/algorithm-patterns.md)

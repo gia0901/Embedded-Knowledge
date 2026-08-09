@@ -17,7 +17,8 @@
 | Ngân hàng câu hỏi | [bank/](bank/) — **DUY NHẤT** | Mọi câu hỏi sống ở đây; nơi khác chỉ link tới |
 | Log phiên | [sessions/](sessions/) (git-track) | 1 file / phiên |
 | Sổ câu yếu | [weak-register.md](weak-register.md) (git-track) | Câu cần hỏi lại |
-| Bài coding | [coding-arena/](coding-arena/) (**git-ignore**) | Ứng viên viết code ở đây, interviewer review |
+| Bài coding — nháp | [coding-arena/](coding-arena/) (**git-ignore**) | Ứng viên viết code ở đây, interviewer review |
+| Bài coding — đã review | [coding-arena/reviewed/](coding-arena/reviewed/) (**git-track**) | Bản nộp giữ nguyên + chú thích inline + bản sửa. **Không mở trước khi làm lại bài đó** |
 
 ---
 
@@ -51,6 +52,7 @@
 **Bước 4 — Cập nhật bộ nhớ (BẮT BUỘC, sau review).**
 - Ghi **1 file log** vào [sessions/](sessions/) theo mẫu [sessions/README.md](sessions/README.md): ngày, track, type, bảng câu (ID + điểm + ghi chú ngắn) **và mục 🔎 "Chi tiết ôn"** — **persist nguyên văn** phần review Bước 3 cho câu ≤3 (thiếu gì + trích bank + trích tài liệu gốc + câu chốt). Log phải **tự chứa** để mở lại là ôn được, không cần đọc lại hội thoại.
 - Cập nhật [weak-register.md](weak-register.md): thêm câu điểm ≤ 2, gỡ/hạ câu đã trả lời vững (≥ 3) qua ≥ 2 lần.
+- **Với phiên có bài coding — ghi bản đã review (BẮT BUỘC):** tạo `coding-arena/reviewed/YYYY-MM-DD--<COD-ID>--<slug>.cpp` gồm (1) header điểm + danh sách ✅/❌ có đánh nhãn, (2) **bản ứng viên nộp giữ nguyên từng dòng**, chỉ chèn comment review tại đúng dòng, (3) **bản sửa** giữ mọi quyết định thiết kế hợp lý của ứng viên, chỉ vá lỗi đã đánh nhãn. File phải **compile + chạy** (`g++ -std=c++17 -Wall`). Chi tiết: [coding-arena/README.md](coding-arena/README.md). Đây là vùng git-track — nháp ở thư mục gốc vẫn ignore, để lần sau còn làm lại được từ file trống.
 - **Đồng bộ ngân hàng:** nếu trong phiên interviewer đặt câu **chưa có trong [bank/](bank/)** (câu tự phát/mở rộng), **thêm câu đó vào đúng file bank** (gán ID kế tiếp, metadata, đáp án) — xem §3. Đây là cơ chế giữ bank luôn là nguồn duy nhất và lớn dần theo thực chiến.
 
 ---

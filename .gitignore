@@ -1,6 +1,9 @@
-# Mock interview coding practice — nháp cá nhân, không commit (chừa README)
+# Mock interview coding practice — NHÁP cá nhân, không commit
 15_prep/mock-interview/coding-arena/*
+
+# ...nhưng README + thư mục bản đã review thì GIỮ (xem coding-arena/README.md)
 !15_prep/mock-interview/coding-arena/README.md
+!15_prep/mock-interview/coding-arena/reviewed/
 
 # OS / editor cruft
 .DS_Store

@@ -186,10 +186,10 @@ Hai chính sách, **chọn theo bản chất dữ liệu**:
    push() trả về false                      push() luôn thành công, tail bị đẩy theo
 
    ┌──┬──┬──┬──┐   push(E)                  ┌──┬──┬──┬──┐   push(E)
-   │A │B │C │D │  ──────►  ❌ false          │A │B │C │D │  ──────►  ┌──┬──┬──┬──┐
+   │A │B │C │D │  ──────►   false           │A │B │C │D │  ──────►  ┌──┬──┬──┬──┐
    └──┴──┴──┴──┘   (A B C D còn nguyên)     └──┴──┴──┴──┘           │E │B │C │D │
-                                                                     └──┴──┴──┴──┘
-                                                                      A BỊ MẤT, giữ mới nhất
+                                                                    └──┴──┴──┴──┘
+                                                                    A BỊ MẤT, giữ mới nhất
 ```
 
 ```cpp
