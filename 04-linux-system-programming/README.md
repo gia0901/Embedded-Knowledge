@@ -35,4 +35,4 @@ flowchart TD
 
 ## Liên kết
 - Nền tảng lý thuyết: [03-operating-system/](../03-operating-system/)
-- Câu hỏi phỏng vấn: [11-interview-questions/linux.md](../11-interview-questions/linux.md)
+- Câu hỏi phỏng vấn: domain `LNX` trong [bank/linux-sysprog.md](../14-prep/mock-interview/bank/linux-sysprog.md)

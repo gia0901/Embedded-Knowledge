@@ -8,11 +8,11 @@
 
 ## 1. Trạng thái dự án
 
-- **Giai đoạn hiện tại:** ✅ Đã viết xong toàn bộ 11 topic (bản đầu đầy đủ). Sang giai đoạn mentor: giải đáp & review câu trả lời, tinh chỉnh nội dung khi cần.
+- **Giai đoạn hiện tại:** ✅ Đã viết xong toàn bộ **13 topic kiến thức (01–13)** + `14-prep` (điều phối ôn) + `15-book-summaries`. Sang giai đoạn mentor: giải đáp & review câu trả lời, tinh chỉnh nội dung khi cần.
 - File này đã được hoàn thiện (không còn là bản nháp mơ hồ). Vẫn có thể tinh chỉnh khi phát sinh nhu cầu mới.
 - Xem **Mục 7 — Tiến độ** để biết tài liệu nào đã/đang/chưa viết.
 
-> 🎯 **ĐANG THỰC THI PLAN PHỎNG VẤN (Datalogic).** Conversation mới muốn tiếp tục ôn: mở **[`15_prep/study-plans/datalogic-plan.md`](15_prep/study-plans/datalogic-plan.md) → §📍 Tiến độ hiện tại** (ngay đầu file) để biết đang ở buổi nào + lệnh làm tiếp. Đó là **nguồn tracking DUY NHẤT** cho tiến độ ôn — không suy đoán từ nơi khác.
+> 🎯 **ĐANG THỰC THI PLAN PHỎNG VẤN (Datalogic).** Conversation mới muốn tiếp tục ôn: mở **[`14-prep/study-plans/datalogic-plan.md`](14-prep/study-plans/datalogic-plan.md) → §📍 Tiến độ hiện tại** (ngay đầu file) để biết đang ở buổi nào + lệnh làm tiếp. Đó là **nguồn tracking DUY NHẤT** cho tiến độ ôn — không suy đoán từ nơi khác.
 
 ---
 
@@ -47,7 +47,7 @@
    - **Ví dụ thực tế / code minh hoạ ngắn.**
 4. **Hình vẽ & sơ đồ:** ưu tiên ASCII diagram hoặc Mermaid khi giúp dễ hình dung (memory layout, kiến trúc, luồng xử lý, state machine...).
 5. **Code:** ngắn gọn, đúng trọng tâm, có comment giải thích chỗ quan trọng. Mặc định **C++ hiện đại (C++17)** trừ khi chủ đề yêu cầu khác.
-6. Mỗi tài liệu con nên có: phần tóm tắt đầu file (TL;DR) + danh sách "câu hỏi phỏng vấn liên quan" cuối file (link tới topic 11).
+6. Mỗi tài liệu con nên có: phần tóm tắt đầu file (TL;DR) + danh sách "câu hỏi phỏng vấn liên quan" cuối file (link tới domain tương ứng trong `14-prep/mock-interview/bank/`).
 7. **Đáp án câu hỏi phỏng vấn PHẢI được ẩn đi** để người học tự tư duy trước, dùng cú pháp:
    ```markdown
    <details><summary>Đáp án</summary>
@@ -100,12 +100,14 @@ Embedded-Interview/
 │   ├── driver-basics.md          # char/block/net driver, module
 │   ├── kernel-userspace.md       # ranh giới kernel/user, ioctl, sysfs
 │   ├── device-tree.md
-│   └── ...
+│   ├── bus-protocols.md          # UART/I2C/SPI — so sánh, clock stretching, CPOL/CPHA
+│   └── pci-usb-drivers.md        # PCI (BAR/MSI-X) + USB (descriptor/URB/gadget)
 │
 ├── 06-build-systems/             # Build system
 │   ├── makefile.md
 │   ├── cmake.md
-│   └── cross-compilation.md      # toolchain, cross-compile cho embedded
+│   ├── cross-compilation.md      # toolchain, cross-compile cho embedded
+│   └── yocto.md                  # BitBake, layer/recipe/bbappend, sstate, SDK
 │
 ├── 07-shared-libraries/          # Thư viện chia sẻ
 │   ├── static-vs-shared.md
@@ -116,7 +118,9 @@ Embedded-Interview/
 ├── 08-embedded-systems/          # Hệ thống nhúng
 │   ├── architecture.md           # SoC, bus, memory-mapped IO
 │   ├── boot-process.md           # bootloader → kernel → init
-│   ├── rtos-vs-linux.md
+│   ├── rtos-vs-linux.md · rtos-programming.md
+│   ├── bare-metal-c.md · memory-and-startup.md · interrupts-bare-metal.md
+│   ├── hardware-debug.md         # JTAG/SWD, GPIO+scope, crash log qua reset
 │   └── constraints.md            # power, memory, realtime constraints
 │
 ├── 09-debugging/                 # Kỹ năng debug (điểm yếu — đầu tư kỹ)
@@ -130,49 +134,44 @@ Embedded-Interview/
 │   ├── problem-solving.md        # phương pháp giải quyết vấn đề
 │   └── system-design.md          # thiết kế hệ thống hướng Embedded Linux
 │
-├── 11-interview-questions/       # ⚠️ CON TRỎ → câu hỏi đã gộp về 15_prep/mock-interview/bank/
-│   ├── README.md                 # bản đồ chuyển hướng sang bank
-│   └── *.md                      # mỗi file trỏ tới domain tương ứng trong bank
-│
-├── 12-design-patterns/           # Mẫu thiết kế (bổ sung)
+├── 11-design-patterns/           # Mẫu thiết kế (bổ sung)
 │   ├── solid-principles.md       # SOLID — nền tảng
 │   ├── creational.md             # Singleton, Factory, Builder
 │   ├── structural.md             # Adapter, Bridge/Pimpl, Facade, Proxy
 │   └── behavioral.md             # Strategy, Observer, State, Command
 │
-├── 13-dsa/                       # Data Structures & Algorithms (bổ sung)
+├── 12-dsa/                       # Data Structures & Algorithms (bổ sung)
 │   ├── complexity-and-structures.md  # Big-O, container, trade-off
 │   ├── algorithm-patterns.md     # two-pointer, sliding window, BFS/DFS, DP
 │   └── ring-buffer.md            # 🎯 5 tầng: 1 luồng → lock-free SPSC; kfifo/pipe/ALSA/io_uring
 │
-├── 14-networking/                # Mạng (bổ sung)
+├── 13-networking/                # Mạng (bổ sung)
 │   ├── tcp-ip.md                 # mô hình, TCP vs UDP, handshake
 │   └── sockets-and-protocols.md  # socket API, HTTP/TLS/MQTT
 │
-├── 15_prep/                      # Chuẩn bị phỏng vấn thực tế
-│   ├── study-plans/              # ⭐ Chiến lược ôn theo 2 vị trí: BSP & C++ (sprint + nền tảng) + gap-register
-│   ├── mock-interview/           # ⭐ Phỏng vấn thử tương tác (/mock) + NGÂN HÀNG CÂU HỎI DUY NHẤT (bank/) + sessions/weak-register/daily-plan/coding-arena
-│   └── technical_round/          # Lý thuyết cốt lõi (01_theory); 02/03/04 nay là con trỏ → bank/
+├── 14-prep/                      # Chuẩn bị phỏng vấn thực tế
+│   ├── study-plans/              # ⭐ Plan bám JD đang nhắm (datalogic-plan, có §📍 tracking) + gap-register
+│   └── mock-interview/           # ⭐ Phỏng vấn thử tương tác (/mock) + NGÂN HÀNG CÂU HỎI DUY NHẤT (bank/) + sessions/weak-register/coding-arena(+reviewed/)
 │
-├── 16-book-summaries/            # Tóm tắt sách chuyên ngành theo cụm chủ đề
+├── 15-book-summaries/            # Tóm tắt sách chuyên ngành theo cụm chủ đề
 │   └── README.md                 # ⚠️ QUY ƯỚC RIÊNG của topic này — đọc trước khi viết/sửa file trong đó
 │
 ├── 00-glossary.md                # Tra cứu nhanh thuật ngữ EN ↔ giải thích
-└── OVERVIEW.md                   # Bản đồ tư duy: các topic kiến thức (01–14) liên kết thế nào
+└── OVERVIEW.md                   # Bản đồ tư duy: các topic kiến thức (01–13) liên kết thế nào
 ```
 
-> **Hai tầng "bức tranh tổng thể":** `OVERVIEW.md` nối *toàn bộ* các topic kiến thức (01–14); mỗi README topic có mục "🗺️ Bức tranh tổng thể" nối *các file con* trong topic đó. Đây là phần thể hiện "hiểu kiến trúc cốt lõi" thay vì kiến thức rời rạc.
+> **Hai tầng "bức tranh tổng thể":** `OVERVIEW.md` nối *toàn bộ* các topic kiến thức (01–13); mỗi README topic có mục "🗺️ Bức tranh tổng thể" nối *các file con* trong topic đó. Đây là phần thể hiện "hiểu kiến trúc cốt lõi" thay vì kiến thức rời rạc.
 
 > Danh sách file con ở trên là **khung gợi ý**, sẽ điều chỉnh/thêm bớt khi viết. Topic mới có thể bổ sung nếu cần.
-> Topic 12–14 + glossary là **bổ sung sau** so với kế hoạch gốc (Design Patterns, DSA, Networking) theo background người học.
+> Topic 11–13 + glossary là **bổ sung sau** so với kế hoạch gốc (Design Patterns, DSA, Networking) theo background người học.
 
 ---
 
 ## 6. Câu hỏi phỏng vấn & Mock interview — quy ước riêng
 
-- **Ngân hàng câu hỏi DUY NHẤT:** mọi câu hỏi sống ở `15_prep/mock-interview/bank/` (chia file theo domain, **ID ổn định** `CPP-001`…, `BSP-002`…). `11-interview-questions/` và `technical_round/02,03,04` nay chỉ là **con trỏ** trỏ vào bank — **không tạo bank thứ hai**, câu mới luôn thêm vào bank.
+- **Ngân hàng câu hỏi DUY NHẤT:** mọi câu hỏi sống ở `14-prep/mock-interview/bank/` (chia file theo domain, **ID ổn định** `CPP-001`…, `BSP-002`…). Các bộ câu hỏi cũ (`11-interview-questions/`, `14-prep/technical_round/`) đã gộp về bank và **xoá hẳn** (2026-08-09) — **không tạo bank thứ hai**, câu mới luôn thêm vào bank.
 - Mỗi câu: dòng metadata (`#### <ID> · level · type [· ⭐] [· 🏗️]`) → đề bài in đậm → **đáp án ẩn trong `<details>`**; phân độ khó 🟢🟡🟠🔴; link ngược tài liệu nền tảng.
-- **Mock interview (`/mock`):** Claude đóng vai **interviewer** — đọc `mock-interview/config.md`, hỏi từng câu theo track+type, **không chấm giữa chừng** (được đào sâu/follow-up), review ở cuối, rồi cập nhật `sessions/` + `weak-register.md` + thêm câu mới vào `bank/`. Câu yếu được hỏi lại (không có luật "đúng rồi thôi"). Chi tiết: [15_prep/mock-interview/README.md](15_prep/mock-interview/README.md).
+- **Mock interview (`/mock`):** Claude đóng vai **interviewer** — đọc `mock-interview/config.md`, hỏi từng câu theo track+type, **không chấm giữa chừng** (được đào sâu/follow-up), review ở cuối, rồi cập nhật `sessions/` + `weak-register.md` + thêm câu mới vào `bank/`. Câu yếu được hỏi lại (không có luật "đúng rồi thôi"). Chi tiết: [14-prep/mock-interview/README.md](14-prep/mock-interview/README.md).
 - **Vai trò khi user tự ôn:** nếu user nhờ **review câu trả lời** (ngoài phiên `/mock`), đối chiếu bank, chỉ ra thiếu/sai/lệch, chấm 0–4, link ôn lại — không chỉ đọc đáp án mẫu.
 
 ---
@@ -187,19 +186,18 @@ Embedded-Interview/
 | 02 Modern C++ | ✅ Xong | raii-smart-pointers, move-semantics, lambdas-functional, concurrency |
 | 03 Operating System | ✅ Xong | process-thread, scheduling, memory-management, sync-primitives, ipc |
 | 04 Linux system programming | ✅ Xong | file-io, processes-signals, io-multiplexing, ipc-linux |
-| 05 Drivers & Device Tree | ✅ Xong | driver-basics, kernel-userspace, device-tree |
-| 06 Build systems | ✅ Xong | makefile, cmake, cross-compilation |
+| 05 Drivers & Device Tree | ✅ Xong | driver-basics, kernel-userspace, device-tree, **bus-protocols**, pci-usb-drivers |
+| 06 Build systems | ✅ Xong | makefile, cmake, cross-compilation, yocto |
 | 07 Shared libraries | ✅ Xong | static-vs-shared, linking-loading, abi-versioning, api-design |
-| 08 Embedded systems | ✅ Xong | architecture, boot-process, rtos-vs-linux, constraints |
+| 08 Embedded systems | ✅ Xong | architecture, boot-process, rtos-vs-linux, rtos-programming, bare-metal-c, memory-and-startup, interrupts-bare-metal, hardware-debug, constraints |
 | 09 Debugging | ✅ Xong | mindset, gdb, tools, memory-bugs, kernel-debugging |
 | 10 Thinking | ✅ Xong | problem-solving, system-design |
-| 11 Interview questions | ➡️ Con trỏ | Câu hỏi đã **gộp về `15_prep/mock-interview/bank/`** (ngân hàng duy nhất); các file ở đây chỉ redirect sang domain tương ứng |
-| 12 Design patterns | ✅ Xong | solid-principles, creational, structural, behavioral (bổ sung) |
-| 13 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
-| 14 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
+| 11 Design patterns | ✅ Xong | solid-principles, creational, structural, behavioral (bổ sung) |
+| 12 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
+| 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
-| 15 Prep | 🟡 Đang dùng | **study-plans/** (chiến lược ôn BSP & C++ + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/daily-plan/coding-arena); technical_round (01 lý thuyết; 02/03/04 nay là con trỏ → bank/) |
-| 16 Book summaries | 🟡 Đang viết | **6 cuốn đã xong + đối chiếu PDF** (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); còn 2 cuốn backlog ⬜ chưa bắt đầu (LDD3/Bootlin, The Linux Programming Interface). Tiến độ chi tiết từng cuốn xem `16-book-summaries/README.md` |
+| 14 Prep | 🟡 Đang dùng | **study-plans/** (`datalogic-plan` — plan JD đang chạy, §📍 là nguồn tracking duy nhất — + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
+| 15 Book summaries | 🟡 Đang viết | **6 cuốn đã xong + đối chiếu PDF** (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); còn 2 cuốn backlog ⬜ chưa bắt đầu (LDD3/Bootlin, The Linux Programming Interface). Tiến độ chi tiết từng cuốn xem `15-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu
 

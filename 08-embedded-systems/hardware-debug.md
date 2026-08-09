@@ -1,7 +1,7 @@
 # Debug phần cứng embedded (JTAG/SWD, semihosting, không-debugger)
 
 > Công cụ debug khi làm việc với phần cứng thật: giao diện debug (JTAG/SWD), và cách debug **khi không có debugger đầy đủ** trên target. Bổ trợ cho [09-debugging](../09-debugging/) (debug userspace/kernel) và [interrupts-bare-metal.md](interrupts-bare-metal.md) (hard fault).
-> Ôn dạng phỏng vấn: bank [EMB-030…031](../15_prep/mock-interview/bank/embedded-fundamentals.md).
+> Ôn dạng phỏng vấn: bank [EMB-030…031](../14-prep/mock-interview/bank/embedded-fundamentals.md).
 
 ---
 
@@ -105,4 +105,4 @@ void main(void) {
 
 ## Ôn tập (bank)
 
-[EMB-030](../15_prep/mock-interview/bank/embedded-fundamentals.md) (JTAG vs SWD), [EMB-031](../15_prep/mock-interview/bank/embedded-fundamentals.md) (debug không-debugger), [EMB-032](../15_prep/mock-interview/bank/embedded-fundamentals.md) (hard fault). Đối chiếu góc Linux/host: [DBG-014 field crash](../15_prep/mock-interview/bank/debugging.md), [DBG-017 GDB](../15_prep/mock-interview/bank/debugging.md).
+[EMB-030](../14-prep/mock-interview/bank/embedded-fundamentals.md) (JTAG vs SWD), [EMB-031](../14-prep/mock-interview/bank/embedded-fundamentals.md) (debug không-debugger), [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md) (hard fault). Đối chiếu góc Linux/host: [DBG-014 field crash](../14-prep/mock-interview/bank/debugging.md), [DBG-017 GDB](../14-prep/mock-interview/bank/debugging.md).

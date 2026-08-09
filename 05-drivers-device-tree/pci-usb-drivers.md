@@ -1,7 +1,7 @@
 # PCI & USB drivers (Linux)
 
 > Hai bus **tự liệt kê được** (self-enumerating) — khác I2C/SPI phải khai trong device tree. Trọng tâm phỏng vấn Embedded Linux có PCI/USB (vd JD Datalogic): device model, config space/descriptor, cách driver probe, interrupt (MSI), DMA, và USB gadget (khi thiết bị *là* USB device). Bổ trợ [driver-basics.md](driver-basics.md).
-> Ôn dạng phỏng vấn: bank [DRV-019…027](../15_prep/mock-interview/bank/drivers-embedded.md).
+> Ôn dạng phỏng vấn: bank [DRV-019…027](../14-prep/mock-interview/bank/drivers-embedded.md).
 
 ---
 
@@ -54,7 +54,7 @@ request_irq(irq, my_isr, 0, "mydrv", dev);   // MSI/MSI-X không cần IRQF_SHAR
 
 ### 1.4. DMA trên PCI
 
-PCI device là **bus master** — tự đọc/ghi RAM. Driver dùng cùng API DMA ([BSP-011](../15_prep/mock-interview/bank/bsp.md)): `dma_alloc_coherent` (descriptor ring) + `dma_map_single/sg` (payload streaming); `dma_set_mask` khai độ rộng địa chỉ device chịu được. PCIe có thể qua IOMMU (bảo vệ + dịch địa chỉ). Vẫn phải lo cache maintenance nếu không coherent.
+PCI device là **bus master** — tự đọc/ghi RAM. Driver dùng cùng API DMA ([BSP-011](../14-prep/mock-interview/bank/bsp.md)): `dma_alloc_coherent` (descriptor ring) + `dma_map_single/sg` (payload streaming); `dma_set_mask` khai độ rộng địa chỉ device chịu được. PCIe có thể qua IOMMU (bảo vệ + dịch địa chỉ). Vẫn phải lo cache maintenance nếu không coherent.
 
 ---
 
@@ -117,4 +117,4 @@ Quan trọng cho embedded: board của bạn đóng vai **USB device** (cắm v�
 
 ## Ôn tập (bank)
 
-[DRV-019…022](../15_prep/mock-interview/bank/drivers-embedded.md) (PCI), [DRV-023…027](../15_prep/mock-interview/bank/drivers-embedded.md) (USB). Nền chung driver: [driver-basics.md](driver-basics.md); DMA/cache: [BSP-011](../15_prep/mock-interview/bank/bsp.md); vì sao I2C/SPI cần device tree: [DRV-007](../15_prep/mock-interview/bank/drivers-embedded.md).
+[DRV-019…022](../14-prep/mock-interview/bank/drivers-embedded.md) (PCI), [DRV-023…027](../14-prep/mock-interview/bank/drivers-embedded.md) (USB). Nền chung driver: [driver-basics.md](driver-basics.md); DMA/cache: [BSP-011](../14-prep/mock-interview/bank/bsp.md); vì sao I2C/SPI cần device tree: [DRV-007](../14-prep/mock-interview/bank/drivers-embedded.md).

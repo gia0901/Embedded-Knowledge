@@ -1,6 +1,6 @@
 # OVERVIEW — Bản đồ tư duy toàn bộ tài liệu
 
-> File này nối **các topic kiến thức (01–14 + glossary)** thành một bức tranh thống nhất. (Topic 15 Prep và 16 Book Summaries là lớp bổ trợ thực chiến/đọc sâu, không thuộc bản đồ này.) Đọc nó để thấy *vì sao* các topic được sắp xếp như vậy và chúng *liên kết* ra sao — thay vì học rời rạc. Đây là "hiểu kiến trúc cốt lõi" mà mục tiêu Senior hướng tới.
+> File này nối **các topic kiến thức (01–13 + glossary)** thành một bức tranh thống nhất. (Topic 14 Prep và 15 Book Summaries là lớp bổ trợ thực chiến/đọc sâu, không thuộc bản đồ này.) Đọc nó để thấy *vì sao* các topic được sắp xếp như vậy và chúng *liên kết* ra sao — thay vì học rời rạc. Đây là "hiểu kiến trúc cốt lõi" mà mục tiêu Senior hướng tới.
 
 ---
 
@@ -16,12 +16,12 @@ Mỗi topic là một **tầng** hoặc một **lát cắt** của câu chuyện
 
 ```mermaid
 flowchart TD
-    TD["🧠 <b>TƯ DUY</b> — cách NGHĨ & THIẾT KẾ (xuyên suốt mọi tầng)<br/>10 Thinking · 12 Design Patterns"]
-    NN["💬 <b>NGÔN NGỮ</b> — công cụ biểu đạt<br/>01 C++ Fundamentals → 02 Modern C++ · 13 DSA"]
+    TD["🧠 <b>TƯ DUY</b> — cách NGHĨ & THIẾT KẾ (xuyên suốt mọi tầng)<br/>10 Thinking · 11 Design Patterns"]
+    NN["💬 <b>NGÔN NGỮ</b> — công cụ biểu đạt<br/>01 C++ Fundamentals → 02 Modern C++ · 12 DSA"]
     DG["📦 <b>ĐÓNG GÓI</b> — source thành binary/lib<br/>06 Build Systems → 07 Shared Libraries"]
-    HT["🖥️ <b>HỆ THỐNG</b> — nền tảng<br/>03 Operating System (lý thuyết) → 04 Linux (API thực tế) · 14 Networking"]
+    HT["🖥️ <b>HỆ THỐNG</b> — nền tảng<br/>03 Operating System (lý thuyết) → 04 Linux (API thực tế) · 13 Networking"]
     PC["🔌 <b>PHẦN CỨNG</b> — chạm thiết bị<br/>05 Drivers & Device Tree · 08 Embedded Systems"]
-    DBG["🐞 <b>09 Debugging</b> — soi mọi tầng khi sai · 11 Interview · 00 Glossary"]
+    DBG["🐞 <b>09 Debugging</b> — soi mọi tầng khi sai · 00 Glossary"]
     TD --> NN --> DG --> HT --> PC
     DBG -. "cắt ngang tất cả" .-> NN
     DBG -. .-> HT
@@ -44,13 +44,13 @@ Ai sở hữu cái gì, sống bao lâu, ai dọn dẹp?
 - **Cùng một tư tưởng** (RAII) xuất hiện từ C++ tới kernel tới API design.
 
 ### 🧵 (b) Cô lập vs Chia sẻ
-- Process cô lập (address space riêng) → cần **IPC** để giao tiếp ([03](03-operating-system/ipc.md), [04](04-linux-system-programming/ipc-linux.md), [14](14-networking/)).
+- Process cô lập (address space riêng) → cần **IPC** để giao tiếp ([03](03-operating-system/ipc.md), [04](04-linux-system-programming/ipc-linux.md), [13](13-networking/)).
 - Thread chia sẻ bộ nhớ → cần **đồng bộ** (sync, atomic, mutex) ([03](03-operating-system/sync-primitives.md), [02](02-modern-cpp/concurrency.md)).
 - Kernel/user cô lập → cần **syscall + copy_to/from_user** ([04](04-linux-system-programming/file-io.md), [05](05-drivers-device-tree/kernel-userspace.md)).
 - **Một nguyên lý:** cô lập cho an toàn, nhưng phải trả giá bằng cơ chế giao tiếp/đồng bộ.
 
 ### 🧵 (c) Trừu tượng hoá & ranh giới ổn định
-- Virtual memory giấu bộ nhớ vật lý ([03](03-operating-system/memory-management.md)); "everything is a file" giấu loại thiết bị ([04](04-linux-system-programming/file-io.md)); device tree tách phần cứng khỏi code ([05](05-drivers-device-tree/device-tree.md)); ABI/API là ranh giới ổn định ([07](07-shared-libraries/abi-versioning.md)); HAL/interface cho testability ([10](10-thinking/system-design.md), [12](12-design-patterns/solid-principles.md)).
+- Virtual memory giấu bộ nhớ vật lý ([03](03-operating-system/memory-management.md)); "everything is a file" giấu loại thiết bị ([04](04-linux-system-programming/file-io.md)); device tree tách phần cứng khỏi code ([05](05-drivers-device-tree/device-tree.md)); ABI/API là ranh giới ổn định ([07](07-shared-libraries/abi-versioning.md)); HAL/interface cho testability ([10](10-thinking/system-design.md), [11](11-design-patterns/solid-principles.md)).
 - **Một nguyên lý:** giấu chi tiết sau một ranh giới ổn định → hai bên đổi độc lập (information hiding / DIP).
 
 ### 🧵 (d) Đánh đổi dưới ràng buộc

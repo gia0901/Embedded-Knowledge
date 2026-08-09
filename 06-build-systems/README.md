@@ -34,4 +34,4 @@ flowchart LR
 
 ## Liên kết
 - Sản phẩm build (thư viện): [07-shared-libraries/](../07-shared-libraries/)
-- Câu hỏi phỏng vấn: [11-interview-questions/cpp.md](../11-interview-questions/cpp.md)
+- Câu hỏi phỏng vấn: domain `BLD` trong [bank/build-systems.md](../14-prep/mock-interview/bank/build-systems.md)

@@ -111,7 +111,52 @@ gdb -p <PID>                         # attach vào process đang chạy
 
 ---
 
-## 8. Mẹo thực dụng
+## 8. Remote debug — target không có GDB đầy đủ 🎯
+
+Tình huống mặc định của Embedded Linux: binary chạy trên **target ARM**, nhưng target không đủ chỗ (hoặc không nên) cài cả GDB + symbol + source. Giải pháp: **tách đôi** — phần nhẹ chạy trên target, phần nặng chạy trên host.
+
+```
+   HOST (x86-64, có source + binary CÓ symbol)      TARGET (ARM, chỉ cần binary)
+   ┌────────────────────────────────────┐          ┌──────────────────────────┐
+   │ gdb-multiarch ./app                │◄── TCP ─►│ gdbserver :1234 ./app    │
+   │  (đọc symbol, source, pretty-print)│  :1234   │  (~vài trăm KB, không    │
+   │                                    │          │   cần symbol/source)     │
+   └────────────────────────────────────┘          └──────────────────────────┘
+```
+
+```sh
+# ── trên TARGET ──
+gdbserver :1234 ./app                  # chạy mới
+gdbserver :1234 --attach <pid>         # gắn vào process đang chạy
+
+# ── trên HOST ──
+gdb-multiarch ./app                    # ← binary CÓ symbol (bản chưa strip!)
+(gdb) set sysroot /path/to/sdk/sysroot # để gdb tìm đúng libc/.so của TARGET
+(gdb) set substitute-path /build/src /home/me/src   # ánh xạ đường dẫn source
+(gdb) target remote 192.168.1.50:1234
+(gdb) b main
+(gdb) c
+```
+
+**Bốn chỗ hay sai — gần như luôn là một trong bốn cái này:**
+
+| Triệu chứng | Nguyên nhân |
+|---|---|
+| Không có tên hàm, chỉ thấy `??` | Nạp nhầm **binary đã strip** trên host. Phải giữ bản **chưa strip** để debug, bản strip mới đem lên target (Yocto sinh sẵn ở `build/tmp/work/.../package/`) |
+| Backtrace đứt khi vào thư viện | Chưa `set sysroot` → gdb đọc `.so` của **host** thay vì của target |
+| Breakpoint theo dòng không khớp | Đường dẫn source lúc build khác lúc debug → `set substitute-path` (hoặc `dir`) |
+| `Remote 'g' packet reply is too long` | **Sai kiến trúc**: dùng `gdb` x86 thay vì `gdb-multiarch` / `arm-linux-gnueabihf-gdb` |
+
+**Biến thể theo tình huống:**
+- **Crash ngoài field, không gắn được máy** → không dùng remote, dùng **core dump** (§5) mang về host: `gdb-multiarch ./app-chưa-strip core`.
+- **Debug kernel/driver**, không phải userspace → `gdbserver` không dùng được; cần **KGDB** qua serial/ethernet, hoặc JTAG ([08/hardware-debug](../08-embedded-systems/hardware-debug.md)).
+- **Bug timing/realtime** → GDB dừng CPU là phá luôn cái đang đo; dùng `perf`/ftrace/GPIO+scope thay vì breakpoint.
+
+> Câu nên nói khi phỏng vấn: *"Trên target tôi chạy `gdbserver`, còn GDB đầy đủ + symbol + source ở host, nối qua TCP. Hai thứ phải khớp là **sysroot** (để đọc đúng thư viện của target) và **binary chưa strip** ở phía host."* Đây là câu phân biệt người từng debug trên board thật với người chỉ đọc tài liệu.
+
+---
+
+## 9. Mẹo thực dụng
 
 - **`-tui`** hoặc `Ctrl-X A`: chế độ giao diện text hiện source + lệnh song song.
 - **`.gdbinit`**: lưu lệnh khởi tạo (pretty-printer cho STL...).

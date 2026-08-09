@@ -36,4 +36,4 @@ flowchart TD
 
 ## Liên kết
 - Bug bộ nhớ nền tảng: [01-cpp-fundamentals/memory-model.md](../01-cpp-fundamentals/memory-model.md)
-- Câu hỏi phỏng vấn: [11-interview-questions/debugging.md](../11-interview-questions/debugging.md)
+- Câu hỏi phỏng vấn: domain `DBG` trong [bank/debugging.md](../14-prep/mock-interview/bank/debugging.md)

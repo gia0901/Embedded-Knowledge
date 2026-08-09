@@ -4,7 +4,7 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 
 > 📌 Định hướng, quy ước viết và vai trò của trợ lý được mô tả trong [CLAUDE.md](CLAUDE.md). Đọc file đó trước nếu bạn là người mới tham gia (hoặc là AI bắt đầu một phiên làm việc mới).
 >
-> 🗺️ **Muốn thấy bức tranh lớn — các topic kiến thức (01–14) liên kết với nhau thế nào?** Đọc [OVERVIEW.md](OVERVIEW.md) (bản đồ tư duy toàn bộ). Mỗi README topic cũng có mục "Bức tranh tổng thể" riêng.
+> 🗺️ **Muốn thấy bức tranh lớn — các topic kiến thức (01–13) liên kết với nhau thế nào?** Đọc [OVERVIEW.md](OVERVIEW.md) (bản đồ tư duy toàn bộ). Mỗi README topic cũng có mục "Bức tranh tổng thể" riêng.
 
 ---
 
@@ -33,26 +33,24 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 | 08 | [Embedded Systems](08-embedded-systems/) | SoC/bus, boot process, RTOS vs Linux, constraints | ✅ |
 | 09 | [Debugging](09-debugging/) | mindset, gdb, valgrind/strace/perf, sanitizers | ✅ |
 | 10 | [Thinking](10-thinking/) | problem solving, system design (embedded) | ✅ |
-| 11 | [Interview Questions](11-interview-questions/) | ➡️ con trỏ → đã gộp về [mock-interview/bank/](15_prep/mock-interview/bank/) | ➡️ |
-| 12 | [Design Patterns](12-design-patterns/) | SOLID, creational/structural/behavioral | ✅ |
-| 13 | [DSA](13-dsa/) | Big-O, cấu trúc dữ liệu, pattern giải thuật | ✅ |
-| 14 | [Networking](14-networking/) | TCP/IP, socket, HTTP/TLS/MQTT | ✅ |
-| 15 | [Prep](15_prep/) | study-plans (chiến lược ôn) + **[mock-interview](15_prep/mock-interview/)** (phỏng vấn thử `/mock` + ngân hàng câu hỏi duy nhất) + technical round (lý thuyết) | 🟡 |
-| 16 | [Book Summaries](16-book-summaries/) | tóm tắt sách chuyên ngành (quy ước riêng trong README topic) | 🟡 |
+| 11 | [Design Patterns](11-design-patterns/) | SOLID, creational/structural/behavioral | ✅ |
+| 12 | [DSA](12-dsa/) | Big-O, cấu trúc dữ liệu, pattern giải thuật, **ring buffer** | ✅ |
+| 13 | [Networking](13-networking/) | TCP/IP, socket, HTTP/TLS/MQTT | ✅ |
+| 14 | [Prep](14-prep/) | study-plans (plan JD đang chạy, có §📍 tracking) + **[mock-interview](14-prep/mock-interview/)** (phỏng vấn thử `/mock` + ngân hàng câu hỏi **duy nhất**) | 🟡 |
+| 15 | [Book Summaries](15-book-summaries/) | tóm tắt sách chuyên ngành (quy ước riêng trong README topic) | 🟡 |
 | 00 | [Glossary](00-glossary.md) | tra cứu nhanh thuật ngữ EN | ✅ |
 
 ---
 
 ## 3. Chiến lược ôn tập theo vị trí
 
-Kế hoạch ôn được tổ chức theo **2 hướng nghề nghiệp đã chọn**, đặt tại **[15_prep/study-plans/](15_prep/study-plans/)** — đây là **nguồn chiến lược duy nhất** (thay cho lộ trình generic trước đây):
+Kế hoạch ôn bám **JD đang nhắm**, đặt tại **[14-prep/study-plans/](14-prep/study-plans/)** — đây là **nguồn chiến lược duy nhất**:
 
-- **[Embedded SW Engineer (BSP)](15_prep/study-plans/bsp-plan.md)** — boot/U-Boot, device tree/probe, kernel internals, interrupt/DMA, storage/OTA, real-time.
-- **[System Software / C++ Engineer](15_prep/study-plans/cpp-systemsw-plan.md)** — modern C++, ABI/shared library, concurrency, design pattern, OS fundamentals.
+- 🎯 **[Embedded Linux Engineer @ Datalogic](14-prep/study-plans/datalogic-plan.md)** — plan 4 tuần đang chạy. **Mở §📍 Tiến độ ở đầu file** để biết đang ở buổi nào và lệnh làm tiếp.
 
-Mỗi kế hoạch có **hai tầng**: 🏃 *sprint* (sát phỏng vấn, chỉ mục 🎯) + 📚 *nền tảng* (dài hơi, phủ toàn diện) — ánh xạ thẳng sang topic + book summary + question bank. Backlog "thiếu gì" nằm ở **[gap-register.md](15_prep/study-plans/gap-register.md)**.
+Plan ánh xạ thẳng sang topic + book summary + question bank, mỗi buổi có phần *Đọc/Hiểu* và phần *Test 🎤*. Backlog "thiếu gì" nằm ở **[gap-register.md](14-prep/study-plans/gap-register.md)**.
 
-> **Tự kiểm tra & phỏng vấn thử dùng chung** cho cả hai hướng: **[15_prep/mock-interview/](15_prep/mock-interview/)** — ngân hàng câu hỏi **duy nhất** ([bank/](15_prep/mock-interview/bank/), đáp án ẩn, phân độ khó, ID ổn định) + phiên phỏng vấn thử tương tác (`/mock`, có track theo job/phần/sách + nhiều loại phiên). Lý thuyết cốt lõi: [15_prep/technical_round/01_theory.md](15_prep/technical_round/01_theory.md). Luyện **DSA** ([13-dsa/](13-dsa/)) song song xuyên suốt.
+> **Tự kiểm tra & phỏng vấn thử:** **[14-prep/mock-interview/](14-prep/mock-interview/)** — ngân hàng câu hỏi **duy nhất** ([bank/](14-prep/mock-interview/bank/), đáp án ẩn, phân độ khó, ID ổn định) + phiên phỏng vấn thử tương tác (`/mock`, có track theo job/phần/sách + nhiều loại phiên). Lý thuyết nền chính là các topic **01–14** dưới đây. Luyện **DSA** ([12-dsa/](12-dsa/)) song song xuyên suốt.
 
 ---
 

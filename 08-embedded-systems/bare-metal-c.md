@@ -1,7 +1,7 @@
 # Bare-metal C — thanh ghi, số học & độ tin cậy
 
 > Nền C cho embedded **không có OS**: thao tác thanh ghi phần cứng, kiểu số xác định, số học fixed-point, và các kỹ thuật độ tin cậy (overflow, CRC, MISRA). Bổ trợ cho [architecture.md](architecture.md) (MMIO) và [constraints.md](constraints.md).
-> Ôn dạng phỏng vấn: bank [EMB-001…004, 024…027](../15_prep/mock-interview/bank/embedded-fundamentals.md).
+> Ôn dạng phỏng vấn: bank [EMB-001…004, 024…027](../14-prep/mock-interview/bank/embedded-fundamentals.md).
 
 ---
 
@@ -110,4 +110,4 @@ Bộ **coding guideline** cho C trong hệ an toàn/quan trọng (ô tô, y tế
 
 ## Ôn tập (bank)
 
-Tự trả lời trước khi mở đáp án: [EMB-001…004](../15_prep/mock-interview/bank/embedded-fundamentals.md) (C & thanh ghi), [EMB-024…027](../15_prep/mock-interview/bank/embedded-fundamentals.md) (số học & độ tin cậy). Liên quan: [CPP-022 volatile](../15_prep/mock-interview/bank/cpp.md), [CPP-038 alignment](../15_prep/mock-interview/bank/cpp.md).
+Tự trả lời trước khi mở đáp án: [EMB-001…004](../14-prep/mock-interview/bank/embedded-fundamentals.md) (C & thanh ghi), [EMB-024…027](../14-prep/mock-interview/bank/embedded-fundamentals.md) (số học & độ tin cậy). Liên quan: [CPP-022 volatile](../14-prep/mock-interview/bank/cpp.md), [CPP-038 alignment](../14-prep/mock-interview/bank/cpp.md).

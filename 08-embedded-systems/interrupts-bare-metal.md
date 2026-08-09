@@ -1,7 +1,7 @@
 # Ngắt bare-metal (ISR, vector table, chia sẻ dữ liệu, hard fault)
 
 > Ngắt trên MCU **không có OS**: quy tắc viết ISR, vector table/NVIC, latency, **chia sẻ dữ liệu ISR ↔ main an toàn**, reentrancy, và điều tra hard fault. Bổ trợ cho [architecture.md §5](architecture.md) (interrupt & DMA tổng quan).
-> Ôn dạng phỏng vấn: bank [EMB-009…013](../15_prep/mock-interview/bank/embedded-fundamentals.md), [EMB-032](../15_prep/mock-interview/bank/embedded-fundamentals.md).
+> Ôn dạng phỏng vấn: bank [EMB-009…013](../14-prep/mock-interview/bank/embedded-fundamentals.md), [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md).
 
 ---
 
@@ -100,7 +100,7 @@ __enable_irq();
 
 ### 3.1. Ring buffer SPSC — mẫu tốt nhất khi truyền *luồng dữ liệu*
 
-> 📘 Phần này là **góc ISR/bare-metal** của ring buffer. Bản đầy đủ theo tầng (1 luồng → chính sách đầy → luồng byte → mutex+condvar → lock-free) và chỗ nó chạy trong Linux thật (`kfifo`, pipe, ALSA, `io_uring`): [13-dsa/ring-buffer.md](../13-dsa/ring-buffer.md).
+> 📘 Phần này là **góc ISR/bare-metal** của ring buffer. Bản đầy đủ theo tầng (1 luồng → chính sách đầy → luồng byte → mutex+condvar → lock-free) và chỗ nó chạy trong Linux thật (`kfifo`, pipe, ALSA, `io_uring`): [12-dsa/ring-buffer.md](../12-dsa/ring-buffer.md).
 
 **Vì sao tốt hơn critical section?** Cách tắt ngắt ở trên có một chi phí ẩn: **mỗi lần main đọc dữ liệu là một lần cả hệ thống bị điếc**. Ngắt khẩn cấp đến đúng lúc đó phải chờ → đẩy **worst-case latency** lên (§4). Ring buffer SPSC bỏ hẳn chi phí đó.
 
@@ -165,7 +165,7 @@ bool rb_pop(uint8_t *out) {
 
 **Ba chi tiết quyết định tính đúng đắn:**
 
-1. **Thứ tự ①→② và cặp `release`/`acquire`.** Nếu index `head` được công bố **trước** khi byte kịp ghi vào buffer, consumer đọc phải rác. `release` ở ② đảm bảo mọi ghi phía trên (①) đã nhìn thấy được với ai `acquire` thành công ở ③. Đây **đúng mẫu publish → subscribe**, xem [CPP-019](../15_prep/mock-interview/bank/cpp.md).
+1. **Thứ tự ①→② và cặp `release`/`acquire`.** Nếu index `head` được công bố **trước** khi byte kịp ghi vào buffer, consumer đọc phải rác. `release` ở ② đảm bảo mọi ghi phía trên (①) đã nhìn thấy được với ai `acquire` thành công ở ③. Đây **đúng mẫu publish → subscribe**, xem [CPP-019](../14-prep/mock-interview/bank/cpp.md).
    > Trên MCU **đơn lõi** (Cortex-M), compiler barrier là đủ và `volatile` + thứ tự lệnh thường "chạy được". Nhưng viết đúng memory order thì code **portable** sang đa lõi (Cortex-A, ARM64) mà không phải sửa — và đây chính là chỗ interviewer đào.
 
 2. **Kích thước lũy thừa 2 + mask.** `idx & (N-1)` thay cho `idx % N`: phép chia/modulo trên MCU không có divider tốn hàng chục chu kỳ, mask chỉ tốn 1. Ngoài ra để index **chạy tự do** (không reset về 0) rồi mới mask giúp phân biệt đầy/rỗng mà không phải hy sinh slot — với điều kiện kiểu unsigned (tràn số unsigned có định nghĩa, wrap đúng).
@@ -282,4 +282,4 @@ Nguyên nhân hay gặp: dereference null/dangling, **stack overflow** đè vùn
 
 ## Ôn tập (bank)
 
-[EMB-009](../15_prep/mock-interview/bank/embedded-fundamentals.md) (ISR rules), [EMB-010](../15_prep/mock-interview/bank/embedded-fundamentals.md) (chia sẻ dữ liệu ISR↔main), [EMB-011](../15_prep/mock-interview/bank/embedded-fundamentals.md) (vector table/NVIC), [EMB-012](../15_prep/mock-interview/bank/embedded-fundamentals.md) (latency), [EMB-013](../15_prep/mock-interview/bank/embedded-fundamentals.md) (reentrancy), [EMB-032](../15_prep/mock-interview/bank/embedded-fundamentals.md) (hard fault). Đối chiếu góc Linux: [DRV-011 top/bottom half](../15_prep/mock-interview/bank/drivers-embedded.md).
+[EMB-009](../14-prep/mock-interview/bank/embedded-fundamentals.md) (ISR rules), [EMB-010](../14-prep/mock-interview/bank/embedded-fundamentals.md) (chia sẻ dữ liệu ISR↔main), [EMB-011](../14-prep/mock-interview/bank/embedded-fundamentals.md) (vector table/NVIC), [EMB-012](../14-prep/mock-interview/bank/embedded-fundamentals.md) (latency), [EMB-013](../14-prep/mock-interview/bank/embedded-fundamentals.md) (reentrancy), [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md) (hard fault). Đối chiếu góc Linux: [DRV-011 top/bottom half](../14-prep/mock-interview/bank/drivers-embedded.md).

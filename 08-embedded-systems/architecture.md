@@ -153,7 +153,7 @@ GPIOA->ODR |= (1u << 5);        // trình biên dịch tự tính offset — kh�
    ⟹ trước khi khởi động DMA phải FLUSH (clean) cache xuống RAM
 ```
 
-  > Quy tắc nhớ: **CPU sắp đọc dữ liệu DMA vừa ghi → invalidate. CPU vừa ghi, DMA sắp đọc → flush.** Trên Linux, API `dma_map_single()/dma_unmap_single()` với đúng **hướng** (`DMA_FROM_DEVICE`/`DMA_TO_DEVICE`) đã lo việc này — và đó là lý do **không được đụng buffer trong lúc đang map** ([BSP-011](../15_prep/mock-interview/bank/bsp.md)).
+  > Quy tắc nhớ: **CPU sắp đọc dữ liệu DMA vừa ghi → invalidate. CPU vừa ghi, DMA sắp đọc → flush.** Trên Linux, API `dma_map_single()/dma_unmap_single()` với đúng **hướng** (`DMA_FROM_DEVICE`/`DMA_TO_DEVICE`) đã lo việc này — và đó là lý do **không được đụng buffer trong lúc đang map** ([BSP-011](../14-prep/mock-interview/bank/bsp.md)).
 
   - **Alignment & vùng nhớ**: buffer DMA thường phải căn lề theo **cache line** (nếu không, hai biến khác nhau nằm chung một line → flush/invalidate cái này giẫm lên cái kia), và nằm ở vùng nhớ DMA truy cập được (một số SoC có vùng RAM mà DMA controller không với tới).
 

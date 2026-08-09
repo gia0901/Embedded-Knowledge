@@ -37,4 +37,4 @@ flowchart TD
 
 ## Liên kết
 - Nền tảng: [01-cpp-fundamentals/](../01-cpp-fundamentals/) (memory model, vtable)
-- Câu hỏi phỏng vấn: [11-interview-questions/cpp.md](../11-interview-questions/cpp.md)
+- Câu hỏi phỏng vấn: domain `CPP` trong [bank/cpp.md](../14-prep/mock-interview/bank/cpp.md)

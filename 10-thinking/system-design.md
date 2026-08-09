@@ -84,10 +84,10 @@ Hầu hết bài design embedded ráp lại từ **một số khối lặp đi l
 | **Nối producer nhanh ↔ consumer chậm** (ISR/DMA → xử lý) | **Ring buffer** (SPSC lock-free nếu 1–1), double-buffering; có *backpressure*/drop-policy khi đầy |
 | **Mô hình đồng thời** | 1 **event loop** (đơn giản, tất định) · **thread theo vai trò** · **RTOS task** + priority. Ưu tiên *message passing* hơn shared mutable ([sync-primitives](../03-operating-system/sync-primitives.md)) |
 | **Lưu trữ trên flash** | Chống mòn (**wear leveling**), ghi **atomic/journaling** chống mất điện, gom **batch** giảm số lần ghi, log-structured |
-| **Giao tiếp/nhận gói** | **Framing** (độ dài hoặc delimiter) + **CRC/checksum** + sequence/ack + **state machine** reassembly ([networking](../14-networking/)) |
+| **Giao tiếp/nhận gói** | **Framing** (độ dài hoặc delimiter) + **CRC/checksum** + sequence/ack + **state machine** reassembly ([networking](../13-networking/)) |
 | **Cập nhật firmware** | **A/B partition** + rollback + **chữ ký/hash** verify + xác nhận health sau boot ([boot-process](../08-embedded-systems/boot-process.md)) |
 | **Độ tin cậy / không người trực** | **Watchdog**, **fail to safe state**, timeout ở *mọi* chỗ chờ, xử lý brownout/mất điện |
-| **Bộ nhớ tất định** | Cấp phát **tĩnh/pool** ([object pool](../12-design-patterns/creational.md)), tính *budget* RAM trước, **không cấp phát động sau init** |
+| **Bộ nhớ tất định** | Cấp phát **tĩnh/pool** ([object pool](../11-design-patterns/creational.md)), tính *budget* RAM trước, **không cấp phát động sau init** |
 | **Test được** | **HAL** tách logic khỏi phần cứng, inject phụ thuộc, build trên host chạy ASan/TSan |
 
 **Template rút gọn (đọc lướt trước khi vào phòng):**
@@ -104,7 +104,7 @@ Hầu hết bài design embedded ráp lại từ **một số khối lặp đi l
 
 ## 6. Ví dụ giải mẫu
 
-> Ba bài dưới đây là **mẫu tư duy** — đọc để thấy cách ráp "hộp đồ nghề" §5 theo quy trình §2. Thêm nhiều **prompt để tự-test** (đáp án ẩn) ở [bank SD](../../15_prep/mock-interview/bank/system-design.md); luyện bằng `/mock type design track system-design`.
+> Ba bài dưới đây là **mẫu tư duy** — đọc để thấy cách ráp "hộp đồ nghề" §5 theo quy trình §2. Thêm nhiều **prompt để tự-test** (đáp án ẩn) ở [bank SD](../14-prep/mock-interview/bank/system-design.md); luyện bằng `/mock type design track system-design`.
 
 ### 6.1 "Thiết kế phần mềm thu thập dữ liệu sensor trên thiết bị nhúng Linux"
 
@@ -125,7 +125,7 @@ Bài "whole system" rất hay gặp cho Embedded Linux (Datalogic JD ghi rõ "de
 - **Requirements**: nguồn ảnh update (mạng OTA / USB / thẻ nhớ)? kích thước ảnh? cho phép downtime bao lâu? cần ký số (chống ảnh giả)? tần suất cập nhật? có phải cập nhật cả bootloader/kernel không?
 - **Constraints**: flash có đủ **2 slot** không? RAM đủ để verify hash/chữ ký? nguồn có ổn định (nguy cơ mất điện khi ghi)? bootloader có kiểm soát được việc chọn slot không?
 - **High-level**: *Downloader* (kéo ảnh, resume được) → *Verifier* (kiểm **hash + chữ ký** trước khi tin) → *Writer* (ghi vào **slot B** trong khi **slot A** đang chạy) → *Bootloader* (cờ "thử slot B") → *Health-check sau boot* (OK → **commit**; lỗi → **rollback** về A).
-- **Deep dive**: **A/B partition** + cờ trong bootloader (`boot_next`, `try_count`); chuyển slot là thao tác **atomic** (đổi một cờ, không ghi đè đang chạy); chỉ mark slot bootable **sau khi** verify chữ ký; **anti-rollback** bằng version counter (chặn hạ cấp về bản có lỗ hổng). Xem [boot-process](../08-embedded-systems/boot-process.md), [melp/bootloader-kernel](../../16-book-summaries/melp/bootloader-kernel.md).
+- **Deep dive**: **A/B partition** + cờ trong bootloader (`boot_next`, `try_count`); chuyển slot là thao tác **atomic** (đổi một cờ, không ghi đè đang chạy); chỉ mark slot bootable **sau khi** verify chữ ký; **anti-rollback** bằng version counter (chặn hạ cấp về bản có lỗ hổng). Xem [boot-process](../08-embedded-systems/boot-process.md), [melp/bootloader-kernel](../15-book-summaries/melp/bootloader-kernel.md).
 - **Trade-offs**: **A/B** (tốn gấp đôi flash, nhưng an toàn tuyệt đối) vs **in-place + recovery partition** (tiết kiệm flash, rủi ro hơn); **ký số** (an toàn, cần quản lý khóa) vs chỉ **CRC** (chống hỏng nhưng không chống giả mạo).
 - **Failure**: mất điện khi ghi slot B → B hỏng nhưng **A vẫn boot** (chưa chuyển cờ); ảnh mới boot lỗi → watchdog + `try_count` hết → bootloader **tự rollback** về A; ảnh giả mạo → **chặn ở Verifier**.
 
@@ -172,4 +172,4 @@ Chìa khóa là tách logic nghiệp vụ khỏi truy cập phần cứng bằng
 </details>
 
 ---
-⬅️ [problem-solving.md](problem-solving.md) · ➡️ Tiếp theo: [11-interview-questions/](../11-interview-questions/)
+⬅️ [problem-solving.md](problem-solving.md) · ➡️ Tiếp theo: [bank/system-design.md](../14-prep/mock-interview/bank/system-design.md)

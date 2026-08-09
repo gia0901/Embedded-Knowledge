@@ -39,4 +39,4 @@ flowchart TD
 ## Liên kết
 - Áp dụng thực tế trên Linux: [04-linux-system-programming/](../04-linux-system-programming/)
 - Sync ở góc C++: [02-modern-cpp/concurrency.md](../02-modern-cpp/concurrency.md)
-- Câu hỏi phỏng vấn: [11-interview-questions/operating-system.md](../11-interview-questions/operating-system.md)
+- Câu hỏi phỏng vấn: domain `OS` trong [bank/os.md](../14-prep/mock-interview/bank/os.md)

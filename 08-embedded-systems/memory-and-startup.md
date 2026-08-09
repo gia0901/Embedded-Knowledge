@@ -1,7 +1,7 @@
 # Bộ nhớ bare-metal & khởi động (startup / linker)
 
 > Bản đồ bộ nhớ của một chương trình bare-metal, chuyện gì xảy ra **trước `main()`**, linker script, và rủi ro stack/heap khi **không có MMU**. Bổ trợ cho [boot-process.md](boot-process.md) (boot *Linux*) — file này là startup **MCU**.
-> Ôn dạng phỏng vấn: bank [EMB-005…008](../15_prep/mock-interview/bank/embedded-fundamentals.md).
+> Ôn dạng phỏng vấn: bank [EMB-005…008](../14-prep/mock-interview/bank/embedded-fundamentals.md).
 
 ---
 
@@ -167,4 +167,4 @@ MPU (có trên nhiều Cortex-M) **không phải MMU** — không dịch địa 
 
 ## Ôn tập (bank)
 
-[EMB-005](../15_prep/mock-interview/bank/embedded-fundamentals.md) (sections), [EMB-006](../15_prep/mock-interview/bank/embedded-fundamentals.md) (startup/crt0), [EMB-007](../15_prep/mock-interview/bank/embedded-fundamentals.md) (linker script), [EMB-008](../15_prep/mock-interview/bank/embedded-fundamentals.md) (stack/heap MCU). Liên quan: [constraints.md](constraints.md) (ràng buộc bộ nhớ), [DRV-016 hạn chế heap](../15_prep/mock-interview/bank/drivers-embedded.md).
+[EMB-005](../14-prep/mock-interview/bank/embedded-fundamentals.md) (sections), [EMB-006](../14-prep/mock-interview/bank/embedded-fundamentals.md) (startup/crt0), [EMB-007](../14-prep/mock-interview/bank/embedded-fundamentals.md) (linker script), [EMB-008](../14-prep/mock-interview/bank/embedded-fundamentals.md) (stack/heap MCU). Liên quan: [constraints.md](constraints.md) (ràng buộc bộ nhớ), [DRV-016 hạn chế heap](../14-prep/mock-interview/bank/drivers-embedded.md).

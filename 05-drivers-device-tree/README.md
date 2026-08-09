@@ -37,4 +37,4 @@ flowchart LR
 
 ## Liên kết
 - Nền tảng: [03-operating-system/](../03-operating-system/), [04-linux-system-programming/](../04-linux-system-programming/)
-- Câu hỏi phỏng vấn: [11-interview-questions/drivers.md](../11-interview-questions/drivers.md)
+- Câu hỏi phỏng vấn: domain `DRV`+`BUS` trong [bank/drivers-embedded.md](../14-prep/mock-interview/bank/drivers-embedded.md)

@@ -1,7 +1,7 @@
 # Yocto Project — build một Linux distro tùy biến
 
 > Chuẩn thực tế để dựng BSP/distro cho sản phẩm embedded Linux (vendor NXP/TI/ST phát hành BSP dạng Yocto layer). Trọng tâm phỏng vấn BSP (vd JD Datalogic yêu cầu "Yocto project experience"). Bổ trợ [cross-compilation.md](cross-compilation.md), [cmake.md](cmake.md).
-> Ôn dạng phỏng vấn: bank [BLD-004…009](../15_prep/mock-interview/bank/build-systems.md) + [BSP-017…019](../15_prep/mock-interview/bank/bsp.md).
+> Ôn dạng phỏng vấn: bank [BLD-004…009](../14-prep/mock-interview/bank/build-systems.md) + [BSP-017…019](../14-prep/mock-interview/bank/bsp.md).
 
 ---
 
@@ -40,7 +40,7 @@ BitBake dựng **task graph** cho toàn bộ dependency rồi chạy các `do_*`
 ## 5. DEPENDS vs RDEPENDS & packaging
 
 - **DEPENDS** = build-time (trong sysroot lúc compile); **RDEPENDS** = runtime (phải **có mặt trong image**).
-- Compile OK mà chạy thiếu lib: thường do `dlopen()`/plugin/`system()` (shlibs scan không thấy) hoặc package bị **tách** (`-dev`,`-dbg`,`-doc`,`-staticdev`). Fix: `RDEPENDS:${PN} += "libfoo"`; soi bằng `oe-pkgdata-util`. (Chi tiết: [BSP-018](../15_prep/mock-interview/bank/bsp.md).)
+- Compile OK mà chạy thiếu lib: thường do `dlopen()`/plugin/`system()` (shlibs scan không thấy) hoặc package bị **tách** (`-dev`,`-dbg`,`-doc`,`-staticdev`). Fix: `RDEPENDS:${PN} += "libfoo"`; soi bằng `oe-pkgdata-util`. (Chi tiết: [BSP-018](../14-prep/mock-interview/bank/bsp.md).)
 
 ## 6. Công cụ phát triển hằng ngày
 
@@ -64,4 +64,4 @@ BitBake dựng **task graph** cho toàn bộ dependency rồi chạy các `do_*`
 
 ## Ôn tập (bank)
 
-[BLD-004…009](../15_prep/mock-interview/bank/build-systems.md) (Yocto), [BSP-017](../15_prep/mock-interview/bank/bsp.md) (Buildroot vs Yocto + BSP layer), [BSP-018](../15_prep/mock-interview/bank/bsp.md) (DEPENDS/RDEPENDS), [BSP-019](../15_prep/mock-interview/bank/bsp.md) (cross-compile "not found"). Đọc thêm: [melp/build-systems](../16-book-summaries/melp/build-systems.md).
+[BLD-004…009](../14-prep/mock-interview/bank/build-systems.md) (Yocto), [BSP-017](../14-prep/mock-interview/bank/bsp.md) (Buildroot vs Yocto + BSP layer), [BSP-018](../14-prep/mock-interview/bank/bsp.md) (DEPENDS/RDEPENDS), [BSP-019](../14-prep/mock-interview/bank/bsp.md) (cross-compile "not found"). Đọc thêm: [melp/build-systems](../15-book-summaries/melp/build-systems.md).

@@ -1,7 +1,7 @@
 # Lập trình RTOS & kiến trúc firmware
 
 > Từ *chọn* RTOS ([rtos-vs-linux.md](rtos-vs-linux.md)) sang **lập trình** RTOS: scheduler, primitive đồng bộ, ISR→task, sizing stack, schedulability; và **kiến trúc firmware** (superloop / event-driven / RTOS) + bootloader bare-metal.
-> Ôn dạng phỏng vấn: bank [EMB-014…023](../15_prep/mock-interview/bank/embedded-fundamentals.md).
+> Ôn dạng phỏng vấn: bank [EMB-014…023](../14-prep/mock-interview/bank/embedded-fundamentals.md).
 
 ---
 
@@ -43,7 +43,7 @@ RTOS phổ biến (FreeRTOS, Zephyr) mặc định **preemptive theo priority**.
 | **Queue** | truyền **dữ liệu có ranh giới** giữa task/ISR | thread-safe sẵn — cách chính để chuyển dữ liệu |
 | **Event flag/group** | chờ **tổ hợp nhiều sự kiện** (AND/OR nhiều bit) | vd chờ cả "data ready" và "buffer free" |
 
-Quy tắc: bảo vệ vùng tới hạn → **mutex**; báo hiệu ISR→task → **semaphore**; chuyển dữ liệu → **queue**; chờ nhiều điều kiện → **event flag**. (Lý do binary semaphore ≠ mutex: xem [priority inversion / OS-015](../15_prep/mock-interview/bank/os.md).)
+Quy tắc: bảo vệ vùng tới hạn → **mutex**; báo hiệu ISR→task → **semaphore**; chuyển dữ liệu → **queue**; chờ nhiều điều kiện → **event flag**. (Lý do binary semaphore ≠ mutex: xem [priority inversion / OS-015](../14-prep/mock-interview/bank/os.md).)
 
 ## 3. ISR → task (deferred interrupt processing)
 
@@ -107,7 +107,7 @@ Nhưng nếu τ₃ tăng lên 16 ms (U₃ = 0.40, ΣU = 0.80 > 0.779) → **chư
 - **Event-driven** (superloop + hàng đợi sự kiện, ISR đẩy event): một luồng nhưng phản ứng theo sự kiện, không polling bận → tiết kiệm điện, mở rộng tốt hơn.
 - **RTOS**: nhiều task ưu tiên, preemptive → tách concern rõ, đảm bảo task quan trọng đúng hạn; đổi lại tốn RAM (stack mỗi task) + phải bảo vệ dữ liệu chia sẻ + phức tạp hơn.
 
-Chọn: bắt đầu superloop/event-driven nếu đủ; lên RTOS khi có **nhiều task với ràng buộc timing khác nhau** hoặc cần blocking API sạch. "Đơn giản nhất chạy được" trước. (State machine — xương sống firmware — xem [DP-010](../15_prep/mock-interview/bank/design-patterns.md).)
+Chọn: bắt đầu superloop/event-driven nếu đủ; lên RTOS khi có **nhiều task với ràng buộc timing khác nhau** hoặc cần blocking API sạch. "Đơn giản nhất chạy được" trước. (State machine — xương sống firmware — xem [DP-010](../14-prep/mock-interview/bank/design-patterns.md).)
 
 ## 8. Bootloader bare-metal & jump-to-app
 
@@ -124,10 +124,10 @@ void jump_to_app(uint32_t app_base) {
 }
 ```
 
-**Update**: bố cục flash **dual-bank** (bootloader + app A/B) — nhận firmware qua UART/CAN/USB/OTA, ghi vào bank không chạy, **verify CRC/chữ ký trước khi kích hoạt**, đổi con trỏ boot; fallback nếu app mới không set cờ "healthy" trong N lần boot; watchdog phủ treo. Nguyên tắc như OTA Linux thu nhỏ: **không được brick**, verify trước khi commit, có đường lùi. Bootloader phải cực ổn định (ghi dở = brick). (So với BSP Linux: [BSP-015 OTA](../15_prep/mock-interview/bank/bsp.md).)
+**Update**: bố cục flash **dual-bank** (bootloader + app A/B) — nhận firmware qua UART/CAN/USB/OTA, ghi vào bank không chạy, **verify CRC/chữ ký trước khi kích hoạt**, đổi con trỏ boot; fallback nếu app mới không set cờ "healthy" trong N lần boot; watchdog phủ treo. Nguyên tắc như OTA Linux thu nhỏ: **không được brick**, verify trước khi commit, có đường lùi. Bootloader phải cực ổn định (ghi dở = brick). (So với BSP Linux: [BSP-015 OTA](../14-prep/mock-interview/bank/bsp.md).)
 
 ---
 
 ## Ôn tập (bank)
 
-[EMB-014](../15_prep/mock-interview/bank/embedded-fundamentals.md) (preemptive/cooperative), [EMB-015](../15_prep/mock-interview/bank/embedded-fundamentals.md) (primitives), [EMB-016](../15_prep/mock-interview/bank/embedded-fundamentals.md) (ISR→task), [EMB-017](../15_prep/mock-interview/bank/embedded-fundamentals.md) (stack sizing), [EMB-018](../15_prep/mock-interview/bank/embedded-fundamentals.md) (RMS), [EMB-019](../15_prep/mock-interview/bank/embedded-fundamentals.md) (tickless), [EMB-020…023](../15_prep/mock-interview/bank/embedded-fundamentals.md) (kiến trúc firmware, bootloader).
+[EMB-014](../14-prep/mock-interview/bank/embedded-fundamentals.md) (preemptive/cooperative), [EMB-015](../14-prep/mock-interview/bank/embedded-fundamentals.md) (primitives), [EMB-016](../14-prep/mock-interview/bank/embedded-fundamentals.md) (ISR→task), [EMB-017](../14-prep/mock-interview/bank/embedded-fundamentals.md) (stack sizing), [EMB-018](../14-prep/mock-interview/bank/embedded-fundamentals.md) (RMS), [EMB-019](../14-prep/mock-interview/bank/embedded-fundamentals.md) (tickless), [EMB-020…023](../14-prep/mock-interview/bank/embedded-fundamentals.md) (kiến trúc firmware, bootloader).

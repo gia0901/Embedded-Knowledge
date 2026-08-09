@@ -14,8 +14,8 @@ flowchart LR
 ```
 
 - **Hai file chung một DNA:** đều bắt đầu bằng *làm rõ trước khi giải*, đều dựa trên *first principles* và *đánh đổi có lý do*, đều coi trọng *think aloud / giao tiếp*.
-- **Topic này cắt ngang mọi topic khác:** mỗi quyết định kỹ thuật ở 01–14 (stack hay heap, template hay virtual, RTOS hay Linux, poll hay interrupt) là một bài tập áp dụng tư duy đánh đổi ở đây.
-- **Nối với Design Patterns:** SOLID & pattern ([12](../12-design-patterns/)) là tư duy thiết kế *đã đóng gói* thành nguyên lý/khuôn — đọc cùng để bổ trợ.
+- **Topic này cắt ngang mọi topic khác:** mỗi quyết định kỹ thuật ở 01–13 (stack hay heap, template hay virtual, RTOS hay Linux, poll hay interrupt) là một bài tập áp dụng tư duy đánh đổi ở đây.
+- **Nối với Design Patterns:** SOLID & pattern ([12](../11-design-patterns/)) là tư duy thiết kế *đã đóng gói* thành nguyên lý/khuôn — đọc cùng để bổ trợ.
 - **Câu hỏi tổng hợp:** *"Thiết kế phần mềm thu thập sensor trên thiết bị nhúng"* — dùng quy trình `system-design` + đánh đổi `problem-solving`, kéo theo kiến thức 03/04/08.
 
 ## Tài liệu trong topic
@@ -30,4 +30,4 @@ flowchart LR
 
 ## Liên kết
 - Áp dụng kiến thức từ mọi topic trước (OS, Linux, embedded, shared lib).
-- Câu hỏi phỏng vấn: [11-interview-questions/system-design.md](../11-interview-questions/system-design.md)
+- Câu hỏi phỏng vấn: domain `SD` trong [bank/system-design.md](../14-prep/mock-interview/bank/system-design.md)

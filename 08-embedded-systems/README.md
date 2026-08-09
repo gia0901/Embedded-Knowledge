@@ -47,4 +47,4 @@ flowchart LR
 
 ## Liên kết
 - Nền tảng OS: [03-operating-system/](../03-operating-system/) · Driver: [05-drivers-device-tree/](../05-drivers-device-tree/)
-- Câu hỏi phỏng vấn: bank [EMB (embedded-fundamentals)](../15_prep/mock-interview/bank/embedded-fundamentals.md) + [DRV/BSP](../15_prep/mock-interview/bank/) — hoặc chạy `/mock` track `embedded`/`bsp`.
+- Câu hỏi phỏng vấn: bank [EMB (embedded-fundamentals)](../14-prep/mock-interview/bank/embedded-fundamentals.md) + [DRV/BSP](../14-prep/mock-interview/bank/) — hoặc chạy `/mock` track `embedded`/`bsp`.

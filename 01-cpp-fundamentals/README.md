@@ -31,5 +31,5 @@ flowchart LR
 `memory-model` → `oop` → `templates`. Memory model là nền cho mọi thứ; vtable trong OOP cần hiểu layout bộ nhớ; template hiểu rõ hơn khi đã nắm class.
 
 ## Liên kết
-- Câu hỏi phỏng vấn: [11-interview-questions/cpp.md](../11-interview-questions/cpp.md)
+- Câu hỏi phỏng vấn: domain `CPP` trong [bank/cpp.md](../14-prep/mock-interview/bank/cpp.md)
 - Nối tiếp: [02-modern-cpp/](../02-modern-cpp/)

@@ -18,7 +18,7 @@ flowchart LR
 
 - **Mạch logic tuyến tính:** chọn shared (`static-vs-shared`) → linker/loader phải ghép symbol lúc runtime (`linking-loading`) → cập nhật `.so` mà không phá binary cũ cần giữ ABI (`abi-versioning`) → muốn ABI ổn định phải thiết kế API đúng (`api-design`, pimpl, `extern "C"`).
 - **Đây là topic SÁT CÔNG VIỆC của bạn nhất** (C++ shared library + API interface) — bốn file là bốn khía cạnh của cùng một nhiệm vụ.
-- **Nối xuống nền tảng:** dựa trên bước link của [06](../06-build-systems/makefile.md), name mangling/vtable của [01](../01-cpp-fundamentals/oop.md); pimpl là Bridge pattern ([12](../12-design-patterns/structural.md)).
+- **Nối xuống nền tảng:** dựa trên bước link của [06](../06-build-systems/makefile.md), name mangling/vtable của [01](../01-cpp-fundamentals/oop.md); pimpl là Bridge pattern ([12](../11-design-patterns/structural.md)).
 - **Câu hỏi tổng hợp:** *"Cập nhật thư viện làm app khách (không build lại) crash — vì sao và tránh thế nào?"* — nối `abi-versioning` + `api-design`.
 
 ## Tài liệu trong topic
@@ -36,4 +36,4 @@ flowchart LR
 ## Liên kết
 - Nền tảng build: [06-build-systems/](../06-build-systems/)
 - Bộ nhớ & vtable: [01-cpp-fundamentals/](../01-cpp-fundamentals/)
-- Câu hỏi phỏng vấn: [11-interview-questions/cpp.md](../11-interview-questions/cpp.md)
+- Câu hỏi phỏng vấn: domain `SD` trong [bank/system-design.md](../14-prep/mock-interview/bank/system-design.md)
