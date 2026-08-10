@@ -6,17 +6,17 @@
 
 ## Cách dùng
 
-Mỗi kế hoạch có **hai tầng** (đọc song song, không loại trừ nhau):
+**Vào việc ngay:** mở [datalogic-plan.md](datalogic-plan.md) → **§📍 Tiến độ hiện tại** (ngay đầu file). Đó là **nguồn tracking DUY NHẤT** — cho biết đang ở buổi nào, lệnh `/mock` làm tiếp, sổ yếu hiện tại. Không suy đoán tiến độ từ nơi khác.
 
-- **🏃 Tầng SPRINT** — dày đặc, cho đợt phỏng vấn sắp tới. Chỉ đi các mục **🎯 xác suất gặp cao**, tổ chức theo tuần, kèm vòng tự kiểm tra bằng question bank. Mục tiêu: *"nói được bản chất"* các câu ruột, không học vẹt.
-- **📚 Tầng NỀN TẢNG** — phủ toàn diện, dài hơi, cho mục tiêu Middle+ → Senior. Không gắn ngày cụ thể; đánh dấu tiến độ khi hoàn thành.
+Kế hoạch tổ chức theo **tuần × buổi**, mỗi buổi hai cột: **Đọc/Hiểu** (chuẩn bị trước — doc cụ thể + pool câu hỏi bank) và **Test 🎤** (phiên mock). Ba nguyên tắc xuyên suốt nằm ở đầu plan: ① ưu tiên *tư duy* hơn cú pháp · ② **xen kẽ + lặp lại ngắt quãng** (khởi động trộn ~5–10′ mỗi buổi + ôn dồn tích cuối tuần) · ③ đọc thì liệt kê đầy đủ, mock thì để ngẫu nhiên.
 
-**Quy trình mỗi buổi ôn (áp cho cả hai tầng):**
-1. Đọc mục 🎯 trong kế hoạch → mở tài liệu được link (ưu tiên **book summary** cho chiều sâu, **topic** cho bản cô đọng).
-2. **Tự trả lời trước** các câu hỏi liên quan (che đáp án) → mở `<details>` đối chiếu.
-3. Chỗ trả lời sai/lúng túng → ghi lại; nếu là **lỗ hổng tài liệu** (repo chưa có) → thêm vào [gap-register.md](gap-register.md).
+**Quy trình mỗi buổi ôn:**
+1. **🔁 Khởi động ~5–10′** — câu yếu ([weak-register](../mock-interview/weak-register.md)) hoặc câu đến hạn trong bảng **🔁 Lịch kiểm tra lại** của tuần hiện tại.
+2. Đọc mục của buổi → mở tài liệu được link (ưu tiên **book summary** cho chiều sâu, **topic** cho bản cô đọng) + pool câu bank đã liệt kê.
+3. **Tự trả lời trước** (che đáp án) → mở `<details>` đối chiếu.
+4. Chạy phiên mock của buổi. Sai/lúng túng → vào weak-register; nếu là **lỗ hổng tài liệu** (repo chưa có) → [gap-register.md](gap-register.md).
 
-Ký hiệu trong checklist: `- [ ]` chưa ôn · `- [x]` đã ôn vững · **🎯** thuộc tầng sprint (ưu tiên cao) · **🕳️** tài liệu còn thiếu (xem gap register).
+Ký hiệu trong checklist: `- [ ]` chưa ôn · `- [x]` đã ôn vững · **🎯** xác suất gặp cao theo JD · **🔁** ôn lặp lại · **🎤** phiên mock · **🕳️** tài liệu còn thiếu (xem gap register).
 
 ---
 
@@ -46,7 +46,8 @@ Không cứng nhắc — điều chỉnh theo quỹ thời gian. Một tuần sp
 
 | Buổi | Việc |
 |------|------|
-| 3–4 buổi đọc/hiểu | Đi các mục 🎯 của tuần đó (đọc summary + tự kiểm tra qua [bank/](../mock-interview/bank/)) |
-| 1 buổi cuối tuần | **Mock interview tương tác**: gõ `/mock` (type `comprehensive` giả lập vòng thật) — theo §📍 của [datalogic-plan](datalogic-plan.md) |
+| B1–B4 (đọc/hiểu) | Đi mục của buổi đó + phiên mock tương ứng ghi ở cột Test 🎤. Mở đầu bằng **🔁 khởi động ~5–10′** |
+| B5 | **Coding** — viết vào [coding-arena/](../mock-interview/coding-arena/), interviewer review rồi lưu `reviewed/` |
+| CN | **Ôn dồn tích** — quét *tất cả* các tuần đã học (không chỉ tuần vừa rồi): `/mock weak-review` + `/mock comprehensive` |
 | Xuyên suốt | Luyện **DSA** song song (vài bài LeetCode/tuần theo pattern — [12-dsa](../../12-dsa/)) |
 | Khi phát hiện lỗ hổng | Ghi vào [gap-register.md](gap-register.md), không dừng mạch ôn để lấp ngay |

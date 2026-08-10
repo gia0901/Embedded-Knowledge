@@ -37,7 +37,11 @@ Interviewer ra 3 bài (theo track — DSA, C++ implement, driver skeleton, C low
 Hỏi lại **mọi câu** trong [weak-register.md](weak-register.md) (lọc theo track nếu nêu) tới khi trả lời vững. Trả lời đạt ≥ 3 điểm hai lần → interviewer gỡ khỏi sổ. Chạy định kỳ (buổi CN theo plan).
 
 ## `retention` — Kiểm tra độ nhớ · câu đã trả lời tốt · ~8 câu
-Hỏi lại các câu **đã từng trả lời TỐT** (≥3) trong [sessions/](sessions/), ưu tiên câu **đã lâu chưa hỏi lại** — kiểm tra kiến thức có còn vững theo thời gian (spaced review). "Đúng rồi" không loại câu khỏi vùng hỏi. Câu nào tụt điểm → quay lại weak-register.
+Hỏi lại các câu **đã từng trả lời TỐT** (≥3) — kiểm tra kiến thức có còn vững theo thời gian (spaced review). "Đúng rồi" không loại câu khỏi vùng hỏi.
+- **Nguồn rút: bảng [🔁 Lịch kiểm tra lại](weak-register.md)** (có ngày đến hạn + góc đã dùng + góc mới đề xuất). Ưu tiên câu **quá hạn lâu nhất**.
+- Hỏi theo [config §6 luật ①](config.md): **nén phần nền còn 1 checkpoint**, dồn trọng số vào follow-up, **không lặp lại góc cũ**.
+- Câu nào tụt **< 3** → **kéo về weak-register** (regression). ≥ 3 → dời lịch +2 tuần.
+- Không nhất thiết chạy thành phiên riêng: câu đến hạn có thể rải vào **slot khởi động 🔁 5–10′** đầu mỗi buổi.
 
 ## `full-review` — Kiểm tra toàn diện · mọi câu đã hỏi
 Trộn **toàn bộ** câu đã từng hỏi (yếu + tốt, mọi track/level) từ [sessions/](sessions/) — quét rộng để tìm chỗ hổng ẩn. Số câu linh hoạt (mặc định ~12); ứng viên gõ "xong" khi muốn dừng. Hợp giai đoạn nước rút.

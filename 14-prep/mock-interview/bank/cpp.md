@@ -916,5 +916,113 @@ Cách đúng khi thật sự cần chia sẻ một biến `shared_ptr` giữa c�
 **Chốt:** *"Đếm thì atomic — nhưng cái vỏ `shared_ptr` và cái ruột object thì không."*
 </details>
 
+#### CPP-053 · 🟠 · concept · ⭐ · [→ oop](../../../01-cpp-fundamentals/oop.md) · 🎤 2026-08-10
+**Class của bạn có `operator bool() const` (không `explicit`). Những biểu thức vô nghĩa nào lọt qua compiler? Sửa thế nào mà `if (obj)` vẫn chạy được?**
+<details><summary>Đáp án</summary>
+
+**Tên vấn đề: safe-bool problem.** Đây là **nửa thứ hai** của [CPP-032](cpp.md) — `explicit` áp cho *cả* constructor 1 đối số *và* **conversion operator**. Nhiều người chỉ nhớ nửa đầu.
+
+**Cơ chế:** `bool` là **integral type**. Nên compiler được phép đi tiếp một nấc: `T` → `bool` → `int` (**integral promotion**) → object của bạn tham gia **mọi phép toán số học và so sánh**.
+
+```cpp
+class Buffer {
+public:
+    Buffer(const char* d) : s_(d) {}
+    operator bool() const { return !s_.empty(); }   // ⚠️ thiếu explicit
+private:
+    std::string s_;
+};
+
+Buffer a("hello"), b(1024);
+std::cout << a;    // ❗ in ra "1" — dù Buffer KHÔNG có operator<<
+a == b;            // ❗ true — hai buffer khác nhau "bằng nhau"
+a + 1;             // ❗ = 2
+a > 3;             // ❗ = 0
+int n = a;         // ❗ n = 1
+```
+
+**Tất cả compile sạch với `-Wall -Wextra`, không một warning.** Đó là lý do lớp bug này sống lâu trong codebase: không có tín hiệu nào cho tới khi log in ra `1` thay vì nội dung.
+
+**Sửa: `explicit operator bool() const`** — và `if (obj)` **vẫn chạy**.
+
+Vì sao vẫn chạy: C++11 định nghĩa **contextual conversion to bool** — ở những vị trí ngôn ngữ *đằng nào cũng cần một bool*, conversion operator `explicit` **vẫn được gọi tự động**. Danh sách vị trí đó:
+
+> `if (…)` · `while (…)` · `for (;…;)` · `!x` · `x && y` · `x || y` · `x ? a : b` · `static_assert` · điều kiện của `do-while`
+
+```cpp
+explicit operator bool() const { return !s_.empty(); }
+
+if (buf)   { }   // ✅ vẫn chạy (contextual conversion)
+while (buf){ }   // ✅
+if (!buf)  { }   // ✅
+std::cout << buf;// ❌ lỗi compile — ĐÚNG như mong muốn
+int n = buf;     // ❌ lỗi compile
+a == b;          // ❌ lỗi compile
+```
+
+**Tiền lệ trong STL — đều dùng `explicit operator bool`:** `std::unique_ptr`, `std::shared_ptr`, `std::optional`, `std::function`, `std::ifstream`. Trước C++11 người ta phải dùng trò **safe-bool idiom** (trả về con trỏ tới member) để né đúng vấn đề này — `explicit operator bool` sinh ra để thay nó.
+
+**Chốt:** *"`explicit` không chỉ cho constructor. Conversion operator thiếu `explicit` biến object thành số nguyên — `if` vẫn chạy nhờ contextual conversion, nên không mất gì khi thêm."*
+</details>
+
+#### CPP-054 · 🟡 · coding · ⭐ · [→ move-semantics](../../../02-modern-cpp/move-semantics.md) · 🎤 2026-08-10
+**Viết class RAII quản lý một file descriptor: cấm copy, cho phép move. Move constructor và move assignment khác nhau chỗ nào?**
+<details><summary>Đáp án</summary>
+
+**Khác biệt cốt lõi — đây là chỗ hay viết sai nhất:**
+
+| | Move **constructor** | Move **assignment** |
+|---|---|---|
+| Object đích | **Chưa tồn tại** — đang được xây | **Đã tồn tại**, đang giữ tài nguyên |
+| Member lúc vào hàm | **Rác** (kiểu built-in không có initializer) | Giá trị hợp lệ |
+| Dọn tài nguyên cũ? | ❌ **Không** — chưa có gì để dọn | ✅ **Bắt buộc**, không thì leak |
+| Cần `if (this != &other)`? | ❌ Không thể tự-move-construct | ✅ Có |
+
+```cpp
+#include <unistd.h>
+#include <utility>
+
+class DeviceHandle {
+public:
+    explicit DeviceHandle(int fd) noexcept : fd_(fd) {}
+    ~DeviceHandle() { if (fd_ != -1) ::close(fd_); }
+
+    DeviceHandle(const DeviceHandle&)            = delete;   // public: message lỗi rõ
+    DeviceHandle& operator=(const DeviceHandle&) = delete;
+
+    // Move ctor: KHÔNG dọn fd_ (đang là rác), chỉ cướp rồi vô hiệu hoá nguồn.
+    DeviceHandle(DeviceHandle&& o) noexcept
+        : fd_(std::exchange(o.fd_, -1)) {}
+
+    // Move assign: PHẢI dọn fd_ đang giữ trước khi nhận cái mới.
+    DeviceHandle& operator=(DeviceHandle&& o) noexcept {
+        if (this != &o) {
+            if (fd_ != -1) ::close(fd_);
+            fd_ = std::exchange(o.fd_, -1);
+        }
+        return *this;
+    }
+private:
+    int fd_ = -1;    // ⭐ default member initializer — chặn luôn lớp bug "đọc rác"
+};
+```
+
+**Bug kinh điển:** copy nguyên thân move-assign sang move-ctor →
+
+```cpp
+DeviceHandle(DeviceHandle&& o) {
+    if (fd_ != -1) ::close(fd_);   // ❌ fd_ CHƯA khởi tạo — đọc rác, UB
+    fd_ = o.fd_; o.fd_ = -1;
+}
+```
+`DeviceHandle b = std::move(a);` — ctor `DeviceHandle(int)` **không chạy** cho `b`, không ai gán `b.fd_`. Nếu rác trên stack tình cờ khác `-1`, bạn `::close()` **fd của module khác** → socket/file ở nơi không liên quan đột nhiên chết, backtrace vô hại. Bật `-fsanitize=memory` hoặc gán `int fd_ = -1;` để diệt tận gốc.
+
+**`noexcept` không phải trang trí:** `std::vector<DeviceHandle>` khi realloc chỉ dùng move nếu move ctor là `noexcept` (strong exception guarantee) — không thì nó **fallback sang copy**, mà copy đã `= delete` → **không compile**. Move-only mà quên `noexcept` = class không dùng được trong container.
+
+**Bẫy phụ (BSP):** đừng `#include <bits/stdc++.h>` trong header thư viện — header nội bộ của libstdc++, không portable (clang/musl không có), kéo cả STL vào mọi TU. Dùng đúng `<unistd.h>` + `<utility>`.
+
+**Chốt:** *"Move ctor xây từ số 0 nên không dọn gì; move assign phải dọn tài nguyên đang giữ. Cả hai `noexcept`, cả hai để nguồn ở trạng thái huỷ được."*
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

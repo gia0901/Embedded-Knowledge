@@ -32,15 +32,22 @@
 - **Tài liệu:** > "…đoạn nguyên văn…" ([lkd/04-memory.md#Lxx](../../../15-book-summaries/lkd/04-memory.md))
 - **Chốt:** streaming = "mượn tạm, trả nhanh"; sai hướng/đụng sớm → dữ liệu hỏng.
 
+## 💬 Calibration (chỉ khi ứng viên phản hồi "câu này quá sâu / lệch trọng tâm")
+> Ghi lại vì nó **đổi cách chấm về sau**. Phân định TỪNG Ý: ✅ đồng ý (hạ khỏi tiêu chí chấm) · 🟡 nửa đúng (giữ mức "biết thì tốt") · ❌ không đồng ý (nêu lý do gắn với JD). Kết luận chép sang mục calibration của [../weak-register.md](../weak-register.md).
+
 ## Tổng kết
 - **Điểm mạnh:** …
 - **Lỗ hổng ưu tiên (top 3):** 1) … 2) … 3) …
 - **Câu mới thêm vào bank:** BSP-0xx (nếu có)
-- **Cập nhật weak-register:** +BSP-011, +… / gỡ …
+- **Cập nhật weak-register:** +BSP-011 / gỡ BSP-002 → **đã xếp lịch kiểm tra lại: Tuần N+2**
+- **Bản code đã review:** `../coding-arena/reviewed/YYYY-MM-DD--<ID>--<slug>.cpp` (nếu phiên có code)
+- **Cập nhật §📍 plan:** đã tick buổi … + sửa 4 dòng trạng thái
 
 ## Phiên kế đề xuất
 - vd: `deep-dive track bsp` tập trung DMA/interrupt; hoặc `weak-review` cuối tuần.
 ```
+
+> **4 đầu ra BẮT BUỘC của một phiên** (config Bước 4) — log này chỉ là 1 trong 4: ① `sessions/` · ② `weak-register.md` (gỡ câu ⟹ **phải** xếp vào bảng 🔁 Lịch kiểm tra lại) · ③ `bank/` (câu tự phát) · ④ `coding-arena/reviewed/` (nếu có code). Cộng thêm **§📍 của plan** nếu phiên thuộc study-plan.
 
 ## Xem tiến bộ
 - Điểm trung bình theo thời gian, câu lặp lại nhiều lần mà vẫn thấp → xem [../weak-register.md](../weak-register.md).

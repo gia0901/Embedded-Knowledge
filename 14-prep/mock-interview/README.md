@@ -11,12 +11,12 @@
 ```
 /mock
 ```
-Claude sẽ đọc config, hỏi bạn chọn **track** + **loại phiên**, rồi bắt đầu phỏng vấn.
+Claude đọc config, rồi mở **§📍 Tiến độ** của [datalogic-plan](../study-plans/datalogic-plan.md) và **đề xuất thẳng buổi kế tiếp** (track + type + lệnh chính xác đã ghi sẵn ở đó). Chỉ khi plan đã chạy hết — hoặc bạn nói rõ là ôn tự do — Claude mới hỏi bạn chọn track/type.
 
 **Cách 2 — Thủ công:** trong hội thoại mới, nói
 > "Chạy mock interview" (kèm track/type nếu muốn, vd "mock comprehensive track BSP").
 
-Cả hai đều nạp [config.md](config.md) làm hợp đồng vận hành.
+Cả hai đều nạp [config.md](config.md) làm hợp đồng vận hành — **bao gồm [§6 Hợp đồng ĐỘ SÂU](config.md)**, phần quyết định phiên có sâu hay không.
 
 ---
 
@@ -46,18 +46,20 @@ Một phiên = **1 track** (hỏi về mảng nào) × **1 interview type** (hì
 
 ```mermaid
 flowchart TD
-    A["/mock hoặc 'chạy mock interview'"] --> B["Claude đọc config + hỏi track/type"]
-    B --> C["Hỏi từng câu · follow-up đào sâu<br/><i>KHÔNG chấm giữa chừng</i>"]
+    A["/mock hoặc 'chạy mock interview'"] --> B["Claude đọc config (gồm §6 độ sâu)<br/>+ §📍 plan → đề xuất buổi kế tiếp"]
+    B --> C["Hỏi từng câu: phần nền + <b>follow-up mở rộng</b><br/><i>KHÔNG chấm giữa chừng</i>"]
     C --> D{"Đủ số câu<br/>hoặc bạn gõ 'xong'?"}
     D -->|chưa| C
-    D -->|rồi| E["REVIEW toàn phiên:<br/>đúng/sai từng câu + điểm + lỗ hổng"]
-    E --> F["Cập nhật: sessions/ + weak-register.md<br/>+ thêm câu mới vào bank/"]
+    D -->|rồi| E["REVIEW toàn phiên: đúng/sai từng câu + điểm<br/>+ trích bank & tài liệu gốc cho câu ≤3"]
+    E --> F["Cập nhật BẮT BUỘC: sessions/ · weak-register<br/>(gồm <b>lịch kiểm tra lại</b> nếu gỡ câu) · bank/<br/>· coding-arena/reviewed/ · §📍 plan"]
     F --> G["Gợi ý ôn tiếp + phiên kế"]
 ```
 
-**Nguyên tắc quan trọng** (từ yêu cầu của bạn):
-- **Review chỉ ở cuối phiên** — trong lúc hỏi, interviewer có thể mở rộng/đào sâu và yêu cầu bạn trả lời thêm như thật; chỉ khi *hoàn thành* mới nhận xét.
-- **Câu cũ vẫn được hỏi lại** — không có luật "đúng rồi thôi"; câu từng sai được ưu tiên hỏi lại (weak-register).
+**Nguyên tắc quan trọng:**
+- **⚠️ Độ sâu là hợp đồng, không phải tuỳ hứng** — [config §6](config.md): **mọi** câu (mới / weak / retention) đều có **phần nền + phần follow-up mở rộng**; nguồn câu chỉ đổi *trọng số* giữa hai phần. Câu weak: nén nền còn 1 checkpoint, **điểm gần như hoàn toàn từ follow-up**. Đây là thứ phân biệt phiên chất lượng với phiên nông.
+- **Review chỉ ở cuối phiên** — trong lúc hỏi, interviewer mở rộng/đào sâu như thật; chỉ khi *hoàn thành* mới nhận xét.
+- **Câu cũ vẫn được hỏi lại** — không có luật "đúng rồi thôi". Câu từng sai → [weak-register](weak-register.md); câu đã gỡ → bảng **🔁 Lịch kiểm tra lại** (hạn = tuần gỡ + 2), **không câu nào biến mất vĩnh viễn**.
+- **Không lặp lại nguyên văn góc hỏi cũ** — hỏi y hệt là đo trí nhớ về hội thoại, không đo kiến thức.
 - **Bank là nguồn duy nhất** — câu interviewer tự phát mà chưa có trong bank sẽ được **thêm vào bank** sau phiên.
 
 ---
@@ -66,13 +68,14 @@ flowchart TD
 
 | Đường dẫn | Vai trò |
 |---|---|
-| [config.md](config.md) | **Hợp đồng vận hành** — defaults, giao thức phiên, thang chấm. Nguồn chân lý. |
+| [config.md](config.md) | **Hợp đồng vận hành** — defaults, giao thức phiên, thang chấm, **§6 hợp đồng độ sâu**. Nguồn chân lý. |
 | [tracks.md](tracks.md) | Định nghĩa track (job / phần / sách) → ánh xạ tới domain trong bank |
 | [interview-types.md](interview-types.md) | Định nghĩa loại phiên → số câu + cơ cấu level |
 | [bank/](bank/) | **Ngân hàng câu hỏi DUY NHẤT** (ID xuyên suốt). Xem [bank/README.md](bank/README.md) |
-| [sessions/](sessions/) | Log từng phiên (git-track) — [mẫu](sessions/README.md) |
-| [weak-register.md](weak-register.md) | Sổ câu còn yếu — ưu tiên hỏi lại |
-| [coding-arena/](coding-arena/) | Nơi viết code khi làm bài coding (**git-ignore**) |
+| [sessions/](sessions/) | Log từng phiên (git-track), **tự chứa** — [mẫu](sessions/README.md) |
+| [weak-register.md](weak-register.md) | Sổ câu yếu **+ bảng 🔁 Lịch kiểm tra lại** (câu đã gỡ, có hạn hỏi lại) |
+| [coding-arena/](coding-arena/) | Nháp code khi làm bài (**git-ignore**) — để lần sau còn làm lại từ file trống |
+| [coding-arena/reviewed/](coding-arena/reviewed/) | Bản đã review: bản nộp nguyên trạng + chú thích + bản sửa (**git-track**, phải compile & chạy) |
 
 ---
 

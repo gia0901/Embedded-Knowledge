@@ -78,9 +78,9 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 
 | Domain | Dải ID đã dùng |
 |---|---|
-| CPP | 001–052 (040–051 = track `emc`, neo theo Item; 052 = shared_ptr 3 tầng thread-safety) |
-| OS | 001–019 |
-| LNX | 001–026 |
+| CPP | 001–054 (040–051 = track `emc`, neo theo Item; 052 = shared_ptr 3 tầng thread-safety; 053 = safe-bool / `explicit operator bool`; 054 = move ctor vs move assign) |
+| OS | 001–021 (020 = thread-safe vs reentrant, 021 = `fork()` trong chương trình đa luồng) |
+| LNX | 001–029 (027 = `EINTR`/`SA_RESTART`, 028 = `O_APPEND` vs `lseek`+`write`, 029 = chọn clock đo thời gian) |
 | DRV | 001–027 (019–027 = PCI/USB) |
 | BUS | 001–004 |
 | EMB | 001–032 |
@@ -88,7 +88,7 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 | BLD | 001–010 (CMake/Yocto/CI) |
 | DBG | 001–019 |
 | DP | 001–016 (014 = Meyers thread-safe/DCLP, 015 = object pool, 016 = decorator) |
-| DSA | 001–012 |
+| DSA | 001–014 (013 = chọn sức chứa N của ring buffer, 014 = consumer biết mình mất dữ liệu — cả hai 🎤 2026-08-09) |
 | NET | 001–012 |
 | SD | 001–016 (012 = OTA, 013 = barcode scanner, 014 = UART framing, 015 = driver subsystem, 016 = memory tất định) |
 | BEH | 001–009 |

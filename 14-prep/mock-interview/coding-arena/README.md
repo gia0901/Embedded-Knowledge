@@ -34,7 +34,9 @@ Trình tự đúng khi gặp lại một bài đã có trong `reviewed/`:
 
 **Khi làm bài** (thư mục gốc): mỗi bài một file, tên interviewer đưa — vd `reverse_list.cpp`, `ring_buffer.cpp`. Ngôn ngữ tuỳ đề (C/C++ mặc định cho track embedded/system). Cứ nháp, chạy thử, sửa thoải mái.
 
-**Khi review xong** (interviewer làm ở Bước 4, không phải bạn): tạo `reviewed/YYYY-MM-DD--<COD-ID>--<slug>.cpp` gồm 3 phần theo thứ tự:
+**Khi review xong** (interviewer làm ở Bước 4, không phải bạn): tạo `reviewed/YYYY-MM-DD--<ID>--<slug>.cpp` gồm 3 phần theo thứ tự:
+
+> `<ID>` là **ID bank của câu sinh ra bài code** — thường là `COD-*`, nhưng **không bắt buộc**. Theo [config §6 luật ⑤](../config.md), câu `concept` cũng có thể yêu cầu viết code (RAII, move, API design, concurrency); khi đó dùng chính ID câu đó — vd `2026-08-10--CPP-045--device-handle.cpp`, `2026-08-10--CPP-032--explicit-buffer.cpp`.
 
 1. **Header block** — ID, ngày, điểm, và danh sách ✅ làm được / ❌ lỗi (đánh nhãn `[A]`, `[B]`… để comment bên dưới trỏ ngược lên).
 2. **Bản bạn nộp, GIỮ NGUYÊN từng dòng** — chỉ chèn comment `// ❌ [X] …` / `// ✅ …` tại đúng dòng. Không sửa code ở phần này; giá trị nằm ở chỗ thấy được chính xác mình đã viết gì.

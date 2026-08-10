@@ -10,13 +10,13 @@
 > **Conversation mới đọc block này TRƯỚC TIÊN** để biết đang ở đâu và làm gì tiếp. Đây là plan **đang chạy** và là **nguồn lịch duy nhất** (không còn daily-plan hay plan role nào khác).
 
 - **Plan đang chạy:** 🎯 Datalogic (file này) · bắt đầu **2026-08-03** (T2). ⚠️ **Trễ 2 ngày**: B5 lẽ ra T6 07/08, thực tế chạy CN 09/08 → **CN và B5 dồn vào cùng ngày**. Tuần 2 nên bắt đầu **T2 10/08**; nếu không kịp buổi CN thì gộp nó vào khởi động buổi đầu Tuần 2, đừng đẩy cả plan lùi.
-- **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **buổi kế tiếp = Buổi CN** (ôn dồn tích, hết Tuần 1).
-- **Buổi gần nhất:** `coding track dsa` (B5) — **3.67/4** ([log](../mock-interview/sessions/2026-08-09--coding--dsa.md)). COD-001 **4** · COD-006 **3** · COD-003 **4**. Lỗ hổng: không hỏi spec "mấy luồng?", không tổng quát hoá race sau khi vá, và cấp phát STL trong hot path. *(B1: 3.25 · B2: 3.3 · B3: 2.83 · B4: 3.17 · B5: 3.67)*
-- **▶️ LÀM TIẾP:** **Buổi CN (hôm nay, đang trễ)** — `/mock weak-review` (dọn nốt 4 câu trong sổ) rồi `/mock comprehensive track cpp-system` (16 câu, chốt Tuần 1). Bài tay ~15′ trước đó: **viết lại `ring_buffer.cpp`** — bỏ `unordered_map` khỏi `push()`, thêm `dropped_count_`, `empty()/full()` an toàn đa luồng.
-- **Sổ yếu hiện tại (4 câu, TẤT CẢ đều ở 1/2 lần ≥3):** CPP-019, CPP-024, CPP-045, CPP-032 — mỗi câu chỉ cần **một** lần ≥3 nữa là sổ sạch. Chèn vào phiên CN → xem [weak-register](../mock-interview/weak-register.md).
+- **Vị trí:** **Tuần 1** (C++17 & Modern C++) → **Buổi CN đang chạy dở**: đã xong phần `weak-review`, **còn lại phần `comprehensive`** để chốt Tuần 1.
+- **Buổi gần nhất:** `weak-review track cpp-system` (CN, phần 1) — **3.0/4** ([log](../mock-interview/sessions/2026-08-10--weak-review--cpp-system.md)). CPP-019 **3** ✅gỡ · CPP-024 **4** ✅gỡ · CPP-045 **3** ✅gỡ · CPP-032 **2** ❌giữ. **Sổ yếu 4 → 2 câu** (gỡ 3, giữ CPP-032, thêm mới CPP-054). Lỗ hổng: `explicit` cho **conversion operator** (safe-bool) + **move ctor vs move assign** (viết move ctor đọc `fd_` chưa khởi tạo → UB). *(B1: 3.25 · B2: 3.3 · B3: 2.83 · B4: 3.17 · B5: 3.67 · CN-1: 3.0)*
+- **▶️ LÀM TIẾP:** **Buổi CN phần 2** — bài tay ~15′: **viết lại `ring_buffer.cpp`** (bỏ `unordered_map` khỏi `push()`, thêm `dropped_count_`, `empty()/full()` an toàn đa luồng) → rồi `/mock comprehensive track cpp-system` (16 câu, chốt Tuần 1). Chèn **CPP-032** + **CPP-054** vào phiên đó để dọn sổ.
+- **Sổ yếu hiện tại (2 câu):** **CPP-032** (`explicit` — reset về 0/2 sau khi tụt 4→2; hổng nửa *conversion operator*) · **CPP-054** 🆕 (move ctor vs move assign, `noexcept`). Xem [weak-register](../mock-interview/weak-register.md). Bank vừa thêm **CPP-053** + **CPP-054** để ôn đúng 2 lỗ hổng này.
 
 **Checklist buổi (tick `[x]` khi xong — đây là "đang dang dở đến đâu"):**
-- **Tuần 1** (C++17): `[x]` B1 · `[x]` B2 · `[x]` B3 · `[x]` B4 · `[x]` B5 · `[ ]` CN
+- **Tuần 1** (C++17): `[x]` B1 · `[x]` B2 · `[x]` B3 · `[x]` B4 · `[x]` B5 · `[~]` CN *(weak-review xong, comprehensive chưa)*
 - **Tuần 2** (Linux sysprog+debug): `[ ]` toàn bộ (chưa tới)
 - **Tuần 3** (kernel/drivers): `[ ]` toàn bộ
 - **Tuần 4** (Yocto/design/behavioral): `[ ]` toàn bộ
@@ -31,6 +31,8 @@
 
 **② Xen kẽ + lặp lại ngắt quãng (chống quên tuần cũ).** Theme tuần chỉ định *trọng tâm học MỚI* — không có nghĩa bỏ tuần trước. Hai cơ chế kéo kiến thức cũ quay lại:
 - **🔁 Khởi động trộn (~5–10') mỗi buổi:** trước khi vào chủ đề mới, chạy nhanh `/mock weak-review` (câu yếu) hoặc `/mock retention track datalogic` (câu tuần trước, đã trả lời tốt — spaced review). Trộn domain là *cố ý*: phỏng vấn thật cũng hỏi ngẫu nhiên.
+  - **Câu retention lấy ở đâu:** bảng **[🔁 Lịch kiểm tra lại](../mock-interview/weak-register.md)** — mỗi câu đã gỡ khỏi sổ yếu đều có **hạn kiểm tra = tuần gỡ + 2** và **góc mới đề xuất** (cấm lặp góc cũ). Mở bảng, lấy câu đến hạn của tuần hiện tại. Tụt < 3 → kéo về sổ yếu.
+  - Lịch hiện tại: **Tuần 2** → CPP-020, CPP-029 · **Tuần 3** → CPP-009, DP-002, OS-003, OS-007 · **Tuần 4** → CPP-019, CPP-024, CPP-045.
 - **🔁 Cuối tuần ôn DỒN TÍCH (tăng dần):** CN mỗi tuần quét *tất cả* các tuần đã học, không chỉ tuần vừa rồi — xem cột "CN" trong từng bảng.
 
 **③ Đọc/Hiểu liệt kê ĐẦY ĐỦ để ôn TRƯỚC; mock cứ để NGẪU NHIÊN.** Cột "Đọc/Hiểu" mỗi buổi nêu **cụ thể** doc (mục) + **pool câu hỏi bank** liên quan — đây là phần *chuẩn bị*, đọc kỹ trước khi vào mock. Mock thì **được phép hỏi ngẫu nhiên/lệch chủ đề trong ngày** (rút từ track rộng + weak-register + retention) — đó là **cố ý**, để luyện *phản ứng* như phỏng vấn thật (câu đến bất ngờ, trộn mảng). Không ép test chỉ trong phạm vi vừa đọc. Việc bị hỏi trúng chỗ chưa ôn là *tín hiệu* để ghi vào weak-register và ôn bù, không phải lỗi của plan.
@@ -65,7 +67,7 @@
 | 3 | - [x] [concurrency](../../02-modern-cpp/concurrency.md) (thread, atomic, memory_order, mutex, lock_guard/unique_lock) + [OS sync-primitives](../../03-operating-system/sync-primitives.md) (mutex vs semaphore + **ownership/priority inheritance**, spinlock, deadlock 4 Coffman). **Pool bank:** CPP-018/019/022/024; OS-003/004/006/007/012 | ✅ `daily cpp-system` 2.83/4 (2026-08-05) — ⚠️ nợ **memory order** (CPP-019) |
 | 4 | - [x] [cmake](../../06-build-systems/cmake.md) — **tư duy target-based** (PUBLIC/PRIVATE/INTERFACE *nghĩa là gì*, toolchain file *giải quyết gì*), cú pháp tra sau | ✅ `daily build-systems` 3.17/4 (2026-08-06) — CMake đạt; nợ **lệnh Yocto** (cleansstate/devtool) |
 | 5 | - [x] Coding: viết vào [coding-arena/](../mock-interview/coding-arena/); nền: [12-dsa/ring-buffer.md](../../12-dsa/ring-buffer.md) | ✅ `coding dsa` 3.67/4 (2026-08-09) — COD-001 **4** · COD-006 **3** · COD-003 **4**; nợ **hỏi spec đa luồng** + **cấp phát trong hot path**. [Bản đã review](../mock-interview/coding-arena/reviewed/) |
-| CN | 🔁 Ôn dồn tích **T1** | `/mock weak-review` + `/mock comprehensive track cpp-system` |
+| CN | 🔁 Ôn dồn tích **T1** | 🟡 Đang dở: ✅ `weak-review cpp-system` 3.0/4 (2026-08-10) — sổ yếu **4 → 2** (CPP-019/024/045 gỡ; CPP-032 tụt 4→2 giữ; +CPP-054 mới) · ⬜ còn `/mock comprehensive track cpp-system` |
 
 ## Tuần 2 — Linux system programming (userspace + debug) 🎯
 
