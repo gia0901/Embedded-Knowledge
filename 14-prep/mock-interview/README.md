@@ -56,7 +56,9 @@ flowchart TD
 ```
 
 **Nguyên tắc quan trọng:**
-- **⚠️ Độ sâu là hợp đồng, không phải tuỳ hứng** — [config §6](config.md): **mọi** câu (mới / weak / retention) đều có **phần nền + phần follow-up mở rộng**; nguồn câu chỉ đổi *trọng số* giữa hai phần. Câu weak: nén nền còn 1 checkpoint, **điểm gần như hoàn toàn từ follow-up**. Đây là thứ phân biệt phiên chất lượng với phiên nông.
+- **⚠️ Độ sâu là hợp đồng, không phải tuỳ hứng** — [config §6](config.md) chặn **hai lỗi ngược nhau**:
+  - *Không được NÔNG*: **mọi** câu (mới / weak / retention) đều có **phần nền + follow-up mở rộng**; câu weak nén nền còn 1 checkpoint, **điểm gần như hoàn toàn từ follow-up**.
+  - *Không được LỆCH TẦNG*: trần mặc định là **T2 (vận dụng & đánh đổi)**. **T3** (tên lệnh, flag, internals, lock-free) hỏi được nhưng **không tính điểm** — muốn T3 tính điểm thì gõ `deep-dive`.
 - **Review chỉ ở cuối phiên** — trong lúc hỏi, interviewer mở rộng/đào sâu như thật; chỉ khi *hoàn thành* mới nhận xét.
 - **Câu cũ vẫn được hỏi lại** — không có luật "đúng rồi thôi". Câu từng sai → [weak-register](weak-register.md); câu đã gỡ → bảng **🔁 Lịch kiểm tra lại** (hạn = tuần gỡ + 2), **không câu nào biến mất vĩnh viễn**.
 - **Không lặp lại nguyên văn góc hỏi cũ** — hỏi y hệt là đo trí nhớ về hội thoại, không đo kiến thức.

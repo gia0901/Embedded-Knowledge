@@ -13,7 +13,8 @@
 | Level ứng viên | Mid-level (kỹ sư ~2–5 năm) | Điều chỉnh độ khó quanh mốc này |
 | Track mặc định | `bsp` (Embedded Linux/BSP) | Ưu tiên 1 theo định hướng ôn tập; xem [tracks.md](tracks.md) |
 | Interview type mặc định | `daily` | Xem [interview-types.md](interview-types.md) |
-| Thang chấm | 0–4 (xem §4) | |
+| **Trần độ sâu** | **T2** (vận dụng & đánh đổi) | **T3** (tên lệnh/flag/internals/lock-free) hỏi được nhưng **không tính điểm**. Bật T3 bằng `deep-dive` hoặc `--deep` — xem §6 |
+| Thang chấm | 0–4 (xem §4) | Kịch trần **4 khi T1+T2 đầy đủ** — thiếu T3 không bị giữ điểm |
 | Ngân hàng câu hỏi | [bank/](bank/) — **DUY NHẤT** | Mọi câu hỏi sống ở đây; nơi khác chỉ link tới |
 | Log phiên | [sessions/](sessions/) (git-track) | 1 file / phiên |
 | Sổ câu yếu | [weak-register.md](weak-register.md) (git-track) | Câu cần hỏi lại |
@@ -28,7 +29,11 @@
 - **Luôn bắt đầu từ plan JD đang chạy:** mở [datalogic-plan.md](../study-plans/datalogic-plan.md) **§📍 Tiến độ hiện tại** (đầu file) → nó cho biết **buổi kế tiếp + lệnh mock chính xác**. **Đề xuất thẳng buổi đó** thay vì hỏi lại từ đầu; sau phiên, cập nhật block §📍 đó (tick buổi + 4 dòng trạng thái).
 - **Chỉ khi plan đã chạy hết** (hoặc người dùng nói rõ là ôn tự do): **hỏi 2 điều** — (a) track nào? (b) interview type nào? — gợi ý mặc định theo §0.
 
-**Bước 1 — Chốt phiên.** Xác nhận: track + type + **số câu** (lấy từ interview-types.md) + level. Thông báo ngắn gọn "Bắt đầu phiên: <type> · <track> · N câu" rồi vào hỏi ngay.
+**Bước 1 — Chốt phiên.** Xác nhận: track + type + **số câu** (lấy từ interview-types.md) + level + **trần độ sâu**. Thông báo ngắn gọn:
+
+> `Bắt đầu phiên: <type> · <track> · N câu · trần <T2|T3>`
+
+Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở chế độ nào và có cơ hội đổi ý (thêm `--deep` nếu muốn khó hơn).
 
 **Bước 2 — Hỏi (KHÔNG chấm giữa chừng).**
 - Hỏi **từng câu một**, rút từ [bank/](bank/) theo track + type + phân bổ level của interview type.
@@ -40,7 +45,8 @@
      - Câu đến hạn được rải vào **slot khởi động 🔁 5–10′ đầu mỗi buổi**, không cần đợi phiên `retention` riêng.
      - Điểm **< 3 → kéo thẳng về bảng sổ yếu** (regression). Điểm ≥ 3 → dời lịch +2 tuần.
 - Người dùng có thể yêu cầu **kiểm tra toàn diện** (hỏi bất kỳ câu nào đã từng trả lời, bất kể điểm) — khi đó ưu tiên nguồn 2 + 3; `comprehensive` mặc định đã trộn cả 3 nguồn.
-- Sau khi ứng viên trả lời, được phép **hỏi đào sâu / follow-up / mở rộng** như phỏng vấn thật (không giới hạn cứng số follow-up), **nhưng chưa đưa nhận xét đúng/sai**. Chỉ ghi nhận và chuyển câu tiếp (hoặc đào sâu). Giữ giọng interviewer: trung tính, thúc đẩy suy nghĩ.
+- Sau khi ứng viên trả lời, **BẮT BUỘC hỏi đào sâu / follow-up ≥1 lần** kể cả khi trả lời đúng (§6 luật ④), **nhưng chưa đưa nhận xét đúng/sai**. Chỉ ghi nhận và chuyển câu tiếp (hoặc đào sâu). Giữ giọng interviewer: trung tính, thúc đẩy suy nghĩ.
+  - ⚠️ **Đào sâu tới đâu thì dừng:** tới hết **T2** ở phiên mặc định. Được phép probe T3 một lần để dò trần, nhưng **không truy tiếp** và **không tính điểm** (§6 → Trần độ sâu).
 - Với câu **coding**: yêu cầu ứng viên viết code vào [coding-arena/](coding-arena/) (đặt tên file rõ), interviewer đọc file đó khi review.
 - Đếm câu tới khi đạt **số câu định sẵn** của interview type → sang Bước 3. Ứng viên có thể chủ động gõ **"xong" / "review"** để kết thúc sớm.
 
@@ -57,7 +63,7 @@
 - Cập nhật [weak-register.md](weak-register.md): thêm câu điểm ≤ 2, gỡ/hạ câu đã trả lời vững (≥ 3) qua ≥ 2 lần.
   - ⚠️ **Gỡ một câu = BẮT BUỘC thêm một dòng vào bảng [🔁 Lịch kiểm tra lại](weak-register.md)** — ghi ngày gỡ, hạn kiểm tra (**tuần gỡ + 2**), **góc đã dùng** (để lần sau không lặp) và góc mới đề xuất. Gỡ mà không xếp lịch = câu đó biến mất vĩnh viễn khỏi vùng được hỏi; đó là lỗi.
   - Câu vừa kiểm tra retention: cập nhật cột KQ (✅ dời +2 tuần · 🔻 kéo về bảng sổ yếu) và **ghi góc vừa dùng vào cột "góc đã dùng"**.
-- **Với phiên có bài coding — ghi bản đã review (BẮT BUỘC):** tạo `coding-arena/reviewed/YYYY-MM-DD--<COD-ID>--<slug>.cpp` gồm (1) header điểm + danh sách ✅/❌ có đánh nhãn, (2) **bản ứng viên nộp giữ nguyên từng dòng**, chỉ chèn comment review tại đúng dòng, (3) **bản sửa** giữ mọi quyết định thiết kế hợp lý của ứng viên, chỉ vá lỗi đã đánh nhãn. File phải **compile + chạy** (`g++ -std=c++17 -Wall`). Chi tiết: [coding-arena/README.md](coding-arena/README.md). Đây là vùng git-track — nháp ở thư mục gốc vẫn ignore, để lần sau còn làm lại được từ file trống.
+- **Với phiên có bài coding — ghi bản đã review (BẮT BUỘC):** tạo `coding-arena/reviewed/YYYY-MM-DD--<ID>--<slug>.cpp` (`<ID>` = ID bank của câu sinh ra bài code — thường `COD-*`, nhưng câu `concept` bắt viết code theo luật ⑤ thì dùng chính ID đó, vd `CPP-045`) gồm (1) header điểm + danh sách ✅/❌ có đánh nhãn, (2) **bản ứng viên nộp giữ nguyên từng dòng**, chỉ chèn comment review tại đúng dòng, (3) **bản sửa** giữ mọi quyết định thiết kế hợp lý của ứng viên, chỉ vá lỗi đã đánh nhãn. File phải **compile + chạy** (`g++ -std=c++17 -Wall`). Chi tiết: [coding-arena/README.md](coding-arena/README.md). Đây là vùng git-track — nháp ở thư mục gốc vẫn ignore, để lần sau còn làm lại được từ file trống.
 - **Đồng bộ ngân hàng:** nếu trong phiên interviewer đặt câu **chưa có trong [bank/](bank/)** (câu tự phát/mở rộng), **thêm câu đó vào đúng file bank** (gán ID kế tiếp, metadata, đáp án) — xem §3. Đây là cơ chế giữ bank luôn là nguồn duy nhất và lớn dần theo thực chiến.
 
 ---
@@ -66,17 +72,17 @@
 
 Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
 
-| Type | Số câu | Cơ cấu | Thời lượng ước |
-|---|---|---|---|
-| `daily` | 6 | 2 rapid + 3 concept (mix 🟢🟡) + 1 revisit (weak-register) | 15–20′ |
-| `rapid` | 12 | 🟢🟡 concept, đáp án ngắn | ~15′ |
-| `comprehensive` | 16 | 1 track chính, đủ 🟢→🔴: ~8 concept + 3 design/tình huống + 2 coding + follow-ups | ~60′ |
-| `by-level` | 10 | cùng 1 level (🟢/🟡/🟠/🔴) trong track chọn | 20–40′ |
-| `coding` | 3 | bài code viết vào coding-arena | 30–45′ |
-| `deep-dive` | 5 | 🟠🔴 design/tình huống 1 track | ~40′ |
-| `weak-review` | toàn bộ weak-register (track chọn) | hỏi lại tới khi vững | linh hoạt |
-| `retention` | 8 | câu đã trả lời tốt (sessions/), spaced review | ~20′ |
-| `full-review` | 12 | mọi câu đã hỏi (yếu + tốt) | ~45′ |
+| Type | Số câu | Trần | Cơ cấu | Thời lượng ước |
+|---|---|---|---|---|
+| `daily` | 6 | T2 | 2 rapid + 3 concept (mix 🟢🟡) + 1 revisit (weak-register). Code = **snippet 5–10′** | 15–20′ |
+| `rapid` | 12 | T2 | 🟢🟡 concept, đáp án ngắn | ~15′ |
+| `comprehensive` | 16 | T2 | 1 track chính, đủ 🟢→🔴. **Cộng đúng 16:** 3🟢 + 5🟡 + 3 design + **1 coding cỡ vừa** + 2 revisit + 2 retention/xuyên-topic | ~60′ |
+| `by-level` | 10 | T2 | cùng 1 level (🟢/🟡/🟠/🔴) trong track chọn | 20–40′ |
+| `coding` | 3 | T2 | 3 bài **cỡ nhỏ 10–15′** viết vào coding-arena | 30–45′ |
+| `deep-dive` | 5 | 🔺 **T3** | 🟠🔴 design/tình huống 1 track; bài coding được phép **cỡ lớn 40′+** | ~40′ |
+| `weak-review` | toàn bộ weak-register (track chọn) | T2 | hỏi lại tới khi vững | linh hoạt |
+| `retention` | 8 | T2 | câu đến hạn ở bảng 🔁 Lịch kiểm tra lại, spaced review | ~20′ |
+| `full-review` | 12 | T2 | mọi câu đã hỏi (yếu + tốt) | ~45′ |
 
 ---
 
@@ -94,15 +100,19 @@ Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
 
 ## 4. Thang chấm 0–4
 
-| Điểm | Nghĩa |
-|---|---|
-| 0 | Không trả lời được / sai bản chất |
-| 1 | Nhớ lõm bõm, thiếu nhiều, có ý sai |
-| 2 | Đúng hướng nhưng thiếu chiều sâu / thiếu "vì sao" / diễn đạt lủng củng |
-| 3 | Đúng bản chất, đủ ý chính, diễn đạt được — **đạt mức mid** |
-| 4 | Đúng + sâu + nêu đánh đổi + ví dụ thực chiến — **mức senior** |
+| Điểm | Nghĩa | Tầng tương ứng |
+|---|---|---|
+| 0 | Không trả lời được / sai bản chất | — |
+| 1 | Nhớ lõm bõm, thiếu nhiều, có ý sai | T1 lỗ chỗ |
+| 2 | Đúng hướng nhưng thiếu chiều sâu / thiếu "vì sao" / diễn đạt lủng củng | T1 có, T2 trắng |
+| 3 | Đúng bản chất, đủ ý chính, diễn đạt được — **đạt mức mid** | T1 chắc + T2 một phần |
+| 4 | Đúng + **sâu** + nêu đánh đổi + ví dụ thực chiến — **mức senior** | **T1 + T2 đầy đủ** |
 
-Ngưỡng: câu **≤ 2** → vào [weak-register.md](weak-register.md). Câu **≥ 3** hai lần liên tiếp → gỡ khỏi weak-register.
+> ⚠️ **"Sâu" ở mức 4 nghĩa là T2, KHÔNG phải T3.** Sâu = *nêu được đánh đổi, biết khi nào dùng / khi nào không, chẩn đoán được tình huống thật*. Sâu **không** phải là nhớ tên lệnh/flag/internals — đó là T3, **không tính điểm** ở phiên mặc định (xem §6 → Trần độ sâu).
+>
+> **Kịch trần = 4 khi T1+T2 đầy đủ.** Không được giữ ứng viên ở 3 chỉ vì họ không biết `abidiff` hay `alignas(64)`. Muốn T3 tính điểm thì phải chạy `deep-dive` / `--deep`.
+
+Ngưỡng: câu **≤ 2** → vào [weak-register.md](weak-register.md). Câu **≥ 3** hai lần liên tiếp → gỡ khỏi weak-register (**và bắt buộc xếp lịch kiểm tra lại** — §1 Bước 4).
 
 ---
 
@@ -115,9 +125,13 @@ Ngưỡng: câu **≤ 2** → vào [weak-register.md](weak-register.md). Câu **
 
 ---
 
-## 6. 🎚️ Hợp đồng ĐỘ SÂU — chống phiên mock nông (BẮT BUỘC)
+## 6. 🎚️ Hợp đồng ĐỘ SÂU — đúng tầng, không nông cũng không lệch (BẮT BUỘC)
 
-> **Vì sao có mục này:** ứng viên đã chạy hai phiên `/mock` cùng tham số ở hai conversation khác nhau và nhận xét *"lần kia dễ và đơn giản hơn, chưa đủ độ sâu"*. Chất lượng phiên **không được phụ thuộc vào conversation nào đang chạy**. Sáu luật dưới đây là thứ tạo ra khác biệt — thi hành, không phải khuyến nghị.
+> **Vì sao có mục này — hai sự cố thật, hai lỗi NGƯỢC nhau:**
+> 1. *(2026-08-10)* Hai phiên `/mock` cùng tham số ở hai conversation cho chất lượng khác nhau; ứng viên nhận xét *"lần kia dễ và đơn giản hơn, chưa đủ độ sâu"* → **lỗi phiên NÔNG**. Chữa bằng **luật ①–⑥**.
+> 2. *(2026-08-10, cùng ngày)* Một phiên `comprehensive` bị chạy ở độ sâu `deep-dive` — chấm cả tên lệnh, ra bài lock-free 40′; ứng viên nhận xét *"nặng thuộc lệnh"*, *"đi quá xa so với mức interview"* → **lỗi phiên LỆCH TẦNG**. Chữa bằng mục **"Trần độ sâu"** cuối §6.
+>
+> Chất lượng phiên **không được phụ thuộc vào conversation nào đang chạy**. Toàn bộ §6 là thi hành, không phải khuyến nghị.
 
 **① MỌI câu đều có phần nền + phần follow-up mở rộng. Nguồn câu hỏi chỉ đổi TRỌNG SỐ giữa hai phần, không đổi việc có hay không.**
 
@@ -143,15 +157,21 @@ Ngưỡng: câu **≤ 2** → vào [weak-register.md](weak-register.md). Câu **
 *"`explicit` là gì"* đo trí nhớ. *"Đây là class API của bạn, `send(1024)` compile được — chuyện gì vừa xảy ra?"* đo hiểu biết. Mặc định dựng một **snippet cụ thể** rồi hỏi vào nó. Với câu ⭐ hoặc 🟠🔴 thì gần như luôn phải làm vậy.
 
 **③ Câu hỏi nhiều tầng (a/b/c) — đây là HÌNH THỨC THI HÀNH của luật ①.**
-Ánh xạ: **(a) = phần nền** · **(b) + (c) = phần follow-up mở rộng**.
-- **(a)** tầng ứng viên chắc chắn làm được → lấy đà, xác nhận nền.
-- **(b)** tầng mở rộng → **định vị trần hiểu biết** (không phải để đánh trượt).
-- **(c)** *quyết định thiết kế / đánh đổi* → chạm trần.
+Ánh xạ **hai trục** (đừng lẫn): a/b/c là *vai trò trong câu hỏi* · T1/T2/T3 là *độ sâu kiến thức* (xem mục "Trần độ sâu" cuối §6).
+
+| Phần | Vai trò | Tầng độ sâu | Tính điểm? |
+|---|---|---|---|
+| **(a)** | Phần nền — lấy đà, xác nhận cơ chế | **T1** | ✅ (câu mới) · ❌ (câu weak/retention — chỉ là checkpoint) |
+| **(b)** | Mở rộng — **định vị trần hiểu biết** | **T2** | ✅ |
+| **(c)** | Quyết định thiết kế / đánh đổi | **T2** | ✅ |
+| *(probe thêm)* | Dò xem có biết chuyên sâu không | 🔺 **T3** | ❌ **KHÔNG** ở phiên mặc định |
+
+> **T3 không phải là (d).** Nó là một probe **ngoài** bộ a/b/c — hỏi được, nhưng **không** nằm trong công thức chấm. Thiếu T3 mà chắc (a)(b)(c) vẫn là **4 điểm**.
 
 | Nguồn câu | Cách dùng a/b/c | Cách chấm |
 |---|---|---|
-| **Câu mới** | Hỏi đủ (a)(b)(c) | (a)+(c) = 3 · thêm (b) = 4 |
-| **Câu weak / retention** | **(a) nén thành 1 probe ngắn** rồi vào thẳng (b)(c) | (a) **không tính điểm** — chỉ là checkpoint chống regression. Điểm nằm ở (b)(c) |
+| **Câu mới** | Hỏi đủ (a)(b)(c) | (a)+(c) = 3 · thêm (b) = **4 (kịch trần)** |
+| **Câu weak / retention** | **(a) nén thành 1 probe ngắn** rồi vào thẳng (b)(c) | (a) **không tính điểm**. Điểm nằm ở (b)(c); đủ (b)(c) = **4** |
 
 **④ Follow-up cho tới khi lộ ranh giới hiểu biết — tối thiểu 1, không giới hạn trên.**
 Trả lời đúng **không** kết thúc câu hỏi. Kỹ thuật hiệu quả:
@@ -162,19 +182,82 @@ Trả lời đúng **không** kết thúc câu hỏi. Kỹ thuật hiệu quả:
 **⑤ Bắt VIẾT CODE rồi review chính code đó — kể cả phiên không phải type `coding`.**
 Một bug thật trong code ứng viên tự viết có giá trị hơn mười câu lý thuyết. Câu hỏi về RAII / move / API design / concurrency: yêu cầu viết vào [coding-arena/](coding-arena/) rồi đọc file. **Lỗi ứng viên tự tạo ra mà không nhận ra là dữ liệu chẩn đoán tốt nhất của cả phiên.**
 
+> ⚠️ **Ngân sách:** ở phiên **không phải** type `coding`, đây là **snippet 5–10′** (một hàm, một class ngắn — vd "viết move ctor cho class này"), **không phải bài tập đầy đủ**. Phiên `daily` chỉ 15–20′ tổng thì không nhét vừa một bài 20′. Muốn bài đầy đủ → dùng type `coding` hoặc `comprehensive`.
+
 **⑥ Ở Bước 3 — KIỂM CHỨNG bằng compiler thật, không phỏng đoán.**
 Trước khi khẳng định *"dòng này compile được"* / *"cái này lỗi"* / *"in ra 1"*: **biên dịch và chạy thật** (`g++ -std=c++17 -Wall -Wextra`), rồi dán **output thật** vào review. Nếu có nhiều compiler thì nêu rõ khác biệt (vd *gcc bắt 0/5, clang bắt 1/5*). Bằng chứng chạy được thuyết phục hơn mọi lời giải thích — và chặn chính interviewer nói sai.
 
 ---
 
-### ⚠️ Lan can: SÂU ≠ TRIVIA
+### 🎚️ TRẦN ĐỘ SÂU theo loại phiên — sâu tới đâu thì DỪNG
 
-Độ sâu tăng theo hướng **“cơ chế nào giải thích một lớp bug sẽ gặp trong công việc”**, **không** phải theo hướng thuật ngữ hiếm. Cụ thể:
+> **Vì sao có mục này (2026-08-10):** một phiên `comprehensive` đã bị chạy ở đúng độ sâu của `deep-dive` — đáp án liệt kê `nm -D`/`abidiff`/`readelf`/`LD_DEBUG`, và bài coding là lock-free SPSC ring buffer (30–45′ riêng nó). Ứng viên phản hồi *"nặng thuộc lệnh"* và *"đi quá xa so với mức interview"* — **đúng**. §6 chống phiên **nông**; mục này chống phiên **lệch tầng**. Hai lỗi khác nhau, đều làm hỏng phiên.
 
-| ✅ Sâu đúng hướng | ❌ Trivia, không chấm |
+**Ba tầng của MỘT câu hỏi** (áp cho mọi domain):
+
+| Tầng | Là gì | Ví dụ |
+|---|---|---|
+| **T1 · Cơ chế** | Cái gì xảy ra, vì sao | *"`unique_ptr` member làm class không copy được"* |
+| **T2 · Vận dụng & đánh đổi** ⭐ | Đọc code tìm bug · chọn phương án · nêu đánh đổi · chẩn đoán tình huống | *"Khách copy `.so` mới rồi app crash — bạn nghi gì, hỏi lại họ điều gì?"* |
+| **T3 · Chuyên sâu** | Tên lệnh/flag · internals · kỹ thuật tối ưu chuyên biệt · tên gọi nội bộ | `abidiff`, `-fvisibility=hidden`, `alignas(64)` chống false sharing, `stlr`/`ldar`, *guard variable* |
+
+**Trần mặc định = T2.** T3 **được phép hỏi** (để định vị trần hiểu biết — luật ③) nhưng **KHÔNG TÍNH ĐIỂM** ở phiên mặc định: thiếu T3 vẫn đạt 4 nếu T1+T2 chắc.
+
+| Loại phiên | Trần | Ghi chú |
+|---|---|---|
+| `daily` · `rapid` · `by-level` · `comprehensive` · `weak-review` · `retention` · `full-review` | **T2** | **Mức phỏng vấn thật.** Mặc định |
+| `deep-dive` | **T3** | **Nâng cao, opt-in.** Chỉ khi ứng viên chủ động chọn |
+
+**Bật T3 có tính điểm — interviewer KHÔNG BAO GIỜ tự bật.** Ba cách, chi tiết ở [interview-types.md → Cách bật chế độ chuyên sâu](interview-types.md):
+
+| Cách | Lệnh | Tác dụng |
+|---|---|---|
+| Loại phiên chuyên sâu | `/mock deep-dive track <track>` | Đổi **cả nội dung**: 5 câu design/tình huống, toàn phiên T3 |
+| Cờ trên loại bất kỳ | `/mock comprehensive track <track> --deep` | Giữ nguyên cơ cấu, chỉ **nâng trần + thang chấm** lên T3 |
+| Nói bằng lời | *"hỏi khó vào"*, *"cho tôi mức senior"* | Như cờ `--deep` |
+
+Không có trạng thái dính: bỏ cờ đi là về lại **T2**. Mỗi phiên độc lập.
+
+**Chuẩn cho bài CODING (chỗ dễ vượt tầng nhất) — BA CỠ BÀI:**
+
+| Cỡ | Thời lượng | Nội dung điển hình | Dùng ở phiên nào |
+|---|---|---|---|
+| **Nhỏ** | **10–15′** | Một hàm: reverse list, two-sum, `memcpy`/`strlen`, endianness | type `coding` (3 bài) · **luật ⑤** trong phiên concept |
+| **Vừa** | **20–30′** | Một class có state: RAII wrapper, ring buffer **dùng mutex** | `comprehensive` (**1 bài**) · `coding` nếu rút còn 2 bài |
+| **Lớn** 🔺 | **40′+** | Lock-free/SPSC, đa luồng, tối ưu cache | **CHỈ `deep-dive`** — không bao giờ ở phiên mặc định |
+
+> ⚠️ **Ngân sách phải khớp số câu.** `comprehensive` là 16 câu / ~60′ ⟹ chỉ đủ chỗ cho **1 bài cỡ vừa** *hoặc* **2 bài cỡ nhỏ**, không phải 2 bài vừa. Ra đề vượt ngân sách là lỗi của interviewer, không phải của ứng viên.
+
+| Tiêu chí chấm | Mặc định (T2) | `deep-dive` (T3) |
+|---|---|---|
+| Đồng bộ | một luồng, **hoặc mutex/`lock_guard`** | lock-free, SPSC, CAS |
+| Tối ưu | đúng + O() hợp lý + edge case | cache line, false sharing, `alignas`, mask thay `%` |
+| Hỏi spec trước khi code | ✅ **tính điểm ở cả hai mức** | ✅ |
+| Ví dụ ring buffer | *"sức chứa cố định, không cấp phát trong `push`, đầy thì đè cái cũ + đếm mất, dùng mutex"* | *"SPSC lock-free, chỉ số chạy tự do, release/acquire, `alignas(64)`"* |
+
+> Repo đã tách sẵn 5 tầng cho ring buffer ở [12-dsa/ring-buffer.md](../../12-dsa/ring-buffer.md): §1–§6 là **T2**, §7 (lock-free SPSC) là **T3**. Hỏi đúng tầng thay vì hỏi tầng cao nhất.
+
+**Khi ứng viên tự nêu T3** (vd tự nói *"chỗ này em sẽ cân nhắc false sharing"*): ghi nhận là **điểm cộng vượt mong đợi**, đào sâu thoải mái — nhưng đó là do họ mở cửa, không phải do interviewer ép.
+
+---
+
+### ⚠️ Lan can: SÂU ≠ TRIVIA — cách phân biệt T2 với T3
+
+Hai lỗi ngược nhau, §6 chặn cả hai:
+- **Phiên nông** — dừng ở T1, chỉ hỏi định nghĩa → luật ①–⑥ chữa.
+- **Phiên lệch tầng** — nhảy lên T3, chấm điểm thuật ngữ → mục "Trần độ sâu" chữa.
+
+**Ranh giới T2 / T3, phát biểu một câu:** T2 là *"cơ chế nào giải thích một lớp bug sẽ gặp trong công việc"* — nó đổi **quyết định** của bạn. T3 là **nhãn dán** lên cơ chế đó — biết thì nói nhanh hơn, không biết vẫn ra quyết định đúng.
+
+| ✅ **T2 — tính điểm** | 🔺 **T3 — hỏi được, KHÔNG chấm** |
 |---|---|
 | *"Vì sao lớp bug này chạy đúng x86 mà chết ARM?"* | Tên lệnh barrier (`stlr`/`ldar`/`dmb ish`) |
 | *"Khi nào bạn CHỌN acquire/release thay vì seq_cst?"* | Tên gọi nội bộ của compiler (*guard variable*) |
+| *"Làm sao khoanh vùng khi khách copy `.so` mới rồi crash?"* | Tên công cụ (`abidiff`, `readelf -d`, `LD_DEBUG`) |
+| *"Giấu state sau con trỏ để `sizeof` không đổi"* | Tên pattern (*Pimpl*), tên flag (`-fvisibility=hidden`) |
+| *"Đầy thì đè cái cũ, và phải đếm được số mất"* | `alignas(64)` chống false sharing, mask thay `%` |
+
+**Phép thử nhanh khi phân vân:** *"Không biết thứ này thì ứng viên có ra quyết định SAI trong công việc không?"* — Có ⟹ T2. Không, chỉ diễn đạt chậm hơn ⟹ T3.
 | *"Move ctor và move assign khác nhau chỗ nào?"* | Số hiệu Item/§ trong sách |
 
 Khi ứng viên phản hồi *"câu này quá sâu"*: **phân định từng ý** (đồng ý / nửa đồng ý / không đồng ý), ghi kết luận vào [weak-register.md](weak-register.md) mục calibration, và **điều chỉnh thang chấm** — như đã làm ngày 2026-08-07 và 2026-08-10. Đừng gật đại, cũng đừng bảo vệ câu hỏi bằng mọi giá.

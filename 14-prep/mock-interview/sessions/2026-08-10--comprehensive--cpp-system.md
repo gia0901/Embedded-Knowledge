@@ -14,6 +14,31 @@
 
 ---
 
+## 🎚️ ĐỌC TRƯỚC — phiên này bị chạy VƯỢT TẦNG, đây là cách ôn cho đúng mức
+
+> **Thừa nhận (2026-08-10):** phiên `comprehensive` này đã bị chạy ở độ sâu của `deep-dive`. Đáp án câu 16 liệt kê `nm -D`/`abidiff`/`readelf`/`LD_DEBUG`, bài coding câu 10 là lock-free SPSC — cả hai **vượt mức một vòng phỏng vấn thật**. Đã sửa quy tắc ở [config §6 — Trần độ sâu](../config.md).
+
+**Ba tầng — dùng để lọc khi ôn:**
+
+| | Nghĩa | Ôn thế nào khi **sát ngày phỏng vấn** |
+|---|---|---|
+| **T1 · Cơ chế** | Cái gì xảy ra, vì sao | ✅ **Phải nắm** |
+| **T2 · Vận dụng & đánh đổi** ⭐ | Đọc code tìm bug, chọn phương án, chẩn đoán tình huống | ✅ **Phải nắm — đây là mức phỏng vấn thật** |
+| **T3 · Chuyên sâu** | Tên lệnh/flag, internals, kỹ thuật lock-free | ⏭️ **Bỏ qua được.** Đọc cho biết, **không cần thuộc** |
+
+Trong file này, các đoạn T3 được đánh dấu **`[T3 – bỏ qua được]`**. Thiếu T3 mà chắc T1+T2 thì vẫn là câu trả lời **4 điểm**.
+
+**Thứ tự ưu tiên ôn** (nếu không đủ thời gian cho cả 16 câu):
+
+| Ưu tiên | Câu | Vì sao |
+|---|---|---|
+| 🔴 **1** | **6** (`unique_ptr` ⟹ move-only) · **13a/b** (cái gì phá ABI) · **14** (Pimpl + incomplete type) | Ba lỗ hổng thật, đều là **C++ lõi**, đều T1–T2 |
+| 🟠 **2** | **4** (string_view) · **7** (RVO/NRVO) · **11** (atomic vs mutex) · **15** (move ctor vs assign) | Cơ chế hay bị hỏi, bạn còn hụt một phần |
+| 🟡 **3** | **1, 2, 3, 5, 8, 9** | Đã trả lời tốt — đọc lướt phần "bổ sung" |
+| ⏭️ **4** | **10** (ring buffer), **12, 16** phần công cụ | Làm nếu còn thời gian; xem bản **T2** đã ghi lại ở câu 10 |
+
+---
+
 # PHẦN A — 9 câu ĐÃ HỎI
 
 > Có kèm câu trả lời thực tế của bạn để đối chiếu. **Nhận xét ẩn trong `<details>`.**
@@ -487,107 +512,154 @@ if (readSensor() > 0)                          // (5)
 > **⛔ KHÔNG mở `reviewed/2026-08-09--COD-006--ring-buffer.cpp` trước khi làm xong.**
 > Lần trước **3/4**. Ba lỗi đã ghi: **cấp phát STL trong hot path** · **không hỏi spec "mấy luồng?"** · **`empty()/full()` không an toàn đa luồng**.
 
+> ⚠️ **Đề gốc tôi ra đã yêu cầu lock-free SPSC — vượt tầng.** Dưới đây là **bản T2 (mức phỏng vấn thật, 20–30′)**; bản lock-free giữ lại ở cuối như **tuỳ chọn T3**.
+
+### 🎯 Bản T2 — LÀM BẢN NÀY
+
 **Đề:** viết `RingBuffer<T>` cho daemon thu dữ liệu sensor trên embedded Linux.
 
 **Spec:**
 - Sức chứa **cố định**, cấp phát **một lần** lúc khởi tạo. **Không cấp phát gì trong `push()`/`pop()`.**
-- **Một** producer thread — **một** consumer thread. Đúng 2 luồng (SPSC).
+- Nhiều thread có thể gọi → dùng **`std::mutex`**.
 - Đầy thì **đè cái cũ nhất**, và **đếm số sample bị mất** — `dropped_count()`.
-- Có `empty()`, `full()`, `size()` dùng được từ cả hai luồng.
+- Có `empty()`, `full()`, `size()`.
 
 **Yêu cầu:**
-1. **Trước khi viết**, nói bạn chọn cơ chế đồng bộ nào và **vì sao** (mutex? atomic? lock-free?). Nêu đánh đổi.
+1. **Trước khi viết**, hỏi lại tôi spec còn thiếu gì *(đây chính là lỗi lần trước: không hỏi "mấy luồng?")*, rồi nói bạn chọn cơ chế đồng bộ nào và **vì sao**.
 2. Viết vào **file mới** `coding-arena/ring_buffer_v2.cpp`, có `main()` test.
 3. Nêu độ phức tạp `push`/`pop`.
 
-<details><summary>Khung đáp án — CHỈ mở sau khi đã viết xong code của bạn</summary>
+<details><summary>Khung đáp án T2 — CHỈ mở sau khi đã viết xong code của bạn</summary>
 
-**Bước 1 — điều interviewer chờ nghe TRƯỚC khi bạn gõ phím:**
+**Bước 1 — điều interviewer chờ nghe TRƯỚC khi bạn gõ phím** (chính là chỗ bị trừ lần trước):
 
-> *"Spec nói đúng 1 producer + 1 consumer ⟹ đây là **SPSC**. Ca này **không cần mutex**: mỗi chỉ số chỉ có **một** thread ghi, thread kia chỉ đọc. Dùng hai `std::atomic<size_t>` với **acquire/release** là đủ và không có lock. Nếu spec là nhiều producer thì tôi sẽ đổi sang mutex hoặc CAS — lock-free MPMC phức tạp hơn nhiều và tôi sẽ không tự viết nếu không có lý do đo đạc."*
+> *"Cho em hỏi spec trước: **mấy luồng** đọc/ghi? Một producer một consumer, hay nhiều? Khi đầy thì **đè cái cũ** hay **chặn/từ chối**? `T` có đắt để copy không?"*
 
-Chính đoạn nói ra đó là thứ vá lỗi *"không hỏi spec mấy luồng"* của lần trước.
+Hỏi được ba câu này trước khi gõ phím **quan trọng hơn** code viết ra. Đây là thứ phân biệt người từng làm sản phẩm thật.
 
-**Bước 2 — những quyết định thiết kế phải nêu:**
+**Bước 2 — quyết định thiết kế cần nêu:**
 
 | Quyết định | Vì sao |
 |---|---|
-| `std::vector<T> buf_` cấp phát **trong constructor** | Không bao giờ cấp phát trong hot path |
-| Sức chứa **luỹ thừa của 2** + `idx & mask_` | Thay `%` (phép chia, chậm trên MCU) bằng AND |
-| Chỉ số **chạy tự do** (không wrap), chỉ mask khi truy cập | Phân biệt được đầy/rỗng mà không cần tốn 1 ô hoặc thêm cờ |
-| `head_` chỉ producer ghi · `tail_` chỉ consumer ghi | Điều kiện để SPSC không cần lock |
-| `alignas(64)` cho hai chỉ số | Chống **false sharing** — hai thread ghi hai biến cùng cache line làm cache ping-pong |
+| `std::vector<T> buf_` cấp phát **trong constructor** | Không bao giờ cấp phát trong hot path — leo lên `push()` là hỏng cả mục tiêu |
+| **Một mutex** bảo vệ toàn bộ state | Nhiều luồng, bất biến trải trên `head_/tail_/count_` ⟹ mutex (xem câu 11) |
+| Giữ `count_` thay vì suy ra từ `head_-tail_` | Phân biệt đầy/rỗng đơn giản, dễ đọc, không cần trick |
+| `dropped_` tăng ngay tại chỗ đè | Mất dữ liệu **phải đo được**, không được im lặng |
 
-**Bộ khung:**
 ```cpp
-#include <atomic>
+#include <mutex>
 #include <vector>
 #include <cstddef>
 
 template <typename T>
 class RingBuffer {
 public:
-    explicit RingBuffer(size_t capacity_pow2)
-        : buf_(capacity_pow2), mask_(capacity_pow2 - 1) {
-        // yêu cầu luỹ thừa của 2
-    }
+    explicit RingBuffer(size_t capacity)
+        : buf_(capacity) {}                       // cấp phát MỘT LẦN, ở đây
 
-    // ---- Producer thread GỌI ----
     void push(const T& item) {
-        const size_t h = head_.load(std::memory_order_relaxed); // chỉ producer ghi head_
-        const size_t t = tail_.load(std::memory_order_acquire); // đọc tiến độ consumer
-        if (h - t == buf_.size()) {                             // ĐẦY → đè cái cũ nhất
-            tail_.store(t + 1, std::memory_order_release);      // bỏ 1 phần tử cũ
-            dropped_.fetch_add(1, std::memory_order_relaxed);   // counter độc lập → relaxed đủ
+        std::lock_guard<std::mutex> lk(m_);
+        if (count_ == buf_.size()) {              // ĐẦY → đè cái cũ nhất
+            tail_ = (tail_ + 1) % buf_.size();    // bỏ phần tử cũ nhất
+            ++dropped_;
+            --count_;
         }
-        buf_[h & mask_] = item;                                 // KHÔNG cấp phát
-        head_.store(h + 1, std::memory_order_release);          // công bố sau khi ghi xong
+        buf_[head_] = item;                       // ghi đè ô có sẵn — KHÔNG cấp phát
+        head_ = (head_ + 1) % buf_.size();
+        ++count_;
     }
 
-    // ---- Consumer thread GỌI ----
-    bool pop(T& out) {
+    bool pop(T& out) {                            // trả false nếu rỗng
+        std::lock_guard<std::mutex> lk(m_);
+        if (count_ == 0) return false;
+        out  = buf_[tail_];
+        tail_ = (tail_ + 1) % buf_.size();
+        --count_;
+        return true;
+    }
+
+    bool   empty() const { std::lock_guard<std::mutex> lk(m_); return count_ == 0; }
+    bool   full()  const { std::lock_guard<std::mutex> lk(m_); return count_ == buf_.size(); }
+    size_t size()  const { std::lock_guard<std::mutex> lk(m_); return count_; }
+    size_t dropped_count() const { std::lock_guard<std::mutex> lk(m_); return dropped_; }
+
+private:
+    std::vector<T>     buf_;
+    size_t             head_ = 0, tail_ = 0, count_ = 0, dropped_ = 0;
+    mutable std::mutex m_;                        // `mutable` để lock được trong hàm const
+};
+```
+
+**Độ phức tạp:** `push`/`pop` đều **O(1)**, không cấp phát.
+
+**Ba điểm ăn điểm khi trình bày:**
+
+1. **`mutable std::mutex`** — vì `empty()/size()` là `const` nhưng vẫn phải khoá. Đây là ca dùng `mutable` chính đáng nhất (đúng nội dung CPP-031).
+
+2. **`empty()`/`full()` "an toàn" nghĩa là gì** *(chỗ bị trừ lần trước)*: chúng an toàn ở nghĩa **không data race**, nhưng giá trị trả về là **ảnh chụp tức thời** — vừa đọc `empty()==false` xong thì thread khác đã `pop` mất. Vì vậy **không được** viết:
+```cpp
+if (!rb.empty()) rb.pop(x);   // ❌ TOCTOU — kiểm tra và lấy là HAI thao tác
+if (rb.pop(x))   { ... }      // ✅ kiểm tra và lấy trong MỘT thao tác có khoá
+```
+Nói được ý này **quan trọng hơn** code.
+
+3. **Đánh đổi nên nêu chủ động:** *"Em dùng mutex vì spec không nói rõ số luồng và mutex đúng trong mọi trường hợp. Nếu đo thấy nghẽn ở đây và xác nhận đúng 1 producer + 1 consumer thì có thể chuyển sang phương án không khoá — nhưng em sẽ không tự viết lock-free nếu chưa có số đo."*
+
+Câu cuối chính là câu trả lời **senior**: biết có phương án nhanh hơn, và biết **lý do chưa dùng nó**.
+
+**Ôn:** [12-dsa/ring-buffer.md](../../../12-dsa/ring-buffer.md) §1–§6 · bank [COD-006](../bank/coding.md), [DSA-013](../bank/dsa.md), [DSA-014](../bank/dsa.md)
+</details>
+
+<details><summary>🔺 [T3 – bỏ qua được] Bản lock-free SPSC — chỉ mở khi muốn nâng cao, KHÔNG cần cho phỏng vấn</summary>
+
+> Chỉ làm bản này khi đã vững bản T2 và **còn dư thời gian**. Trong vòng technical thật, đây là bài 30–45′ riêng nó — hiếm khi được yêu cầu, trừ vị trí chuyên về low-latency.
+
+Điều kiện áp dụng: **đúng 1 producer + 1 consumer** (SPSC). Mỗi chỉ số chỉ **một** thread ghi, thread kia chỉ đọc ⟹ không cần khoá.
+
+| Kỹ thuật | Vì sao |
+|---|---|
+| Sức chứa **luỹ thừa của 2** + `idx & mask_` | Thay `%` (phép chia, chậm) bằng AND |
+| Chỉ số **chạy tự do** (không wrap), chỉ mask khi truy cập | Phân biệt đầy/rỗng không cần tốn ô hay thêm cờ |
+| `alignas(64)` cho hai chỉ số | Chống **false sharing** — hai thread ghi hai biến cùng cache line gây cache ping-pong |
+| `release` khi công bố · `acquire` khi đọc | Thấy chỉ số mới ⟹ thấy luôn dữ liệu đã ghi trước đó (xem CPP-019) |
+
+```cpp
+template <typename T>
+class SpscRingBuffer {
+public:
+    explicit SpscRingBuffer(size_t cap_pow2) : buf_(cap_pow2), mask_(cap_pow2 - 1) {}
+
+    void push(const T& item) {                                   // CHỈ producer gọi
+        const size_t h = head_.load(std::memory_order_relaxed);  // chỉ mình ghi head_
+        const size_t t = tail_.load(std::memory_order_acquire);
+        if (h - t == buf_.size()) {                              // đầy → đè
+            tail_.store(t + 1, std::memory_order_release);
+            dropped_.fetch_add(1, std::memory_order_relaxed);    // counter độc lập → relaxed đủ
+        }
+        buf_[h & mask_] = item;
+        head_.store(h + 1, std::memory_order_release);           // công bố SAU khi ghi xong
+    }
+
+    bool pop(T& out) {                                           // CHỈ consumer gọi
         const size_t t = tail_.load(std::memory_order_relaxed);
-        const size_t h = head_.load(std::memory_order_acquire); // thấy h ⟹ thấy dữ liệu đã ghi
-        if (h == t) return false;                               // RỖNG
+        const size_t h = head_.load(std::memory_order_acquire);  // thấy h ⟹ thấy dữ liệu
+        if (h == t) return false;
         out = buf_[t & mask_];
         tail_.store(t + 1, std::memory_order_release);
         return true;
     }
-
-    // ---- Gọi được từ CẢ HAI thread (snapshot, không phải giá trị "đúng mãi") ----
-    bool   empty() const { return size() == 0; }
-    bool   full()  const { return size() == buf_.size(); }
-    size_t size()  const {
-        return head_.load(std::memory_order_acquire) -
-               tail_.load(std::memory_order_acquire);
-    }
-    size_t dropped_count() const { return dropped_.load(std::memory_order_relaxed); }
-
 private:
     std::vector<T> buf_;
     size_t mask_;
-    alignas(64) std::atomic<size_t> head_{0};   // chỉ producer ghi
-    alignas(64) std::atomic<size_t> tail_{0};   // chỉ consumer ghi
+    alignas(64) std::atomic<size_t> head_{0};
+    alignas(64) std::atomic<size_t> tail_{0};
     alignas(64) std::atomic<size_t> dropped_{0};
 };
 ```
 
-**Độ phức tạp:** `push` và `pop` đều **O(1)**, không cấp phát, không lock.
+**Lỗ hổng của chính bản này (nói ra thì rất ghi điểm):** ở SPSC, `tail_` lẽ ra **chỉ consumer** được ghi. Khi producer đè, nó phải ghi `tail_` ⟹ **phá vỡ giả định SPSC**. Phương án sạch hơn: producer không bao giờ đụng `tail_`; consumer tự phát hiện bị bỏ xa (`h - t > capacity`) rồi tự nhảy `tail_` lên.
 
-**⚠️ Điểm mà lần trước bạn bị trừ — `empty()`/`full()` "an toàn đa luồng" nghĩa là gì:**
-Chúng an toàn ở nghĩa **không UB** (đọc atomic, không rách dữ liệu), **nhưng giá trị trả về là ảnh chụp tức thời** — vừa đọc xong `empty()==true` thì producer có thể đã push. Vì vậy **không được** viết:
-```cpp
-if (!rb.empty()) { rb.pop(x); }   // ❌ TOCTOU — sai tư duy
-```
-mà phải để `pop()` **tự** báo:
-```cpp
-if (rb.pop(x)) { ... }            // ✅ kiểm tra và lấy trong MỘT thao tác
-```
-Nói được ý này trong phỏng vấn quan trọng hơn viết đúng code.
-
-**Đè cái cũ nhất — chỗ tinh tế:** ở SPSC, `tail_` lẽ ra chỉ consumer được ghi. Khi producer đè, nó phải ghi `tail_` ⟹ **phá vỡ giả định SPSC**. Bản trên chấp nhận đánh đổi này (đơn giản, chấp nhận đua hiếm gặp làm lệch một phần tử). **Nói ra đánh đổi này** — hoặc nêu phương án đúng hơn: consumer tự phát hiện bị bỏ xa (`h - t > capacity`) rồi tự nhảy `tail_`, để producer **không bao giờ** đụng `tail_`.
-
-**Ôn:** [12-dsa/ring-buffer.md](../../../12-dsa/ring-buffer.md) §4 (chính sách khi đầy) → §7 (lock-free SPSC) · bank [COD-006](../bank/coding.md), [DSA-013](../bank/dsa.md), [DSA-014](../bank/dsa.md)
+**Ôn:** [12-dsa/ring-buffer.md](../../../12-dsa/ring-buffer.md) §7
 </details>
 
 ---
@@ -668,9 +740,8 @@ Không cần `count` nữa — `data.size()` đã dưới sự bảo vệ của 
 - Cân nhắc **`extern "C"` ở lớp ngoài** + C++ bên trong: C ABI ổn định, không mangling, gọi được từ Python/Rust/Java. Đánh đổi: mất kiểu mạnh, phải tự quản lý handle (`void*` hoặc struct opaque).
 
 **② Giấu implementation**
-- **Pimpl** — header chỉ khai báo `class Impl; std::unique_ptr<Impl> pimpl_;`. Thêm member vào `Impl` **không đổi kích thước** class public ⟹ không phá ABI. Chi phí: một lần cấp phát + một lần gián tiếp.
-- **Visibility**: `-fvisibility=hidden` + đánh dấu `__attribute__((visibility("default")))` cho đúng những symbol muốn xuất. Giảm kích thước bảng symbol, tăng tốc load, và **ngăn khách hàng lỡ phụ thuộc vào internal**.
-- **Version script** (`.map`) để khoá danh sách symbol xuất.
+- **Pimpl** — header chỉ khai báo `class Impl; std::unique_ptr<Impl> pimpl_;`. Thêm member vào `Impl` **không đổi kích thước** class public ⟹ không phá ABI. Chi phí: một lần cấp phát + một lần gián tiếp. *(Ý tưởng này là **T2 — phải nắm**; tên gọi "Pimpl" chỉ là nhãn.)*
+- 🔺 **[T3 – bỏ qua được]** Cơ chế thu hẹp bề mặt symbol: `-fvisibility=hidden` + `__attribute__((visibility("default")))` cho symbol muốn xuất; **version script** (`.map`) khoá danh sách. **Mức phỏng vấn thật chỉ cần ý:** *"nên xuất càng ít symbol càng tốt, để khách không lỡ phụ thuộc vào internal"* — không cần tên flag.
 
 **③ Vòng đời & sở hữu**
 - Ai cấp phát thì người đó giải phóng — **không** để khách `delete` con trỏ do thư viện `new` (khác heap/allocator ⟹ crash). Cung cấp `create()`/`destroy()` theo cặp.
@@ -918,7 +989,10 @@ SocketHandle(SocketHandle&& o) {
 
 Loại thứ hai **nguy hiểm hơn nhiều** vì nó im lặng. Đây là lý do bump SONAME quan trọng: nó biến lỗi âm thầm thành lỗi **báo ngay lúc load**.
 
-**(c) Công cụ chứng minh:**
+**(c) Công cụ chứng minh** — 🔺 **[T3 – bỏ qua được]**
+
+> **Mức phỏng vấn thật chỉ cần nói được Ý:** *"Em sẽ **so sánh danh sách symbol xuất** của hai bản `.so` xem có symbol nào biến mất, và **kiểm tra app đang cần SONAME nào**."* Nói được hai ý đó là **đủ điểm**. Tên lệnh dưới đây là để tra khi ngồi máy, **không cần thuộc** — nhớ được `nm -D` và `ldd` là quá đủ.
+
 ```bash
 # 1. So sánh symbol xuất giữa hai bản
 nm -D --defined-only libscan.so.1.old | sort > old.txt
@@ -978,6 +1052,18 @@ valgrind --tool=memcheck ./app   # bắt ghi đè do sizeof lệch
 - Khi bị chỉ ra sai (câu 6), **tổng quát hoá được ngay** sang trường hợp gốc — kỹ năng lần trước bị trừ điểm (09/08) nay đã cải thiện.
 
 ## Khi mock lại phiên này
-- **Không lặp nguyên văn** các đề trên (config §6). Đổi góc: câu 6 → đưa class đã sửa rồi hỏi *"vì sao `vector::push_back` giờ chạy được"*; câu 9 → đổi sang `operator int()` thay vì `operator bool()`.
+- **Trần độ sâu = T2** (config §6). Phần T3 được phép hỏi để dò trần nhưng **không tính điểm**. Muốn bản khó thì gõ `/mock deep-dive track cpp-system` hoặc thêm cờ `--deep`.
+- ⚠️ **Chỉ 1 bài coding cỡ vừa**, không phải 2 — phiên gốc ra 2 bài (câu 10 + câu 15) là **vượt ngân sách 60′**, đã sửa quy tắc ở [interview-types → comprehensive](../interview-types.md). Khi mock lại: chọn **một** trong hai, bài còn lại tự làm ngoài phiên.
+- **Không lặp nguyên văn** các đề trên. Đổi góc: câu 6 → đưa class đã sửa rồi hỏi *"vì sao `vector::push_back` giờ chạy được"*; câu 9 → đổi sang `operator int()` thay vì `operator bool()`.
 - **Chưa cập nhật** `weak-register.md` và **chưa tick** buổi CN trong plan — phiên chưa hoàn tất, không chấm nửa vời.
-- Hai bài coding (câu 10, 15) **bắt buộc làm từ file trống**, không mở `reviewed/`.
+- Hai bài coding (câu 10, 15) **bắt buộc làm từ file trống**, không mở `reviewed/`. Câu 10 làm **bản T2 (mutex)**, không phải lock-free.
+
+## ✅ Tự đánh giá "đã đủ cho phỏng vấn chưa"
+
+Với mỗi câu, hỏi mình đúng ba việc — làm được cả ba là **đạt mức phỏng vấn thật**, không cần hơn:
+
+1. **Nói được cơ chế** trong 3–4 câu, không đọc thuộc định nghĩa.
+2. **Nhìn code chỉ ra được chỗ sai** và giải thích hậu quả cụ thể.
+3. **Nêu được một đánh đổi** — *"em chọn X vì Y, đổi lại mất Z"*.
+
+Nếu tắc ở tên lệnh hay tên kỹ thuật mà vẫn nói được cả ba việc trên → **không phải lỗ hổng**, đừng mất thời gian học thuộc.
