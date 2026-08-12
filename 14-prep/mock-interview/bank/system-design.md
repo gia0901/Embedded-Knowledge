@@ -146,6 +146,57 @@ Tách vai trò (realtime đọc/điều khiển, process kia xử lý/UI/mạng)
 - **Vấn đề**: `malloc`/`new` ở runtime gây **fragmentation** (thất bại dù còn RAM) + thời gian **bất định** → nguy hiểm cho hệ chạy năm trời/realtime.
 - **Chiến lược**: cấp phát mọi thứ **lúc init** rồi khóa; sau đó chỉ dùng **pool/arena** cố định. Các khối: **object pool** (slot cố định, mượn/trả O(1)), **fixed-block allocator** theo size-class, **ring/arena allocator** cho dữ liệu tạm (reset theo khung), **stack allocator** cho vòng đời LIFO.
 - **Deep dive**: tính **budget RAM** trước (mỗi module bao nhiêu, worst-case đồng thời); pool trả `nullptr` khi cạn (tất định) thay vì `bad_alloc`; placement new + destructor tường minh; cân nhắc `-fno-exceptions`/no-RTTI nếu môi trường yêu cầu.
+
+---
+
+### ⭐ Vì sao "cẩn thận `delete` đầy đủ" KHÔNG chữa được phân mảnh
+
+Đây là chỗ hay bị nói lướt. **Phân mảnh không phải là leak** — nó xảy ra ngay cả khi bạn giải phóng hoàn hảo:
+
+```
+Cấp phát xen kẽ rồi giải phóng hết các khối 1000:
+
+ [100][1000][100][1000][100][1000][100]
+   ↓ free hết khối 1000
+ [100][    ][100][    ][100][    ][100]
+        900        900        900         ← tổng trống 2700 byte
+
+ Xin 1 khối 2000 byte  →  ❌ THẤT BẠI (không mảnh nào đủ 2000)
+```
+
+**Vì sao allocator không gom ba mảnh 900 lại?** Vì muốn gom thì phải **dời** các khối 100 đang dùng — mà C/C++ phơi bày **địa chỉ thật**: chương trình đang giữ con trỏ trỏ thẳng vào đó. Dời khối = mọi con trỏ ấy thành rác, và allocator **không có cách nào tìm ra** chúng để cập nhật.
+
+> Ngôn ngữ có GC (Java, Go) **nén được** heap chính vì chúng không cho bạn giữ địa chỉ trần — chúng dùng handle mà runtime có thể sửa. C++ đánh đổi khả năng đó lấy hiệu năng và khả năng kiểm soát.
+
+⇒ Phân mảnh là hệ quả của **mẫu cấp phát**, không phải của **kỷ luật giải phóng**. Sửa bằng cách **đổi mẫu cấp phát**, không phải bằng cách "cẩn thận hơn".
+
+### Nếu code ĐÃ LỠ dùng STL khắp nơi
+
+Không phải viết lại — C++17 có **`std::pmr`** (polymorphic memory resource): giữ nguyên container, chỉ đổi **nguồn cấp phát**.
+
+```cpp
+#include <memory_resource>
+
+static std::array<std::byte, 64 * 1024> pool;            // bộ nhớ TĨNH, cấp 1 lần
+std::pmr::monotonic_buffer_resource res{pool.data(), pool.size()};
+
+std::pmr::vector<Sample>          samples{&res};          // vẫn là vector
+std::pmr::string                  name{&res};
+std::pmr::unordered_map<int, Log> logs{&res};
+
+// ... dùng bình thường ...
+res.release();      // "giải phóng" cả pool trong O(1) — reset con trỏ, không free từng khối
+```
+
+| Memory resource | Hành vi | Hợp với |
+|---|---|---|
+| `monotonic_buffer_resource` | Chỉ cấp, **không** trả lẻ; reset cả khối | Dữ liệu theo **khung/vòng lặp** — reset mỗi chu kỳ |
+| `unsynchronized_pool_resource` | Pool theo size-class, có trả lẻ | Object vòng đời lẫn lộn, **một luồng** |
+| `synchronized_pool_resource` | Như trên, có khoá | Nhiều luồng dùng chung pool |
+
+**Đánh đổi phải nói ra:** `pmr` thêm **một lần gián tiếp qua vtable** ở mỗi lần cấp phát (memory resource là interface ảo). Đổi lại: tất định, không phân mảnh heap toàn cục, và **không phải sửa logic**. Với hệ chạy dài ngày, đây gần như luôn là giao dịch có lợi.
+
+**Chốt:** *"Phân mảnh sinh ra từ mẫu cấp phát chứ không từ việc quên free — nên phải đổi mẫu, không phải đổi kỷ luật. Cấp một lần lúc init, sau đó chỉ mượn-trả trong pool; code cũ dùng STL thì bọc bằng `std::pmr` thay vì viết lại."*
 - **Trade-offs**: pool (nhanh, tất định, nhưng phí RAM giữ chỗ + phải ước lượng đúng) vs heap (linh hoạt, rủi ro); nhiều size-class (ít phí) vs một cỡ (đơn giản).
 - **Failure**: pool cạn → chính sách rõ (drop/chờ/degrade), không tràn âm thầm; phát hiện leak-logic (mượn không trả) bằng đếm slot; guard chống double-release.
 </details>

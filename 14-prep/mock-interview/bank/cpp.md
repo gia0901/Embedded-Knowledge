@@ -1024,5 +1024,66 @@ DeviceHandle(DeviceHandle&& o) {
 **Chốt:** *"Move ctor xây từ số 0 nên không dọn gì; move assign phải dọn tài nguyên đang giữ. Cả hai `noexcept`, cả hai để nguồn ở trạng thái huỷ được."*
 </details>
 
+#### CPP-055 · 🟠 · concept · ⭐ · [→ oop](../../../01-cpp-fundamentals/oop.md) · 🎤 2026-08-13
+**Một class cho chuyển ngầm CẢ HAI CHIỀU (ctor 1 đối số + conversion operator, đều không `explicit`). Sinh ra những lớp lỗi nào mà chỉ một chiều thì không có?**
+<details><summary>Đáp án</summary>
+
+Đây là tầng thứ ba của [CPP-032](cpp.md) — sau *ctor ngầm* và *safe-bool*, đến ca **hai chiều**.
+
+```cpp
+class Timeout {
+public:
+    Timeout(int ms) : ms_(ms) {}      // int → Timeout   (chiều vào)
+    operator int() const { return ms_; }  // Timeout → int (chiều ra)
+private:
+    int ms_;
+};
+void wait(Timeout t);
+void retry(int times);
+```
+
+**① Số học im lặng trên kiểu không phải số** — đã chạy thật:
+```cpp
+Timeout a(100), b(200);
+int s = a + b;        // = 300, kiểu int. Cộng hai "thời hạn" ra một số vô nghĩa
+wait(a + b);          // 300 quay ngược thành Timeout(300ms) — vòng tròn khép kín
+```
+
+**② Dùng nhầm API mà giá trị trông "hợp lý"** — nguy hiểm hơn safe-bool:
+```cpp
+retry(a);             // chạy: retry(100 LẦN) trong khi a nghĩa là 100 MILLISECOND
+```
+Với `operator bool` sai thì giá trị chỉ là `0/1` — dễ thấy bất thường trong log. Ở đây giá trị **đúng con số người viết nghĩ tới**, chỉ **sai đơn vị/ngữ nghĩa** → log trông bình thường, bug sống rất lâu.
+
+**③ Nhập nhằng — lớp lỗi CHỈ có khi đủ hai chiều:**
+```cpp
+bool operator==(const Timeout&, const Timeout&);
+Timeout a(1);
+bool r = (a == 100);
+// error: ambiguous overload for 'operator==' (operand types are 'Timeout' and 'int')
+```
+Compiler có **hai đường cùng hạng**: đưa `100` thành `Timeout` rồi dùng `operator==` của bạn · hoặc đưa `a` thành `int` rồi dùng `==` dựng sẵn. Không luật nào ưu tiên → lỗi. Thiếu **một trong hai** chiều thì chỉ còn một đường, không nhập nhằng.
+
+Tương tự với hai conversion operator cùng hạng:
+```cpp
+operator int() const;  operator long() const;
+a + 1;   // error: ambiguous overload for 'operator+'
+```
+
+**⚠️ Bẫy chẩn đoán (thí sinh hay sai):** `Timeout c(a);` **gọi copy constructor**, KHÔNG đi đường `a→int→Timeout(int)`. Copy ctor là **exact match**, luôn thắng chuỗi chuyển đổi do người dùng định nghĩa. Muốn kiểm chứng thì đừng chỉ đặt log ở một ctor — copy ctor **ngầm** không in gì nên phép đo không phân biệt được hai giả thuyết. Dùng:
+```cpp
+static_assert(std::is_copy_constructible_v<Timeout>);
+```
+
+**Sửa:** `explicit` cả hai chiều.
+```cpp
+explicit Timeout(int ms);
+explicit operator int() const;     // muốn lấy số thì gọi tên rõ: t.count()
+```
+Tốt hơn nữa cho API đo thời gian: dùng **kiểu mạnh** `std::chrono::milliseconds` — nó chặn lẫn đơn vị ngay từ hệ thống kiểu, `wait(500ms)` không thể nhầm với `retry(500)`.
+
+**Chốt:** *"Một chiều ngầm đã dễ sai; hai chiều thì object của bạn thành số nguyên trá hình — vừa lọt phép toán vô nghĩa, vừa sinh nhập nhằng mà một chiều không có."*
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

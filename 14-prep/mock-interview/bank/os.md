@@ -301,7 +301,55 @@ Hai **câu hỏi khác nhau**, và chỗ hầu hết người trả lời gộp 
 
 Đây chính là lý do danh sách **async-signal-safe hẹp hơn nhiều** so với thread-safe: `printf` **là** thread-safe (glibc khoá stdio) nhưng **không** async-signal-safe — gọi từ handler khi luồng chính đang giữ khoá stdio là deadlock ([LNX-011](linux-sysprog.md)).
 
-**Nguyên nhân điển hình khiến hàm không thread-safe:** dùng **biến toàn cục/static**. Đó là lý do có họ `_r` — `strtok_r`, `localtime_r`, `getpwnam_r`: thay vì trả con trỏ tới **bộ nhớ tĩnh dùng chung**, chúng nhận **buffer do caller cấp** → hết trạng thái chia sẻ → reentrant luôn.
+**Nguyên nhân điển hình khiến hàm không thread-safe:** dùng **biến toàn cục/static**. Đó là lý do có họ `_r` — `strtok_r`, `localtime_r`, `getpwnam_r`: thay vì trả con trỏ tới **bộ nhớ tĩnh dùng chung**, chúng nhận **buffer do caller cấp** → hết trạng thái chia sẻ.
+
+---
+
+### Ví dụ cụ thể — cùng một hàm, hai câu trả lời khác nhau
+
+```cpp
+std::mutex m;
+int counter = 0;
+
+void logEvent(const char* msg) {
+    std::lock_guard<std::mutex> lk(m);     // ← khoá
+    counter++;
+    write(fd, msg, strlen(msg));
+}
+```
+| | Trả lời | Vì sao |
+|---|---|---|
+| Thread-safe? | ✅ **Có** | mutex bảo vệ `counter` và thứ tự ghi |
+| Reentrant / async-signal-safe? | ❌ **Không** | Luồng chính đang giữ `m` → signal chen ngang → handler gọi lại `logEvent` → `lock()` lần hai trên mutex **không đệ quy** → **tự deadlock**. Chương trình treo, không crash, không log gì |
+
+**Bản dùng được trong signal handler:**
+```cpp
+volatile sig_atomic_t counter = 0;          // kiểu chuẩn cho dữ liệu chia sẻ với handler
+
+void logEventSafe(const char* msg, size_t len) {
+    counter++;                              // không khoá
+    write(STDERR_FILENO, msg, len);         // ✅ write LÀ async-signal-safe
+}
+```
+Bỏ mutex, bỏ mọi thứ đụng trạng thái toàn cục. Truyền sẵn `len` để khỏi phụ thuộc `strlen`.
+
+### ⚠️ Hai hiểu lầm phải tránh
+
+**① `write()` KHÔNG phải hàm cấm.** Nó nằm trong danh sách async-signal-safe của POSIX (`man 7 signal-safety`) vì là **syscall trần** — không khoá, không buffer trong userspace.
+
+| ✅ Async-signal-safe | ❌ KHÔNG (dù thread-safe) | Vì sao cấm |
+|---|---|---|
+| `write`, `read`, `open`, `close` | `printf`, `fprintf`, `puts` | buffer stdio + khoá stdio |
+| `_exit`, `kill`, `signal`, `sigaction` | `malloc`, `free`, `new` | khoá heap — handler chen giữa lúc heap dở dang |
+| `time`, `sem_post` | `localtime`, `strerror` | trả con trỏ tới **static buffer** |
+
+**② Họ `_r` giải quyết THREAD-SAFETY, không phải SIGNAL-SAFETY.** Hai tính chất giao nhau nhưng khác nhau — `localtime_r` thread-safe nhưng vẫn **không** nằm trong danh sách async-signal-safe. Đừng suy ra "cứ `_r` là gọi được trong handler".
+
+**Nguyên tắc tự suy khi không nhớ danh sách:** hàm nào **lấy khoá** hoặc **đụng trạng thái toàn cục có thể đang dở dang** thì cấm. Handler chen vào **giữa** một thao tác của luồng chính — mọi bất biến đang xây dở đều có thể bị nhìn thấy.
+
+**Mẫu thực chiến:** handler chỉ làm việc tối thiểu — đặt một cờ `volatile sig_atomic_t` hoặc `write()` một byte vào **self-pipe** — rồi để vòng lặp chính (event loop) xử lý phần nặng. Đây là *self-pipe trick*, xem [LNX-011](linux-sysprog.md).
+
+**Chốt:** *"Thread-safe được phép dùng khoá; reentrant thì không — vì kẻ chen ngang chính là mình. Vì thế danh sách signal-safe hẹp hơn hẳn, và `_r` không phải là vé vào cửa."*
 </details>
 
 #### OS-021 · 🟠 · concept · [→ process-thread](../../../03-operating-system/process-thread.md)

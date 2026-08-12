@@ -78,7 +78,7 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 
 | Domain | Dải ID đã dùng |
 |---|---|
-| CPP | 001–054 (040–051 = track `emc`, neo theo Item; 052 = shared_ptr 3 tầng thread-safety; 053 = safe-bool / `explicit operator bool`; 054 = move ctor vs move assign) |
+| CPP | 001–055 (040–051 = track `emc`, neo theo Item; 052 = shared_ptr 3 tầng thread-safety; 053 = safe-bool / `explicit operator bool`; 054 = move ctor vs move assign; 055 = chuyển ngầm hai chiều + nhập nhằng) |
 | OS | 001–021 (020 = thread-safe vs reentrant, 021 = `fork()` trong chương trình đa luồng) |
 | LNX | 001–029 (027 = `EINTR`/`SA_RESTART`, 028 = `O_APPEND` vs `lseek`+`write`, 029 = chọn clock đo thời gian) |
 | DRV | 001–027 (019–027 = PCI/USB) |
