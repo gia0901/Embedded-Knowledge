@@ -10,15 +10,15 @@
 > **Conversation mới đọc block này TRƯỚC TIÊN** để biết đang ở đâu và làm gì tiếp. Đây là plan **đang chạy** và là **nguồn lịch duy nhất** (không còn daily-plan hay plan role nào khác).
 
 - **Plan đang chạy:** 🎯 Datalogic (file này) · bắt đầu **2026-08-03** (T2). ⚠️ **Trễ 2 ngày**: B5 lẽ ra T6 07/08, thực tế chạy CN 09/08 → **CN và B5 dồn vào cùng ngày**. Tuần 2 nên bắt đầu **T2 10/08**; nếu không kịp buổi CN thì gộp nó vào khởi động buổi đầu Tuần 2, đừng đẩy cả plan lùi.
-- **Vị trí:** ✅ **HẾT Tuần 1** (C++17 & Modern C++). Buổi CN đã chạy xong phần chính → sang **Tuần 2** (Linux sysprog + debug).
-- **Buổi gần nhất:** `comprehensive track cpp-system` (CN, trần T2) — **3.0/4**, 15/16 câu ([log](../mock-interview/sessions/2026-08-13--comprehensive--cpp-system.md)). Sổ yếu **2 → 5** (+CPP-016 slicing, +OS-020 signal-safety, +SD-016 bộ nhớ tất định; CPP-032 lên 1/2). Retention CPP-020 (**4**) + CPP-029 (**3**) đạt → dời Tuần 4. Điểm sáng: CPP-014, OS-001, CPP-020 đều 4. *(B1: 3.25 · B2: 3.3 · B3: 2.83 · B4: 3.17 · B5: 3.67 · CN-weak: 3.0 · CN-comp: 3.0)*
-- **▶️ LÀM TIẾP:** **Tuần 2 Buổi 1** — 🔁 khởi động 5–10′ (câu đến hạn Tuần 3 chưa tới, dùng sổ yếu: OS-020) → đọc [file-io](../../04-linux-system-programming/file-io.md) + [processes-signals](../../04-linux-system-programming/processes-signals.md) → `/mock rapid track linux-sysprog`. **OS-020 (signal-safety) sẽ được chèn lại ở đây** vì đúng domain.
-- **Nợ lại từ Tuần 1:** ① **bài coding** `SocketHandle` (CPP-054) + `ring_buffer_v2` bản mutex (COD-006) — chạy `/mock coding track cpp-system`, làm từ file trống. ② Viết lại đáp án bank **DP-011** theo tiêu chuẩn mới (có code + cơ chế).
-- **Sổ yếu (5 câu):** CPP-016 · OS-020 · SD-016 · CPP-032 (1/2 lần ≥3) · CPP-054 (chưa hỏi lại). Xem [weak-register](../mock-interview/weak-register.md).
+- **Vị trí:** **Tuần 2 · Buổi 1 — ĐANG DỞ** (mới 3/12 câu, ứng viên tạm ngưng). Tuần 1 đã xong hết.
+- **Buổi gần nhất:** `rapid track linux-sysprog` (T2·B1, trần T2) — **2.67/4**, **3/12 câu** rồi tạm ngưng ([log](../mock-interview/sessions/2026-08-13--rapid--linux-sysprog.md)). OS-020 **2 → 3** (nền signal-safety đã vá xong, còn hụt vận dụng) · LNX-005 **2** → vào sổ yếu · LNX-028 **3**. Sinh câu bank mới **LNX-030** (`SA_RESTART` phá shutdown). *(B1: 3.25 · B2: 3.3 · B3: 2.83 · B4: 3.17 · B5: 3.67 · CN-weak: 3.0 · CN-comp: 3.0 · T2B1: 2.67 dở)*
+- **▶️ LÀM TIẾP:** **hoàn tất Tuần 2 Buổi 1** — chạy lại `/mock rapid track linux-sysprog` cho **9 câu còn lại**. Bắt đầu từ **LNX-012 đã ra đề mà chưa trả lời** (daemon `fork`+`exec` → `EADDRINUSE`, đề chép nguyên trong [log](../mock-interview/sessions/2026-08-13--rapid--linux-sysprog.md)). Trước đó đọc nốt [file-io](../../04-linux-system-programming/file-io.md) + [processes-signals](../../04-linux-system-programming/processes-signals.md).
+- **Nợ lại từ Tuần 1:** ① **bài coding** `SocketHandle` (CPP-054) + `ring_buffer_v2` bản mutex (COD-006) — chạy `/mock coding track cpp-system`, làm từ file trống. ② Viết lại đáp án bank **DP-011** theo tiêu chuẩn mới (có code + cơ chế). ③ 🆕 **Bổ sung tài liệu:** `13-networking/tcp-ip.md` thiếu hẳn mục *"TCP không giữ ranh giới message ⇒ phải tự framing"* — lỗ hổng lộ ra ở câu LNX-005.
+- **Sổ yếu (6 câu):** CPP-016 · SD-016 · CPP-054 (chưa hỏi lại) · **LNX-005** 🆕 · OS-020 (1/2 lần ≥3) · CPP-032 (1/2 lần ≥3). Xem [weak-register](../mock-interview/weak-register.md).
 
 **Checklist buổi (tick `[x]` khi xong — đây là "đang dang dở đến đâu"):**
 - **Tuần 1** (C++17): `[x]` B1 · `[x]` B2 · `[x]` B3 · `[x]` B4 · `[x]` B5 · `[x]` CN *(weak-review 3.0 + comprehensive 3.0; nợ 2 bài coding)*
-- **Tuần 2** (Linux sysprog+debug): `[ ]` B1 ⬅️ **ĐANG Ở ĐÂY** · `[ ]` B2 · `[ ]` B3 · `[ ]` B4 · `[ ]` B5 · `[ ]` CN
+- **Tuần 2** (Linux sysprog+debug): `[~]` B1 ⬅️ **ĐANG Ở ĐÂY — dở 3/12 câu, làm nốt trước** · `[ ]` B2 · `[ ]` B3 · `[ ]` B4 · `[ ]` B5 · `[ ]` CN
 - **Tuần 3** (kernel/drivers): `[ ]` toàn bộ
 - **Tuần 4** (Yocto/design/behavioral): `[ ]` toàn bộ
 
@@ -76,7 +76,7 @@
 
 | Buổi | Đọc/Hiểu | Test 🎤 |
 |---|---|---|
-| 1 | - [ ] [file-io](../../04-linux-system-programming/file-io.md) (fd, syscall, blocking/non-blocking, `O_NONBLOCK`), [processes-signals](../../04-linux-system-programming/processes-signals.md) (fork/exec/wait, zombie, signal handler async-safe). **Pool bank:** LNX-001…012 | `/mock rapid track linux-sysprog` |
+| 1 | - [~] [file-io](../../04-linux-system-programming/file-io.md) (fd, syscall, blocking/non-blocking, `O_NONBLOCK`), [processes-signals](../../04-linux-system-programming/processes-signals.md) (fork/exec/wait, zombie, signal handler async-safe). **Pool bank:** LNX-001…012, **LNX-030** | 🟡 `rapid linux-sysprog` **2.67/4 — dở 3/12 câu** (2026-08-13, [log](../mock-interview/sessions/2026-08-13--rapid--linux-sysprog.md)). Làm nốt 9 câu, bắt đầu từ LNX-012 |
 | 2 | - [ ] 🎯 [io-multiplexing](../../04-linux-system-programming/io-multiplexing.md) (select/poll/epoll, **LT vs ET**, event loop) + [ipc-linux](../../04-linux-system-programming/ipc-linux.md) (pipe, shm, mq, socket, so sánh). **Pool bank:** LNX-013…026 | `/mock by-level 🟠 track linux-sysprog` |
 | 3 | - [ ] 🎯 [09-debugging](../../09-debugging/): [gdb](../../09-debugging/gdb.md), [tools](../../09-debugging/tools.md) (strace/ltrace/perf), [memory-bugs](../../09-debugging/memory-bugs.md) (ASan/TSan/Valgrind), core dump. **Pool bank:** DBG-001…011, 017/018 | `/mock daily track debugging` |
 | 4 | - [ ] [gdb](../../09-debugging/gdb.md) sâu (breakpoint/watchpoint/`bt`/frame, remote **gdbserver**, core dump post-mortem) — điểm yếu cần vá. **Pool bank:** DBG-009/010, 012…016 | `/mock deep-dive track debugging` |

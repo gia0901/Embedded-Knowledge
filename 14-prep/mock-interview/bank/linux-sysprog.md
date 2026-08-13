@@ -353,5 +353,63 @@ Vì đó là **hai syscall**, và giữa chúng process khác chen vào được
 Trong C++ đúng cùng nguyên tắc: **`std::chrono::steady_clock`** cho đo khoảng, `system_clock` cho thời điểm theo lịch — `steady_clock` tồn tại chính vì lý do này.
 </details>
 
+#### LNX-030 · 🟡 · concept · ⭐ · 🎤 2026-08-13 · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**Daemon dưới systemd không tắt được bằng `systemctl stop` — phải `SIGKILL`. Handler đã viết đúng chuẩn "chỉ set cờ". Vấn đề ở đâu?**
+
+```c
+volatile sig_atomic_t stop = 0;
+void on_sigterm(int sig) { stop = 1; }            // ✅ chuẩn sách vở
+
+int main(void) {
+    struct sigaction sa = { .sa_handler = on_sigterm };
+    sa.sa_flags = SA_RESTART;                     // "cho chắc, tránh EINTR"
+    sigaction(SIGTERM, &sa, NULL);
+
+    for (;;) {
+        char* ev = read_next_event();             // read() CHẶN trên socket
+        process(ev);
+        if (stop) break;
+    }
+}
+```
+
+<details><summary>Đáp án</summary>
+
+**Handler đúng, nhưng `SA_RESTART` vô hiệu hoá chính nó.**
+
+`SA_RESTART` khiến `read()` **tự chạy lại** sau khi handler chạy xong. Thiết bị lúc rảnh không có event ⇒ `read()` chặn vĩnh viễn ⇒ vòng lặp **không bao giờ tới dòng `if (stop)`**. Cờ được set nhưng không ai đọc.
+
+**Đây là lỗi tư duy ngược:** `EINTR` bị coi là "phiền toái phải dập". Thật ra nó là **cơ chế duy nhất để signal đánh thức bạn ra khỏi chỗ đang chặn** — đúng thứ shutdown cần.
+
+| | `sa_flags = 0` | `sa_flags = SA_RESTART` |
+|---|---|---|
+| `read()` khi có signal | trả `-1`, `errno = EINTR` | tự gọi lại, **không trả về** |
+| Vòng lặp kiểm tra được cờ | ✅ | ❌ **không bao giờ** |
+| `systemctl stop` | thoát sạch | treo tới `TimeoutStopSec` (**mặc định 90 s**) rồi **SIGKILL** |
+
+**Hệ quả thực tế** (chứ không chỉ "chậm"): mỗi lần restart treo 90 giây; OTA update rơi vào timeout; bị SIGKILL nên **không kịp flush trạng thái** → mất dữ liệu.
+
+**Sửa — xử lý `EINTR` theo *ý định*, không dập bằng cờ:**
+```c
+sa.sa_flags = 0;                       // ✅ để EINTR đánh thức
+...
+ssize_t n = read(fd, buf, len);
+if (n < 0 && errno == EINTR) {
+    if (stop) break;                   // ✅ signal shutdown → thoát
+    continue;                          // ✅ signal khác     → thử lại
+}
+```
+
+**Kiến trúc tốt hơn:** kéo signal vào event loop bằng **`signalfd`** ([LNX-014](linux-sysprog.md)) hoặc **self-pipe trick** — khi đó `epoll_wait` thấy signal như một fd bình thường, không còn cờ `volatile` lẫn `EINTR` để xử lý.
+
+⚠️ **Phân biệt với [LNX-027](linux-sysprog.md):** LNX-027 nói *"`SA_RESTART` không cứu được mọi syscall"* (thiếu). Câu này là vế ngược, ít người biết hơn: *"`SA_RESTART` còn có hại — nó phá shutdown"*.
+
+**Bẫy liên quan cùng đoạn code:** `printf(...)` rồi `_exit(0)` lúc thoát ⇒ `_exit` **không flush stdio**; dưới systemd `stdout` là **pipe tới journald** nên full-buffered ⇒ **mất đúng dòng log shutdown**. Dùng `fflush` + `_exit`, hoặc `exit()`, hoặc `write(2, ...)`.
+
+**Chốt:** *"`EINTR` không phải lỗi cần dập — nó là cách signal gọi bạn dậy. Dập nó bằng `SA_RESTART` là tự làm daemon không tắt được."*
+
+> 🔬 Kiểm chứng chạy thật + bản sửa đầy đủ: [coding-arena/reviewed/2026-08-13--OS-020--sigterm-handler.cpp](../coding-arena/reviewed/2026-08-13--OS-020--sigterm-handler.cpp)
+</details>
+
 ---
 ⬅️ [Bank index](README.md)
