@@ -59,7 +59,10 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 - Tổng kết: điểm mạnh, 2–3 lỗ hổng ưu tiên, mỗi lỗ hổng kèm **link tài liệu + mục cụ thể** (không chỉ link file trống).
 
 **Bước 4 — Cập nhật bộ nhớ (BẮT BUỘC, sau review).**
-- Ghi **1 file log** vào [sessions/](sessions/) theo mẫu [sessions/README.md](sessions/README.md): ngày, track, type, bảng câu (ID + điểm + ghi chú ngắn) **và mục 🔎 "Chi tiết ôn"** — **persist nguyên văn** phần review Bước 3 cho câu ≤3 (thiếu gì + trích bank + trích tài liệu gốc + câu chốt). Log phải **tự chứa** để mở lại là ôn được, không cần đọc lại hội thoại.
+- Ghi **1 file log** vào [sessions/](sessions/) theo mẫu [sessions/README.md](sessions/README.md). Log phải **tự chứa** — mở lại là ôn được, không cần đọc lại hội thoại. **Ba luật hình thức BẮT BUỘC** (chi tiết + khung mẫu ở sessions/README.md):
+  1. **Chép nguyên đề bài, kể cả code**, cho từng câu. Chỉ ghi tên câu rồi phân tích bên dưới = log hỏng.
+  2. **Trình bày kiểu bank:** đề để **mở**, phần *"bạn trả lời gì + nhận xét + đáp án đầy đủ"* **ẩn trong `<details>`**. Cố ý lặp nội dung bank — giá trị nằm ở chỗ đặt **lỗi của ứng viên cạnh đáp án chuẩn**.
+  3. **Câu điểm 3 giải thích đầy đủ ngang câu điểm 2** — nêu rõ *được gì · vì sao chưa 4 · đáp án của phần còn thiếu*. Không gộp các câu 3 thành danh sách gạch đầu dòng ngắn.
 - Cập nhật [weak-register.md](weak-register.md): thêm câu điểm ≤ 2, gỡ/hạ câu đã trả lời vững (≥ 3) qua ≥ 2 lần.
   - ⚠️ **Gỡ một câu = BẮT BUỘC thêm một dòng vào bảng [🔁 Lịch kiểm tra lại](weak-register.md)** — ghi ngày gỡ, hạn kiểm tra (**tuần gỡ + 2**), **góc đã dùng** (để lần sau không lặp) và góc mới đề xuất. Gỡ mà không xếp lịch = câu đó biến mất vĩnh viễn khỏi vùng được hỏi; đó là lỗi.
   - Câu vừa kiểm tra retention: cập nhật cột KQ (✅ dời +2 tuần · 🔻 kéo về bảng sổ yếu) và **ghi góc vừa dùng vào cột "góc đã dùng"**.

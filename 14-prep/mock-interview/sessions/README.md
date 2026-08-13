@@ -7,7 +7,37 @@
 
 ## Mẫu file log
 
-> **Nguyên tắc:** log phải **tự chứa** — mở lại là ôn được ngay, không cần lục chat. Bảng cho *nhìn nhanh*; mục 🔎 **persist nguyên văn phần review chi tiết** (trích bank + tài liệu gốc) mà Bước 3 config bắt buộc cho câu ≤3.
+> **Nguyên tắc:** log phải **tự chứa** — mở lại là ôn được ngay, không cần lục chat.
+
+### ⚠️ Ba luật BẮT BUỘC về hình thức (rút từ góp ý 2026-08-13)
+
+**① CHÉP NGUYÊN ĐỀ BÀI — kể cả code.**
+Ghi *"CPP-030 size/capacity"* rồi bên dưới phân tích ba trang là **log hỏng**: đọc lại không biết đang nói về cái gì. Mỗi câu phải có **nguyên văn đề bài + snippet code y như lúc hỏi**, rồi mới tới nhận xét. Đây là điều kiện của "tự chứa", không phải tuỳ chọn.
+
+**② TRÌNH BÀY THEO KIỂU BANK — đề mở, feedback + đáp án ẩn trong `<details>`.**
+```markdown
+### Câu N · <ID> · <level> · **<điểm>/4**
+
+<nguyên văn đề bài, đủ code>
+
+**🔁 Follow-up:** <nguyên văn follow-up đã hỏi>
+
+<details><summary>Bạn trả lời gì · Nhận xét · Đáp án</summary>
+
+**Bạn trả lời:** <tóm tắt trung thực, đánh dấu ✅/❌ từng ý>
+**✅ Được:** … **❌ Vì sao mất điểm:** …
+**Đáp án đầy đủ:** <cơ chế + bảng + code>
+**Chốt:** <một câu>
+**Lần sau sẽ hỏi:** <góc mới — chép sang weak-register>
+**Ôn:** <link tài liệu + bank>
+</details>
+```
+Để đề **mở** thì lần sau còn tự trả lời lại được; đáp án **ẩn** nên không lộ. **Không ngại lặp nội dung bank** — giá trị của log nằm ở chỗ *lỗi của chính mình đặt cạnh đáp án chuẩn*, thứ bank không có.
+
+**③ CÂU ĐIỂM 3 PHẢI GIẢI THÍCH ĐẦY ĐỦ NHƯ CÂU ĐIỂM 2.**
+Điểm 3 là *"đạt mức mid"*, **không** phải "xong rồi". Gộp các câu 3 vào một danh sách gạch đầu dòng ngắn là **sai** — đó chính là khoảng cách giữa 3 và 4, tức chỗ cần đọc nhất. Mỗi câu 3 phải nói rõ: **được gì · vì sao chưa 4 · đáp án đầy đủ của phần còn thiếu**.
+
+> Áp cho **mọi** câu ≤ 3. Câu 4 thì gọn hơn được, nhưng vẫn giữ nguyên đề bài và ghi phần bổ sung.
 
 ```markdown
 # Phiên mock — <ngày> · <type> · track <track>
