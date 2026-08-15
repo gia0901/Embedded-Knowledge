@@ -74,11 +74,85 @@ Vì thực chất là global state trá hình: tạo coupling ẩn (mọi nơi t
 State pattern cho object đổi hành vi khi trạng thái nội bộ đổi — hiện thực state machine (cốt lõi firmware/protocol). Embedded thường dùng enum + switch/bảng chuyển trạng thái vì tất định, không cấp phát động, không chi phí virtual, footprint biết trước, dễ review — hợp ràng buộc tài nguyên và tin cậy. Bản OOP (mỗi state một class) chỉ đáng dùng khi logic mỗi state đủ phức tạp.
 </details>
 
-#### DP-011 · 🔴 · concept · [→ solid-principles](../../../11-design-patterns/solid-principles.md), [system-design](../../../10-thinking/system-design.md)
-**Dependency Inversion giúp testability thế nào? Liên hệ embedded HAL.**
+#### DP-011 · 🔴 · concept · ⭐ · [→ solid-principles](../../../11-design-patterns/solid-principles.md), [system-design](../../../10-thinking/system-design.md)
+**Logic đọc mã vạch của bạn gọi thẳng driver I2C. Sếp yêu cầu: phải test được trên máy dev, không có phần cứng. Dependency Inversion giải quyết thế nào — và cụ thể "đảo ngược" cái gì?**
+
+```cpp
+// Trạng thái hiện tại
+#include "i2c_driver.h"                      // ← logic PHỤ THUỘC driver
+
+class ScannerLogic {
+public:
+    int readBarcode() {
+        i2c_write(ADDR, CMD_TRIGGER);        // ← gọi thẳng hàm C của driver
+        return i2c_read(ADDR);
+    }
+};
+```
 <details><summary>Đáp án</summary>
 
-DIP yêu cầu module cấp cao phụ thuộc abstraction (interface) và inject implementation từ ngoài. Khi test, thay implementation thật (database, driver phần cứng) bằng mock/stub cùng interface → test logic độc lập, nhanh, không cần tài nguyên thật. Đây chính là nền của Hardware Abstraction Layer trong embedded: logic gọi qua interface nên test được trên host với phần cứng giả lập, còn build cùng code chạy ASan/TSan.
+**Cơ chế — "đảo ngược" là đảo CHIỀU PHỤ THUỘC, không phải "dùng interface".**
+
+Đây là chỗ hầu hết câu trả lời dừng lại quá sớm. Thêm một interface **chưa chắc** là DIP; điều quyết định là **ai SỞ HỮU interface đó**.
+
+```
+❌ TRƯỚC:   ScannerLogic ──────────────►  i2c_driver
+            (cấp cao)                     (cấp thấp)
+            Muốn build/test logic thì BẮT BUỘC phải có driver
+
+✅ SAU:     ScannerLogic ──►  IBarcodePort  ◄────── I2cBarcodeAdapter
+            (cấp cao)        (cấp cao SỞ HỮU)      (cấp thấp)
+            Mũi tên của tầng dưới ĐẢO CHIỀU, chĩa LÊN
+```
+
+**Interface phải nằm ở tầng logic và mô tả *nhu cầu của logic*** (`readBarcode()`), **không** mô tả *khả năng của driver* (`i2cWrite`, `i2cRead`). Nếu bạn đặt `II2cDriver` cạnh driver rồi cho logic gọi vào — **không có gì bị đảo cả**, chỉ thêm một tầng gián tiếp.
+
+**Vì sao — hai tầng:**
+- **Tầng nông (ai cũng nói được):** *"để thay bằng mock lúc test"*.
+- **Tầng thật:** nó cắt **phụ thuộc lúc BUILD/LINK**, không chỉ lúc chạy. Sau khi đảo, `ScannerLogic` **compile được mà không cần file driver tồn tại** ⇒ (1) test chạy trên **x86 host**, nhanh gấp trăm lần nạp firmware; (2) chạy được **ASan/TSan/fuzzer** — thứ không chạy nổi trên MCU; (3) **team logic và team driver làm song song**, chỉ cần chốt interface trước; (4) đổi I2C sang SPI/USB **không đụng một dòng logic nào**.
+
+```cpp
+// ✅ SAU — interface do TẦNG LOGIC định nghĩa, theo nhu cầu của nó
+struct IBarcodePort {                        // đặt cạnh ScannerLogic
+    virtual ~IBarcodePort() = default;
+    virtual std::optional<std::string> read() = 0;
+};
+
+class ScannerLogic {
+    IBarcodePort& port_;                     // ← inject từ ngoài
+public:
+    explicit ScannerLogic(IBarcodePort& p) : port_(p) {}
+    int readBarcode() { /* dùng port_.read() */ }
+};
+
+// Tầng driver hiện thực interface của tầng trên — mũi tên chĩa LÊN
+class I2cBarcodeAdapter : public IBarcodePort { /* gọi i2c_write/i2c_read */ };
+
+// Test trên host, không cần phần cứng
+class FakeBarcodePort : public IBarcodePort {
+    std::optional<std::string> read() override { return "4006381333931"; }
+};
+```
+
+**Ba cách hiện thực seam — chọn theo ràng buộc, đây là phần đánh đổi:**
+
+| Cách | Chi phí runtime | Đổi được lúc nào | Hợp khi |
+|---|---|---|---|
+| **Virtual interface** (trên) | 1 lần gọi gián tiếp qua vtable | **Runtime** | Mặc định. Không đủ nhanh mới tính tiếp |
+| **Template / CRTP** | **0** — nội tuyến hết | Compile-time | Hot path, ISR, MCU không đủ RAM cho vtable |
+| **Link-time seam** (cùng tên hàm, 2 file `.c`) | **0** | Lúc link | Codebase **C** thuần, không đổi được sang C++ |
+
+⚠️ Chỉ bỏ virtual khi **đã đo**. Một lần gọi gián tiếp trên đường đọc mã vạch 30 lần/giây là vô nghĩa; trong ISR chạy 100 kHz thì có thể đáng.
+
+**Bẫy:**
+1. **Đặt interface ở tầng driver** — lỗi phổ biến nhất, không đảo gì cả (xem sơ đồ).
+2. **Interface rò rỉ chi tiết tầng dưới** — `IBarcodePort` mà có hàm `setI2cClockSpeed()` thì đổi sang SPI là vỡ. Interface phải mô tả **cái logic cần**, không phải **cái driver có**.
+3. **Mock hoá mọi thứ** → test xanh nhưng không bắt được bug tích hợp thật. DIP cho phép test logic **nhanh**, **không thay thế** test trên phần cứng thật.
+4. **Nhầm DIP với DI.** *Dependency **Injection*** chỉ là cách truyền phụ thuộc vào (qua ctor/setter) — một kỹ thuật. *Dependency **Inversion*** là nguyên tắc về **chiều phụ thuộc và quyền sở hữu interface**. Dùng DI mà interface vẫn thuộc tầng dưới ⇒ vẫn chưa đảo.
+
+**Chốt:** *"DIP không phải 'thêm interface' — mà là tầng cao **sở hữu** interface theo nhu cầu của nó, để tầng thấp phải chĩa lên. Bằng chứng đã làm đúng: logic compile và test được khi driver chưa tồn tại."*
+
+> 🎤 Viết lại 2026-08-13 (nợ từ Tuần 1). Bản cũ (465 ký tự) chỉ nêu kết luận *"thay implementation bằng mock"* — không nói được **đảo cái gì**, không có seam nào ngoài virtual, không có đánh đổi.
 </details>
 
 #### DP-012 · 🔴 · concept · [→ behavioral](../../../11-design-patterns/behavioral.md)
@@ -118,6 +192,98 @@ Cấp phát sẵn một tập object cố định + danh sách slot rảnh; `acq
 <details><summary>Đáp án</summary>
 
 Decorator thêm hành vi cho object **động, từng lớp** bằng cách bọc nó trong các decorator **cùng interface**, có thể **xếp chồng** nhiều lớp (vd file ← nén ← mã hóa) — tránh bùng nổ lớp con cho mọi tổ hợp tính năng (`EncryptedCompressedStream`...). Mỗi decorator vừa *là* interface đó vừa *giữ* một con trỏ tới object được bọc để ủy nhiệm. Khác Proxy: cả hai đều bọc và cùng interface, nhưng **Proxy kiểm soát *truy cập*** tới một object (lazy load, quyền, cache) — thường một lớp; **Decorator thêm *chức năng*** và thiết kế để **chồng nhiều lớp**. Trong C++ có thể thay bằng template/composition khi tập tính năng biết lúc compile.
+</details>
+
+#### DP-016 · 🟡 · concept · 📦 2026-08-13 · [→ structural](../../../11-design-patterns/structural.md)
+**Adapter pattern dùng khi nào? Cho ví dụ trong embedded.**
+<details><summary>Đáp án</summary>
+
+**Adapter chuyển đổi interface của một lớp có sẵn sang interface mà code của bạn mong đợi** — để hai thứ **không được thiết kế để làm việc cùng nhau** vẫn ghép được.
+
+**Khi nào dùng — ba dấu hiệu:**
+1. Có một **thư viện/driver bên thứ ba** không sửa được, nhưng interface của nó không khớp với hệ thống của bạn.
+2. Muốn **đổi nhà cung cấp** (đổi chip cảm biến, đổi thư viện) mà **không sửa logic**.
+3. Cần **cách ly** code của mình khỏi một API hay thay đổi.
+
+```cpp
+struct ITempSensor {                       // interface hệ thống bạn cần
+    virtual ~ITempSensor() = default;
+    virtual float celsius() = 0;
+};
+
+class Tmp102Adapter : public ITempSensor { // bọc driver của hãng
+    tmp102_handle_t h_;                    // API C của hãng: đọc ra raw 12-bit
+public:
+    float celsius() override { return tmp102_read_raw(&h_) * 0.0625f; }
+};
+```
+
+⇒ **Đây chính là bản chất của HAL trong embedded** ([BSP-001](bsp.md)): mỗi chip một adapter, logic phía trên chỉ biết `ITempSensor`. Đổi chip = viết adapter mới, **không đụng logic**.
+
+**Liên hệ với DIP:** adapter là cách **hiện thực** Dependency Inversion — interface do tầng logic sở hữu, adapter (tầng thấp) hiện thực nó ⇒ mũi tên phụ thuộc chĩa lên ([DP-011](design-patterns.md)).
+
+⚠️ **Đánh đổi:** thêm một tầng gián tiếp (lời gọi ảo + đôi khi cả chuyển đổi dữ liệu). Ở đường nóng hoặc MCU RAM ít, cân nhắc adapter **compile-time** bằng template thay vì virtual ([CPP-017](cpp.md)).
+
+⚠️ **Bẫy:** adapter **rò rỉ** interface gốc — vẫn phơi ra khái niệm riêng của chip (thanh ghi, mã lỗi của hãng) ⇒ đổi chip vẫn phải sửa logic, tức là adapter đã thất bại ở đúng mục đích của nó.
+
+**Chốt:** *"Adapter dịch interface của thứ có sẵn sang thứ bạn cần — nền của HAL. Nhưng nếu nó vẫn để lộ khái niệm của chip ra ngoài thì đổi chip vẫn phải sửa logic, và adapter đó vô dụng."*
+</details>
+
+#### DP-017 · 🟡 · concept · 📦 2026-08-13 · [→ structural](../../../11-design-patterns/structural.md)
+**Facade khác Adapter thế nào?**
+<details><summary>Đáp án</summary>
+
+Cả hai đều "bọc" thứ khác lại, nhưng **mục đích ngược nhau**:
+
+| | **Adapter** | **Facade** |
+|---|---|---|
+| Vấn đề giải quyết | Interface **không khớp** | Interface **quá phức tạp** |
+| Bọc cái gì | Thường **một** lớp/thư viện | **Nhiều** lớp / cả một hệ con |
+| Interface kết quả | **Do bên ngoài quy định** (bạn phải khớp) | **Do bạn tự thiết kế** cho gọn |
+| Câu hỏi nó trả lời | *"Làm sao ghép được?"* | *"Làm sao dùng cho đỡ mệt?"* |
+
+**Ví dụ trong embedded:**
+- **Adapter:** driver TMP102 của hãng → interface `ITempSensor` của bạn ([DP-016](design-patterns.md)).
+- **Facade:** `ScannerApi::scan()` — bên trong nó bật nguồn cảm biến, chờ ổn định, cấu hình phơi sáng, chụp, giải mã, tắt nguồn. Người dùng chỉ gọi **một hàm** thay vì biết cả bảy bước và thứ tự của chúng.
+
+**⭐ Facade thường là thứ bạn phơi ra ở BIÊN GIỚI THƯ VIỆN**: giấu hệ con phức tạp sau một interface nhỏ ⇒ vừa dễ dùng, vừa **giảm bề mặt ABI** phải giữ ổn định ([SD-020](system-design.md)).
+
+⚠️ **Bẫy của Facade:** giấu quá tay ⇒ người dùng cần một biến thể mà facade không cho ⇒ họ **đi vòng qua** nó, và bạn có hai đường vào hệ con. Cách xử lý: facade cho ca thường gặp, **vẫn cho phép truy cập tầng dưới** khi cần — đừng chặn cứng.
+
+**Chốt:** *"Adapter sửa interface không khớp, Facade làm gọn interface quá phức tạp. Adapter phải theo hình dạng người ta quy định; Facade thì bạn tự thiết kế."*
+</details>
+
+#### DP-018 · 🟠 · concept · 📦 2026-08-13 · [→ structural](../../../11-design-patterns/structural.md)
+**Proxy pattern có những biến thể nào? Cho ví dụ ứng dụng.**
+<details><summary>Đáp án</summary>
+
+**Proxy giữ NGUYÊN interface của đối tượng thật**, nhưng chen vào giữa để làm thêm việc gì đó. Đây là điểm phân biệt: adapter **đổi** interface, proxy **giữ nguyên**.
+
+| Biến thể | Thêm việc gì | Ví dụ |
+|---|---|---|
+| **Virtual proxy** | **Hoãn khởi tạo** tới lần dùng đầu | Ảnh/tài nguyên nặng chỉ nạp khi thực sự cần |
+| **Remote proxy** | Che giấu việc đối tượng nằm ở **process/máy khác** | Client stub của RPC/IPC — gọi như hàm cục bộ |
+| **Protection proxy** | Kiểm tra **quyền** trước khi cho qua | Chỉ tiến trình có quyền mới ghi được thanh ghi cấu hình |
+| **Caching proxy** | Nhớ kết quả, tránh gọi lại | Đọc cảm biến chậm: trả giá trị cache nếu chưa quá N ms |
+| **Logging/counting proxy** | Ghi lại mọi lời gọi | Gỡ lỗi, đo hiệu năng mà **không sửa** đối tượng thật |
+
+**Ví dụ embedded đáng nhớ — caching proxy cho cảm biến:**
+```cpp
+class CachedSensor : public ITempSensor {
+    ITempSensor& real_;  float last_;  steady_clock::time_point t_;
+public:
+    float celsius() override {
+        auto now = steady_clock::now();                 // ⚠️ steady_clock, không system_clock
+        if (now - t_ > 100ms) { last_ = real_.celsius(); t_ = now; }
+        return last_;                                   // đọc I2C chậm ⇒ tránh gọi lại
+    }
+};
+```
+Logic phía trên **không biết** có cache — đó chính là giá trị của việc giữ nguyên interface.
+
+⚠️ **Đánh đổi:** proxy làm hành vi **khó đoán hơn** — người gọi tưởng đang đọc giá trị mới nhất nhưng nhận giá trị cũ 100 ms. Với dữ liệu điều khiển thì đây có thể là bug nghiêm trọng ⇒ **phải ghi rõ trong tài liệu**, và cân nhắc cho phép ép đọc mới.
+
+**Chốt:** *"Proxy giữ nguyên interface và chen thêm việc: hoãn khởi tạo, che giấu khoảng cách, kiểm quyền, cache, ghi log. Khác adapter ở chỗ adapter ĐỔI interface còn proxy thì không."*
 </details>
 
 ---

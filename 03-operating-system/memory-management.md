@@ -99,37 +99,51 @@ Khi cần frame mà RAM đầy, chọn page nào để đẩy ra:
 
 ---
 
+## 8. 💰 Chi phí thật & ⚠️ bẫy
+
+**Thang thời gian — thứ quyết định mọi lập luận về bộ nhớ:**
+
+| Sự kiện | Bậc thời gian | So với cache L1 |
+|---|---|---|
+| Cache L1 hit | ~1 ns | 1× |
+| RAM (TLB hit, cache miss) | ~100 ns | **100×** |
+| **Minor page fault** (trang đã ở RAM, chỉ map lại) | **~1 µs** | 1.000× |
+| **Major page fault** (đọc từ eMMC/SSD) | **~0,1–10 ms** | **~1.000.000×** |
+
+⇒ Một **major fault** đắt ngang **hàng triệu** lệnh. Đó là lý do:
+- Hệ **realtime** phải `mlockall()` — một lệnh gán bình thường mà dính major fault là **trượt deadline**.
+- Thiết bị RAM ít **giật từng cơn** trong khi máy dev mượt: máy dev gần như chỉ có minor fault ([OS-010](../14-prep/mock-interview/bank/os.md)).
+- Cần đo thì nhìn **tỉ lệ major/minor**, không nhìn tổng số fault — minor nhiều là bình thường.
+
+**Kích thước cần nhớ:** page **4 KB** · huge page **2 MB** (một mục TLB phủ 2 MB thay vì 4 KB — đáng kể với vùng dữ liệu lớn) · TLB thường **vài trăm–vài nghìn mục**, hit rate thực tế **>99%**.
+
+**⚠️ Bẫy:**
+
+**① `malloc()` thành công KHÔNG có nghĩa là có RAM.** Linux **overcommit**: nó cấp **địa chỉ ảo**, RAM thật chỉ đến ở **lần chạm đầu tiên** (một minor fault). Hệ quả: thời điểm hết bộ nhớ **không phải** lúc `malloc`, mà lúc *ghi* — và khi đó **OOM killer** giết một tiến trình theo `oom_score`, có thể **không phải** tiến trình có lỗi.
+⇒ Kiểm `malloc != NULL` là **chưa đủ** để nói "đã có bộ nhớ". Cần chắc chắn ⇒ cấp phát rồi **chạm hết** (hoặc `mlockall`).
+
+**② `free()` không trả bộ nhớ về OS.** glibc giữ lại trong arena để tái sử dụng ⇒ RSS **không giảm** sau khi `free`. Điều này **bình thường**, đừng nhầm với rò rỉ. (Khối lớn cấp qua `mmap` thì có trả lại.) Muốn biết rò thật hay không: xem **xu hướng RSS theo thời gian**, không xem một thời điểm.
+
+**③ "RAM còn trống ít" thường là chuyện tốt.** Linux **cố ý** dùng RAM rảnh làm page cache. Con số cần nhìn là **available**, không phải **free**.
+
+**④ Trên hệ KHÔNG có MMU, mọi lưới an toàn ở trên biến mất.** Con trỏ hỏng **không** SIGSEGV mà **ghi đè im lặng** vào dữ liệu module khác; phân mảnh **không gom lại được**; tràn stack không ai báo. ⇒ Cấp phát tĩnh/pool, dùng **MPU** nếu có ([OS-024](../14-prep/mock-interview/bank/os.md), [08/constraints.md](../08-embedded-systems/constraints.md)).
+
+**⑤ Thrashing là vách đá, không phải dốc thoải** — vòng phản hồi dương, qua điểm gãy thì **không tự hồi**. Dấu hiệu: **CPU idle cao mà máy đứng** ([OS-014](../14-prep/mock-interview/bank/os.md)).
+
+---
+
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Virtual memory là gì và giải quyết vấn đề gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Virtual memory cho mỗi process một không gian địa chỉ ảo riêng, liên tục, được OS và MMU ánh xạ tới bộ nhớ vật lý. Nó giải quyết: (1) **bảo vệ & cô lập** — process không truy cập được bộ nhớ của process khác; (2) **đơn giản hóa** — mỗi process thấy không gian liền mạch từ 0, không cần biết bố trí vật lý, tránh fragmentation bên ngoài; (3) **overcommit** — tổng bộ nhớ ảo có thể vượt RAM nhờ đẩy page ít dùng ra swap, và demand paging chỉ nạp khi cần.
-</details>
-
-<details><summary>2) Paging hoạt động thế nào? Page table là gì?</summary>
-
-Không gian ảo được chia thành các page cố định (thường 4KB), bộ nhớ vật lý chia thành frame cùng kích thước. Page table (mỗi process một bảng) ánh xạ số page ảo → số frame vật lý kèm các cờ (present, read/write, user/kernel, dirty, accessed). Địa chỉ ảo gồm phần page number và offset; page number tra page table ra frame, ghép với offset thành địa chỉ vật lý. Vì page table phẳng quá lớn nên dùng multi-level page table để chỉ cấp phát phần cần.
-</details>
-
-<details><summary>3) MMU và TLB là gì? Vì sao TLB quan trọng?</summary>
-
-MMU (Memory Management Unit) là phần cứng dịch địa chỉ ảo sang vật lý ở mỗi lần truy cập bộ nhớ và kiểm tra quyền. Vì tra multi-level page table tốn nhiều lần đọc RAM, MMU có TLB (Translation Lookaside Buffer) — một cache lưu các ánh xạ page→frame gần đây. TLB hit cho dịch tức thì; TLB miss buộc đi bộ qua page table rồi nạp vào TLB. TLB quyết định lớn tới hiệu năng; switch process thường phải flush TLB (nếu không có ASID), góp phần làm switch process đắt.
-</details>
-
-<details><summary>4) Page fault là gì? Có phải luôn là lỗi không?</summary>
-
-Page fault là trap khi process truy cập một page chưa "present" trong RAM. Không phải luôn là lỗi: **minor fault** (page đã trong RAM nhưng chưa map vào process, hoặc copy-on-write) chỉ cần cập nhật page table — nhanh; **major fault** (page nằm trên disk/swap) phải đọc I/O — chậm; chỉ **invalid fault** (truy cập địa chỉ không hợp lệ như null/ngoài vùng) mới sinh `SIGSEGV` (segfault). Cơ chế này cho phép demand paging — chỉ nạp page khi thực sự cần.
-</details>
-
-<details><summary>5) Swap là gì? Thrashing xảy ra khi nào?</summary>
-
-Swap là vùng trên disk dùng để chứa các page bị đẩy khỏi RAM khi RAM cạn; kernel chọn page ít dùng (xấp xỉ LRU) ghi ra swap để giải phóng frame, và nạp lại qua major page fault khi cần. Thrashing xảy ra khi tổng working set của các process vượt RAM khả dụng, khiến hệ thống liên tục swap in/out và dành phần lớn thời gian cho I/O thay vì tính toán → hiệu năng sụp đổ. Khắc phục: giảm tải, thêm RAM, hoặc để OOM killer kết thúc process ngốn bộ nhớ.
-</details>
-
-<details><summary>6) Hệ thống không có MMU (embedded) khác gì? Cần lưu ý gì?</summary>
-
-Không có MMU nghĩa là không có dịch địa chỉ ảo→vật lý và không có bảo vệ bộ nhớ phần cứng: mọi process/tác vụ chạy trên địa chỉ vật lý chung, một con trỏ sai có thể phá vùng nhớ bất kỳ, không cô lập. Cần kỷ luật lập trình cao, và lưu ý: cache coherency với DMA (phải flush/invalidate cache để CPU và thiết bị thấy dữ liệu nhất quán), yêu cầu alignment của kiến trúc, và có thể dùng MPU (Memory Protection Unit) để bảo vệ vùng nhớ theo region mà không dịch địa chỉ như MMU.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [OS-008](../14-prep/mock-interview/bank/os.md) | Virtual memory là gì và giải quyết vấn đề gì? |
+| [OS-023](../14-prep/mock-interview/bank/os.md) | Paging hoạt động thế nào? Page table là gì? |
+| [OS-011](../14-prep/mock-interview/bank/os.md) | MMU và TLB là gì? Vì sao TLB quan trọng? |
+| [OS-010](../14-prep/mock-interview/bank/os.md) | Page fault là gì? Có phải luôn là lỗi không? |
+| [OS-014](../14-prep/mock-interview/bank/os.md) | Swap là gì? Thrashing xảy ra khi nào? |
+| [OS-024](../14-prep/mock-interview/bank/os.md) | Hệ thống không có MMU (embedded) khác gì? Cần lưu ý gì? |
 
 ---
 ⬅️ [scheduling.md](scheduling.md) · ➡️ Tiếp theo: [sync-primitives.md](sync-primitives.md)

@@ -47,15 +47,22 @@
    - **Ví dụ thực tế / code minh hoạ ngắn.**
 4. **Hình vẽ & sơ đồ:** ưu tiên ASCII diagram hoặc Mermaid khi giúp dễ hình dung (memory layout, kiến trúc, luồng xử lý, state machine...).
 5. **Code:** ngắn gọn, đúng trọng tâm, có comment giải thích chỗ quan trọng. Mặc định **C++ hiện đại (C++17)** trừ khi chủ đề yêu cầu khác.
-6. Mỗi tài liệu con nên có: phần tóm tắt đầu file (TL;DR) + danh sách "câu hỏi phỏng vấn liên quan" cuối file (link tới domain tương ứng trong `14-prep/mock-interview/bank/`).
-7. **Đáp án câu hỏi phỏng vấn PHẢI được ẩn đi** để người học tự tư duy trước, dùng cú pháp:
+6. Mỗi tài liệu con **PHẢI** có: **TL;DR** đầu file + mục **"Câu hỏi phỏng vấn liên quan"** cuối file.
+7. ⚠️ **MỘT ĐÁP ÁN, MỘT CHỖ — đáp án chỉ sống trong [`bank/`](14-prep/mock-interview/bank/), KHÔNG chép vào tài liệu topic.**
+
+   Mục cuối file chỉ được là **danh sách trỏ sang bank**, không có `<details>` đáp án:
    ```markdown
-   <details><summary>Đáp án</summary>
+   ## Câu hỏi phỏng vấn liên quan
 
-   ... nội dung đáp án đầy đủ ...
-
-   </details>
+   | ID | Câu hỏi |
+   |----|---------|
+   | [LNX-005](../14-prep/mock-interview/bank/linux-sysprog.md) | short read — vì sao lab đúng mà hiện trường sai |
    ```
+   Đáp án vẫn **ẩn trong `<details>`** — nhưng ẩn ở **bank**, nơi nó được định nghĩa một lần.
+
+   > **Vì sao (sự cố thật 2026-08-13):** rà soát đếm được **262 câu hỏi có đáp án chép thẳng vào tài liệu topic 01–13**, song song với 303 câu trong bank — tức 262 bản sao **không có cơ chế đồng bộ**. Cùng ngày, bank `LNX-005` được nâng cấp từ 277 → 2.736 ký tự (thêm cơ chế TCP luồng byte), nhưng bản sao trong `04-.../file-io.md` **vẫn y nguyên bản cũ**. Người học mở tài liệu ra ôn thì đọc đúng phiên bản đã bị kết luận là không đủ. Mâu thuẫn gốc: §4.6 (cũ) nói *"link tới bank"* còn thực tế các file chép nguyên đáp án vào — hai thế hệ quy ước cùng tồn tại.
+   >
+   > **Luật thi hành:** thấy `<details>` chứa đáp án trong tài liệu topic ⇒ đó là **nợ kỹ thuật**, phải chuyển về bank. Câu nào **chưa có** trong bank thì **thêm vào bank trước**, rồi mới thay bằng link — **không bao giờ xoá thẳng**.
 
 ---
 

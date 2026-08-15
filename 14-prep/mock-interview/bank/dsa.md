@@ -119,5 +119,62 @@ Chi tiết đáng nói thêm: nội dung **còn lại** trong buffer luôn liên
 Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
 </details>
 
+#### DSA-013 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
+**Ring buffer: làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho `head == tail`?**
+<details><summary>Đáp án</summary>
+
+**Vấn đề:** với hai chỉ số `head`/`tail` chạy vòng, trạng thái **rỗng** và **đầy** đều dẫn tới `head == tail` ⇒ không phân biệt được.
+
+**Ba cách giải — mỗi cách một đánh đổi:**
+
+| Cách | Làm thế nào | Đánh đổi |
+|---|---|---|
+| **① Bỏ trống một ô** | Coi là đầy khi `(head+1) % N == tail` | Đơn giản nhất, **không cần biến thêm** ⇒ hợp lock-free. Mất **một ô** sức chứa |
+| **② Giữ biến `count`** | Đếm số phần tử đang có | Rõ ràng, dùng hết N ô. Nhưng `count` là **biến chung cả hai bên cùng sửa** ⇒ **phá vỡ SPSC lock-free** ([DSA-014](dsa.md)) |
+| **③ Chỉ số chạy tự do** | `head`/`tail` **không** lấy dư, chỉ tăng mãi; số phần tử = `head - tail`; lấy dư **chỉ khi truy cập mảng** | Dùng hết N ô **và** giữ được lock-free. Phải để ý **tràn số** — an toàn nếu N là luỹ thừa của 2 và dùng số nguyên không dấu |
+
+**⭐ Chọn thế nào:**
+- Một luồng, hoặc đã có mutex ⇒ **② `count`** vì dễ đọc nhất.
+- **SPSC lock-free** ⇒ **① hoặc ③**, vì mỗi biến chỉ có **một** bên ghi.
+- ③ là cách các cài đặt nghiêm túc hay dùng (kể cả trong kernel), vì được cả sức chứa lẫn tính lock-free.
+
+⚠️ **Vì sao ② phá lock-free:** `count` bị **cả producer lẫn consumer cùng ghi** ⇒ phải nguyên tử hoá và đồng bộ ⇒ mất đúng tính chất *"mỗi biến một người ghi"* vốn là nền tảng của SPSC.
+
+⚠️ **Bẫy tràn số ở ③:** nếu `head`/`tail` là số nguyên **không dấu** và N là luỹ thừa của 2 thì phép trừ `head - tail` **vẫn đúng** khi tràn (số học modulo) — nhưng dùng số **có dấu** thì tràn là **UB**. Đây là chi tiết dễ sai.
+
+**Chốt:** *"Ba cách: bỏ trống một ô, giữ biến đếm, hoặc chỉ số chạy tự do. Biến đếm dễ đọc nhất nhưng bị cả hai bên ghi nên phá lock-free — vì thế cài đặt SPSC dùng cách bỏ ô hoặc chỉ số tự do."*
+</details>
+
+#### DSA-014 · 🔴 · concept · 🔺T3 · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
+**SPSC lock-free ring buffer hoạt động thế nào? Vì sao điều kiện "một producer, một consumer" lại quan trọng đến vậy?**
+
+> 🔺 **Câu T3** — chỉ tính điểm ở phiên `deep-dive` ([config §6](../config.md)). Ở phiên thường, không biết vẫn đạt 4 nếu nắm chắc bản mutex ([COD-006](coding.md)).
+
+<details><summary>Đáp án</summary>
+
+**Ý tưởng cốt lõi: MỖI BIẾN CHỈ CÓ MỘT NGƯỜI GHI.**
+
+| Biến | Ai **ghi** | Ai **đọc** |
+|---|---|---|
+| `head` (vị trí ghi) | **Chỉ producer** | Cả hai |
+| `tail` (vị trí đọc) | **Chỉ consumer** | Cả hai |
+
+⇒ Không bao giờ có hai bên cùng ghi một ô ⇒ **không cần khoá loại trừ**. Đây là toàn bộ lý do nó lock-free được — và cũng là lý do **thêm một producer thứ hai là hỏng ngay**: hai producer cùng ghi `head` ⇒ cần thao tác nguyên tử kiểu so-sánh-và-đổi, tức là đã sang bài toán khác hẳn (MPMC), khó hơn nhiều bậc.
+
+**Nhưng "không cần khoá" chưa đủ — vẫn cần ĐỒNG BỘ BỘ NHỚ.** Vấn đề: consumer thấy `head` đã tăng nhưng **chưa chắc thấy dữ liệu** vừa ghi vào ô đó, vì compiler và CPU được phép sắp xếp lại.
+
+⇒ Cần cặp **release/acquire**: producer ghi dữ liệu **rồi mới** publish `head` bằng *release*; consumer đọc `head` bằng *acquire* **rồi mới** đọc dữ liệu. Cặp này đảm bảo: *thấy `head` mới ⇒ chắc chắn thấy cả dữ liệu ghi trước đó* ([CPP-019](cpp.md)).
+
+⚠️ **Đây là lý do "chạy đúng trên x86, chết trên ARM":** x86 có mô hình bộ nhớ mạnh nên thường tha cho code thiếu nhãn; ARM lỏng hơn nhiều và sẽ lộ bug ngay.
+
+**Hai tối ưu chuyên sâu (T3):**
+- **Kích thước luỹ thừa của 2** ⇒ thay `% N` bằng phép AND — phép chia dư đắt hơn nhiều trên MCU không có lệnh chia.
+- **`alignas(64)` tách `head` và `tail` sang hai cache line khác nhau** ⇒ tránh **false sharing**: hai biến ở chung một cache line làm hai core liên tục giành nhau đúng dòng cache đó, mất phần lớn hiệu năng vừa giành được.
+
+**⚠️ Khi nào KHÔNG nên dùng lock-free:** khi bạn **chưa đo** thấy mutex là nút thắt. Bản dùng mutex **đúng dễ hơn nhiều**, dễ đọc, dễ bảo trì; bản lock-free sai thì hỏng **hiếm và không tái hiện được**. Mặc định dùng mutex, chỉ đổi khi có số liệu ([COD-006](coding.md)).
+
+**Chốt:** *"SPSC lock-free được vì mỗi chỉ số chỉ một bên ghi — thêm producer thứ hai là mất tính chất đó. Nhưng vẫn cần cặp release/acquire, nếu không thì đúng trên x86 và chết trên ARM."*
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

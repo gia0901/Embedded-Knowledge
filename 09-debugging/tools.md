@@ -117,30 +117,15 @@ Trên Linux: `journalctl`/`syslog`; embedded thường ring buffer + xuất qua 
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) strace dùng để làm gì? Cho ví dụ tình huống nó cứu bạn.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-strace theo dõi mọi system call mà một tiến trình thực hiện cùng tham số và giá trị trả về — tức là mọi tương tác của chương trình với kernel/thế giới ngoài (file, mạng, thiết bị, IPC). Ví dụ điển hình: chương trình báo lỗi mơ hồ "không khởi động được"; chạy `strace` thấy `openat("/etc/app/config.yaml", O_RDONLY) = -1 ENOENT` → lộ ngay là nó tìm config sai đường dẫn (hoặc `EACCES` là lỗi quyền). Hoặc khi chương trình treo, strace cho thấy syscall cuối đang đứng (vd `read` blocking, `futex` chờ lock, `connect` chờ mạng) → biết nó kẹt ở đâu. strace đặc biệt mạnh cho lớp bug "thiếu file/thư viện/quyền/mạng" mà đọc code không thấy.
-</details>
-
-<details><summary>2) strace và ltrace khác nhau thế nào?</summary>
-
-strace theo dõi **system call** — ranh giới giữa chương trình và kernel (open, read, write, mmap, futex, socket...). ltrace theo dõi **lời gọi hàm thư viện động** trong user space (libc và các `.so`: malloc, free, strcpy, hàm của thư viện bên thứ ba...). Nói cách khác, strace cho thấy chương trình yêu cầu gì từ hệ điều hành, còn ltrace cho thấy nó gọi API thư viện nào (nhiều lời gọi thư viện cuối cùng dẫn tới syscall, nhưng ltrace bắt ở tầng cao hơn). Dùng strace cho vấn đề I/O/hệ thống/treo; dùng ltrace khi muốn kiểm tra tương tác với thư viện (vd theo dõi cấp phát bộ nhớ hoặc lời gọi tới một lib cụ thể).
-</details>
-
-<details><summary>3) Khi chương trình chạy chậm, bạn tìm nguyên nhân thế nào?</summary>
-
-Không đoán hotspot mà **đo** bằng profiler như perf. Bắt đầu với `perf stat` để có bức tranh tổng quan (số cycle, instruction, tỉ lệ cache miss, branch miss). Sau đó `perf record -g` để lấy mẫu call stack theo thời gian và `perf report` (hoặc dựng flame graph) để xem hàm nào chiếm nhiều CPU nhất — đó là nơi đáng tối ưu. Nếu chậm do chờ I/O chứ không phải CPU, perf sẽ cho thấy CPU không bận và cần nhìn sang strace (`-T` đo thời gian mỗi syscall) để tìm syscall chậm, hoặc kiểm tra blocking/lock contention. Nguyên tắc cốt lõi: đo trước khi tối ưu, vì trực giác về hotspot thường sai.
-</details>
-
-<details><summary>4) /proc/<PID>/ cung cấp thông tin gì hữu ích cho debug?</summary>
-
-`/proc/<PID>` là cửa sổ vào trạng thái runtime của tiến trình mà không cần dừng nó: `status` cho biết trạng thái, dung lượng bộ nhớ (VmRSS), số thread; `fd/` liệt kê các file descriptor đang mở (rất hữu ích để phát hiện fd leak — số fd tăng dần không đóng); `maps` cho bản đồ vùng nhớ (vùng nào ánh xạ thư viện nào, phát hiện thư viện sai/địa chỉ); `cmdline` và `environ` cho biết tham số và biến môi trường **thực tế** đang chạy (hữu ích khi nghi ngờ chạy sai cấu hình); `limits` cho giới hạn tài nguyên. Đây là cách kiểm tra nhanh "process đang ở tình trạng nào" trong production.
-</details>
-
-<details><summary>5) Vì sao logging quan trọng và một hệ thống log tốt cần gì?</summary>
-
-Ở môi trường production hoặc thiết bị embedded ngoài field, thường không thể gắn debugger hay tái hiện bug, nên log là công cụ điều tra chính — đôi khi là duy nhất. Một hệ log tốt cần: **mức độ (level)** ERROR/WARN/INFO/DEBUG/TRACE để điều chỉnh độ chi tiết và tránh ngập log; **timestamp** (kèm clock đơn điệu) để xếp thứ tự sự kiện, đo khoảng thời gian và phát hiện trễ; **ngữ cảnh** đủ để tái dựng tình huống (id request/thread, giá trị biến liên quan); nên **có cấu trúc** (key=value/JSON) nếu cần phân tích bằng máy. Cũng phải lưu ý không ghi dữ liệu nhạy cảm và cân nhắc chi phí (log đồng bộ trong hot path làm chậm). Một dòng log đặt đúng chỗ với đủ ngữ cảnh thường tiết kiệm hơn nhiều so với ngồi dò bằng debugger.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DBG-005](../14-prep/mock-interview/bank/debugging.md) | strace dùng để làm gì? Cho ví dụ tình huống nó cứu bạn. |
+| [DBG-028](../14-prep/mock-interview/bank/debugging.md) | strace và ltrace khác nhau thế nào? |
+| [DBG-006](../14-prep/mock-interview/bank/debugging.md) | Khi chương trình chạy chậm, bạn tìm nguyên nhân thế nào? |
+| [LNX-023](../14-prep/mock-interview/bank/linux-sysprog.md) | /proc/<PID>/ cung cấp thông tin gì hữu ích cho debug? |
+| [DBG-029](../14-prep/mock-interview/bank/debugging.md) | Vì sao logging quan trọng và một hệ thống log tốt cần gì? |
 
 ---
 ⬅️ [gdb.md](gdb.md) · ➡️ Tiếp theo: [memory-bugs.md](memory-bugs.md)

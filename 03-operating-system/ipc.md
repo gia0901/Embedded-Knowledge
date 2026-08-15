@@ -114,37 +114,50 @@ signal(SIGINT, handler);     // (đơn giản; thực tế nên dùng sigaction)
 
 ---
 
+## 8. 💰 Chi phí thật & ⚠️ bẫy
+
+> Đây là góc **lý thuyết**. Góc **API + thực chiến trên Linux** (kèm code, sơ đồ chọn, `SIGBUS`, robust mutex) nằm ở [04-linux-system-programming/ipc-linux.md](../04-linux-system-programming/ipc-linux.md).
+
+**Chỉ có HAI cách chuyển byte** — mọi khác biệt còn lại đẻ ra từ đây:
+
+| | ① Kernel copy hộ (pipe · socket · mq) | ② Map chung khung trang (shared memory) |
+|---|---|---|
+| Copy / message | **2** (user→kernel→user) | **0** |
+| Syscall / message | **2** | **0** |
+| Đồng bộ | **Kernel lo** (đệm, chặn khi đầy) | **Bạn lo** |
+| **Một bên chết** | **Kernel lo** ⇒ bên kia nhận **EOF/EPIPE** và biết đường xử lý | **Bạn lo** ⇒ khoá kẹt vĩnh viễn, bên kia **treo mãi** |
+| Báo hiệu "có dữ liệu mới" | Có sẵn | **Không có** — thường phải kèm `eventfd`/semaphore |
+
+⇒ **Câu chốt của cả trang:** cách ② nhanh hơn vì nó **trả lại cho bạn** đúng phần việc kernel vẫn làm hộ.
+
+**⚠️ Bẫy:**
+
+**① "Shared memory nhanh nhất" là câu trả lời chưa xong.** Nó chỉ đúng khi message **lớn và dày**. Với message nhỏ (vài trăm byte) chi phí bị **syscall** chi phối ⇒ shm gần như **không nhanh hơn** mà vẫn phải trả đủ ba khoản ở cột ②. **Phép thử: đã ĐO thấy copy là nút thắt chưa?**
+
+**② Trục "một bên chết" hay bị bỏ quên nhất, và là trục hay bị hỏi nhất.** Tách hai process để cách ly lỗi, rồi đặt một mutex chung vào giữa = **nối lại đúng thứ vừa tách**. Chữa bằng robust mutex, bỏ khoá ở đường nóng, hoặc watchdog.
+
+**③ Byte stream không có ranh giới message.** Pipe/FIFO/`SOCK_STREAM` chỉ đảm bảo *dãy byte*, **không** đảm bảo *"một lần ghi = một lần đọc"* ⇒ mọi protocol phải **tự framing**. Đây là lớp bug *"đúng ở lab, sai ở khách"* ([13-networking/tcp-ip.md §6](../13-networking/tcp-ip.md)).
+
+**④ Ghi vào pipe không còn bên đọc ⇒ `SIGPIPE`, mặc định GIẾT process** — im lặng, không log. Daemon phải `signal(SIGPIPE, SIG_IGN)` rồi xử lý `EPIPE`.
+
+**⑤ Hàng đầy là câu hỏi NGHIỆP VỤ, không phải kỹ thuật.** Dữ liệu **trạng thái** (nhiệt độ, độ sáng) ⇒ **đè cái cũ**, vì mẫu cũ đã sai so với hiện tại. Dữ liệu **sự kiện/lệnh** ⇒ **chặn/backpressure**, mất là sai nghiệp vụ. Luôn có **biến đếm số bị bỏ** — mất thì được, không biết mình mất thì không.
+
+**⑥ Signal là cơ chế báo hiệu, không phải kênh truyền dữ liệu.** Không xếp hàng (nhiều lần gửi có thể gộp thành một), không mang được payload đáng kể, và handler chỉ được gọi hàm **async-signal-safe**. Muốn dùng nghiêm túc trong event loop ⇒ **`signalfd`** ([04/ipc-linux.md §7](../04-linux-system-programming/ipc-linux.md)).
+
+---
+
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Vì sao process cần IPC còn thread thì không (theo cách đó)?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Mỗi process có không gian địa chỉ riêng và bị OS cô lập, nên không đọc/ghi trực tiếp bộ nhớ của process khác; muốn trao đổi dữ liệu phải qua cơ chế IPC do kernel cung cấp (pipe, shared memory, message queue, socket, signal). Thread trong cùng process đã chia sẻ sẵn code/data/heap, nên trao đổi dữ liệu chỉ là đọc/ghi biến chung — không cần IPC mà chỉ cần đồng bộ (mutex, condition variable) để tránh race.
-</details>
-
-<details><summary>2) Cơ chế IPC nào nhanh nhất và vì sao? Đánh đổi là gì?</summary>
-
-Shared memory nhanh nhất vì hai process map cùng một vùng nhớ vật lý và đọc/ghi trực tiếp, **không phải copy dữ liệu qua kernel** (các IPC khác thường copy từ user sang kernel rồi sang user — hai lần). Đánh đổi: kernel không tự đồng bộ giúp, nên lập trình viên phải tự dùng semaphore/mutex để tránh race condition — đây là phần dễ sai. Phù hợp cho dữ liệu lớn, tần suất cao trên cùng máy.
-</details>
-
-<details><summary>3) Pipe và FIFO khác nhau thế nào?</summary>
-
-Cả hai là kênh byte một chiều theo thứ tự FIFO. Pipe ẩn danh không có tên trên filesystem nên chỉ dùng được giữa các tiến trình **họ hàng** (kế thừa file descriptor qua fork), ví dụ `ls | grep`. FIFO (named pipe, tạo bằng `mkfifo`) có một tên trên filesystem, nên hai tiến trình **bất kỳ, không họ hàng** có thể mở cùng tên đó để giao tiếp.
-</details>
-
-<details><summary>4) Message queue khác pipe ở điểm nào?</summary>
-
-Pipe là luồng byte liên tục không có ranh giới — bên nhận phải tự phân định đâu là hết một thông điệp. Message queue giữ **ranh giới message**: mỗi lần gửi là một thông điệp rời rạc, bên nhận lấy đúng từng thông điệp; ngoài ra hỗ trợ **độ ưu tiên** và khử ghép (bên gửi/nhận không cần chạy đồng thời vì queue đệm). Pipe phù hợp luồng dữ liệu kiểu stream, message queue phù hợp trao đổi lệnh/sự kiện có cấu trúc.
-</details>
-
-<details><summary>5) Khi nào dùng socket thay vì shared memory?</summary>
-
-Dùng socket khi cần giao tiếp **qua mạng/giữa các máy** hoặc muốn thiết kế dễ mở rộng từ một máy ra phân tán (cùng API cho local Unix domain lẫn remote TCP/UDP). Shared memory chỉ hoạt động trên cùng một máy và yêu cầu tự đồng bộ; nó tối ưu cho thông lượng/độ trễ cực thấp với dữ liệu lớn cùng máy. Nói ngắn gọn: hiệu năng cực đại cùng máy → shared memory; linh hoạt/qua mạng/mở rộng → socket.
-</details>
-
-<details><summary>6) Signal có hạn chế gì? Vì sao handler phải cẩn thận?</summary>
-
-Signal chỉ mang rất ít thông tin (chủ yếu là số hiệu signal) nên không dùng để truyền dữ liệu lớn — nó là cơ chế thông báo bất đồng bộ. Handler được gọi bất đồng bộ, có thể chen vào giữa bất kỳ chỗ nào của chương trình, kể cả khi đang trong `malloc`/`printf`; vì vậy trong handler chỉ được gọi các hàm **async-signal-safe**, nếu không sẽ gây deadlock/UB. Pattern an toàn là chỉ đặt một cờ `volatile sig_atomic_t` trong handler rồi xử lý thực sự ở vòng lặp chính.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [OS-022](../14-prep/mock-interview/bank/os.md) | Vì sao process cần IPC còn thread thì không (theo cách đó)? |
+| [LNX-008](../14-prep/mock-interview/bank/linux-sysprog.md) | Cơ chế IPC nào nhanh nhất và vì sao? Đánh đổi là gì? |
+| [LNX-020](../14-prep/mock-interview/bank/linux-sysprog.md) | Pipe và FIFO khác nhau thế nào? |
+| [LNX-018](../14-prep/mock-interview/bank/linux-sysprog.md) | Message queue khác pipe ở điểm nào? |
+| [LNX-016](../14-prep/mock-interview/bank/linux-sysprog.md) | Khi nào dùng socket thay vì shared memory? |
+| [LNX-011](../14-prep/mock-interview/bank/linux-sysprog.md) | Signal có hạn chế gì? Vì sao handler phải cẩn thận? |
 
 ---
 ⬅️ [sync-primitives.md](sync-primitives.md) · ➡️ Tiếp theo: [04-linux-system-programming/](../04-linux-system-programming/)

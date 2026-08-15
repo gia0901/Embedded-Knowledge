@@ -136,40 +136,17 @@ request_irq(irq, my_isr, IRQF_SHARED, "mydev", dev);
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Phân biệt character, block và network driver.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Character driver phơi bày thiết bị như một luồng byte tuần tự, đọc/ghi từng byte qua device node (`/dev/...`) — vd tty, serial, sensor, GPIO. Block driver quản lý thiết bị truy cập theo khối cố định và ngẫu nhiên (disk, SSD, eMMC), đi qua block layer với page cache và I/O scheduler để tối ưu/gộp request. Network driver xử lý gói tin, không xuất hiện dưới `/dev` mà gắn vào network stack và được truy cập qua socket API. Character driver là loại cơ bản và hay được hỏi nhất.
-</details>
-
-<details><summary>2) Kernel module là gì? Ưu điểm so với biên dịch tĩnh vào kernel?</summary>
-
-Kernel module (`.ko`) là một đoạn code kernel có thể **nạp/gỡ động** lúc runtime bằng `insmod`/`modprobe`/`rmmod`, không cần biên dịch lại hay khởi động lại toàn bộ kernel. Ưu điểm: phát triển và cập nhật driver nhanh (chỉ nạp lại module), tiết kiệm bộ nhớ vì chỉ nạp khi cần thiết, và giữ kernel cốt lõi gọn. Module chạy trong kernel space nên không dùng được libc — phải dùng API kernel (`kmalloc`, `printk`...). Biên dịch tĩnh phù hợp cho driver thiết yếu lúc boot (vd driver ổ chứa rootfs).
-</details>
-
-<details><summary>3) Khi user space gọi read() trên /dev/mydev, điều gì xảy ra trong driver?</summary>
-
-`read()` của user là một syscall; kernel tra device node `/dev/mydev` để biết major/minor → xác định driver phụ trách, rồi gọi hàm `.read` đã đăng ký trong struct `file_operations` của driver đó. Hàm read của driver nhận con trỏ `char __user *buf` (buffer của user, không được truy cập trực tiếp), thực hiện lấy dữ liệu từ phần cứng/bộ đệm, dùng `copy_to_user` để chép sang buffer user một cách an toàn, và trả về số byte đã đọc. Tương tự, `open/write/close/ioctl` ánh xạ tới `.open/.write/.release/.unlocked_ioctl`.
-</details>
-
-<details><summary>4) Major và minor number để làm gì?</summary>
-
-Major number xác định **driver** nào phụ trách thiết bị — kernel dùng nó để định tuyến thao tác trên device node tới đúng driver. Minor number do driver dùng để phân biệt các **thiết bị/instance** cụ thể mà nó quản lý (vd nhiều cổng serial cùng một driver có cùng major, khác minor). Device node trong `/dev` mang cặp (major, minor); ngày nay thường xin major động (`alloc_chrdev_region`) và để `udev` tự tạo node thay vì `mknod` thủ công.
-</details>
-
-<details><summary>5) Probe() trong mô hình driver hiện đại làm gì? Device và driver match thế nào?</summary>
-
-Linux Device Model tách "device" (thiết bị tồn tại, đến từ device tree, ACPI, hay enumeration của bus như PCI/USB) khỏi "driver" (code điều khiển một loại thiết bị). Mỗi driver khai báo nó hỗ trợ thiết bị nào qua một match table (vd `of_match_table` khớp thuộc tính `compatible` trong device tree, hoặc ID table cho PCI/USB). Khi kernel tìm thấy device khớp với một driver, nó gọi hàm `probe()` của driver — nơi khởi tạo: ánh xạ vùng thanh ghi (`ioremap`), xin IRQ, cấp phát tài nguyên, đăng ký với subsystem. Khi device bị tháo hoặc module gỡ, `remove()` được gọi để dọn dẹp.
-</details>
-
-<details><summary>6) Vì sao interrupt tốt hơn polling? Top half và bottom half là gì?</summary>
-
-Polling buộc CPU liên tục hỏi thanh ghi trạng thái → lãng phí CPU và độ trễ phụ thuộc chu kỳ hỏi. Interrupt cho thiết bị chủ động báo khi có sự kiện, CPU chỉ phản ứng khi cần → hiệu quả và độ trễ thấp (polling chỉ hợp khi sự kiện cực dày hoặc thiết bị không hỗ trợ IRQ). Interrupt handler (top half) chạy với ngắt bị tắt nên phải **cực nhanh và không được ngủ**; phần xử lý nặng/có thể ngủ được hoãn sang bottom half — tasklet/softirq (ngữ cảnh atomic) hoặc workqueue/threaded IRQ (ngữ cảnh process, được phép ngủ). Điều này giữ hệ thống đáp ứng và không bỏ lỡ ngắt khác.
-</details>
-
-<details><summary>7) Quản lý tài nguyên trong driver vì sao quan trọng? devm_* giúp gì?</summary>
-
-Vì driver chạy trong kernel: rò rỉ tài nguyên không bị cô lập như crash một process — nó tích lũy làm cạn kiệt hệ thống, còn dùng tài nguyên đã giải phóng gây kernel oops/panic. Mọi thứ xin phải được trả đúng và theo thứ tự ngược (kfree, free_irq, iounmap, release_mem_region...), kể cả trên các nhánh lỗi — rất dễ sót. Các API managed `devm_*` (devm_kmalloc, devm_request_irq, devm_ioremap...) gắn tài nguyên vào vòng đời của device và **tự giải phóng** khi device bị remove hoặc probe lỗi, đóng vai trò như RAII cho driver, giảm mạnh leak và lỗi dọn dẹp.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DRV-001](../14-prep/mock-interview/bank/drivers-embedded.md) | Phân biệt character, block và network driver. |
+| [DRV-002](../14-prep/mock-interview/bank/drivers-embedded.md) | Kernel module là gì? Ưu điểm so với biên dịch tĩnh vào kernel? |
+| [DRV-005](../14-prep/mock-interview/bank/drivers-embedded.md) | Khi user space gọi read() trên /dev/mydev, điều gì xảy ra trong driver? |
+| [DRV-003](../14-prep/mock-interview/bank/drivers-embedded.md) | Major và minor number để làm gì? |
+| [DRV-010](../14-prep/mock-interview/bank/drivers-embedded.md) | Probe() trong mô hình driver hiện đại làm gì? Device và driver match thế nào? |
+| [DRV-011](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao interrupt tốt hơn polling? Top half và bottom half là gì? |
+| [DRV-014](../14-prep/mock-interview/bank/drivers-embedded.md) | Quản lý tài nguyên trong driver vì sao quan trọng? devm_* giúp gì? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [kernel-userspace.md](kernel-userspace.md)

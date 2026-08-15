@@ -127,30 +127,15 @@ Mỗi thư viện là một target tự mô tả thuộc tính PUBLIC/PRIVATE c�
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) CMake là gì? Nó khác Make thế nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-CMake là một **meta-build system**: nó không trực tiếp biên dịch mà từ mô tả `CMakeLists.txt` sinh ra một build system cụ thể (Unix Makefiles, Ninja, Visual Studio, Xcode...) phù hợp với nền tảng và công cụ hiện có; rồi build system đó mới thực sự gọi compiler. Make là build system thực thi trực tiếp (đọc Makefile, chạy recipe). Lợi ích của CMake so với Makefile viết tay: di động đa nền tảng/compiler từ một mô tả duy nhất, tự tìm thư viện (`find_package`), quản lý dependency theo target và phạm vi, tích hợp IDE, test (CTest) và đóng gói (CPack).
-</details>
-
-<details><summary>2) Hai bước configure và build trong CMake là gì? Out-of-source build là gì?</summary>
-
-Bước **configure** (`cmake -S . -B build`): CMake đọc CMakeLists.txt, dò compiler/thư viện/hệ thống, đánh giá logic, và sinh ra build system thật vào thư mục build. Bước **build** (`cmake --build build`): gọi công cụ thật (make/ninja) để biên dịch và link. Out-of-source build nghĩa là mọi file sinh ra (cache, Makefile, object, binary) nằm trong một thư mục build riêng tách khỏi source — giữ cây source sạch, cho phép nhiều cấu hình song song (Debug/Release ở các thư mục build khác nhau), và xóa thư mục build là dọn sạch hoàn toàn.
-</details>
-
-<details><summary>3) PUBLIC, PRIVATE, INTERFACE trong target_link_libraries/target_include_directories nghĩa là gì?</summary>
-
-Chúng quy định phạm vi lan truyền (usage requirement) của một thuộc tính. PRIVATE: thuộc tính chỉ áp dụng khi build **chính target đó**, không lan sang target khác link nó. INTERFACE: ngược lại — không áp cho chính target mà chỉ lan sang target dùng nó (thường cho header-only library). PUBLIC: cả hai — áp cho chính target và lan sang target dùng nó. Nhờ cơ chế này, khi target A link một thư viện B với thuộc tính PUBLIC (vd include dir), bất kỳ target nào link A cũng tự động kế thừa các yêu cầu PUBLIC của B (transitive dependency), không phải khai báo lại thủ công.
-</details>
-
-<details><summary>4) Modern CMake (target-based) khác cách cũ ở điểm nào và vì sao tốt hơn?</summary>
-
-Cách cũ dùng các lệnh/biến toàn cục như `include_directories()`, `add_definitions()`, `link_libraries()` áp đặt lên **mọi** target trong scope hiện tại — gây rò rỉ flag/include không mong muốn, khó biết target nào thực sự cần gì, dễ xung đột. Modern CMake gắn mọi thuộc tính trực tiếp vào target qua `target_include_directories`, `target_compile_definitions`, `target_link_libraries` với phạm vi PUBLIC/PRIVATE/INTERFACE rõ ràng. Lợi ích: mỗi target tự mô tả "yêu cầu sử dụng" của nó, dependency lan truyền chính xác và tự động, dự án dễ mở rộng và tái sử dụng (mỗi thư viện là một đơn vị độc lập, kéo theo đúng yêu cầu của nó khi được link).
-</details>
-
-<details><summary>5) find_package làm gì? Có những cách nào để dùng thư viện ngoài trong CMake?</summary>
-
-`find_package(X)` định vị thư viện X đã cài trên hệ thống (qua module Find hoặc file config do thư viện cung cấp) và thường tạo ra các **imported target** (vd `fmt::fmt`, `Threads::Threads`) đóng gói sẵn include path, đường dẫn library và các định nghĩa cần thiết; ta chỉ cần `target_link_libraries(app PRIVATE fmt::fmt)` là có đủ. Các cách khác để lấy dependency: `add_subdirectory` (gộp source của thư viện như sub-project), `FetchContent` (tải và build dependency cùng lúc configure), hoặc dùng package manager như vcpkg/Conan tích hợp với CMake.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [BLD-001](../14-prep/mock-interview/bank/build-systems.md) | CMake là gì? Nó khác Make thế nào? |
+| [BLD-011](../14-prep/mock-interview/bank/build-systems.md) | Hai bước configure và build trong CMake là gì? Out-of-source build là gì? |
+| [BLD-002](../14-prep/mock-interview/bank/build-systems.md) | PUBLIC, PRIVATE, INTERFACE trong target_link_libraries/target_include_directories nghĩa là gì? |
+| [BLD-001](../14-prep/mock-interview/bank/build-systems.md) | Modern CMake (target-based) khác cách cũ ở điểm nào và vì sao tốt hơn? |
+| [BLD-012](../14-prep/mock-interview/bank/build-systems.md) | find_package làm gì? Có những cách nào để dùng thư viện ngoài trong CMake? |
 
 ---
 ⬅️ [makefile.md](makefile.md) · ➡️ Tiếp theo: [cross-compilation.md](cross-compilation.md)

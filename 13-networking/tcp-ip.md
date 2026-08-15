@@ -80,7 +80,71 @@ TCP biến IP best-effort thành kênh tin cậy nhờ:
 
 ---
 
-## 6. Khái niệm liên quan (điểm danh)
+## 6. ⚠️ TCP là LUỒNG BYTE — không có ranh giới message
+
+> **Đây là hệ quả thực dụng quan trọng nhất của cả trang này.** Nó sinh ra một lớp bug kinh điển: **chạy đúng ở phòng lab, sai ở nhà khách**.
+
+### Cái TCP hứa và cái nó KHÔNG hứa
+
+| ✅ TCP hứa | ❌ TCP **không** hứa |
+|---|---|
+| Byte tới **đủ**, không mất | Bạn `write()` 8 byte một lần thì bên kia `read()` được 8 byte một lần |
+| Byte tới **đúng thứ tự** | Một lần `send` = một lần `recv` |
+| Không trùng lặp | Có bất kỳ khái niệm "gói tin" nào ở tầng ứng dụng |
+
+TCP là **byte stream**: nó chỉ đảm bảo *dãy byte*, hoàn toàn **không lưu giữ ranh giới các lần ghi**. UDP thì ngược lại — datagram giữ nguyên ranh giới, một `sendto` = một `recvfrom`.
+
+### Hai hiện tượng, cùng một nguyên nhân
+
+```
+Bên gửi:  send("ABCDEFGH")        (8 byte, một lần gọi)
+
+① Chia nhỏ (short read):     recv -> "ABC"        recv -> "DEFGH"
+② Dính gói (coalescing):     send("XY") ngay sau  ->  recv -> "ABCDEFGHXY"
+```
+
+**Vì sao xảy ra:** **MSS/phân mảnh** (dữ liệu vắt qua hai segment) · **Nagle + delayed ACK** (gom nhiều lần ghi nhỏ thành một segment) · **retransmit** làm segment sau tới trễ · và `read()` **trả về ngay khi có byte nào đó**, không đợi đủ số byte bạn xin.
+
+### ⚠️ Vì sao phòng lab không bao giờ lộ
+
+LAN có **RTT ~0.1 ms**, không mất gói ⇒ dữ liệu nhỏ **luôn** gọn trong một segment và **đã nằm sẵn** trong receive buffer trước khi bạn gọi `read()`. Ra hiện trường qua Wi-Fi/4G: RTT vài chục ms, có retransmit và jitter ⇒ cửa sổ *"mới tới một phần"* mở ra thật.
+
+⇒ **"Test không lỗi" không chứng minh code đúng.** Phải suy luận theo cơ chế, không theo kết quả chạy.
+
+### Hệ quả bắt buộc: mọi protocol trên TCP phải TỰ ĐÓNG KHUNG (framing)
+
+| Cách framing | Cách làm | Đánh đổi |
+|---|---|---|
+| **Length-prefix** ⭐ | Gửi độ dài (vd 4 byte) rồi mới gửi thân | Đơn giản, nhanh, **nên dùng mặc định**. Nhớ thống nhất **endianness** |
+| **Delimiter** | Kết thúc bằng ký tự đánh dấu (`\n`) | Đọc log dễ. **Phải giới hạn buffer**, nếu không một gói không có `\n` làm cạn RAM (DoS) — và phải escape ký tự đó trong dữ liệu |
+| **Độ dài cố định** | Mọi message đúng N byte | Chỉ hợp giao thức nhị phân cứng; hết co giãn |
+
+```c
+// ✅ Mọi read trên socket đều phải có dạng này — KHÔNG BAO GIỜ dùng read() trần
+static int read_full(int fd, void* buf, size_t len) {
+    size_t got = 0;
+    while (got < len) {
+        ssize_t n = read(fd, (char*)buf + got, len - got);
+        if (n > 0)  { got += n; continue; }
+        if (n == 0) return 0;                 // peer đóng sớm
+        if (errno == EINTR) continue;         // bị signal cắt, không phải lỗi
+        return -1;
+    }
+    return 1;
+}
+
+// ❌ Bug kinh điển — chỉ lộ ở nhà khách
+ssize_t n = read(sock, hdr, 8);
+if (n != 8) { /* coi là lỗi */ }
+```
+
+**Bẫy:** (1) `if (n != count) return -1;` — sai; (2) chỉ lặp cho `read` mà quên **`write` cũng short**; (3) test bằng **file trên đĩa** — file thường luôn trả đủ nên bug không bao giờ lộ, **phải test bằng socket/pipe thật**; (4) tưởng tắt Nagle (`TCP_NODELAY`) là hết dính gói — không, nó chỉ giảm độ trễ, **ranh giới message vẫn không tồn tại**.
+
+> 🔗 Bank: [LNX-005](../14-prep/mock-interview/bank/linux-sysprog.md) (short read), [LNX-028](../14-prep/mock-interview/bank/linux-sysprog.md) (short write). Chi tiết syscall: [04-linux-system-programming/file-io.md](../04-linux-system-programming/file-io.md).
+
+---
+
+## 7. Khái niệm liên quan (điểm danh)
 
 - **Port**: phân biệt nhiều dịch vụ/kết nối trên cùng IP (vd 80=HTTP, 443=HTTPS, 22=SSH). Một kết nối TCP định danh bởi bộ 4: (IP nguồn, port nguồn, IP đích, port đích).
 - **DNS**: dịch tên miền → IP (chạy chủ yếu trên UDP).
@@ -92,30 +156,15 @@ TCP biến IP best-effort thành kênh tin cậy nhờ:
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Vì sao mạng được tổ chức theo tầng (layering)?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Vì mạng quá phức tạp để xử lý một khối; chia thành các tầng cho phép mỗi tầng giải quyết một trách nhiệm rõ ràng và che giấu chi tiết khỏi tầng trên, theo nguyên lý separation of concerns. Mô hình TCP/IP gồm Link (truyền khung trên môi trường vật lý), Internet/IP (định tuyến packet giữa các máy qua địa chỉ IP), Transport (TCP/UDP — giao tiếp giữa các tiến trình qua port, tin cậy hay không), và Application (HTTP, DNS...). Lợi ích: có thể thay đổi hoặc nâng cấp một tầng mà không ảnh hưởng tầng khác (đổi Wi-Fi sang Ethernet không đụng tới TCP/HTTP), mỗi tầng phát triển độc lập, và dễ chuẩn hóa. Dữ liệu đi xuống được mỗi tầng đóng gói thêm header (encapsulation) và bên nhận bóc ngược lại.
-</details>
-
-<details><summary>2) TCP và UDP khác nhau thế nào? Khi nào chọn cái nào?</summary>
-
-TCP hướng kết nối (thiết lập qua three-way handshake trước khi truyền), đảm bảo dữ liệu tới nơi, đúng thứ tự, không trùng (qua sequence number, ACK, retransmit), và có flow control + congestion control; nó là luồng byte, nhưng overhead lớn hơn và chậm hơn. UDP không kết nối, không đảm bảo (gói có thể mất, lệch thứ tự, trùng), không kiểm soát luồng/tắc nghẽn; nó truyền datagram rời rạc, nhẹ và nhanh, độ trễ thấp. Chọn TCP khi cần dữ liệu nguyên vẹn và đúng thứ tự (web/HTTP, truyền file, email, SSH). Chọn UDP khi ưu tiên độ trễ thấp và chấp nhận mất mát (gọi video/voice, game thời gian thực, DNS, streaming dữ liệu sensor) — nơi một gói trễ tệ hơn một gói mất; hoặc khi tự xây cơ chế tin cậy riêng (như QUIC trên UDP).
-</details>
-
-<details><summary>3) Mô tả TCP three-way handshake. Vì sao cần ba bước?</summary>
-
-Handshake gồm: client gửi SYN với sequence number khởi đầu x ("tôi muốn kết nối, seq của tôi là x"); server đáp SYN-ACK với seq y của nó và ack = x+1 ("đồng ý, seq của tôi là y, đã nhận x"); client gửi ACK với ack = y+1 ("đã nhận y") và kết nối thiết lập. Cần ba bước để **cả hai bên trao đổi và xác nhận sequence number khởi đầu của nhau** theo cả hai chiều, đảm bảo cả hai cùng sẵn sàng và đồng bộ trước khi truyền dữ liệu (TCP đánh số từng byte để đảm bảo thứ tự/tin cậy nên cần seq ban đầu của mỗi hướng). Hai bước là không đủ vì chiều server→client chưa được client xác nhận. Đóng kết nối dùng four-way handshake (FIN/ACK mỗi chiều) vì mỗi hướng đóng độc lập.
-</details>
-
-<details><summary>4) TCP đảm bảo tin cậy bằng cách nào trên nền IP best-effort?</summary>
-
-IP chỉ best-effort (không đảm bảo gói tới, đúng thứ tự hay không trùng), nên TCP tự xây độ tin cậy ở tầng transport: mỗi byte có **sequence number**, bên nhận gửi **ACK** cho dữ liệu đã nhận; nếu bên gửi không nhận ACK trong thời gian chờ thì **retransmit**. Bên nhận dùng sequence number để **sắp xếp lại** các segment đúng thứ tự và loại trùng trước khi giao cho ứng dụng. Ngoài ra TCP có **flow control** qua cửa sổ nhận (receive window) để không gửi nhanh hơn bên nhận xử lý, và **congestion control** (slow start, congestion avoidance) để điều tiết tốc độ theo tình trạng tắc nghẽn mạng. Kết hợp lại biến kênh IP không tin cậy thành luồng byte tin cậy, đúng thứ tự.
-</details>
-
-<details><summary>5) Phân biệt flow control và congestion control trong TCP.</summary>
-
-Cả hai đều điều tiết tốc độ gửi nhưng bảo vệ đối tượng khác nhau. Flow control bảo vệ **bên nhận**: bên nhận thông báo kích thước cửa sổ nhận (còn bao nhiêu chỗ trong bộ đệm) để bên gửi không gửi nhanh hơn bên nhận có thể tiếp nhận và xử lý, tránh tràn bộ đệm bên nhận. Congestion control bảo vệ **mạng**: bằng các thuật toán như slow start và congestion avoidance, TCP dò và điều chỉnh tốc độ gửi theo mức độ tắc nghẽn của mạng (suy ra từ mất gói/độ trễ), tránh bơm quá nhiều dữ liệu làm nghẽn router và sụp đổ thông lượng chung. Nói gọn: flow control là thỏa thuận giữa hai đầu cuối về khả năng của bên nhận; congestion control là phản ứng với tình trạng của mạng ở giữa.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [NET-002](../14-prep/mock-interview/bank/networking.md) | Vì sao mạng được tổ chức theo tầng (layering)? |
+| [NET-001](../14-prep/mock-interview/bank/networking.md) | TCP và UDP khác nhau thế nào? Khi nào chọn cái nào? |
+| [NET-004](../14-prep/mock-interview/bank/networking.md) | Mô tả TCP three-way handshake. Vì sao cần ba bước? |
+| [NET-005](../14-prep/mock-interview/bank/networking.md) | TCP đảm bảo tin cậy bằng cách nào trên nền IP best-effort? |
+| [NET-008](../14-prep/mock-interview/bank/networking.md) | Phân biệt flow control và congestion control trong TCP. |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [sockets-and-protocols.md](sockets-and-protocols.md)

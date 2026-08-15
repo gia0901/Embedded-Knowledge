@@ -188,40 +188,17 @@ classDiagram
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) class và struct trong C++ khác nhau thế nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Chỉ khác mặc định access và inheritance: `struct` mặc định `public`, `class` mặc định `private`. Mọi tính năng khác (method, kế thừa, virtual...) đều dùng được cho cả hai. Quy ước: `struct` cho dữ liệu thuần, `class` cho kiểu có đóng gói/hành vi.
-</details>
-
-<details><summary>2) Đa hình runtime hoạt động thế nào ở mức cơ chế?</summary>
-
-Qua `virtual` function + vtable/vptr. Mỗi class có hàm virtual sẽ có một vtable (mảng con trỏ tới phiên bản hàm virtual đúng của class). Mỗi object chứa một vptr ẩn trỏ tới vtable của class nó. Khi gọi hàm virtual qua con trỏ/reference base, runtime lấy vptr → tra vtable → gọi đúng hàm của lớp thực (dynamic dispatch). Chi phí: 1 con trỏ/object và 1 lần gián tiếp khi gọi, thường không inline được.
-</details>
-
-<details><summary>3) Vì sao destructor của base class nên là virtual?</summary>
-
-Nếu xóa một object lớp con qua con trỏ kiểu base (`Base* p = new Derived; delete p;`) mà destructor base không virtual, chỉ `~Base()` được gọi, `~Derived()` bị bỏ qua → tài nguyên của lớp con không được giải phóng (leak) và đây là Undefined Behavior. Để base class đa hình thì destructor phải virtual.
-</details>
-
-<details><summary>4) Object slicing là gì?</summary>
-
-Khi gán/copy một object lớp con vào một object **trị giá** kiểu lớp cha, phần dữ liệu riêng của lớp con bị "cắt" bỏ, chỉ giữ phần lớp cha; đa hình cũng mất (gọi hàm của base). Xảy ra vì object base có kích thước cố định. Tránh bằng cách dùng con trỏ/reference base thay vì object trị giá.
-</details>
-
-<details><summary>5) Pure virtual function và abstract class là gì? C++ có interface không?</summary>
-
-Pure virtual là hàm khai báo `= 0`, buộc lớp con phải override. Class chứa ít nhất một pure virtual là abstract class — không thể tạo instance trực tiếp, dùng làm base/interface. C++ không có từ khóa `interface`; một interface được mô phỏng bằng abstract class chỉ gồm các pure virtual function và một virtual destructor.
-</details>
-
-<details><summary>6) Static dispatch và dynamic dispatch khác nhau ra sao? Khi nào dùng virtual?</summary>
-
-Static dispatch: lời gọi được quyết định lúc biên dịch (hàm thường, non-virtual), có thể inline, không chi phí runtime. Dynamic dispatch: quyết định lúc chạy qua vtable (hàm virtual), linh hoạt nhưng tốn 1 lần gián tiếp và thường chặn inline. Dùng `virtual` khi thật sự cần đa hình runtime (xử lý nhiều kiểu con qua interface chung). Không nên làm mọi hàm virtual — với code nhạy hiệu năng/embedded, cân nhắc chi phí.
-</details>
-
-<details><summary>7) Diamond problem là gì và giải quyết thế nào?</summary>
-
-Khi D kế thừa từ B và C, mà cả B, C cùng kế thừa từ A, thì D chứa **hai** bản sao của phần A → truy cập thành viên A bị nhập nhằng. Giải bằng **virtual inheritance**: `B : virtual public A`, `C : virtual public A`; khi đó D chỉ có một bản A duy nhất, được chia sẻ.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [CPP-002](../14-prep/mock-interview/bank/cpp.md) | class và struct trong C++ khác nhau thế nào? |
+| [CPP-006](../14-prep/mock-interview/bank/cpp.md) | Đa hình runtime hoạt động thế nào ở mức cơ chế? |
+| [CPP-010](../14-prep/mock-interview/bank/cpp.md) | Vì sao destructor của base class nên là virtual? |
+| [CPP-016](../14-prep/mock-interview/bank/cpp.md) | Object slicing là gì? |
+| [CPP-061](../14-prep/mock-interview/bank/cpp.md) | Pure virtual function và abstract class là gì? C++ có interface không? |
+| [CPP-017](../14-prep/mock-interview/bank/cpp.md) | Static dispatch và dynamic dispatch khác nhau ra sao? Khi nào dùng virtual? |
+| [CPP-062](../14-prep/mock-interview/bank/cpp.md) | Diamond problem là gì và giải quyết thế nào? |
 
 ---
 ⬅️ [memory-model.md](memory-model.md) · ➡️ Tiếp theo: [templates.md](templates.md)

@@ -169,35 +169,16 @@ gdb-multiarch ./app                    # ← binary CÓ symbol (bản chưa stri
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Vì sao cần build với -g và nên dùng -O0 khi debug?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-`-g` nhúng thông tin debug (tên biến, kiểu, ánh xạ địa chỉ máy ↔ số dòng source) vào binary, để gdb có thể hiển thị code nguồn, in biến theo tên và đặt breakpoint theo dòng/hàm. `-O0` tắt tối ưu vì khi tối ưu (`-O2/-O3`), compiler inline hàm, sắp xếp lại lệnh, loại bỏ hoặc gộp biến — khiến việc step nhảy không theo thứ tự source và nhiều biến báo "optimized out", rất khó theo dõi. Khi buộc phải debug code tối ưu (vd bug chỉ xuất hiện ở bản release), dùng `-Og` để có mức tối ưu vừa phải mà vẫn debug được tương đối.
-</details>
-
-<details><summary>2) Khi chương trình crash, bạn dùng gdb thế nào để tìm nguyên nhân?</summary>
-
-Cách trực tiếp nhất là dùng backtrace. Nếu chạy live: `run` trong gdb tới khi crash, rồi `bt` để xem call stack tại điểm crash — nó cho biết hàm nào lỗi và chuỗi gọi dẫn tới đó; dùng `frame N` để chuyển frame và `print`/`info locals` xem giá trị biến (vd con trỏ null, index sai). Nếu không tiện chạy live hoặc crash ở field, dùng **core dump**: bật `ulimit -c unlimited`, để chương trình crash sinh file core, rồi `gdb ./app core` và `bt` để phân tích post-mortem trạng thái lúc chết mà không cần tái hiện. Đọc kỹ stack và giá trị biến thường lộ ngay nguyên nhân (dereference null, truy cập ngoài mảng, gọi sai...).
-</details>
-
-<details><summary>3) step và next khác nhau thế nào?</summary>
-
-Cả hai chạy một dòng nguồn rồi dừng, nhưng khác cách xử lý lời gọi hàm: `step` (s) **đi vào trong** hàm được gọi ở dòng đó để debug chi tiết nó; `next` (n) **bước qua** lời gọi hàm — thực thi toàn bộ hàm đó rồi dừng ở dòng kế tiếp của hàm hiện tại, không vào trong. Dùng `step` khi nghi ngờ hàm con có vấn đề và muốn theo dõi bên trong; dùng `next` khi tin hàm con đúng và chỉ muốn lướt qua. Ngoài ra `finish` chạy tới khi hàm hiện tại return (và in giá trị trả về), `until` giúp thoát vòng lặp.
-</details>
-
-<details><summary>4) Core dump là gì và dùng để làm gì?</summary>
-
-Core dump là một ảnh chụp toàn bộ trạng thái bộ nhớ của tiến trình tại thời điểm nó crash (gồm stack, heap, thanh ghi). Nó cho phép phân tích **post-mortem**: nạp vào gdb (`gdb ./app core`) và dùng `bt`, `print`, `info locals` để xem call stack và giá trị biến lúc chết, mà không cần tái hiện lỗi trực tiếp. Điều này cực kỳ giá trị với bug khó tái hiện hoặc crash xảy ra ở production/thiết bị field (embedded): chỉ cần thu file core về máy có symbol để điều tra offline. Cần bật `ulimit -c unlimited` (và cấu hình `core_pattern`) để hệ thống sinh core khi crash.
-</details>
-
-<details><summary>5) Làm sao điều tra một chương trình bị treo (hang/deadlock) bằng gdb?</summary>
-
-Attach gdb vào tiến trình đang chạy bằng `gdb -p <PID>` (không cần khởi động lại), rồi chạy `thread apply all bt` để in backtrace của **mọi** thread — xem từng thread đang kẹt ở đâu. Với deadlock, thường thấy hai (hoặc nhiều) thread cùng dừng trong hàm khóa mutex, mỗi thread đang chờ một lock mà thread kia đang giữ — chuỗi chờ vòng tròn lộ ra ngay. Với treo do vòng lặp vô tận hoặc chờ I/O, backtrace cho thấy thread chính kẹt ở đâu. Có thể kết hợp `info threads`, `thread N` để chuyển và xem chi tiết, hoặc dùng công cụ nhanh như `pstack`/`gstack`. Sau đó truy ngược thứ tự khóa để sửa (vd áp đặt thứ tự lock thống nhất).
-</details>
-
-<details><summary>6) Watchpoint là gì? Khi nào dùng?</summary>
-
-Watchpoint (data breakpoint) khiến gdb dừng khi một biến hoặc vùng nhớ **bị thay đổi** (`watch`), bị đọc (`rwatch`), hoặc cả hai. Dùng khi một giá trị "bỗng nhiên" sai mà không biết đoạn code nào ghi đè nó — đặt watchpoint lên biến/địa chỉ đó, gdb sẽ dừng ngay tại lệnh ghi và `bt` chỉ ra thủ phạm. Rất hiệu quả cho lỗi memory corruption hoặc ghi đè ngoài ý muốn (vd buffer overflow ghi sang biến lân cận, con trỏ sai trỏ trúng biến này). Lưu ý hardware watchpoint nhanh nhưng giới hạn số lượng; watch vùng lớn bằng phần mềm có thể làm chương trình chạy chậm hẳn.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DBG-001](../14-prep/mock-interview/bank/debugging.md) | Vì sao cần build với -g và nên dùng -O0 khi debug? |
+| [DBG-004](../14-prep/mock-interview/bank/debugging.md) | Khi chương trình crash, bạn dùng gdb thế nào để tìm nguyên nhân? |
+| [DBG-002](../14-prep/mock-interview/bank/debugging.md) | step và next khác nhau thế nào? |
+| [DBG-003](../14-prep/mock-interview/bank/debugging.md) | Core dump là gì và dùng để làm gì? |
+| [DBG-010](../14-prep/mock-interview/bank/debugging.md) | Làm sao điều tra một chương trình bị treo (hang/deadlock) bằng gdb? |
+| [DBG-009](../14-prep/mock-interview/bank/debugging.md) | Watchpoint là gì? Khi nào dùng? |
 
 ---
 ⬅️ [mindset.md](mindset.md) · ➡️ Tiếp theo: [tools.md](tools.md)

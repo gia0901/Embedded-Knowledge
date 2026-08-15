@@ -128,35 +128,16 @@ DT là chuẩn de-facto cho embedded Linux; ACPI phổ biến ở x86/server (fi
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Device tree là gì và giải quyết vấn đề gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Device tree là một cấu trúc dữ liệu dạng cây mô tả phần cứng của hệ thống — CPU, bus, thiết bị, địa chỉ thanh ghi, IRQ, clock... — tách rời khỏi mã kernel, được bootloader nạp và truyền cho kernel lúc boot. Nó giải quyết vấn đề của ARM/embedded: phần cứng gắn cứng không tự khai báo như PCI/ACPI, nên trước đây phải hard-code mô tả trong "board file" C cho từng board, gây bùng nổ code và phải build lại kernel cho mỗi biến thể. Với device tree, cùng một kernel image chạy được trên nhiều board chỉ bằng cách nạp DTB khác nhau — dễ bảo trì và port board mới.
-</details>
-
-<details><summary>2) DTS, DTB, dtc là gì?</summary>
-
-DTS (.dts/.dtsi) là source device tree dạng text do người viết; `.dtsi` là file include dùng chung (vd mô tả SoC) còn `.dts` mô tả từng board. DTB (.dtb, device tree blob) là dạng binary compact biên dịch từ DTS, được bootloader nạp vào RAM và truyền cho kernel. dtc là device tree compiler chuyển đổi giữa DTS và DTB.
-</details>
-
-<details><summary>3) Property compatible dùng để làm gì?</summary>
-
-`compatible` là chuỗi (thường dạng `"vendor,model"`) trong mỗi node thiết bị, là khóa để kernel **match node với driver**: mỗi driver khai báo một bảng `of_match_table` liệt kê các chuỗi compatible nó hỗ trợ, kernel so chuỗi compatible của node với các bảng này, khi khớp thì tạo device tương ứng và gọi `probe()` của driver đó. Thường khai nhiều giá trị từ cụ thể đến tổng quát để driver tổng quát vẫn nhận được nếu không có driver chuyên biệt.
-</details>
-
-<details><summary>4) Driver lấy thông tin từ device tree như thế nào?</summary>
-
-Sau khi match qua `compatible`, kernel gọi `probe()` với một `platform_device` (hoặc thiết bị bus tương ứng) chứa thông tin trích từ node DT. Driver dùng các API `of_*`/`platform_*` để đọc: `platform_get_resource`/`devm_ioremap_resource` lấy và map vùng thanh ghi từ property `reg`; `platform_get_irq` lấy IRQ từ `interrupts`; `of_property_read_u32`/`_string`/`_bool` đọc các property cấu hình (clock-frequency, gpios...). Nhờ vậy cùng một driver chạy cho nhiều board chỉ khác nhau ở dữ liệu DT.
-</details>
-
-<details><summary>5) Device tree có chứa driver không? Nó khác gì với driver?</summary>
-
-Không. Device tree chỉ **mô tả phần cứng tồn tại và tham số của nó** (địa chỉ, IRQ, clock, cấu hình) — nó là dữ liệu, không phải code và không chứa logic điều khiển. Driver (code điều khiển thiết bị) vẫn nằm trong kernel/module. Device tree đóng vai trò "danh sách thiết bị + cấu hình" để kernel biết phần cứng nào có mặt và ghép với driver phù hợp; driver mới là phần thực sự vận hành thiết bị. Tách biệt này cho phép tái dùng driver across boards và thay đổi cấu hình phần cứng mà không sửa code.
-</details>
-
-<details><summary>6) Device tree khác ACPI thế nào? Khi nào dùng cái nào?</summary>
-
-Cả hai đều mô tả phần cứng cho OS thay vì hard-code. Device tree là dữ liệu do người làm board cung cấp (DTS→DTB), phổ biến trên ARM/embedded, RISC-V — kernel parse trực tiếp. ACPI là các bảng do firmware/BIOS cung cấp với cả mô tả lẫn phương thức (AML), phổ biến trên x86/server và mang tính OS-agnostic, cho phép firmware trừu tượng hóa phần cứng và quản lý nguồn. Embedded/ARM thường dùng device tree vì gọn và do nhà phát triển board kiểm soát; hệ x86/server và một số ARM server dùng ACPI vì hạ tầng firmware đã có sẵn và cần tính tương thích rộng.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DRV-007](../14-prep/mock-interview/bank/drivers-embedded.md) | Device tree là gì và giải quyết vấn đề gì? |
+| [DRV-028](../14-prep/mock-interview/bank/drivers-embedded.md) | DTS, DTB, dtc là gì? |
+| [DRV-029](../14-prep/mock-interview/bank/drivers-embedded.md) | Property compatible dùng để làm gì? |
+| [DRV-030](../14-prep/mock-interview/bank/drivers-embedded.md) | Driver lấy thông tin từ device tree như thế nào? |
+| [DRV-031](../14-prep/mock-interview/bank/drivers-embedded.md) | Device tree có chứa driver không? Nó khác gì với driver? |
+| [DRV-032](../14-prep/mock-interview/bank/drivers-embedded.md) | Device tree khác ACPI thế nào? Khi nào dùng cái nào? |
 
 ---
 ⬅️ [kernel-userspace.md](kernel-userspace.md) · ➡️ Tiếp theo: [06-build-systems/](../06-build-systems/)

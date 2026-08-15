@@ -141,47 +141,16 @@ Makefile viết tay: tường minh, không phụ thuộc công cụ ngoài, tố
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Các bước từ file .cpp tới executable là gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Bốn bước: (1) **Preprocess** — khai triển `#include`, macro `#define`, xử lý `#ifdef`, ra source đã mở rộng. (2) **Compile** — dịch source thành assembly, áp dụng tối ưu, xử lý từng translation unit độc lập. (3) **Assemble** — dịch assembly thành mã máy, tạo object file `.o` (mã máy + bảng symbol, chưa chạy được). (4) **Link** — nối nhiều object file và thư viện, phân giải các tham chiếu symbol tới định nghĩa, tạo executable. Lỗi `undefined reference` xảy ra ở bước link, không phải compile.
-</details>
-
-<details><summary>2) Tại sao "undefined reference" là lỗi link chứ không phải compile?</summary>
-
-Vì compiler xử lý từng translation unit **độc lập** và chỉ cần **khai báo** (chữ ký từ header) để biên dịch một lời gọi hàm — nó không cần thấy định nghĩa thật ở TU khác, chỉ ghi lại một tham chiếu symbol chưa giải quyết trong object file. Tới bước **link**, linker mới gom mọi object file/thư viện và cố khớp từng tham chiếu với một định nghĩa; nếu không tìm thấy định nghĩa nào cho symbol đó thì báo `undefined reference`. Ngược lại, định nghĩa trùng ở nhiều nơi gây `multiple definition` cũng ở bước link.
-</details>
-
-<details><summary>3) Include guard / #pragma once để làm gì?</summary>
-
-Chúng ngăn một header bị include nhiều lần trong cùng một translation unit. Nếu không có, khi nhiều header cùng include một header chung, nội dung (vd định nghĩa struct/class) sẽ xuất hiện lặp lại trong cùng TU → lỗi định nghĩa trùng. Include guard dùng `#ifndef X / #define X / ... / #endif` để lần include thứ hai trở đi bị bỏ qua; `#pragma once` đạt cùng mục đích gọn hơn (compiler-specific nhưng được hỗ trợ rộng rãi).
-</details>
-
-<details><summary>4) Make quyết định build lại cái gì như thế nào? Incremental build là gì?</summary>
-
-Make dựa trên đồ thị phụ thuộc của các rule (`target: prerequisites`) và so sánh thời gian sửa đổi (mtime): nó chỉ chạy recipe để build lại một target nếu target không tồn tại hoặc có ít nhất một prerequisite **mới hơn** target. Nhờ vậy chỉ phần bị ảnh hưởng bởi thay đổi mới được biên dịch lại (incremental build), tiết kiệm thời gian lớn trong dự án lớn. Điều kiện để đúng là dependency phải khai báo đầy đủ — nếu quên liệt kê một header là prerequisite, sửa header đó sẽ không trigger rebuild và sinh binary lỗi thời; thực tế dùng `-MMD` của gcc/g++ để tự sinh dependency.
-</details>
-
-<details><summary>5) Khác biệt giữa khai báo (declaration) và định nghĩa (definition)? ODR là gì?</summary>
-
-Khai báo cho compiler biết một thực thể tồn tại và chữ ký của nó (vd prototype hàm, `extern int x;`) — thường đặt trong header để nhiều TU dùng chung. Định nghĩa cung cấp nội dung thực tế (thân hàm, cấp phát biến) — đặt trong `.cpp`. ODR (One Definition Rule) quy định mỗi entity (hàm non-inline, biến) chỉ được có **đúng một định nghĩa** trong toàn chương trình; vi phạm gây lỗi multiple definition khi link. Đó là lý do header chỉ nên chứa khai báo (trừ `inline`/`template`/`constexpr` được phép định nghĩa trong header vì có ngoại lệ ODR).
-
-**Ví dụ ngoại lệ ODR với `inline`:**
-```cpp
-// util.h — SAI: định nghĩa thường trong header
-int square(int x) { return x * x; }        // a.cpp và b.cpp cùng include
-// → link: multiple definition of `square(int)'  (mỗi TU một bản)
-
-// util.h — ĐÚNG: thêm inline
-inline int square(int x) { return x * x; } // inline = giấy phép ODR
-// → linker gộp các bản trùng ở mọi TU thành một, không lỗi
-```
-Ngược lại nếu khai báo `inline` ở header nhưng giấu định nghĩa trong `.cpp`, TU gọi không thấy thân hàm → `undefined reference` (hàm `inline` phải được định nghĩa ở *mọi* TU dùng tới). Cùng cơ chế này giải thích vì sao **template** cũng phải để định nghĩa trong header — chi tiết truy vết từng bước: [01/templates.md §6](../01-cpp-fundamentals/templates.md).
-</details>
-
-<details><summary>6) Khi nào dùng Makefile viết tay, khi nào dùng CMake?</summary>
-
-Makefile viết tay phù hợp dự án nhỏ, mục tiêu đơn giản, hoặc môi trường đặc thù (vd kernel module dùng kbuild) — nó tường minh, không phụ thuộc công cụ ngoài. CMake phù hợp dự án lớn hoặc cần **di động** đa nền tảng/đa compiler: nó tự tìm thư viện (`find_package`), quản lý dependency và include path theo target, tích hợp IDE, và sinh ra Makefile/Ninja/VS project tùy môi trường. Khi dự án phải build trên nhiều OS, dùng nhiều thư viện, hoặc cần cross-compile có hệ thống, CMake giảm rất nhiều công sức bảo trì so với Makefile thủ công.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [BLD-016](../14-prep/mock-interview/bank/build-systems.md) | Các bước từ file .cpp tới executable là gì? |
+| [SD-026](../14-prep/mock-interview/bank/system-design.md) | Tại sao "undefined reference" là lỗi link chứ không phải compile? |
+| [BLD-017](../14-prep/mock-interview/bank/build-systems.md) | Include guard / #pragma once để làm gì? |
+| [BLD-018](../14-prep/mock-interview/bank/build-systems.md) | Make quyết định build lại cái gì như thế nào? Incremental build là gì? |
+| [SD-026](../14-prep/mock-interview/bank/system-design.md) | Khác biệt giữa khai báo (declaration) và định nghĩa (definition)? ODR là gì? |
+| [BLD-019](../14-prep/mock-interview/bank/build-systems.md) | Khi nào dùng Makefile viết tay, khi nào dùng CMake? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [cmake.md](cmake.md)

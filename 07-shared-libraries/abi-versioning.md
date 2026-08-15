@@ -93,35 +93,16 @@ g++ -shared -Wl,--version-script=version.map ...
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Phân biệt API và ABI.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-API là hợp đồng ở mức **source code**: tên hàm, danh sách/kiểu tham số, kiểu trả về, tên class — quyết định việc code nguồn cũ có **biên dịch lại** được với phiên bản thư viện mới hay không. ABI là hợp đồng ở mức **nhị phân**: layout và kích thước/căn lề của struct, calling convention (cách truyền tham số/trả về), quy ước name mangling, layout vtable — quyết định việc một binary đã biên dịch sẵn có **chạy đúng với `.so` mới mà không cần biên dịch lại** hay không. Một thay đổi có thể giữ API nhưng phá ABI (vẫn biên dịch được nhưng binary cũ chạy sai), nên cần phân biệt rõ khi maintain thư viện.
-</details>
-
-<details><summary>2) ABI break là gì? Cho ví dụ thay đổi giữ API nhưng phá ABI.</summary>
-
-ABI break là thay đổi khiến binary được build với phiên bản thư viện cũ chạy sai hoặc crash khi liên kết với `.so` mới. Ví dụ giữ API nhưng phá ABI: thêm một data member vào một struct/class public — chữ ký hàm và tên không đổi nên code cũ vẫn **biên dịch lại** được (API còn nguyên), nhưng `sizeof` và offset các field thay đổi, nên binary cũ (đã hard-code offset/kích thước cũ) đọc/ghi sai vùng nhớ khi dùng `.so` mới. Tương tự, thêm một virtual function làm đổi layout vtable khiến lời gọi virtual của binary cũ nhảy sai hàm.
-</details>
-
-<details><summary>3) Những thay đổi nào trong C++ thường phá ABI?</summary>
-
-Các thay đổi phổ biến phá ABI: thêm/bớt/đổi thứ tự data member của class public (đổi sizeof và offset); thêm/bớt/đổi thứ tự virtual function (đổi vtable); đổi chữ ký hàm (kiểu tham số/trả về, const, số lượng tham số → đổi cả mangled name); đổi kiểu cơ sở hoặc underlying type của enum, đổi alignment/packing; chuyển hàm giữa inline và non-inline khi caller cũ đã inline; xóa hoặc đổi linkage của symbol đang export. C++ đặc biệt nhạy vì phơi bày nhiều chi tiết triển khai (layout object, vtable, template instantiation) ra ABI.
-</details>
-
-<details><summary>4) soname là gì và liên quan thế nào tới tương thích ABI?</summary>
-
-soname (vd `libfoo.so.1`) là tên được nhúng trong file ELF của shared library, mã hóa **major version** đại diện cho mức ABI. Khi build, executable ghi nhận cần soname tại thời điểm đó (`libfoo.so.1`), và loader dùng soname để tìm thư viện lúc chạy. Quy ước: thay đổi tương thích ngược (sửa lỗi, thêm tính năng không phá ABI) giữ nguyên soname; thay đổi **phá ABI** thì tăng major và **đổi soname** (`libfoo.so.2`). Nhờ vậy bản cũ và mới có soname khác nhau, cùng tồn tại trên hệ thống, và mỗi app vẫn nạp đúng bản ABI mà nó được build cùng — tránh app cũ vô tình dùng `.so` đã phá ABI.
-</details>
-
-<details><summary>5) Symbol versioning là gì? Khác gì với tăng soname?</summary>
-
-Symbol versioning (cơ chế của glibc, qua version script) cho phép một shared library chứa **nhiều phiên bản của cùng một symbol** trong cùng một file, mỗi binary bind tới phiên bản tương ứng lúc nó được build. Nhờ vậy có thể thay đổi/cập nhật một hàm mà binary cũ vẫn dùng phiên bản cũ của symbol, giữ tương thích **mà không phải tăng soname** hay tách ra file `.so` mới — ví dụ glibc giữ `memcpy@GLIBC_2.2.5` cùng các phiên bản mới trong một `libc.so.6`. Tăng soname thì tạo ra một file thư viện major mới hoàn toàn (hai bản tách biệt cùng tồn tại); symbol versioning tinh vi hơn, giữ mọi thứ trong một file và chỉ phiên bản hóa ở mức từng symbol. Ngoài ra version script (`local: *`) còn giúp ẩn symbol nội bộ, thu nhỏ bề mặt ABI.
-</details>
-
-<details><summary>6) Làm sao giữ shared library tương thích ABI khi phát triển tiếp?</summary>
-
-Các chiến lược chính: thu nhỏ bề mặt ABI bằng cách chỉ export symbol cần thiết (`-fvisibility=hidden` + version script); dùng kỹ thuật pimpl để giấu data member nên thêm field không đổi layout public; chỉ **thêm** hàm/class mới thay vì sửa chữ ký hoặc layout đã phát hành; thận trọng với virtual function trong interface public (thêm virtual phá vtable); dùng biên giới C (`extern "C"`, kiểu POD) cho API công khai khi cần tương thích chéo compiler; và áp dụng versioning kỷ luật — tăng major và đổi soname khi buộc phải phá ABI. Có thể dùng công cụ như `abidiff` (libabigail) hoặc `abi-compliance-checker` để tự động phát hiện ABI break giữa hai phiên bản trước khi phát hành.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [SD-017](../14-prep/mock-interview/bank/system-design.md) | Phân biệt API và ABI. |
+| [SD-017](../14-prep/mock-interview/bank/system-design.md) | ABI break là gì? Cho ví dụ thay đổi giữ API nhưng phá ABI. |
+| [SD-018](../14-prep/mock-interview/bank/system-design.md) | Những thay đổi nào trong C++ thường phá ABI? |
+| [SD-019](../14-prep/mock-interview/bank/system-design.md) | soname là gì và liên quan thế nào tới tương thích ABI? |
+| [SD-019](../14-prep/mock-interview/bank/system-design.md) | Symbol versioning là gì? Khác gì với tăng soname? |
+| [SD-020](../14-prep/mock-interview/bank/system-design.md) | Làm sao giữ shared library tương thích ABI khi phát triển tiếp? |
 
 ---
 ⬅️ [linking-loading.md](linking-loading.md) · ➡️ Tiếp theo: [api-design.md](api-design.md)

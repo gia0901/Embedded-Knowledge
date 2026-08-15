@@ -150,25 +150,14 @@ Tránh **bùng nổ lớp con** cho mọi tổ hợp tính năng (`EncryptedComp
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Adapter pattern dùng khi nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Adapter dùng khi bạn có một class hữu ích nhưng interface của nó **không khớp** với interface mà client mong đợi — điển hình là thư viện bên thứ ba, code legacy, hoặc API phần cứng mà bạn không sửa được. Adapter bọc object đó lại và phơi bày interface mà client cần, chuyển đổi lời gọi giữa hai bên. Lợi ích: tích hợp code không sửa được vào kiến trúc của mình mà không để interface lạ lan tỏa khắp codebase, và có thể thay thế thư viện bên dưới mà chỉ sửa adapter. Trong embedded, một lớp bọc driver/chip cụ thể sau một interface chung chính là dạng adapter.
-</details>
-
-<details><summary>2) Pimpl liên quan thế nào tới Bridge pattern? Lợi ích của nó?</summary>
-
-Pimpl (Pointer to Implementation) là một ứng dụng cụ thể của ý tưởng Bridge: tách phần abstraction (class public mà client thấy) khỏi phần implementation (đặt trong struct `Impl` ở file .cpp), nối với nhau qua một `unique_ptr<Impl>`. Lợi ích chính trong C++: **bảo vệ ABI** — `sizeof` class public không đổi (chỉ là một con trỏ) nên thêm/bớt data member trong `Impl` không thay đổi layout mà client phụ thuộc, tránh ABI break; và **giảm thời gian biên dịch** — header không cần include dependency của implementation, nên thay đổi nội bộ không buộc rebuild mọi nơi include header. Đánh đổi là một lần truy cập gián tiếp qua con trỏ và một cấp phát heap.
-</details>
-
-<details><summary>3) Facade khác Adapter thế nào?</summary>
-
-Cả hai đều bọc cái khác, nhưng mục đích khác. Adapter chuyển đổi **một** interface không tương thích thành interface mà client mong đợi — mục tiêu là tương thích, thường giữ nguyên mức độ chức năng. Facade cung cấp **một interface đơn giản, cấp cao** che giấu sự phức tạp của **nhiều** hệ thống con bên dưới — mục tiêu là đơn giản hóa, giảm cho client phải hiểu chi tiết. Nói cách khác: Adapter làm cho thứ không khớp trở nên dùng được; Facade làm cho thứ phức tạp trở nên dễ dùng. Trong embedded, một Hardware Abstraction Layer thường kết hợp cả hai: facade hóa trình tự phức tạp và adapter hóa các chip/driver khác nhau sau một API thống nhất.
-</details>
-
-<details><summary>4) Proxy pattern có những biến thể nào? Cho ví dụ ứng dụng.</summary>
-
-Proxy là object đại diện kiểm soát truy cập tới object thật, với các biến thể: virtual proxy (lazy loading — trì hoãn tạo object đắt tới khi thật sự cần, vd chỉ nạp file ảnh khi draw); protection proxy (kiểm tra quyền trước khi cho truy cập); caching proxy (lưu kết quả tránh tính lại hoặc gọi mạng lặp); remote proxy (đại diện cục bộ cho object ở xa, như stub RPC). Ví dụ quen thuộc trong C++: `shared_ptr`/`weak_ptr` là dạng smart proxy quản lý vòng đời và truy cập object. Proxy hữu ích khi muốn thêm một lớp kiểm soát (hiệu năng, bảo mật, vòng đời) mà client vẫn dùng object qua cùng interface như bình thường.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DP-016](../14-prep/mock-interview/bank/design-patterns.md) | Adapter pattern dùng khi nào? |
+| [DP-007](../14-prep/mock-interview/bank/design-patterns.md) | Pimpl liên quan thế nào tới Bridge pattern? Lợi ích của nó? |
+| [DP-017](../14-prep/mock-interview/bank/design-patterns.md) | Facade khác Adapter thế nào? |
+| [DP-018](../14-prep/mock-interview/bank/design-patterns.md) | Proxy pattern có những biến thể nào? Cho ví dụ ứng dụng. |
 
 ---
 ⬅️ [creational.md](creational.md) · ➡️ Tiếp theo: [behavioral.md](behavioral.md)

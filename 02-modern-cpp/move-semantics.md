@@ -174,35 +174,16 @@ std::vector<int> make_bad() {
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) lvalue và rvalue khác nhau thế nào? rvalue reference là gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-lvalue là biểu thức định danh được, có địa chỉ bền, sống qua biểu thức hiện tại (vd biến có tên). rvalue là giá trị tạm thời, không tên hoặc sắp hết hạn (vd literal, kết quả `a+b`, giá trị trả về theo trị). rvalue reference `T&&` là tham chiếu chỉ bind tới rvalue, cho phép một hàm/constructor "ăn cắp" tài nguyên nội bộ của object tạm đó (move) thay vì copy.
-</details>
-
-<details><summary>2) std::move thực sự làm gì?</summary>
-
-Không di chuyển gì cả. `std::move(x)` chỉ là một `static_cast` biến `x` thành rvalue reference (`T&&`), nhờ đó trình biên dịch chọn được overload move ctor/assignment. Việc "di chuyển" thật (ăn cắp con trỏ/buffer) nằm trong định nghĩa move ctor/assignment. Sau khi bị move, object nguồn ở trạng thái valid-but-unspecified.
-</details>
-
-<details><summary>3) Move semantics tăng hiệu năng bằng cách nào?</summary>
-
-Thay vì deep copy tài nguyên (vd cấp phát buffer mới rồi copy n phần tử — O(n)), move ctor chỉ chuyển quyền sở hữu bằng cách sao chép vài con trỏ/kích thước rồi đặt nguồn về null — O(1). Điều này đặc biệt hiệu quả khi nguồn là object tạm sắp bị hủy (rvalue), vì không cần giữ lại bản sao.
-</details>
-
-<details><summary>4) Vì sao move constructor nên là noexcept?</summary>
-
-Các container chuẩn như `std::vector` chỉ dùng move khi reallocate **nếu** move ctor được đánh dấu `noexcept`; nếu không, chúng buộc phải dùng copy để bảo toàn strong exception guarantee (nếu move ném giữa chừng sẽ mất dữ liệu không khôi phục được). Vì vậy quên `noexcept` khiến `vector` âm thầm copy thay vì move → mất hiệu năng.
-</details>
-
-<details><summary>5) Perfect forwarding là gì? std::move khác std::forward ra sao?</summary>
-
-Perfect forwarding là truyền tham số qua một lớp wrapper template mà **giữ nguyên** tính lvalue/rvalue (và const) của đối số gốc, để lớp đích chọn đúng copy/move. Đạt được bằng forwarding reference `T&&` (T suy ra) + `std::forward<T>(arg)`. `std::move` luôn ép thành rvalue (dùng cho rvalue reference thường, khi chắc chắn muốn move); `std::forward` chỉ ép thành rvalue *nếu* đối số gốc là rvalue (dùng trong template để forward).
-</details>
-
-<details><summary>6) RVO là gì? Vì sao không nên return std::move(local)?</summary>
-
-RVO (Return Value Optimization)/copy elision là tối ưu trong đó compiler xây object trả về thẳng vào vị trí của caller, bỏ qua hoàn toàn copy lẫn move (C++17 bắt buộc trong một số trường hợp). Khi `return v;` (v là local), RVO áp dụng được. Nếu viết `return std::move(v)`, biểu thức trả về thành rvalue reference chứ không phải tên biến → chặn RVO và ép một lần move không cần thiết, thường chậm hơn. Quy tắc: trả về biến local thì cứ `return v;`.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [CPP-014](../14-prep/mock-interview/bank/cpp.md) | lvalue và rvalue khác nhau thế nào? rvalue reference là gì? |
+| [CPP-008](../14-prep/mock-interview/bank/cpp.md) | std::move thực sự làm gì? |
+| [CPP-049](../14-prep/mock-interview/bank/cpp.md) | Move semantics tăng hiệu năng bằng cách nào? |
+| [CPP-011](../14-prep/mock-interview/bank/cpp.md) | Vì sao move constructor nên là noexcept? |
+| [CPP-013](../14-prep/mock-interview/bank/cpp.md) | Perfect forwarding là gì? std::move khác std::forward ra sao? |
+| [CPP-012](../14-prep/mock-interview/bank/cpp.md) | RVO là gì? Vì sao không nên return std::move(local)? |
 
 ---
 ⬅️ [raii-smart-pointers.md](raii-smart-pointers.md) · ➡️ Tiếp theo: [lambdas-functional.md](lambdas-functional.md)

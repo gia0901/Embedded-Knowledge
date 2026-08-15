@@ -33,6 +33,8 @@ Interviewer **không bao giờ tự bật**. Ba cách, chọn cách hợp ngữ 
 ## `rapid` — Phản xạ nhanh · 12 câu · ~15′
 Bắn liên tục câu 🟢🟡 **concept**, đáp án ngắn gọn, đo độ *trôi chảy* — thứ interviewer test ở màn khởi động. Ít follow-up. Hợp warm-up trước phiên lớn hoặc lúc ít thời gian.
 
+> ⚠️ **`rapid` là NGOẠI LỆ DUY NHẤT của [config §6](config.md) luật ①②③④⑤** — xem mục *"Ngoại lệ duy nhất của luật ① và ④"*. Ở đây **được phép hỏi thẳng *"X là gì"***, tối đa **1 probe ngắn**, **~1 phút/câu**. Đây là loại phiên duy nhất luyện năng lực *nói gọn một khái niệm* — thứ vòng screen thật hỏi trước tiên. Chạy đúng ngân sách 15′; muốn sâu thì đổi type, **không** trộn.
+
 ## `comprehensive` — Giả lập vòng technical thật · 16 câu · ~60′
 Mô phỏng một vòng phỏng vấn kỹ thuật đầy đủ trên **1 track chính**. Cơ cấu tăng dần độ khó — **cộng đúng 16**:
 

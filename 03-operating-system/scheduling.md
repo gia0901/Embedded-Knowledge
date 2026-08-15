@@ -90,37 +90,46 @@ Tác vụ ưu tiên TRUNG BÌNH (M) (không liên quan) preempt L.
 
 ---
 
+## 8. 💰 Con số & ⚠️ bẫy
+
+**Mốc cần nhớ trên Linux:**
+
+| Thứ | Giá trị điển hình | Vì sao đáng nhớ |
+|---|---|---|
+| Ưu tiên realtime | **1–99** (99 cao nhất) | Mọi task RT **luôn** thắng mọi task `SCHED_OTHER`, bất kể `nice` |
+| `nice` | **−20 … +19** | Chỉ đổi **trọng số** `vruntime`, **không** phải ưu tiên tuyệt đối |
+| Trọng số theo `nice` | mỗi bậc ≈ **×1,25** CPU | Chênh 10 bậc ≈ **×10** thị phần CPU |
+| Timer tick | 100 / 250 / **1000 Hz** | Quyết định độ hạt của lập lịch và timer |
+| Context switch | ~1–5 µs | Time slice quá nhỏ ⇒ chi phí switch ăn hết ([process-thread.md](process-thread.md)) |
+
+**⚠️ Bẫy:**
+
+**① `SCHED_FIFO` + vòng lặp bận = TREO CẢ MÁY.** Task FIFO chạy **tới khi tự nhường**; ở ưu tiên cao nó không cho cả shell của bạn chạy. ⇒ Dùng RT thì **luôn** để lối thoát: `RLIMIT_RTTIME`, watchdog, hoặc chừa một core không dành cho RT.
+
+**② Chuyển sang realtime KHÔNG chữa được phần lớn nguyên nhân trễ.** Nó chỉ chữa ca *bị task khác giành CPU*. Trễ do **chờ I/O** (`D` state), **page fault**, hay **priority inversion** thì đổi lớp lịch vô ích — thậm chí làm tệ hơn. ⇒ **Đo trước, đổi sau** ([OS-026](../14-prep/mock-interview/bank/os.md)).
+
+**③ Realtime + mutex thường = priority inversion nặng hơn.** Task RT chờ khoá do task thường giữ, mà task thường **không bao giờ được lịch** để nhả khoá ⇒ kẹt vĩnh viễn. ⇒ Dùng RT thì mutex **bắt buộc** bật **priority inheritance** (`PTHREAD_PRIO_INHERIT`) — §6.
+
+**④ `nice` không đảm bảo gì cả.** `nice -20` vẫn phải chia CPU với mọi tiến trình khác; nó **không** là ưu tiên cứng, và **không** giúp gì cho độ trễ đuôi.
+
+**⑤ Ưu tiên tiến trình I/O-bound không phải "thiên vị".** Chúng chạy rất ngắn rồi ngủ; cho chạy trước gần như miễn phí mà giữ được thiết bị luôn bận ⇒ **tăng tổng thông lượng**. CFS đạt việc này tự nhiên: ngủ thì `vruntime` đứng yên ([OS-025](../14-prep/mock-interview/bank/os.md), [OS-016](../14-prep/mock-interview/bank/os.md)).
+
+**⑥ Đo độ trễ bằng `CLOCK_REALTIME` là sai** — NTP chỉnh giờ làm phép đo ra số âm hoặc timeout hàng giờ. Dùng **`CLOCK_MONOTONIC`** ([LNX-029](../14-prep/mock-interview/bank/linux-sysprog.md)).
+
+---
+
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Preemptive và cooperative scheduling khác nhau thế nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Cooperative (non-preemptive): tác vụ chạy đến khi tự nguyện nhường CPU (yield hoặc block I/O); đơn giản, ít context switch nhưng một tác vụ tham lam/bug có thể treo cả hệ thống. Preemptive: OS chủ động giành lại CPU qua timer interrupt sau một time slice hoặc khi có tác vụ ưu tiên cao hơn; đảm bảo công bằng và đáp ứng, là cách Linux và hầu hết OS hiện đại dùng. Đánh đổi: đơn giản/tin tưởng tác vụ vs an toàn/phức tạp hơn.
-</details>
-
-<details><summary>2) CFS hoạt động theo nguyên lý nào?</summary>
-
-CFS (Completely Fair Scheduler) mô phỏng một CPU đa nhiệm "lý tưởng" chia đều cho mọi tác vụ. Nó theo dõi **vruntime** — thời gian CPU ảo mỗi tác vụ đã dùng (có trọng số theo giá trị nice) — và luôn chọn chạy tác vụ có vruntime nhỏ nhất, dùng cấu trúc cây đỏ-đen để tìm nhanh. Tác vụ nice thấp (ưu tiên cao) có vruntime tăng chậm hơn nên được nhiều CPU hơn. Kết quả là chia sẻ CPU công bằng theo trọng số thay vì time slice cố định. (Kernel mới thay bằng EEVDF.)
-</details>
-
-<details><summary>3) CPU-bound và I/O-bound khác nhau ra sao? Scheduler nên ưu tiên loại nào?</summary>
-
-CPU-bound dùng hết time slice cho tính toán; I/O-bound thường block chờ I/O và dùng ít CPU mỗi lần. Scheduler tốt nên ưu tiên cho I/O-bound được chạy nhanh khi sẵn sàng, vì chúng sẽ sớm block lại — như vậy giữ thiết bị I/O luôn bận và hệ thống phản hồi mượt, còn tác vụ CPU-bound lấp các khoảng CPU rảnh. Đây là lý do tác vụ tương tác (hay ngủ) được ưu tiên hơn tác vụ tính toán nặng.
-</details>
-
-<details><summary>4) Priority inversion là gì và khắc phục thế nào?</summary>
-
-Priority inversion xảy ra khi một tác vụ ưu tiên cao bị chặn gián tiếp bởi tác vụ ưu tiên thấp hơn: tác vụ thấp (L) giữ một mutex mà tác vụ cao (H) cần; trong khi đó tác vụ trung bình (M) không liên quan lại preempt L, khiến L không nhả được lock và H bị chặn vô thời hạn bởi M. Khắc phục: **priority inheritance** (L tạm thừa kế ưu tiên của H để chạy xong và nhả lock nhanh) hoặc **priority ceiling** (nâng ai giữ mutex lên mức trần định trước). Đây là sự cố nổi tiếng của Mars Pathfinder.
-</details>
-
-<details><summary>5) Linux có những scheduling class nào? Khi nào dùng realtime?</summary>
-
-Theo ưu tiên giảm dần: lớp **realtime** (`SCHED_FIFO`, `SCHED_RR`, ưu tiên 1–99) luôn chạy trước; **normal** (`SCHED_OTHER`, dùng CFS/EEVDF) cho tiến trình thường, điều chỉnh bằng nice; **idle** (`SCHED_IDLE`) chỉ chạy khi rảnh. Dùng realtime cho tác vụ cần tất định về thời gian (điều khiển, xử lý tín hiệu, audio): `SCHED_FIFO` chạy đến khi tự nhường/bị RT cao hơn preempt, `SCHED_RR` thêm time slice xoay vòng cùng mức. Phải cẩn thận vì tác vụ RT có thể bỏ đói tác vụ thường; embedded khắt khe thường dùng kernel PREEMPT_RT.
-</details>
-
-<details><summary>6) Starvation là gì? Aging giải quyết ra sao?</summary>
-
-Starvation là khi một tác vụ không bao giờ (hoặc rất lâu mới) được cấp CPU — thường do luôn có tác vụ ưu tiên cao hơn trong hệ priority-based, hoặc tác vụ dài bị các tác vụ ngắn chen mãi (SJF). Aging khắc phục bằng cách **tăng dần độ ưu tiên** của tác vụ theo thời gian nó chờ; chờ càng lâu ưu tiên càng cao, cuối cùng chắc chắn được chạy, đảm bảo tiến triển (progress) cho mọi tác vụ.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [EMB-014](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Preemptive và cooperative scheduling khác nhau thế nào? |
+| [OS-016](../14-prep/mock-interview/bank/os.md) | CFS hoạt động theo nguyên lý nào? |
+| [OS-025](../14-prep/mock-interview/bank/os.md) | CPU-bound và I/O-bound khác nhau ra sao? Scheduler nên ưu tiên loại nào? |
+| [OS-015](../14-prep/mock-interview/bank/os.md) | Priority inversion là gì và khắc phục thế nào? |
+| [OS-026](../14-prep/mock-interview/bank/os.md) | Linux có những scheduling class nào? Khi nào dùng realtime? |
+| [OS-027](../14-prep/mock-interview/bank/os.md) | Starvation là gì? Aging giải quyết ra sao? |
 
 ---
 ⬅️ [process-thread.md](process-thread.md) · ➡️ Tiếp theo: [memory-management.md](memory-management.md)

@@ -146,30 +146,15 @@ Bài "whole system" rất hay gặp cho Embedded Linux (Datalogic JD ghi rõ "de
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Khi được giao một bài system design mơ hồ, bước đầu tiên bạn làm gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Làm rõ yêu cầu trước khi thiết kế bất cứ gì. Tôi hỏi về **yêu cầu chức năng** (hệ thống phải làm gì, input/output, use case chính) và đặc biệt **yêu cầu phi chức năng** (hiệu năng, độ trễ, giới hạn RAM/flash, điện năng, độ tin cậy, realtime, thời gian boot) — vì với embedded chính các ràng buộc này định hình kiến trúc. Tôi cũng xác định phạm vi (cái gì trong/ngoài scope) để không thiết kế thừa, và nêu rõ các giả định. Chỉ sau khi hiểu đúng bài toán và ràng buộc tôi mới phác kiến trúc — vì giải đúng một bài sai là vô nghĩa, và một giải pháp tốt cho ràng buộc này có thể tệ cho ràng buộc khác.
-</details>
-
-<details><summary>2) System design cho embedded khác gì cho web/server scale?</summary>
-
-Ràng buộc và mục tiêu tối ưu khác hẳn. Web/server tối ưu cho throughput, latency và khả năng scale ngang (thêm máy, cache phân tán, load balancer) trước hàng triệu request; lỗi xử lý bằng retry/redundancy/restart, và deploy liên tục. Embedded bị giới hạn bởi RAM/flash (KB–MB), CPU yếu, điện năng (pin), yêu cầu realtime và độ tin cậy cao; "nhiều" nghĩa là vài KB bộ nhớ hay vài mW điện chứ không phải triệu user. Quan trọng là **thường không scale ngang được** — phải vừa phần cứng cố định; lỗi xử lý bằng watchdog và fail-safe vì không người can thiệp; và cập nhật firmware khó nên phải an toàn (A/B, rollback). Do đó không nên bê tư duy "thêm server/cache phân tán" vào bài embedded; ở đây tối ưu nghĩa là vừa tài nguyên, tiết kiệm điện, tất định thời gian và chạy bền bỉ lâu dài.
-</details>
-
-<details><summary>3) Những nguyên tắc thiết kế nào giúp một hệ thống dễ bảo trì và mở rộng?</summary>
-
-Tách concern và module hóa: chia hệ thành các module độc lập, mỗi module một trách nhiệm rõ (single responsibility), giao tiếp qua interface ổn định và giấu chi tiết nội bộ (information hiding) để coupling thấp — nhờ đó thay đổi bên trong một module không lan ra toàn hệ. Tránh chia sẻ trạng thái mutable để giảm bug đồng bộ. Thiết kế trạng thái xác định với xử lý lỗi đầy đủ (mọi lỗi có đường dẫn về safe state). Tách logic khỏi I/O phần cứng (hardware abstraction layer) để test được logic trên host. Và tuân theo YAGNI — thiết kế cho yêu cầu hiện tại cộng chỗ mở rộng hợp lý, không over-engineer cho tính năng tưởng tượng. Những nguyên tắc này làm hệ thống dễ hiểu, dễ test, dễ thay thế từng phần.
-</details>
-
-<details><summary>4) Trong thiết kế, bạn xử lý lỗi và trường hợp hệ thống chạy không người giám sát thế nào?</summary>
-
-Tôi thiết kế để hệ thống luôn về được trạng thái an toàn (fail-safe) khi có lỗi, thay vì treo hay sập âm thầm. Cụ thể với embedded: dùng watchdog timer để tự reset nếu hệ treo (và kick watchdog ở vị trí phản ánh hệ thực sự hoạt động); kiểm tra mọi giá trị trả về và có đường xử lý cho từng lỗi (sensor timeout thì đánh dấu lỗi và tiếp tục, không để một thiết bị lỗi làm treo cả hệ); bảo vệ dữ liệu quan trọng trước mất điện bằng ghi atomic/journaling; xử lý mất kết nối bằng buffer cục bộ và retry; và cập nhật firmware an toàn bằng A/B partition với rollback để không "brick" thiết bị. Vì thiết bị thường không có người can thiệp, khả năng tự phục hồi và chịu lỗi là yêu cầu cốt lõi chứ không phải tính năng thêm.
-</details>
-
-<details><summary>5) Làm sao thiết kế để hệ thống dễ test, đặc biệt khi phụ thuộc phần cứng?</summary>
-
-Chìa khóa là tách logic nghiệp vụ khỏi truy cập phần cứng bằng một lớp trừu tượng (Hardware Abstraction Layer/interface): code logic gọi qua interface thay vì đụng trực tiếp thanh ghi/driver, nhờ đó khi test có thể thay phần cứng thật bằng một implementation giả lập (mock/stub) và chạy logic trên host (PC) — nhanh, lặp lại được, không cần board thật. Thiết kế module với coupling thấp và interface rõ ràng cũng cho phép test từng phần độc lập. Với phần phụ thuộc thời gian/IO, tiêm (inject) các phụ thuộc đó để kiểm soát trong test. Ngoài ra build cùng code trên host để chạy các công cụ như AddressSanitizer/ThreadSanitizer (thường không chạy được trên target hạn chế). Tư duy "design for testability" ngay từ kiến trúc giúp phát hiện bug sớm và rẻ hơn nhiều so với chỉ test trên thiết bị.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [SD-004](../14-prep/mock-interview/bank/system-design.md) | Khi được giao một bài system design mơ hồ, bước đầu tiên bạn làm gì? |
+| [SD-005](../14-prep/mock-interview/bank/system-design.md) | System design cho embedded khác gì cho web/server scale? |
+| [SD-006](../14-prep/mock-interview/bank/system-design.md) | Những nguyên tắc thiết kế nào giúp một hệ thống dễ bảo trì và mở rộng? |
+| [SD-011](../14-prep/mock-interview/bank/system-design.md) | Trong thiết kế, bạn xử lý lỗi và trường hợp hệ thống chạy không người giám sát thế nào? |
+| [SD-007](../14-prep/mock-interview/bank/system-design.md) | Làm sao thiết kế để hệ thống dễ test, đặc biệt khi phụ thuộc phần cứng? |
 
 ---
 ⬅️ [problem-solving.md](problem-solving.md) · ➡️ Tiếp theo: [bank/system-design.md](../14-prep/mock-interview/bank/system-design.md)

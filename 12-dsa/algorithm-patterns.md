@@ -142,30 +142,15 @@ int fib(int n) {
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Khi nào dùng sliding window? Nó cải thiện complexity thế nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Dùng sliding window cho các bài về **đoạn con liên tục** (substring/subarray) — ví dụ "đoạn con dài nhất/ngắn nhất thỏa một điều kiện", tổng cửa sổ, đếm trong cửa sổ. Ý tưởng là duy trì một cửa sổ `[left, right]` và trượt: mở rộng `right` để thêm phần tử, thu hẹp `left` khi cửa sổ vi phạm điều kiện. Vì mỗi phần tử chỉ vào và ra khỏi cửa sổ đúng một lần, tổng công việc là O(n) — cải thiện từ O(n²) của cách xét mọi đoạn con bằng hai vòng lồng. Đây là biến thể của two pointers áp dụng cho đoạn liên tục.
-</details>
-
-<details><summary>2) Two-sum: giải O(n) thế nào và đánh đổi gì?</summary>
-
-Với mảng chưa sắp xếp, dùng hash map: duyệt một lần, với mỗi phần tử `a[i]` tính phần bù `need = target - a[i]` và kiểm tra `need` đã có trong map chưa; nếu có thì trả về cặp index, nếu chưa thì lưu `a[i] → i` vào map. Độ phức tạp O(n) thời gian, O(n) bộ nhớ — đánh đổi thêm không gian (map) để giảm thời gian từ O(n²) của brute force hai vòng lặp. Nếu mảng **đã sắp xếp**, có thể dùng two pointers (l ở đầu, r ở cuối, dịch theo tổng so với target) đạt O(n) thời gian mà chỉ O(1) bộ nhớ phụ — tốt hơn về không gian nhưng yêu cầu mảng sắp xếp.
-</details>
-
-<details><summary>3) BFS và DFS khác nhau thế nào? Khi nào dùng BFS?</summary>
-
-BFS (Breadth-First Search) duyệt theo tầng dùng một queue — thăm tất cả node ở khoảng cách k trước khi sang k+1. DFS (Depth-First Search) đi sâu hết một nhánh rồi quay lui, dùng stack hoặc đệ quy. Dùng **BFS khi cần đường đi ngắn nhất trên đồ thị không trọng số** (vì nó thăm node theo thứ tự khoảng cách tăng dần, lần đầu chạm đích là ngắn nhất) hoặc duyệt theo tầng. Dùng DFS cho tìm đường bất kỳ, đếm/khám phá thành phần liên thông, phát hiện chu trình, và backtracking (sinh tổ hợp/hoán vị). Cả hai đều cần đánh dấu visited để tránh lặp vô tận; DFS đệ quy trên đồ thị sâu cần coi chừng stack overflow (có thể chuyển sang stack tường minh).
-</details>
-
-<details><summary>4) Dynamic programming áp dụng khi nào? Hai cách hiện thực?</summary>
-
-DP áp dụng cho bài tối ưu hoặc đếm có hai đặc điểm: **cấu trúc con tối ưu** (lời giải tối ưu của bài lớn dựa trên lời giải tối ưu của bài con) và **bài toán con chồng lấp** (cùng một bài con được tính lại nhiều lần) — dấu hiệu đề thường là "số cách", "min/max chi phí". Ý tưởng cốt lõi là lưu kết quả bài con để không tính lại, giảm độ phức tạp mũ xuống đa thức. Hai cách hiện thực: **top-down (memoization)** — viết đệ quy tự nhiên rồi cache kết quả mỗi state; **bottom-up (tabulation)** — lặp xây kết quả từ bài con nhỏ nhất lên. Phần khó nhất là định nghĩa state và công thức truy hồi (recurrence); cách thực tế là bắt đầu từ lời giải brute-force đệ quy, nhận ra các bài con lặp lại, rồi thêm cache hoặc chuyển thành bảng.
-</details>
-
-<details><summary>5) Trong phỏng vấn coding, quy trình tiếp cận một bài nên thế nào?</summary>
-
-Làm rõ trước: hỏi về ràng buộc (kích thước input, miền giá trị, có trùng/âm không, yêu cầu thời gian/không gian), xác nhận input/output bằng một ví dụ nhỏ. Sau đó **nhận diện pattern** (mảng sắp xếp → two pointers/binary search; đoạn con → sliding window; đồ thị → BFS/DFS; "số cách/min-max" → DP...). Trình bày **brute force** trước để có baseline đúng và thể hiện hiểu bài, rồi tối ưu dần, nêu rõ đánh đổi. Phân tích complexity (time + space) cho giải pháp chọn. Cuối cùng kiểm tra **edge case** (rỗng, một phần tử, trùng, biên). Quan trọng là **think aloud** — nói ra suy nghĩ và lý do, vì người phỏng vấn chấm cách tiếp cận chứ không chỉ đáp án.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DSA-006](../14-prep/mock-interview/bank/dsa.md) | Khi nào dùng sliding window? Nó cải thiện complexity thế nào? |
+| [DSA-005](../14-prep/mock-interview/bank/dsa.md) | Two-sum: giải O(n) thế nào và đánh đổi gì? |
+| [DSA-007](../14-prep/mock-interview/bank/dsa.md) | BFS và DFS khác nhau thế nào? Khi nào dùng BFS? |
+| [DSA-008](../14-prep/mock-interview/bank/dsa.md) | Dynamic programming áp dụng khi nào? Hai cách hiện thực? |
+| [DSA-011](../14-prep/mock-interview/bank/dsa.md) | Trong phỏng vấn coding, quy trình tiếp cận một bài nên thế nào? |
 
 ---
 ⬅️ [complexity-and-structures.md](complexity-and-structures.md) · ➡️ Tiếp theo: [13-networking/](../13-networking/)

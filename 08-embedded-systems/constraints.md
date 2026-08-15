@@ -198,37 +198,59 @@ q16_t q16_mul(q16_t a, q16_t b) {
 
 ---
 
+## 7. 💰 Con số & ⚠️ bẫy — ràng buộc chỉ có nghĩa khi có SỐ
+
+Nói *"bộ nhớ hạn chế"* là vô nghĩa cho tới khi có con số. Thang bậc điển hình:
+
+| | MCU (Cortex-M) | SoC Linux nhúng | Máy chủ |
+|---|---|---|---|
+| RAM | **16 KB – 1 MB** | 128 MB – 2 GB | 16+ GB |
+| Lưu trữ | 64 KB – 2 MB flash | 512 MB – 32 GB eMMC | TB |
+| MMU | **Không** (có thể có MPU) | Có | Có |
+| Độ trễ ngắt | **~1 µs**, tất định | ~10–100 µs, **không** đảm bảo | — |
+
+**Năng lượng — thứ quyết định thiết kế firmware chạy pin:**
+
+| Trạng thái | Dòng điển hình | So với chạy đủ |
+|---|---|---|
+| Chạy đủ tốc độ | ~10–100 mA | 1× |
+| Sleep (giữ RAM, chờ ngắt) | ~1–100 µA | **~1.000×** ít hơn |
+| Deep sleep / shutdown | ~0,1–1 µA | ~100.000× ít hơn |
+
+⇒ **Kết luận đổi cách viết code:** tuổi thọ pin **không** quyết định bởi code chạy nhanh cỡ nào, mà bởi **tỉ lệ thời gian ở trạng thái ngủ**. Chạy nhanh gấp đôi rồi ngủ sớm gấp đôi (*race to idle*) thường **tiết kiệm hơn** chạy chậm liên tục — vì dòng lúc ngủ nhỏ hơn cả nghìn lần. Kẻ giết pin thật sự là **thứ đánh thức bạn dậy**: polling định kỳ, timer không cần thiết, một chân GPIO bị kéo sai gây rò dòng.
+
+**Flash — ràng buộc ít ai nhớ:** eMMC/NAND chịu khoảng **1.000–100.000 chu kỳ ghi** mỗi khối. ⇒ Ghi log dày tay có thể **tự tạo ra hỏng hóc**; ghi biến đếm mỗi giây vào cùng một chỗ là cách chắc chắn để giết thiết bị sau vài năm.
+
+**⚠️ Bẫy:**
+
+**① Tối ưu mà không đo — và đo sai chỗ.** Trên hệ nhúng, nút thắt thường **không phải CPU** mà là: chờ I/O, cache miss, hoặc thời gian thức. Đo trên máy dev x86 rồi kết luận cho ARM là vô nghĩa (khác mô hình bộ nhớ, khác cache, khác tốc độ flash).
+
+**② `malloc` trong đường nóng.** Ngay cả khi còn bộ nhớ, thời gian cấp phát **không tất định** (phụ thuộc trạng thái phân mảnh) ⇒ phá realtime. Và không MMU thì **phân mảnh là vĩnh viễn**. ⇒ Cấp hết lúc khởi động, dùng **pool cỡ cố định**; cần giữ API kiểu STL thì `std::pmr` ([SD-016](../14-prep/mock-interview/bank/system-design.md)).
+
+**③ Tràn stack im lặng.** Không MMU thì không có guard page — stack task này **đâm vào** dữ liệu task khác, hỏng ở chỗ hoàn toàn khác. ⇒ Tô mẫu lên stack lúc khởi động rồi **đo mức dùng cao nhất**, đặt watermark, bật MPU nếu có.
+
+**④ Số thực dấu phẩy động trên MCU không có FPU.** Compiler âm thầm gọi thư viện phần mềm ⇒ chậm hơn **hàng chục tới hàng trăm lần**, và nuốt cả stack. ⇒ Dùng **số nguyên / fixed-point**; nếu buộc phải dùng `float` thì kiểm xem chip có FPU không, và **cẩn thận với `double`** (nhiều FPU chỉ hỗ trợ `float` đơn).
+
+**⑤ Watchdog nuôi sai chỗ.** Một thread riêng chỉ biết nuôi watchdog sẽ **vẫn nuôi** dù toàn bộ phần còn lại đã chết ⇒ watchdog trở thành đồ trang trí. Phải nuôi **ở nơi chứng minh được hệ thống thực sự làm việc** (vd mọi task chính đều check-in trong chu kỳ).
+
+**⑥ Thiết bị field phải giả định MẤT ĐIỆN BẤT KỲ LÚC NÀO.** Ghi file cấu hình bằng `open("w")` + ghi đè là cách chắc chắn mất sạch dữ liệu. Mẫu đúng: **ghi file tạm → `fsync` → `rename` nguyên tử → `fsync` thư mục** ([04/file-io.md](../04-linux-system-programming/file-io.md), [LNX-007](../14-prep/mock-interview/bank/linux-sysprog.md)).
+
+**⑦ Nhiệt độ và điện áp là biến số thật.** Thạch anh trôi theo nhiệt; pin yếu làm điện áp sụt khi bật radio ⇒ brown-out reset trông y hệt bug phần mềm. Trước khi truy phần mềm hàng tuần, hãy **loại trừ nguồn và nhiệt**.
+
+---
+
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Vì sao nên hạn chế cấp phát động (heap) trong embedded? Thay bằng gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Cấp phát động lâu dài gây **fragmentation**: bộ nhớ bị phân mảnh khiến `malloc` có thể thất bại dù tổng dung lượng còn trống, và thời gian cấp phát/giải phóng **không tất định** — cả hai đều nguy hiểm cho hệ chạy liên tục và hệ realtime. Trên thiết bị RAM rất ít, một lần `malloc` thất bại có thể làm hỏng chức năng. Thay thế: cấp phát **tĩnh** (biến static/global, buffer cố định — biết footprint lúc biên dịch), dùng **stack** cho dữ liệu vòng đời ngắn (cẩn thận overflow vì stack nhỏ), hoặc **memory pool/fixed-block allocator** (cấp các khối cùng kích thước từ pool — tất định và không phân mảnh). Nhiều coding standard embedded (như MISRA) hạn chế hoặc cấm cấp phát động sau giai đoạn khởi tạo.
-</details>
-
-<details><summary>2) Phần mềm ảnh hưởng tới tiêu thụ điện như thế nào?</summary>
-
-Rất lớn, đặc biệt với thiết bị chạy pin. Các kỹ thuật phần mềm: đưa CPU và peripheral vào **sleep mode** khi rảnh và thức dậy bằng interrupt (chiến lược "race to sleep" — làm xong nhanh rồi ngủ sâu); dùng **interrupt thay vì polling** để CPU không bận chờ; **tắt peripheral và clock** (clock gating) khi không dùng; **hạ tần số/điện áp** (DVFS) khi tải thấp. Polling, busy-wait, hoặc giữ CPU thức không cần thiết đốt điện vô ích. Vì vậy thiết kế luồng điều khiển hướng sự kiện (event-driven) và quản lý trạng thái nguồn là phần quan trọng của lập trình embedded tiết kiệm năng lượng.
-</details>
-
-<details><summary>3) Watchdog timer là gì và dùng thế nào cho đúng?</summary>
-
-Watchdog là một timer phần cứng đếm ngược; phần mềm phải định kỳ "kick" (reset bộ đếm) để báo hệ thống còn sống. Nếu hệ treo hoặc kẹt (không kick kịp), watchdog hết giờ và **reset thiết bị**, cho phép tự phục hồi — quan trọng với thiết bị chạy không người giám sát. Dùng đúng: kick ở vị trí phản ánh hệ thống thực sự hoạt động bình thường (vd cuối một chu kỳ xử lý chính, hoặc khi mọi task quan trọng đều báo còn sống), **không** kick mù trong một interrupt độc lập vì như vậy watchdog vẫn được kick dù logic chính đã chết. Một số thiết kế dùng windowed watchdog (phải kick trong một cửa sổ thời gian, không quá sớm cũng không quá muộn) để bắt cả lỗi chạy quá nhanh.
-</details>
-
-<details><summary>4) Làm sao đảm bảo tính realtime ở mức lập trình?</summary>
-
-Một số nguyên tắc: giữ interrupt handler thật ngắn (top half) và đẩy việc nặng xuống bottom half/task; tránh trong vùng realtime các thao tác không tất định như cấp phát động, I/O blocking, page fault (khóa bộ nhớ bằng `mlockall` trên Linux để tránh swap/fault), và giữ khóa quá lâu; gán độ ưu tiên hợp lý và dùng priority inheritance để tránh priority inversion; phân tích worst-case execution time (WCET) thay vì chỉ trung bình; và **đo latency/jitter thực tế** (vd cyclictest trên Linux PREEMPT_RT) thay vì tin lý thuyết. Trên Linux còn dùng `SCHED_FIFO`/`SCHED_RR` và cô lập CPU (`isolcpus`) cho tác vụ realtime.
-</details>
-
-<details><summary>5) volatile có đủ để đồng bộ biến chia sẻ giữa các thread không?</summary>
-
-Không. `volatile` chỉ đảm bảo compiler không tối ưu bỏ/cache/đổi thứ tự các truy cập tới biến đó — cần thiết khi biến thay đổi bởi phần cứng hoặc ISR (để mỗi lần đọc/ghi diễn ra thật). Nhưng `volatile` **không** cung cấp tính nguyên tử (atomicity) cho thao tác đọc-sửa-ghi, cũng không cung cấp memory ordering/đồng bộ giữa các CPU core. Do đó dùng `volatile` để bảo vệ dữ liệu chia sẻ giữa các thread trên hệ đa lõi là sai và gây race condition. Đồng bộ đa luồng cần `std::atomic` (với memory order phù hợp) hoặc mutex; `volatile` chỉ đúng cho giao tiếp với phần cứng/ISR và ngay cả khi đó vẫn có thể cần barrier.
-</details>
-
-<details><summary>6) Làm sao giảm dung lượng flash/RAM của firmware?</summary>
-
-Về flash (code): biên dịch với `-Os` (tối ưu kích thước), bật LTO và `--gc-sections` để loại bỏ code/dữ liệu không dùng, cẩn thận với template/STL vì có thể phình code, dùng `const` để đặt dữ liệu chỉ-đọc ở flash thay vì RAM, và loại bỏ tính năng/log không cần trong bản release. Về RAM: ưu tiên cấp phát tĩnh có kiểm soát thay vì heap, giảm kích thước buffer xuống mức đủ dùng, đặt dữ liệu hằng ở flash, theo dõi stack high-water mark để cắt dư. Luôn **đo** bằng lệnh `size`, map file của linker và công cụ phân tích footprint để biết phần nào chiếm chỗ thay vì cắt mò.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DRV-016](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao nên hạn chế cấp phát động (heap) trong embedded? Thay bằng gì? |
+| [EMB-029](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Phần mềm ảnh hưởng tới tiêu thụ điện như thế nào? |
+| [DRV-017](../14-prep/mock-interview/bank/drivers-embedded.md) | Watchdog timer là gì và dùng thế nào cho đúng? |
+| [EMB-035](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Làm sao đảm bảo tính realtime ở mức lập trình? |
+| [CPP-022](../14-prep/mock-interview/bank/cpp.md) | volatile có đủ để đồng bộ biến chia sẻ giữa các thread không? |
+| [EMB-036](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Làm sao giảm dung lượng flash/RAM của firmware? |
 
 ---
 ⬅️ [rtos-vs-linux.md](rtos-vs-linux.md) · ➡️ Tiếp theo: [09-debugging/](../09-debugging/)

@@ -127,30 +127,15 @@ echo 'module my_driver +p' > /sys/kernel/debug/dynamic_debug/control
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Vì sao debug kernel khó hơn debug userspace?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Vì kernel không có ranh giới bảo vệ như process userspace: một bug (vd dereference con trỏ sai) trong kernel có thể làm hỏng hoặc sập cả hệ thống (oops/panic) thay vì chỉ crash một process cô lập. Không thể chạy gdb trực tiếp lên kernel đang chạy như với một chương trình userspace — kernel chính là nền mà gdb userspace dựa vào; debug live cần cơ chế đặc biệt (kgdb với máy host thứ hai, hoặc JTAG trên embedded). Ngoài ra một số ngữ cảnh kernel (interrupt handler) bị hạn chế nghiêm ngặt (không được ngủ, không gọi nhiều hàm), nên công cụ phải phù hợp. Hệ quả là debug kernel dựa nhiều vào để lại dấu vết (printk, ftrace) và phân tích crash dump hơn là step trực tiếp.
-</details>
-
-<details><summary>2) printk/dmesg là gì và dùng thế nào trong driver?</summary>
-
-`printk` là hàm in của kernel (tương đương printf), ghi vào kernel ring buffer; người dùng đọc qua lệnh `dmesg` (có `dmesg -w` để theo dõi realtime, lọc theo mức). Nó có các mức log (`KERN_ERR`, `KERN_WARNING`, `KERN_INFO`, `KERN_DEBUG`...) quyết định thông điệp nào hiện ra console theo loglevel hiện tại. Trong driver nên dùng các macro tiện như `pr_err/pr_info/pr_debug`, và đặc biệt `dev_err/dev_dbg` vì chúng gắn kèm tên thiết bị vào thông điệp, cho ngữ cảnh rõ ràng. Như ở userspace, đặt log đúng chỗ (probe, cấu hình IRQ, đường I/O, nhánh lỗi) là cách điều tra chủ lực, nhất là với bug khó tái hiện.
-</details>
-
-<details><summary>3) Khi gặp kernel oops, bạn đọc thông tin gì để tìm nguyên nhân?</summary>
-
-Bản oops chứa: dòng mô tả lỗi (vd "NULL pointer dereference" kèm địa chỉ), thanh ghi **RIP/PC** chỉ hàm và offset đang chạy khi lỗi (vd `my_driver_read+0x2c [my_driver]` cho biết module và hàm), **Call Trace** là chuỗi gọi hàm dẫn tới điểm lỗi (như backtrace), và danh sách "Modules linked in" cùng cờ tainted. Cách điều tra: xác định hàm gây lỗi từ RIP và module liên quan, đọc Call Trace để hiểu đường dẫn thực thi, rồi dùng `addr2line -e my_driver.ko <offset>` (hoặc gdb trên `.ko` có debug info) để map offset về đúng dòng source. Kết hợp với hiểu loại lỗi (NULL deref → con trỏ chưa khởi tạo/đã free) để truy nguyên nhân gốc.
-</details>
-
-<details><summary>4) ftrace dùng để làm gì?</summary>
-
-ftrace là framework tracing tích hợp sẵn trong kernel, điều khiển qua `/sys/kernel/tracing`, không cần build lại kernel. Nó cho phép: trace các function call trong kernel (function tracer) để biết hàm nào được gọi và theo thứ tự nào; vẽ cây gọi hàm kèm thời lượng mỗi hàm (function_graph) để tìm hotspot/latency; và dùng các tracer chuyên biệt như `irqsoff` (đo các vùng tắt interrupt lâu — quan trọng cho realtime), `wakeup` (latency lập lịch), hay event tracing cho các subsystem (sched, irq, block...). Nó là nền cho các công cụ cấp cao như trace-cmd, perf và một phần eBPF. Rất hữu ích để điều tra vấn đề hiệu năng, latency và luồng thực thi trong kernel mà printk khó nắm bắt.
-</details>
-
-<details><summary>5) Có những cách nào debug memory bug và deadlock trong kernel?</summary>
-
-Cho memory bug trong kernel: build kernel với **KASAN** (Kernel Address Sanitizer) — tương tự AddressSanitizer ở userspace, bắt buffer overflow và use-after-free trong kernel/driver và in báo cáo với stack trace nơi truy cập, cấp phát và giải phóng. Cho deadlock và lỗi thứ tự khóa: bật **LOCKDEP** (`CONFIG_PROVE_LOCKING`) — nó theo dõi thứ tự acquire các khóa lúc runtime và cảnh báo khi phát hiện khả năng deadlock (vd hai khóa được lấy theo hai thứ tự ngược nhau ở các đường khác nhau) ngay cả khi deadlock chưa thực sự xảy ra. Ngoài ra có thể dùng kgdb để step và inspect, kdump/crash để phân tích vmcore sau panic, và eBPF/bpftrace để quan sát động. Các tùy chọn debug này thường bật khi phát triển và tắt ở bản production vì có overhead.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DBG-020](../14-prep/mock-interview/bank/debugging.md) | Vì sao debug kernel khó hơn debug userspace? |
+| [DBG-021](../14-prep/mock-interview/bank/debugging.md) | printk/dmesg là gì và dùng thế nào trong driver? |
+| [DBG-015](../14-prep/mock-interview/bank/debugging.md) | Khi gặp kernel oops, bạn đọc thông tin gì để tìm nguyên nhân? |
+| [DBG-022](../14-prep/mock-interview/bank/debugging.md) | ftrace dùng để làm gì? |
+| [DBG-023](../14-prep/mock-interview/bank/debugging.md) | Có những cách nào debug memory bug và deadlock trong kernel? |
 
 ---
 ⬅️ [memory-bugs.md](memory-bugs.md) · ➡️ Tiếp theo: [10-thinking/](../10-thinking/)

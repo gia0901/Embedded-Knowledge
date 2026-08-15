@@ -129,37 +129,68 @@ Dùng `std::atomic` + CAS (compare-and-swap) để xây cấu trúc dữ liệu 
 
 ---
 
+## 9. 💰 Chi phí thật — con số để quyết định
+
+Mọi lựa chọn ở trên đều vô nghĩa nếu không biết **thứ tự độ lớn**. Số dưới đây là mốc điển hình trên x86-64 hiện đại (chênh theo máy, nhưng **tỉ lệ giữa chúng** mới là thứ cần nhớ):
+
+| Thao tác | Bậc thời gian | Ghi chú |
+|---|---|---|
+| Truy cập biến trong **cache L1** | **~1 ns** | Mốc so sánh |
+| `std::atomic` tăng, **không tranh chấp** | **~5–20 ns** | Chỉ một lệnh có khoá bus/cache |
+| `mutex.lock()` **không tranh chấp** | **~20 ns** | Trên Linux là **futex** — đường nhanh chạy **hoàn toàn trong user space**, không syscall |
+| Cache line **bật giữa 2 core** | **~50–100 ns** | Cái giá thật của việc "chia sẻ" một biến |
+| `mutex.lock()` **có tranh chấp** → ngủ + đánh thức | **~1–5 µs** | Phải vào kernel + **context switch** |
+| Context switch thread | ~1–2 µs | ([process-thread.md](process-thread.md)) |
+
+**Ba kết luận rút ra — đây mới là phần dùng được:**
+
+1. ⭐ **Mutex không tranh chấp gần như miễn phí.** `lock()` chỉ tốn syscall **khi thực sự phải chờ** (futex). ⇒ Bỏ mutex đi để "tối ưu" khi khoá hiếm khi tranh chấp là **tối ưu nhầm chỗ** — và đánh đổi bằng nguy cơ race.
+2. **Cái đắt là TRANH CHẤP, không phải bản thân cái khoá.** Chênh lệch 20 ns → 1–5 µs là **~100×**. ⇒ Muốn nhanh thì **giảm tranh chấp** (chia nhỏ khoá, giảm thời gian giữ khoá, dữ liệu riêng theo thread), chứ không phải đổi loại primitive.
+3. **Spinlock chỉ thắng khi thời gian giữ khoá < chi phí một context switch (~1 µs).** Giữ lâu hơn thì spin đốt CPU vô ích. ⇒ Trong **user space hầu như không bao giờ** nên tự viết spinlock; nó là công cụ của kernel.
+
+---
+
+## 10. ⚠️ Bẫy — những chỗ code chạy đúng 99% rồi chết
+
+**① `std::mutex` KHÔNG đệ quy — lock hai lần là tự khoá chính mình.**
+```cpp
+void publicApi()  { std::lock_guard lk(m_); helper(); }   // giữ m_
+void helper()     { std::lock_guard lk(m_); /* ... */ }   // ❌ lock lại m_ → DEADLOCK
+```
+Xảy ra khi refactor tách hàm, hoặc khi một hàm public gọi một hàm public khác. Cũng chính là cơ chế **self-deadlock** khi signal handler chen vào hàm đang giữ khoá ([OS-020](../14-prep/mock-interview/bank/os.md)).
+⚠️ Chữa bằng `recursive_mutex` là **giấu bệnh**: nó cho code chạy tiếp nhưng bất biến của bạn đang bị nhìn thấy ở trạng thái dở dang. Cách đúng: tách **hàm private không khoá** rồi cho cả hai lối vào cùng gọi nó.
+
+**② Lost wakeup — `notify` trước khi bên kia kịp `wait`.**
+Condition variable **không nhớ** tín hiệu: `notify_one()` phát ra lúc không ai đang chờ thì **mất luôn**. Đây là lý do **bắt buộc** dùng predicate — nó kiểm tra *trạng thái*, không dựa vào việc bắt được tín hiệu:
+```cpp
+cv.wait(lk, []{ return ready; });   // ✅ ready đã true từ trước thì không chờ nữa
+cv.wait(lk);                        // ❌ ngủ mãi nếu notify đã bay qua
+```
+
+**③ `notify_one` khi các consumer chờ điều kiện KHÁC nhau.** Kernel chọn *một* thread bất kỳ; nếu trúng thread mà predicate của nó chưa đúng, nó ngủ lại — và tín hiệu **mất**, thread lẽ ra chạy được thì không được đánh thức. ⇒ Nhiều loại điều kiện trên cùng cv ⇒ dùng **`notify_all`**, hoặc tách thành nhiều cv.
+
+**④ Giữ khoá trong lúc làm I/O.** `lock()` rồi `read()`/`write()`/`printf` ⇒ giữ khoá hàng **ms** thay vì **ns**, biến critical section thành nút thắt. Nguyên tắc: **lấy dữ liệu ra dưới khoá, xử lý ngoài khoá.**
+
+**⑤ Spinlock trên hệ MỘT core = thảm hoạ.** Thread spin **chiếm trọn** CPU, mà thread đang giữ khoá lại **cần chính CPU đó** để chạy tiếp và nhả khoá ⇒ kẹt tới hết time slice. Spinlock chỉ có nghĩa khi **thật sự có core khác đang chạy song song**.
+
+**⑥ Không dùng RAII.** `lock()` … `return` sớm / ném exception ⇒ **không bao giờ `unlock()`**. Luôn `lock_guard`/`scoped_lock`. Cần khoá nhiều mutex cùng lúc: **`std::scoped_lock(a, b)`** — nó chống deadlock bằng thuật toán tránh, an toàn hơn tự lock theo thứ tự.
+
+**⑦ Đo trước khi đổi sang `shared_mutex`.** Reader–writer lock phải **đếm reader**, mà biến đếm là ô nhớ **ghi chung** ⇒ reader tưởng "chỉ đọc" vẫn gây tranh chấp cache. Với critical section ngắn, nó **chậm hơn** mutex thường ([OS-028](../14-prep/mock-interview/bank/os.md)).
+
+---
+
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Race condition là gì? Critical section là gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Race condition là tình huống kết quả của chương trình phụ thuộc vào thứ tự/timing không kiểm soát được giữa nhiều luồng cùng truy cập dữ liệu chung (ít nhất một ghi). Critical section là đoạn code truy cập dữ liệu chung đó và cần được thực thi loại trừ lẫn nhau — một lúc chỉ một luồng được vào. Mục tiêu của đồng bộ là đảm bảo mutual exclusion cho critical section trong khi vẫn đảm bảo tiến triển và công bằng.
-</details>
-
-<details><summary>2) Mutex và spinlock khác nhau thế nào? Khi nào dùng spinlock?</summary>
-
-Khi không lấy được lock, mutex đưa thread vào **ngủ** (block, nhường CPU), còn spinlock cho thread **bận xoay** (busy-wait) liên tục kiểm tra. Spinlock tránh chi phí context switch nên nhanh khi lock được giữ **cực ngắn** và có nhiều core; nhưng đốt CPU nếu chờ lâu. Dùng spinlock chủ yếu trong kernel/SMP cho critical section vài lệnh, và tuyệt đối không ngủ/block khi đang giữ spinlock. Mutex phù hợp critical section dài và code user-space.
-</details>
-
-<details><summary>3) Mutex và semaphore khác nhau ra sao?</summary>
-
-Mutex là cơ chế khóa có **ownership**: thread nào lock thì chính nó phải unlock, dùng để bảo vệ critical section (loại trừ lẫn nhau). Semaphore là bộ đếm có hai thao tác wait/signal, **không có ownership** — bất kỳ thread nào cũng có thể signal, nên dùng để báo hiệu giữa các luồng hoặc quản lý N tài nguyên (counting). Binary semaphore (0/1) giống mutex về hình thức nhưng khác bản chất; dùng semaphore thay mutex để bảo vệ critical section sẽ mất priority inheritance và dễ lỗi.
-</details>
-
-<details><summary>4) Condition variable dùng để làm gì? Vì sao phải đi kèm mutex và predicate?</summary>
-
-Condition variable cho phép thread ngủ chờ tới khi một điều kiện trở nên đúng, thay vì busy-wait. Nó đi kèm mutex vì điều kiện thường dựa trên dữ liệu chung cần bảo vệ: `wait` nhả mutex trong lúc ngủ (để thread khác sửa dữ liệu/điều kiện) rồi giành lại mutex khi thức. Phải dùng predicate (`wait(lock, pred)`) để chống spurious wakeup (thức không do notify) và để kiểm tra điều kiện trước/sau khi chờ, đảm bảo chỉ tiếp tục khi điều kiện thật sự đúng. Ứng dụng kinh điển: producer–consumer.
-</details>
-
-<details><summary>5) Deadlock là gì? Bốn điều kiện và cách tránh?</summary>
-
-Deadlock là khi các thread chờ vòng tròn tài nguyên do nhau giữ nên kẹt vĩnh viễn. Bốn điều kiện Coffman phải đồng thời thỏa: mutual exclusion, hold-and-wait, no preemption, circular wait. Tránh deadlock bằng cách phá ít nhất một điều kiện: phổ biến nhất là phá circular wait bằng cách luôn acquire các lock theo **một thứ tự toàn cục cố định**; hoặc dùng lock có timeout, acquire tất cả lock một lần (`scoped_lock`), hoặc tránh hold-and-wait.
-</details>
-
-<details><summary>6) Reader-writer lock dùng khi nào? Rủi ro gì?</summary>
-
-Dùng khi dữ liệu được **đọc nhiều, ghi ít**: cho phép nhiều reader truy cập đồng thời (vì đọc không xung đột) nhưng writer phải độc quyền. Điều này tăng song song so với mutex thường. Rủi ro chính là **writer starvation**: nếu reader liên tục đến, writer có thể chờ mãi không được ghi; cần chính sách ưu tiên writer hoặc fairness. Ngoài ra reader-writer lock nặng hơn mutex thường nên chỉ đáng dùng khi tỉ lệ đọc thực sự áp đảo.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [OS-004](../14-prep/mock-interview/bank/os.md) | Race condition là gì? Critical section là gì? |
+| [OS-006](../14-prep/mock-interview/bank/os.md) | Mutex và spinlock khác nhau thế nào? Khi nào dùng spinlock? |
+| [OS-007](../14-prep/mock-interview/bank/os.md) | Mutex và semaphore khác nhau ra sao? |
+| [OS-012](../14-prep/mock-interview/bank/os.md) | Condition variable dùng để làm gì? Vì sao phải đi kèm mutex và predicate? |
+| [OS-003](../14-prep/mock-interview/bank/os.md) | Deadlock là gì? Bốn điều kiện và cách tránh? |
+| [OS-028](../14-prep/mock-interview/bank/os.md) | Reader-writer lock dùng khi nào? Rủi ro gì? |
 
 ---
 ⬅️ [memory-management.md](memory-management.md) · ➡️ Tiếp theo: [ipc.md](ipc.md)

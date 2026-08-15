@@ -3,6 +3,7 @@
 - **Level:** mid-level · **Số câu:** 12 dự kiến → **dừng ở câu 4** (ứng viên tạm ngưng), tính **3 câu**
 - **Điểm trung bình:** **2.67 / 4** (3 · 2 · 3) · **Trần độ sâu: T2**
 - **Bối cảnh:** Datalogic plan — **Tuần 2 · Buổi 1** (Linux sysprog: file-io + processes-signals). Mở màn bằng slot 🔁 khởi động với câu yếu **OS-020** đúng như §📍 chỉ định.
+- **➡️ Phần tiếp theo:** [2026-08-13--rapid--linux-sysprog-2.md](2026-08-13--rapid--linux-sysprog-2.md) — 9 câu còn lại, hoàn tất Buổi 1 (điểm cả buổi **2.67/4**).
 - **Đặc điểm phiên:** dù là `rapid`, câu 1 bị đào sâu 6 tầng (a→f) vì là câu trong sổ yếu — đúng [config §6 luật ①](../config.md) (câu weak: nén nền, dồn trọng số vào follow-up).
 
 ## Kết quả từng câu (nhìn nhanh)

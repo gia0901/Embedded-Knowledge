@@ -121,25 +121,14 @@ SOLID giảm coupling nhưng thêm abstraction (interface, lớp) → phức t�
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) SOLID là gì? Mục tiêu chung của 5 nguyên lý?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-SOLID là 5 nguyên lý thiết kế hướng đối tượng: Single Responsibility (một class một trách nhiệm/lý do thay đổi), Open/Closed (mở để mở rộng, đóng để sửa đổi), Liskov Substitution (lớp con thay được lớp cha về hành vi), Interface Segregation (interface nhỏ chuyên biệt thay vì béo), Dependency Inversion (phụ thuộc abstraction chứ không implementation cụ thể). Mục tiêu chung là **giảm coupling và tăng cohesion** để code dễ bảo trì, mở rộng và test — thay đổi một chỗ không làm vỡ chỗ khác. Đây là nền tảng để hiểu vì sao nhiều design pattern tồn tại (pattern thường là cách hiện thực hóa các nguyên lý này).
-</details>
-
-<details><summary>2) Cho ví dụ vi phạm Liskov Substitution Principle.</summary>
-
-Ví dụ kinh điển là Square kế thừa Rectangle: Rectangle có `setWidth` và `setHeight` độc lập, nhưng Square buộc width = height nên override `setWidth` để đổi cả hai. Code viết cho Rectangle giả định "đổi width không đổi height" sẽ cho kết quả sai khi nhận một Square — lớp con đã phá vỡ hợp đồng hành vi của lớp cha. Đây là vi phạm LSP: dù Square "is-a" Rectangle về mặt dữ liệu, nó không thay thế được Rectangle về mặt hành vi. Bài học: kế thừa phải là quan hệ is-a thực sự về hành vi, không chỉ dữ liệu; khi nghi ngờ nên dùng composition.
-</details>
-
-<details><summary>3) Dependency Inversion Principle giúp ích gì cho việc test?</summary>
-
-DIP yêu cầu module cấp cao phụ thuộc vào abstraction (interface) thay vì implementation cụ thể, và inject implementation từ ngoài vào. Nhờ đó khi test, ta có thể thay implementation thật (vd database MySQL, driver phần cứng) bằng một mock/stub triển khai cùng interface, và kiểm thử logic cấp cao độc lập, nhanh, lặp lại được mà không cần tài nguyên thật. Đây chính là nền tảng của hardware abstraction layer trong embedded: logic gọi qua interface nên test được trên host với phần cứng giả lập. Không có DIP, logic gắn chặt với implementation cụ thể sẽ rất khó test.
-</details>
-
-<details><summary>4) Áp dụng SOLID có nhược điểm gì? Khi nào không nên?</summary>
-
-SOLID giảm coupling nhưng đánh đổi bằng việc thêm abstraction — nhiều interface, lớp, tầng gián tiếp — làm code phức tạp hơn và khó theo dõi luồng hơn. Không nên áp dụng giáo điều: với code nhỏ, ổn định, không có nhu cầu thay đổi/mở rộng thực sự thì thêm abstraction là over-engineering, vi phạm YAGNI. Trong embedded còn phải tính chi phí runtime: mỗi interface/virtual function thêm vtable và một lần gọi gián tiếp, có thể đáng kể trên hệ hạn chế tài nguyên hoặc hot path. Nguyên tắc là áp dụng SOLID khi thực sự cần linh hoạt/dễ thay đổi an toàn, và cân bằng với sự đơn giản.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DP-001](../14-prep/mock-interview/bank/design-patterns.md) | SOLID là gì? Mục tiêu chung của 5 nguyên lý? |
+| [DP-008](../14-prep/mock-interview/bank/design-patterns.md) | Cho ví dụ vi phạm Liskov Substitution Principle. |
+| [DP-011](../14-prep/mock-interview/bank/design-patterns.md) | Dependency Inversion Principle giúp ích gì cho việc test? |
+| [DP-012](../14-prep/mock-interview/bank/design-patterns.md) | Áp dụng SOLID có nhược điểm gì? Khi nào không nên? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [creational.md](creational.md)

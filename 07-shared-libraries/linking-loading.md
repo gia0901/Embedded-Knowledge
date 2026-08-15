@@ -103,35 +103,16 @@ dlclose(h);
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Phân biệt linking và loading. Static linking khác dynamic linking ở đâu?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Linking là quá trình phân giải symbol (khớp tham chiếu với định nghĩa) và relocate (gán/điều chỉnh địa chỉ) để tạo ra ảnh chương trình chạy được. Loading là quá trình đưa chương trình (và các thư viện nó cần) vào bộ nhớ để thực thi. Static linking thực hiện toàn bộ phân giải/relocate lúc **build**, copy code thư viện vào executable. Dynamic linking chỉ ghi nhận thư viện cần lúc build; việc nạp `.so`, relocate và phân giải symbol giữa executable với thư viện được **dynamic loader** hoàn tất lúc load/runtime. Vì vậy với dynamic, một số lỗi (thiếu symbol, thiếu `.so`) chỉ lộ ra khi chạy.
-</details>
-
-<details><summary>2) Symbol là gì? Khi nào gặp undefined reference vs multiple definition?</summary>
-
-Symbol là tên đại diện cho một hàm hoặc biến toàn cục trong object file/thư viện, có thể ở trạng thái "defined" (có định nghĩa) hoặc "undefined" (chỉ là tham chiếu). Linker khớp mỗi undefined symbol với đúng một defined symbol. `undefined reference` xảy ra khi không tìm thấy định nghĩa nào cho một symbol được dùng (quên link thư viện, sai thứ tự `-l`, thiếu `extern "C"`...). `multiple definition` xảy ra khi cùng một symbol có nhiều định nghĩa (vi phạm ODR, vd định nghĩa hàm non-inline trong header bị include nhiều nơi). Cả hai đều là lỗi ở bước link.
-</details>
-
-<details><summary>3) Dynamic loader làm gì khi chương trình khởi động?</summary>
-
-Kernel nạp executable và trao quyền cho dynamic loader (`ld-linux.so`) trước khi vào `main`. Loader: (1) đọc danh sách thư viện cần thiết (`NEEDED` trong ELF); (2) tìm và map từng `.so` vào bộ nhớ theo thứ tự RPATH/RUNPATH → `LD_LIBRARY_PATH` → `ld.so.cache` → đường mặc định; (3) thực hiện relocation và phân giải symbol giữa executable và các thư viện (thường lazy qua PLT/GOT); (4) chạy code khởi tạo của các thư viện (constructor). Sau đó mới chuyển điều khiển vào chương trình. `ldd` cho thấy các phụ thuộc, `LD_DEBUG=libs` cho thấy quá trình tìm/nạp.
-</details>
-
-<details><summary>4) PLT và GOT là gì? Lazy binding hoạt động thế nào?</summary>
-
-GOT (Global Offset Table) là bảng dữ liệu chứa địa chỉ thật của các symbol toàn cục, do loader điền lúc relocate; code truy cập hàm/biến ngoài gián tiếp qua GOT nên không phụ thuộc địa chỉ nạp cố định (cần cho PIC/ASLR). PLT (Procedure Linkage Table) là bảng các stub code cho lời gọi hàm, cho phép lazy binding. Lazy binding: lần đầu gọi một hàm thư viện, PLT stub gọi loader để phân giải địa chỉ hàm, ghi vào GOT, rồi nhảy tới hàm; các lần gọi sau đọc thẳng địa chỉ đã lưu trong GOT nên nhanh. Lợi ích là khởi động nhanh vì không phân giải mọi symbol ngay; có thể tắt bằng `LD_BIND_NOW=1` để phân giải hết lúc load (tốt cho tính tất định/realtime).
-</details>
-
-<details><summary>5) C++ name mangling là gì? extern "C" để làm gì?</summary>
-
-Name mangling là việc trình biên dịch C++ mã hóa thông tin kiểu tham số, namespace, class vào tên symbol của hàm — cần thiết vì C++ cho phép overload (nhiều hàm cùng tên khác tham số), nên mỗi phiên bản phải có symbol riêng. Nhược điểm: tên mangled không chuẩn hóa giữa các compiler và khó dùng trực tiếp (vd `dlsym`). `extern "C"` yêu cầu trình biên dịch **không mangle** một hàm, giữ tên symbol gốc theo quy ước C — nhờ đó hàm gọi được từ C, tra cứu được bằng `dlsym` đơn giản, và quan trọng là tạo một ABI ổn định, không phụ thuộc compiler ở biên giới thư viện. Đó là lý do API công khai của shared library thường bọc bằng `extern "C"`.
-</details>
-
-<details><summary>6) dlopen/dlsym dùng để làm gì? Khác liên kết động thông thường ra sao?</summary>
-
-`dlopen` nạp một shared library vào tiến trình **theo yêu cầu lúc runtime**, `dlsym` lấy địa chỉ một symbol (hàm/biến) theo tên từ thư viện đó, `dlclose` gỡ. Khác với liên kết động thông thường (thư viện được khai báo phụ thuộc lúc build và loader nạp tự động lúc khởi động), dlopen cho phép chương trình chính nạp module mà nó **không biết lúc build** — nền tảng của kiến trúc plugin: phát hiện và nạp module lúc chạy, gọi qua con trỏ hàm. Với C++ thường export hàm `extern "C"` (vd một factory trả về con trỏ tới abstract interface) để tránh phụ thuộc tên mangled khi `dlsym`.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [SD-025](../14-prep/mock-interview/bank/system-design.md) | Phân biệt linking và loading. Static linking khác dynamic linking ở đâu? |
+| [SD-026](../14-prep/mock-interview/bank/system-design.md) | Symbol là gì? Khi nào gặp undefined reference vs multiple definition? |
+| [SD-027](../14-prep/mock-interview/bank/system-design.md) | Dynamic loader làm gì khi chương trình khởi động? |
+| [SD-027](../14-prep/mock-interview/bank/system-design.md) | PLT và GOT là gì? Lazy binding hoạt động thế nào? |
+| [SD-028](../14-prep/mock-interview/bank/system-design.md) | C++ name mangling là gì? extern "C" để làm gì? |
+| [SD-029](../14-prep/mock-interview/bank/system-design.md) | dlopen/dlsym dùng để làm gì? Khác liên kết động thông thường ra sao? |
 
 ---
 ⬅️ [static-vs-shared.md](static-vs-shared.md) · ➡️ Tiếp theo: [abi-versioning.md](abi-versioning.md)

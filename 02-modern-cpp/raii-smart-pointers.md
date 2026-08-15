@@ -228,35 +228,16 @@ public:
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) RAII là gì? Vì sao quan trọng trong C++?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-RAII = Resource Acquisition Is Initialization: ràng buộc vòng đời của một tài nguyên (heap, file, mutex, socket...) vào vòng đời một object. Constructor giành tài nguyên, destructor trả lại. Vì destructor luôn được gọi khi object ra scope — kể cả khi có exception — nên tài nguyên được giải phóng tự động, đúng đắn và exception-safe, không cần `finally`. Đây là nền tảng cho smart pointer, `lock_guard`, container... và là cách C++ tránh leak.
-</details>
-
-<details><summary>2) unique_ptr, shared_ptr, weak_ptr khác nhau và dùng khi nào?</summary>
-
-`unique_ptr`: sở hữu độc quyền, không copy (chỉ move), zero overhead — dùng mặc định. `shared_ptr`: sở hữu chia sẻ qua reference count atomic, tốn bộ nhớ và chi phí đếm — chỉ dùng khi nhiều owner độc lập thật sự cùng quyết định vòng đời. `weak_ptr`: tham chiếu không sở hữu, không tăng ref count — dùng để phá circular reference giữa các `shared_ptr` hoặc quan sát object "nếu còn sống" (cache/observer), truy cập qua `lock()`.
-</details>
-
-<details><summary>3) shared_ptr hoạt động bên trong thế nào? Có thread-safe không?</summary>
-
-`shared_ptr` quản lý một control block chứa strong count và weak count. Mỗi copy tăng strong count, mỗi hủy giảm; khi strong count về 0, object bị hủy; khi cả hai về 0, control block bị giải phóng. Các thao tác đếm là **atomic** nên việc copy/destroy `shared_ptr` từ nhiều thread là an toàn. Tuy nhiên đây chỉ là thread-safe cho **bộ đếm**, KHÔNG đảm bảo an toàn cho dữ liệu mà nó trỏ tới — truy cập dữ liệu đó đồng thời vẫn cần đồng bộ (mutex).
-</details>
-
-<details><summary>4) Circular reference với shared_ptr là gì, khắc phục ra sao?</summary>
-
-Khi hai object giữ `shared_ptr` trỏ tới nhau, strong count của mỗi cái không bao giờ về 0 dù không còn ai bên ngoài tham chiếu → cả hai bị leak. Khắc phục: biến một chiều (thường là chiều "ngược"/parent) thành `weak_ptr` để không tăng strong count, phá vòng. Khi cần dùng, gọi `lock()` để lấy `shared_ptr` tạm.
-</details>
-
-<details><summary>5) Rule of 0/3/5 là gì?</summary>
-
-Liên quan 5 special member functions (destructor, copy ctor, copy assign, move ctor, move assign). Rule of 3: nếu phải tự viết 1 trong {destructor, copy ctor, copy assign} thì thường phải viết cả 3 (class quản lý tài nguyên thô). Rule of 5: thêm move ctor và move assign cho move semantics. Rule of 0 (khuyến nghị): thiết kế để **không phải viết cái nào** bằng cách dùng member RAII (smart pointer, container); khi đó compiler tự sinh đúng và an toàn.
-</details>
-
-<details><summary>6) Vì sao nên dùng make_unique/make_shared thay vì new?</summary>
-
-`make_shared` cấp phát object và control block trong **một** lần cấp phát (thay vì hai khi dùng `shared_ptr<T>(new T)`), nhanh hơn và locality tốt hơn. Cả `make_unique`/`make_shared` đều **exception-safe**: tránh rò rỉ trong trường hợp đánh giá tham số xen kẽ giữa `new` và constructor smart pointer. Ngoài ra code gọn, không lặp tên kiểu, và không để lộ con trỏ thô.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [CPP-005](../14-prep/mock-interview/bank/cpp.md) | RAII là gì? Vì sao quan trọng trong C++? |
+| [CPP-007](../14-prep/mock-interview/bank/cpp.md) | unique_ptr, shared_ptr, weak_ptr khác nhau và dùng khi nào? |
+| [CPP-024](../14-prep/mock-interview/bank/cpp.md) | shared_ptr hoạt động bên trong thế nào? Có thread-safe không? |
+| [CPP-025](../14-prep/mock-interview/bank/cpp.md) | Circular reference với shared_ptr là gì, khắc phục ra sao? |
+| [CPP-020](../14-prep/mock-interview/bank/cpp.md) | Rule of 0/3/5 là gì? |
+| [CPP-047](../14-prep/mock-interview/bank/cpp.md) | Vì sao nên dùng make_unique/make_shared thay vì new? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [move-semantics.md](move-semantics.md)

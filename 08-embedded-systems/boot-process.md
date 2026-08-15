@@ -96,37 +96,49 @@ Hệ embedded đơn giản có thể bỏ qua initramfs và mount thẳng rootfs
 
 ---
 
+## 7. 🔧 Bring-up & ⚠️ bẫy — chỗ boot thật sự hỏng
+
+**Chẩn đoán theo CHỖ CHẾT** — mỗi giai đoạn chết một kiểu, và triệu chứng nói cho bạn biết đang ở đâu:
+
+| Triệu chứng | Chết ở giai đoạn | Nghi gì trước tiên |
+|---|---|---|
+| **Im lặng hoàn toàn**, không một ký tự trên UART | BootROM / SPL | Nguồn, clock, chân boot-mode (strapping), thiết bị boot hỏng/trống |
+| Ra vài ký tự rác rồi dừng | SPL — UART đã chạy nhưng **sai baud** | Cấu hình clock sai ⇒ **baud lệch** (dấu hiệu: đổi baud thì đọc được) |
+| SPL in ra rồi treo | **Khởi tạo DRAM** | Sai tham số DDR — bug khó nhất của bring-up |
+| U-Boot chạy, kernel không nhúc nhích | Trao tay kernel | Sai địa chỉ nạp, sai/thiếu **device tree**, sai `bootargs` |
+| Kernel panic *"unable to mount root fs"* | Rootfs | Sai `root=`, thiếu driver lưu trữ **trong kernel/initramfs**, sai kiểu filesystem |
+| Boot xong rồi reboot vòng lặp | Userspace / watchdog | Init chết, hoặc **watchdog không được nuôi** kịp |
+
+**⚠️ Bẫy:**
+
+**① Không có console = mù hoàn toàn.** Việc **đầu tiên** khi bring-up một bo mới là làm UART chạy — trước cả DRAM nếu có thể. Không có nó thì mọi bước sau chỉ là đoán. Hết cách thì **nhấp một chân GPIO** làm dấu hiệu sống ([hardware-debug.md](hardware-debug.md)).
+
+**② Vì sao phải nhiều giai đoạn — trả lời cho đúng.** Không phải "cho gọn", mà vì **SRAM nội quá nhỏ** (thường vài chục–vài trăm KB). BootROM chỉ nạp nổi **SPL** vào SRAM; SPL có mỗi một việc quan trọng: **khởi tạo DRAM**, để từ đó mới nạp nổi bootloader đầy đủ (vài trăm KB–MB) rồi tới kernel. **Ràng buộc kích thước SRAM chính là lý do tồn tại của SPL.**
+
+**③ Device tree sai thì kernel boot "thành công" nhưng thiết bị không có.** Kernel chạy, có shell, mà `/dev` thiếu — vì DT là thứ **mô tả phần cứng cho kernel**. Sai địa chỉ thanh ghi/số IRQ trong DT thì driver nạp mà không nói chuyện được với chip. Triệu chứng dễ nhầm với "driver lỗi" ([05-drivers-device-tree/device-tree.md](../05-drivers-device-tree/device-tree.md)).
+
+**④ Nâng cấp bootloader là thao tác NGUY HIỂM NHẤT trên thiết bị field.** Mất điện giữa lúc ghi ⇒ **gạch vĩnh viễn**, không cứu được từ xa. ⇒ Thiết kế **A/B (hai bản)** + cờ "đã boot thành công": bản mới boot lỗi thì bootloader tự **quay về bản cũ**. Đây là câu hỏi thiết kế hay được hỏi cho JD embedded.
+
+**⑤ Watchdog phải bật SỚM nhưng đừng quá sớm.** Bật từ bootloader thì được bảo vệ toàn tuyến — nhưng nếu userspace khởi động lâu hơn timeout thì thiết bị **reboot vòng lặp** và trông y hệt "hỏng phần cứng". ⇒ Chọn timeout theo thời gian boot **xấu nhất**, và nuôi watchdog ở nơi thật sự chứng minh hệ thống sống (không phải một thread rỗng chỉ biết nuôi).
+
+**⑥ `initramfs` không phải luôn cần.** Nó tồn tại để **nạp driver cần cho việc mount rootfs** (khi driver đó không biên dịch thẳng vào kernel). Thiết bị nhúng biết trước phần cứng ⇒ **biên dịch thẳng driver lưu trữ vào kernel** rồi bỏ initramfs sẽ **boot nhanh hơn và ít thứ hỏng hơn**.
+
+**⑦ Thời gian boot là yêu cầu sản phẩm, không phải chuyện kỹ thuật vặt.** Mốc điển hình: BootROM+SPL ~**100 ms**, U-Boot ~**0,5–2 s** (phần lớn là **delay chờ nhấn phím** — bỏ đi được), kernel ~**1–3 s**, userspace tuỳ. Muốn cắt thì đo trước (kernel có sẵn cơ chế in mốc thời gian khởi tạo), đừng đoán.
+
+---
+
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Mô tả quá trình boot của một hệ embedded Linux.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Khi cấp nguồn, CPU thực thi tại địa chỉ reset, chạy **Boot ROM** cứng trong SoC; Boot ROM cấu hình tối thiểu và nạp bootloader giai đoạn 1 (**SPL**) từ thiết bị boot vào SRAM on-chip. SPL khởi tạo **DRAM controller** (để có RAM ngoài) rồi nạp **U-Boot** vào DRAM. U-Boot khởi tạo thêm peripheral, nạp **kernel + device tree (DTB) + (tuỳ chọn) initramfs** vào RAM, dựng tham số dòng lệnh và nhảy vào kernel. **Kernel** giải nén, khởi tạo subsystem và driver (dựa trên DTB), mount **root filesystem**, rồi chạy tiến trình **init** (PID 1). init khởi động các service và dẫn tới **userspace** đầy đủ. Mỗi giai đoạn chỉ khởi tạo đủ phần cứng để nạp và trao quyền cho giai đoạn kế tiếp.
-</details>
-
-<details><summary>2) Vì sao quá trình boot phải chia nhiều giai đoạn?</summary>
-
-Vì lúc bật nguồn hầu như chưa có gì được khởi tạo: RAM ngoài (DRAM) chưa cấu hình, clock chưa set, storage và peripheral chưa truy cập được — nên không thể nạp và chạy ngay một OS lớn. Boot diễn ra theo kiểu bootstrapping: một mẩu code rất nhỏ và dễ truy cập (Boot ROM trong silicon) khởi tạo đủ để nạp mẩu lớn hơn vào nơi đã sẵn sàng; SPL khởi tạo DRAM để U-Boot có chỗ chạy; U-Boot khởi tạo đủ để nạp kernel; kernel khởi tạo phần còn lại. Mỗi giai đoạn mở rộng dần khả năng phần cứng cho tới khi hệ thống đầy đủ. Việc tách giai đoạn cũng do ràng buộc kích thước (SPL phải vừa SRAM nhỏ) và để hỗ trợ secure boot theo chuỗi tin cậy.
-</details>
-
-<details><summary>3) Boot ROM và SPL khác U-Boot ở điểm nào? Vì sao cần SPL riêng?</summary>
-
-Boot ROM là mã cố định trong silicon (không sửa được), chạy đầu tiên, quyết định boot từ thiết bị nào và nạp bootloader giai đoạn 1 vào SRAM on-chip; nó cũng là gốc của chuỗi tin cậy cho secure boot. SPL (giai đoạn 1) là một bootloader **rất nhỏ** để vừa kích thước SRAM on-chip giới hạn (vì DRAM chưa khả dụng); nhiệm vụ chính của nó là **khởi tạo DRAM controller** rồi nạp U-Boot vào DRAM. U-Boot là bootloader chính đầy đủ tính năng (shell, biến môi trường, mạng, storage) nhưng quá lớn để chạy trực tiếp từ SRAM — nên cần SPL làm bước trung gian khởi tạo RAM trước. Tóm lại: Boot ROM (cứng) → SPL (nhỏ, khởi tạo DRAM) → U-Boot (đầy đủ, nạp kernel).
-</details>
-
-<details><summary>4) initramfs để làm gì? Khi nào cần?</summary>
-
-initramfs (hoặc initrd) là một filesystem nhỏ được nạp vào RAM cùng kernel và dùng làm root tạm thời trong giai đoạn đầu. Cần khi rootfs thật nằm trên thiết bị mà kernel chưa truy cập được ngay — ví dụ phải nạp module/driver (mạng cho NFS root, controller storage, RAID, giải mã ổ đĩa) hoặc phải chạy logic dò tìm/chuẩn bị thiết bị trước khi mount rootfs thật, sau đó dùng `switch_root`/`pivot_root` để chuyển sang. Hệ embedded đơn giản với rootfs nằm sẵn trên flash mà kernel hỗ trợ trực tiếp có thể bỏ qua initramfs và mount thẳng.
-</details>
-
-<details><summary>5) Tiến trình init (PID 1) là gì và vai trò của nó?</summary>
-
-init là tiến trình userspace **đầu tiên** mà kernel khởi chạy sau khi mount rootfs, mang PID 1 và là tổ tiên (cha trực tiếp hoặc gián tiếp) của mọi tiến trình khác. Vai trò: khởi động và quản lý các service hệ thống theo cấu hình, mount các filesystem còn lại, thiết lập mạng, và **nhận nuôi (reap) các tiến trình orphan/zombie** để thu hồi tài nguyên. Trên embedded nhỏ thường dùng BusyBox init (đơn giản, nhẹ); hệ thống lớn dùng systemd (quản lý dependency, song song, log, restart). Nếu PID 1 chết thì kernel panic, nên nó phải bền vững.
-</details>
-
-<details><summary>6) Vì sao hệ embedded thường dùng A/B partition và rootfs read-only?</summary>
-
-A/B partition (hai bộ kernel+rootfs song song) cho phép **cập nhật firmware an toàn**: ghi bản mới vào slot không đang dùng, đánh dấu boot thử; nếu bản mới hỏng/không boot được, bootloader **rollback** về slot cũ — tránh "bricking" thiết bị ngoài hiện trường. rootfs **read-only** bảo vệ hệ thống khỏi hư hỏng do ghi (đặc biệt khi mất điện đột ngột) và do mòn flash; dữ liệu thay đổi được để ở một phân vùng data riêng (read-write). Kết hợp lại giúp thiết bị embedded cập nhật được mà vẫn tin cậy và chịu lỗi tốt — quan trọng vì nhiều thiết bị khó hoặc không thể can thiệp vật lý sau khi triển khai.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DRV-013](../14-prep/mock-interview/bank/drivers-embedded.md) | Mô tả quá trình boot của một hệ embedded Linux. |
+| [BSP-002](../14-prep/mock-interview/bank/bsp.md) | Vì sao quá trình boot phải chia nhiều giai đoạn? |
+| [BSP-002](../14-prep/mock-interview/bank/bsp.md) | Boot ROM và SPL khác U-Boot ở điểm nào? Vì sao cần SPL riêng? |
+| [BSP-029](../14-prep/mock-interview/bank/bsp.md) | initramfs để làm gì? Khi nào cần? |
+| [BSP-030](../14-prep/mock-interview/bank/bsp.md) | Tiến trình init (PID 1) là gì và vai trò của nó? |
+| [DRV-018](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao hệ embedded thường dùng A/B partition và rootfs read-only? |
 
 ---
 ⬅️ [architecture.md](architecture.md) · ➡️ Tiếp theo: [rtos-vs-linux.md](rtos-vs-linux.md)

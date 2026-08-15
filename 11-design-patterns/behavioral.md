@@ -124,25 +124,14 @@ std::queue<std::unique_ptr<ICommand>> commandQueue;
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Strategy pattern là gì? C++ hiện đại hiện thực thế nào cho gọn?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Strategy đóng gói mỗi thuật toán/hành vi sau một interface chung và cho phép chọn hoặc hoán đổi chúng lúc runtime mà không sửa code sử dụng — ví dụ các thuật toán nén khác nhau dùng chung interface `compress`. Nó là hiện thực trực tiếp của Open/Closed (thêm thuật toán mới không sửa client) và Dependency Inversion (client phụ thuộc interface). Cách cổ điển là một hệ phân cấp class với interface abstract; nhưng C++ hiện đại, với strategy đơn giản (chỉ là một hàm), thường dùng `std::function` + lambda gọn hơn nhiều: lưu một `std::function` làm member và truyền lambda vào constructor, không cần định nghĩa cả cây class. Khi cần hiệu năng và biết lúc compile, có thể dùng template parameter cho strategy (zero overhead).
-</details>
-
-<details><summary>2) Observer pattern dùng khi nào? Rủi ro cần lưu ý?</summary>
-
-Observer dùng khi một object (subject) thay đổi trạng thái và cần tự động thông báo nhiều object khác (observer) quan tâm, mà không gắn chặt với chúng — nền của mô hình event-driven/callback, rất phổ biến trong embedded và UI (sự kiện sensor, nhấn nút, GPIO interrupt thông báo các thành phần). Subject giữ danh sách observer đăng ký và gọi callback của tất cả khi có sự kiện, nên coupling thấp và dễ thêm observer mới. Rủi ro chính là **lifetime/dangling**: nếu một observer bị hủy mà chưa hủy đăng ký khỏi subject, subject sẽ gọi vào con trỏ chết → UB; cần cơ chế unsubscribe an toàn hoặc dùng `weak_ptr` để subject kiểm tra observer còn sống. Ngoài ra cần cẩn thận thứ tự thông báo và tránh vòng lặp thông báo vô tận.
-</details>
-
-<details><summary>3) State pattern là gì? Vì sao embedded thường dùng enum + switch thay vì State pattern OOP?</summary>
-
-State pattern cho một object thay đổi hành vi khi trạng thái nội bộ thay đổi, như thể nó đổi class — là cách hiện thực state machine, cốt lõi của firmware, giao thức và luồng UI. Bản OOP thuần biểu diễn mỗi state là một class xử lý sự kiện và quyết định chuyển state, linh hoạt khi logic mỗi state phức tạp. Tuy nhiên embedded thường ưu tiên cách nhẹ — một `enum` trạng thái với `switch`/bảng chuyển trạng thái — vì nó **tất định, không cấp phát động, không chi phí virtual**, footprint biết trước, và dễ đọc/review; rất hợp với ràng buộc tài nguyên và yêu cầu tin cậy của hệ nhúng. State machine rõ ràng (dù bằng enum) còn giúp tránh "trạng thái lỡ" và xử lý giao thức đáng tin cậy. Chọn bản OOP chỉ khi logic mỗi state đủ phức tạp để đáng tách thành class.
-</details>
-
-<details><summary>4) Command pattern giải quyết vấn đề gì?</summary>
-
-Command đóng gói một yêu cầu (hành động cùng tham số của nó) thành một object, tách người phát lệnh khỏi người thực thi. Nhờ là object, yêu cầu có thể được lưu trữ, xếp vào hàng đợi để thực thi sau, ghi log, hoàn tác (lưu lịch sử command để undo/redo), gộp thành macro, hoặc gửi đi nơi khác. Trong embedded/hệ thống đồng thời, command thường được đẩy vào một hàng đợi giữa các thread/process hoặc giữa các core (vd RTOS task hoặc giao diện gửi lệnh tới module điều khiển), kết hợp với message queue. Nó hữu ích khi cần tách thời điểm/nơi phát lệnh khỏi thời điểm/nơi thực thi, hoặc cần khả năng undo/replay/audit các thao tác.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DP-005](../14-prep/mock-interview/bank/design-patterns.md) | Strategy pattern là gì? C++ hiện đại hiện thực thế nào cho gọn? |
+| [DP-006](../14-prep/mock-interview/bank/design-patterns.md) | Observer pattern dùng khi nào? Rủi ro cần lưu ý? |
+| [DP-010](../14-prep/mock-interview/bank/design-patterns.md) | State pattern là gì? Vì sao embedded thường dùng enum + switch thay vì State pattern OOP? |
+| [DP-013](../14-prep/mock-interview/bank/design-patterns.md) | Command pattern giải quyết vấn đề gì? |
 
 ---
 ⬅️ [structural.md](structural.md) · ➡️ Tiếp theo: [12-dsa/](../12-dsa/)

@@ -97,30 +97,15 @@ Có thể tự động hóa với `git bisect run <script>` (script trả 0 nế
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Mô tả quy trình debug có hệ thống của bạn.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Tôi áp dụng phương pháp khoa học: (1) **Reproduce** — tái hiện bug ổn định, tối thiểu, ghi lại môi trường/input; bug tái hiện được là đã giải quyết một nửa. (2) **Isolate** — thu hẹp không gian nghi ngờ bằng chia để trị (binary search trong code, git bisect cho regression, đơn giản hóa input). (3) **Hypothesize** — đặt giả thuyết cụ thể, kiểm chứng được về nguyên nhân. (4) **Test** — thí nghiệm xác nhận/bác bỏ, chỉ đổi một biến mỗi lần; nếu sai thì dùng thông tin mới tinh chỉnh giả thuyết. (5) **Fix** — sửa đúng nguyên nhân gốc chứ không vá triệu chứng. (6) **Verify** — xác nhận bug hết bằng cách reproduce ban đầu, không gây regression, và thêm test ngăn tái diễn. Nguyên tắc xuyên suốt: tin dữ liệu hơn trực giác, kiểm tra giả định trước, một thay đổi một lần.
-</details>
-
-<details><summary>2) Bug không tái hiện được thì làm sao debug?</summary>
-
-Việc đầu tiên là cố **làm cho nó tái hiện**: tăng tần suất/tải, chạy lặp nhiều lần, ép các điều kiện biên (timing, bộ nhớ thấp, input đặc biệt), thêm logging có cấu trúc với timestamp để bắt được khi nó xảy ra. Với bug không tất định (thường là concurrency hoặc UB như dùng biến chưa khởi tạo), dùng công cụ phát hiện chủ động thay vì quan sát thụ động: ThreadSanitizer cho data race, AddressSanitizer/Valgrind cho lỗi bộ nhớ — chúng bắt lỗi ngay cả khi triệu chứng chưa biểu hiện. Thu thập core dump khi crash để phân tích sau (post-mortem). Ghi lại mọi điều kiện khi bug xuất hiện để tìm pattern chung. Cẩn thận "Heisenbug" — thêm log/debugger có thể đổi timing và che bug, nên ưu tiên sanitizer.
-</details>
-
-<details><summary>3) Vì sao không nên "sửa bừa cho hết lỗi"? Sửa triệu chứng vs nguyên nhân gốc.</summary>
-
-Sửa bừa nhiều chỗ cùng lúc khiến bạn không biết thay đổi nào thực sự có tác dụng, dễ che giấu bug thay vì sửa, và có thể tạo regression mới. Sửa triệu chứng (vd thêm `if (p)` để tránh crash mà không hiểu vì sao `p` null) chỉ làm bug ẩn đi rồi quay lại ở dạng khác, hoặc gây sai dữ liệu âm thầm. Sửa nguyên nhân gốc đòi hỏi hiểu **vì sao** lỗi xảy ra (kỹ thuật "5 whys": truy ngược chuỗi nguyên nhân tới gốc), nhờ đó sửa dứt điểm và phát hiện các chỗ khác có cùng lỗi. Đây cũng là lý do nên đổi một biến một lần và kiểm chứng từng giả thuyết.
-</details>
-
-<details><summary>4) git bisect dùng để làm gì và hoạt động thế nào?</summary>
-
-git bisect dùng để tìm commit đầu tiên gây ra một regression bằng tìm kiếm nhị phân trên lịch sử git. Bạn đánh dấu một commit "bad" (có bug, thường là HEAD) và một commit "good" (cũ, biết là tốt); git tự checkout commit ở giữa, bạn test và trả lời good/bad; git tiếp tục chia đôi khoảng còn lại. Sau khoảng log2(N) bước nó chỉ ra chính xác commit gây lỗi. Có thể tự động hóa hoàn toàn bằng `git bisect run <script>` với script trả về 0 nếu tốt, khác 0 nếu lỗi. Đây là cách rất hiệu quả để khoanh vùng "thay đổi code nào" gây lỗi giữa hàng trăm commit mà không phải đọc thủ công.
-</details>
-
-<details><summary>5) Heisenbug là gì? Xử lý thế nào?</summary>
-
-Heisenbug là bug thay đổi hành vi hoặc biến mất khi bạn cố quan sát nó — ví dụ thêm câu lệnh in, chạy dưới debugger, hoặc đổi mức tối ưu làm bug không còn xuất hiện. Nguyên nhân thường là lỗi nhạy với timing (data race trong code đa luồng) hoặc Undefined Behavior (biến chưa khởi tạo, truy cập ngoài mảng) mà việc thêm code làm thay đổi layout bộ nhớ/thời điểm thực thi. Cách xử lý: thay vì quan sát thụ động (in ấn làm đổi timing), dùng công cụ phát hiện chủ động không phụ thuộc may rủi — ThreadSanitizer cho data race, AddressSanitizer/UBSan/Valgrind cho lỗi bộ nhớ và UB; chạy lặp nhiều lần; và xem lại các giả định về khởi tạo và đồng bộ hóa.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DBG-008](../14-prep/mock-interview/bank/debugging.md) | Mô tả quy trình debug có hệ thống của bạn. |
+| [DBG-012](../14-prep/mock-interview/bank/debugging.md) | Bug không tái hiện được thì làm sao debug? |
+| [DBG-026](../14-prep/mock-interview/bank/debugging.md) | Vì sao không nên "sửa bừa cho hết lỗi"? Sửa triệu chứng vs nguyên nhân gốc. |
+| [DBG-027](../14-prep/mock-interview/bank/debugging.md) | git bisect dùng để làm gì và hoạt động thế nào? |
+| [DBG-012](../14-prep/mock-interview/bank/debugging.md) | Heisenbug là gì? Xử lý thế nào? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [gdb.md](gdb.md)

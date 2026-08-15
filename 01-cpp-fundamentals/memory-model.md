@@ -176,46 +176,16 @@ Quy tắc: cặp đôi phải khớp — `new`↔`delete`, `new[]`↔`delete[]`,
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Sự khác nhau giữa stack và heap? Khi nào dùng cái nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Stack cấp phát/giải phóng tự động theo scope, rất nhanh, kích thước nhỏ, vòng đời theo `{}`. Heap cấp phát thủ công (`new`/`malloc`), linh hoạt về vòng đời và kích thước, chậm hơn, có thể fragmentation. Dùng stack mặc định; dùng heap khi dữ liệu cần sống lâu hơn scope, kích thước biết lúc runtime, object lớn, hoặc cần polymorphism. C++ hiện đại nên dùng container/smart pointer thay vì quản lý heap trực tiếp.
-</details>
-
-<details><summary>2) Con trỏ và tham chiếu khác nhau thế nào?</summary>
-
-Con trỏ là biến chứa địa chỉ: có thể null, đổi target, làm pointer arithmetic, có thể không khởi tạo. Tham chiếu là alias của một object đã tồn tại: không null, phải bind ngay khi khai báo, không reseat được. Reference an toàn và sạch hơn cho tham số hàm bắt buộc tồn tại; pointer cần khi giá trị có thể không có (optional), cần reseat, làm việc với C API hoặc cấp phát động.
-</details>
-
-<details><summary>3) Đoạn code sau có vấn đề gì?
-```cpp
-int* getValue() {
-    int x = 42;
-    return &x;
-}
-```
-</summary>
-
-Trả về địa chỉ của biến local `x`. Khi hàm return, `x` ra khỏi scope và bị hủy khỏi stack → con trỏ trả về là **dangling pointer**. Dereference nó là **Undefined Behavior** (có thể đọc giá trị rác, hoặc trông đúng rồi hỏng về sau). Sửa: trả về theo giá trị (`int`), hoặc cấp phát trên heap và quản lý bằng smart pointer.
-</details>
-
-<details><summary>4) Undefined Behavior là gì? Vì sao nguy hiểm?</summary>
-
-UB là hành vi mà chuẩn C++ không định nghĩa — compiler được phép làm bất cứ điều gì. Nguy hiểm vì chương trình có thể *trông như chạy đúng* trong lúc test (do may mắn về layout bộ nhớ/optimization) rồi crash hoặc cho kết quả sai khi đổi compiler, mức tối ưu, hoặc môi trường. Ví dụ: dereference null/dangling, truy cập ngoài mảng, signed integer overflow, data race. Quy tắc: UB là sai kể cả khi chưa thấy lỗi.
-</details>
-
-<details><summary>5) `new`/`delete` khác `malloc`/`free` ở đâu?</summary>
-
-`new` gọi constructor và trả về con trỏ đúng kiểu, ném `std::bad_alloc` khi thất bại; `malloc` chỉ cấp vùng nhớ thô, trả `void*`, trả `NULL` khi thất bại, không gọi constructor. `delete` gọi destructor; `free` thì không. Phải khớp cặp: `new`↔`delete`, `new[]`↔`delete[]`, `malloc`↔`free`; trộn lẫn là UB.
-</details>
-
-<details><summary>6) Phân biệt `const int* p`, `int* const p`, `const int* const p`.</summary>
-
-- `const int* p`: con trỏ tới int **hằng** — không sửa `*p`, được đổi `p`.
-- `int* const p`: con trỏ **hằng** tới int — được sửa `*p`, không đổi `p`.
-- `const int* const p`: cả giá trị trỏ tới lẫn con trỏ đều không sửa được.
-
-Mẹo đọc từ phải sang trái quanh tên biến.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [CPP-004](../14-prep/mock-interview/bank/cpp.md) | Sự khác nhau giữa stack và heap? Khi nào dùng cái nào? |
+| [CPP-001](../14-prep/mock-interview/bank/cpp.md) | Con trỏ và tham chiếu khác nhau thế nào? |
+| [CPP-060](../14-prep/mock-interview/bank/cpp.md) | Đoạn code sau có vấn đề gì? ```cpp int* getValue() { int x = 42; return &x; } ``` |
+| [CPP-036](../14-prep/mock-interview/bank/cpp.md) | Undefined Behavior là gì? Vì sao nguy hiểm? |
+| [CPP-033](../14-prep/mock-interview/bank/cpp.md) | `new`/`delete` khác `malloc`/`free` ở đâu? |
+| [CPP-003](../14-prep/mock-interview/bank/cpp.md) | Phân biệt `const int* p`, `int* const p`, `const int* const p`. |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [oop.md](oop.md)

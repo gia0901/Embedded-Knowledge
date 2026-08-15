@@ -108,30 +108,15 @@ Bug bộ nhớ tốt nhất là bug **không bao giờ được tạo ra**:
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Liệt kê các loại lỗi bộ nhớ thường gặp trong C/C++ và vì sao chúng nguy hiểm.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Các loại chính: memory leak (cấp phát không giải phóng → cạn RAM dần, OOM), use-after-free/dangling pointer (dùng con trỏ sau khi vùng nhớ đã giải phóng/hết hạn → đọc-ghi rác), buffer overflow (truy cập ngoài vùng cấp phát → hỏng dữ liệu lân cận, lỗ hổng bảo mật), double free (giải phóng hai lần → hỏng heap metadata), và uninitialized read (đọc biến chưa khởi tạo → giá trị rác). Chúng nguy hiểm vì phần lớn là **Undefined Behavior**: chương trình có thể trông như chạy đúng trong test rồi hỏng ở môi trường khác, và quan trọng là nhiều lỗi **không crash ngay tại chỗ sai** mà làm hỏng bộ nhớ rồi gây crash hoặc kết quả sai ở nơi khác về sau — khiến việc truy nguồn rất khó nếu chỉ nhìn vào điểm crash. Nhiều lỗi loại này còn là cửa cho khai thác bảo mật.
-</details>
-
-<details><summary>2) AddressSanitizer hoạt động thế nào và bắt được gì?</summary>
-
-ASan được bật lúc biên dịch (`-fsanitize=address`); compiler chèn mã kiểm tra và dùng "shadow memory" để theo dõi vùng nào hợp lệ, cùng "red zones" quanh các vùng cấp phát để phát hiện truy cập ra ngoài. Khi chương trình truy cập một địa chỉ không hợp lệ, ASan dừng ngay và in báo cáo gồm loại lỗi, stack trace **nơi truy cập sai**, và nơi vùng nhớ được **cấp phát** cũng như **giải phóng** — nên thấy ngay nguyên nhân. Nó bắt heap/stack/global buffer overflow, use-after-free, use-after-return, double free, và (kèm LeakSanitizer) cả memory leak. Ưu điểm là bắt lỗi **ngay tại thời điểm xảy ra** với overhead thấp (~2x), nên rất phù hợp bật trong test/CI.
-</details>
-
-<details><summary>3) ASan và Valgrind khác nhau thế nào? Khi nào dùng cái nào?</summary>
-
-ASan cần **biên dịch lại** với cờ sanitizer (chèn kiểm tra vào code), chạy nhanh (~2x), bắt stack/global overflow tốt và báo lỗi ngay khi xảy ra. Valgrind (memcheck) chạy bằng cách diễn giải binary trên một CPU ảo nên **không cần build lại** và rất tỉ mỉ (đặc biệt với uninitialized reads qua `--track-origins`), nhưng **chậm hơn nhiều** (10–50x), tốn RAM và bắt stack/global overflow kém hơn. Dùng ASan trong vòng phát triển và CI vì nhanh và chính xác; dùng Valgrind khi không thể recompile (chỉ có binary), khi cần kiểm tra kỹ uninitialized memory, hoặc để bắt loại lỗi ASan bỏ sót. Cả hai bổ sung cho nhau.
-</details>
-
-<details><summary>4) Làm sao phát hiện data race? Vì sao race khó debug bằng cách thông thường?</summary>
-
-Dùng ThreadSanitizer (`-fsanitize=thread`): nó theo dõi các truy cập bộ nhớ và quan hệ đồng bộ (happens-before) giữa các thread, phát hiện khi hai thread truy cập cùng một vùng nhớ mà ít nhất một là ghi, không có đồng bộ — kể cả khi lần chạy đó chưa biểu hiện lỗi rõ ràng. Race khó debug theo cách thông thường vì nó **không tất định**: phụ thuộc timing/lập lịch nên có thể không tái hiện, và thêm câu lệnh in hay chạy dưới debugger thường thay đổi timing khiến lỗi biến mất (Heisenbug). Vì vậy quan sát thụ động (printf) không đáng tin; cần công cụ phát hiện chủ động như TSan không phụ thuộc vào việc race có thực sự "trúng" trong lần chạy đó hay không. Lưu ý TSan không chạy chung với ASan và có overhead lớn.
-</details>
-
-<details><summary>5) Làm sao phòng ngừa lỗi bộ nhớ ngay từ đầu trong C++ hiện đại?</summary>
-
-Cách hiệu quả nhất là không tạo ra lỗi bằng thiết kế: dùng RAII và smart pointer (`unique_ptr`/`shared_ptr`) thay cho `new`/`delete` thủ công để vòng đời tự quản — loại bỏ leak, double free, quên giải phóng; dùng container chuẩn (`vector`, `array`, `string`) thay mảng C thô để biên được quản lý; dùng `.at()` hoặc kiểm tra biên ở nơi nghi ngờ và `std::span` (mang theo kích thước) thay con trỏ trần; khởi tạo biến ngay khi khai báo; bật cảnh báo `-Wall -Wextra` và bật ASan/UBSan trong CI. Cẩn thận với `string_view`/`span` vì chúng không sở hữu dữ liệu — không được giữ chúng quá thời gian sống của nguồn để tránh dangling. Trong embedded nơi sanitizer khó chạy trên target, nên test trên host với cùng code và bù bằng review kỹ và thiết kế ownership rõ ràng.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DBG-024](../14-prep/mock-interview/bank/debugging.md) | Liệt kê các loại lỗi bộ nhớ thường gặp trong C/C++ và vì sao chúng nguy hiểm. |
+| [DBG-011](../14-prep/mock-interview/bank/debugging.md) | AddressSanitizer hoạt động thế nào và bắt được gì? |
+| [DBG-011](../14-prep/mock-interview/bank/debugging.md) | ASan và Valgrind khác nhau thế nào? Khi nào dùng cái nào? |
+| [DBG-013](../14-prep/mock-interview/bank/debugging.md) | Làm sao phát hiện data race? Vì sao race khó debug bằng cách thông thường? |
+| [DBG-025](../14-prep/mock-interview/bank/debugging.md) | Làm sao phòng ngừa lỗi bộ nhớ ngay từ đầu trong C++ hiện đại? |
 
 ---
 ⬅️ [tools.md](tools.md) · ➡️ Tiếp theo: [kernel-debugging.md](kernel-debugging.md)

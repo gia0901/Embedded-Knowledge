@@ -5,6 +5,10 @@
 !14-prep/mock-interview/coding-arena/README.md
 !14-prep/mock-interview/coding-arena/reviewed/
 
+# Claude Code — cấu hình CÁ NHÂN theo máy, KHÔNG commit
+# (nhưng .claude/commands/ thì GIỮ — đó là lệnh /mock, phải đi theo repo)
+.claude/settings.local.json
+
 # OS / editor cruft
 .DS_Store
 *.swp

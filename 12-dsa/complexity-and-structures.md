@@ -82,25 +82,14 @@ Big-O coi mọi truy cập bộ nhớ là bằng nhau, nhưng thực tế **cach
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Big-O là gì? Phân biệt time và space complexity.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Big-O mô tả tốc độ tăng của tài nguyên (thời gian hoặc bộ nhớ) theo kích thước input khi input lớn dần, bỏ qua hằng số và số hạng bậc thấp — cho phép so sánh bản chất thuật toán độc lập với phần cứng. Time complexity đo số thao tác cơ bản theo input; space complexity đo bộ nhớ **phụ** dùng thêm (không tính input), bao gồm cả stack của đệ quy. Hai cái có thể đánh đổi cho nhau (vd dùng thêm bộ nhớ để tăng tốc, như memoization). Mặc định phân tích worst case; đôi khi nêu thêm average hoặc amortized. Khi trả lời nên nêu cả hai, vì một thuật toán nhanh nhưng tốn O(n) bộ nhớ phụ có thể không phù hợp cho hệ hạn chế RAM.
-</details>
-
-<details><summary>2) Amortized O(1) của vector::push_back nghĩa là gì?</summary>
-
-`vector` lưu phần tử trong một vùng nhớ liền mạch với dung lượng (capacity) nhất định. Khi push_back mà còn chỗ thì chỉ là gán — O(1). Khi đầy, nó cấp vùng mới lớn hơn (thường gấp đôi) và copy/move toàn bộ phần tử cũ sang — O(n) cho lần đó. Nhưng vì capacity tăng theo cấp số nhân, các lần reallocate ngày càng thưa, nên **tính trung bình qua nhiều lần push_back**, chi phí mỗi lần vẫn là hằng số — đó là "amortized O(1)". Nói cách khác, tổng chi phí của n lần push_back là O(n), chia đều ra O(1) mỗi lần, dù một số lần lẻ tẻ tốn O(n).
-</details>
-
-<details><summary>3) Khi nào dùng hash map, khi nào dùng balanced tree (map)?</summary>
-
-Dùng hash map (`unordered_map`) khi cần tra cứu/chèn/xóa theo key cực nhanh — O(1) trung bình — và **không** cần thứ tự. Dùng balanced tree (`map`/`set`) khi cần **giữ thứ tự sắp xếp** của key: duyệt theo thứ tự, tìm phần tử nhỏ nhất/lớn nhất, hoặc range query (tìm các key trong khoảng) — các thao tác này là O(log n) và hash map không hỗ trợ hiệu quả. Đánh đổi: hash map nhanh hơn về trung bình nhưng worst case O(n) khi nhiều collision và không có thứ tự; tree ổn định O(log n) và có thứ tự nhưng chậm hơn về hằng số và locality kém hơn. Nếu chỉ cần tra cứu thuần thì hash map; nếu cần thứ tự/range thì tree.
-</details>
-
-<details><summary>4) Vì sao vector thường nhanh hơn list dù cùng O(n)?</summary>
-
-Vì Big-O bỏ qua chi phí thực tế của truy cập bộ nhớ, trong khi cache locality tạo khác biệt lớn. `vector` lưu phần tử liền mạch trong bộ nhớ, nên khi duyệt, CPU prefetch hiệu quả và phần lớn truy cập là cache hit. `list` lưu mỗi node rải rác trên heap, nối bằng con trỏ, nên mỗi bước duyệt thường gây cache miss — đắt hơn cache hit hàng chục đến hàng trăm lần. Kết quả là duyệt hay chèn-cuối trên `vector` thường nhanh hơn `list` nhiều lần dù lý thuyết cùng O(n). Đây là lý do thực dụng nên mặc định dùng `vector` (hoặc cấu trúc liền mạch) trừ khi cần chèn/xóa giữa nhiều ở vị trí đã biết — đặc biệt quan trọng trên embedded và hot path.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DSA-001](../14-prep/mock-interview/bank/dsa.md) | Big-O là gì? Phân biệt time và space complexity. |
+| [DSA-004](../14-prep/mock-interview/bank/dsa.md) | Amortized O(1) của vector::push_back nghĩa là gì? |
+| [DSA-002](../14-prep/mock-interview/bank/dsa.md) | Khi nào dùng hash map, khi nào dùng balanced tree (map)? |
+| [DSA-009](../14-prep/mock-interview/bank/dsa.md) | Vì sao vector thường nhanh hơn list dù cùng O(n)? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [algorithm-patterns.md](algorithm-patterns.md)

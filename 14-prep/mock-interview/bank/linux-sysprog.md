@@ -26,38 +26,215 @@ Blocking (mặc định): `read` trên fd chưa có dữ liệu làm thread ng�
 </details>
 
 #### LNX-004 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
-**fork và exec khác nhau? Vì sao dùng chung?**
+**fork và exec khác nhau? Vì sao gần như luôn dùng chung — và "khoảng giữa" hai lời gọi đó để làm gì?**
 <details><summary>Đáp án</summary>
 
-`fork` tạo process con (bản sao COW). `exec` thay thế image hiện tại bằng chương trình khác, giữ PID, không trả về nếu thành công. Dùng chung để chạy chương trình mới mà vẫn giữ process cha; khoảng giữa cho con tùy biến môi trường (redirect fd, đổi uid) — chính là cách shell làm `cmd > file`.
+| | `fork()` | `exec()` |
+|---|---|---|
+| Làm gì | Tạo **process mới**, là bản sao của process gọi | **Thay thế** chương trình đang chạy bằng chương trình khác |
+| PID | Con có **PID mới** | **Giữ nguyên** PID |
+| Trả về | **Hai lần**: `0` ở con, PID con ở cha, `-1` lỗi | **Không trả về** nếu thành công |
+| Bộ nhớ | Sao chép **copy-on-write** — rẻ | Xoá sạch, nạp image mới |
+
+⇒ Chúng làm **hai việc trực giao**: `fork` sinh ra một *process*, `exec` quyết định process đó *chạy chương trình gì*.
+
+**Vì sao tách làm hai — và "khoảng giữa" là điểm mấu chốt.** Sau `fork` và trước `exec`, process con đã tồn tại nhưng **vẫn đang chạy code của bạn**. Đó là **cửa sổ duy nhất** để chuẩn bị môi trường cho chương trình sắp chạy:
+
+```c
+if (fork() == 0) {                       // ---- trong process CON ----
+    int fd = open("out.txt", O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    dup2(fd, STDOUT_FILENO);             // ① đổi hướng stdout
+    close(fd);
+    setuid(nobody_uid);                  // ② hạ quyền
+    chdir("/srv");                       // ③ đổi thư mục làm việc
+    execlp("tool", "tool", NULL);        // ④ giờ mới nạp chương trình mới
+    _exit(127);                          // exec lỗi mới tới đây
+}
+```
+`tool` không hề biết stdout của nó đã bị đổi hướng — nó cứ ghi stdout như thường. **Đây chính là cách shell hiện thực `cmd > file`, `cmd1 | cmd2`, và cách daemon hạ quyền trước khi chạy tác vụ.** Gộp thành một syscall thì mất hẳn khả năng này.
+
+**Bẫy:**
+1. ⭐ **`fork()` trong chương trình ĐA LUỒNG chỉ an toàn nếu `exec()` ngay.** Con chỉ thừa hưởng thread đang gọi; các thread khác biến mất *giữa chừng* cùng mọi mutex chúng đang giữ ⇒ con gọi `malloc`/`printf` là **treo**. Giữa `fork` và `exec` chỉ được gọi hàm **async-signal-safe** ([OS-021](os.md)).
+2. **fd rò sang chương trình con.** `exec` **giữ nguyên** mọi fd trừ khi có `O_CLOEXEC` ⇒ socket/secret của bạn lọt sang `tool`, và cổng vẫn bị giữ sau khi daemon chết ([LNX-012](linux-sysprog.md)).
+3. **Quên `_exit()` sau `exec`** — `exec` lỗi thì con **chạy tiếp code của cha**, sinh ra hai process cùng làm một việc.
+4. **Không `wait()`** ⇒ zombie tích tụ, cạn PID ([OS-009](os.md)).
+5. Dùng `exit()` thay `_exit()` trong con ⇒ chạy `atexit` và **flush buffer stdio đã sao chép từ cha** ⇒ output bị in **hai lần**.
+
+**Chốt:** *"`fork` sinh process, `exec` quyết định nó chạy gì — tách ra để có khoảng giữa mà chỉnh fd, quyền, thư mục. Đó chính là cách shell làm redirect và pipe."*
 </details>
 
-#### LNX-005 · 🟡 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
-**read() trả về ít byte hơn yêu cầu — lỗi không? Xử lý sao?**
+#### LNX-005 · 🟡 · concept · ⭐ · [→ file-io](../../../04-linux-system-programming/file-io.md), [tcp-ip](../../../13-networking/tcp-ip.md)
+**Đoạn này chạy hoàn hảo trên LAN phòng lab, ra hiện trường qua Wi-Fi thì thỉnh thoảng khách báo "mất kết nối". Vì sao?**
+
+```c
+uint8_t hdr[8];
+ssize_t n = read(sock, hdr, 8);
+if (n != 8) { log_error("header lỗi"); close(sock); return -1; }
+```
 <details><summary>Đáp án</summary>
 
-Không phải lỗi (short read). `read`/`write` trả số byte thực sự xử lý, có thể ít hơn (pipe/socket mới có một phần, bị signal ngắt). Xử lý bằng vòng lặp tiếp tục cho phần còn lại tới khi đủ/EOF/lỗi, và xử lý `EINTR` bằng thử lại.
+**Cơ chế — `read` trả về ít hơn yêu cầu là chuyện BÌNH THƯỜNG, không phải lỗi** (*short read*). `read`/`write` trả **số byte thực sự xử lý**, và nó trả về **ngay khi có byte nào đó**, không đợi cho đủ `count`.
+
+**Vì sao — hai tầng:**
+
+- **Tầng nông (ai cũng nói được):** *"mạng không ổn định"*. Đúng nhưng vô dụng — không chỉ ra được phải sửa gì.
+- **Tầng thật:** **TCP là luồng byte, KHÔNG có ranh giới message.** TCP chỉ hứa hai điều: byte tới **đủ** và **đúng thứ tự**. Nó **không** hứa *"bên kia `write` 8 byte một lần thì bạn nhận 8 byte một lần"*. 8 byte tới thành 3 + 5 vì: **MSS/phân mảnh** (header vắt qua hai segment) · **Nagle + delayed ACK** · **retransmit**.
+
+**Vì sao lab không lộ:** LAN có RTT ~0.1 ms, không mất gói ⇒ 8 byte luôn gọn trong một segment và **đã nằm sẵn** trong receive buffer trước khi bạn gọi `read()`. Wi-Fi hiện trường có retransmit + jitter + RTT vài chục ms ⇒ cửa sổ *"mới tới một phần"* mở ra thật.
+
+⚠️ **Đây là mẫu bug đắt nhất của nghề: đúng trên máy dev, sai ở khách — vì môi trường dev không tạo được điều kiện race.**
+
+**Các giá trị `n` và ý nghĩa:**
+
+| `n` | Nghĩa | Làm gì |
+|---|---|---|
+| `= count` | đủ | đi tiếp |
+| `1 … count-1` | **short read** — mới có một phần | **đọc tiếp phần còn lại** |
+| `0` | peer đã đóng (EOF) | dọn dẹp, đóng |
+| `-1`, `errno == EINTR` | bị signal cắt — **không phải lỗi** | gọi lại |
+| `-1`, `errno == EAGAIN` | fd non-blocking, chưa có dữ liệu | quay lại event loop |
+| `-1`, khác | lỗi thật | xử lý lỗi |
+
+```c
+// ✅ Mọi read trên socket/pipe đều phải có dạng này
+static int read_full(int fd, void* buf, size_t len) {
+    size_t got = 0;
+    while (got < len) {
+        ssize_t n = read(fd, (char*)buf + got, len - got);
+        if (n > 0)  { got += n; continue; }
+        if (n == 0) return 0;                  // peer đóng sớm
+        if (errno == EINTR) continue;
+        return -1;
+    }
+    return 1;
+}
+```
+
+**Hệ quả thiết kế bắt buộc rút ra:** **mọi protocol chạy trên TCP đều phải tự framing** — hoặc **length-prefix** (gửi độ dài trước), hoặc **delimiter** (`\n`, kèm **giới hạn buffer** để không bị gói khổng lồ làm cạn RAM).
+
+**Bẫy:** (1) `if (n != count) return -1;` — bug kinh điển, chỉ lộ ở khách; (2) chỉ lặp cho `read` mà quên **`write` cũng short** (LNX-028); (3) test bằng file trên đĩa — file thường **luôn** trả đủ, nên bug không bao giờ lộ khi test; phải test bằng socket/pipe thật.
+
+**Chốt:** *"TCP giao đủ byte, đúng thứ tự — nhưng không giao đúng lô. Mọi `read` phải lặp, mọi protocol phải tự đóng khung."*
+
+> 🎤 Viết lại 2026-08-13 sau khi ứng viên đạt **2 điểm** — liệt kê đúng cả 4 giá trị `n` nhưng **cơ chế TCP luồng byte trắng hoàn toàn**. Bản cũ (277 ký tự) không hề nói tới TCP.
 </details>
 
 #### LNX-006 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
-**Vì sao nên dùng sigaction thay vì signal?**
+**Vì sao nên dùng `sigaction` thay vì `signal`? Nêu một bug thật mà `signal()` gây ra.**
 <details><summary>Đáp án</summary>
 
-`signal()` có ngữ nghĩa không thống nhất giữa nền tảng (có hệ reset handler về mặc định sau lần đầu) và không kiểm soát rõ mask/restart. `sigaction` xác định, di động: kiểm soát signal mask khi handler chạy, cờ `SA_RESTART` (tự thử lại syscall bị ngắt), `SA_SIGINFO`.
+**Vấn đề gốc: `signal()` có ngữ nghĩa KHÔNG THỐNG NHẤT.** Cùng một dòng code cho hành vi khác nhau tuỳ hệ/tuỳ libc:
+
+| | Kiểu System V | Kiểu BSD |
+|---|---|---|
+| Sau khi handler chạy lần đầu | **Reset về hành động mặc định** | Giữ nguyên handler |
+| Signal cùng loại lúc handler đang chạy | **Không chặn** ⇒ handler tự chen vào chính nó | Chặn |
+| Syscall bị ngắt | Trả `EINTR` | Tự restart |
+
+**Bug thật do kiểu System V:**
+```c
+signal(SIGINT, handler);   // ❌ trên hệ reset-về-mặc-định
+```
+Người dùng nhấn Ctrl-C **lần đầu** → handler chạy, đồng thời `SIGINT` **trở lại mặc định**. Nhấn **lần hai** → chương trình **chết ngay**, không kịp dọn dẹp. Triệu chứng *"lần đầu thì xử lý đúng, lần sau chết"* — và **không tái hiện được** trên máy dev nếu libc ở đó theo kiểu BSD.
+
+Bug thứ hai: handler chưa chạy xong đã bị chính signal đó chen vào ⇒ **đệ quy handler**, tràn stack, hoặc hỏng trạng thái dở dang.
+
+**`sigaction` khắc phục vì nó BUỘC BẠN NÓI RÕ:**
+```c
+struct sigaction sa;
+memset(&sa, 0, sizeof sa);          // ✅ luôn zero trước — có trường ẩn
+sa.sa_handler = handler;
+sigemptyset(&sa.sa_mask);           // ① signal nào bị chặn TRONG lúc handler chạy
+sa.sa_flags   = 0;                  // ② hành vi restart: 0 = để EINTR đánh thức
+sigaction(SIGINT, &sa, NULL);       //    handler KHÔNG bị reset — hành vi xác định
+```
+- **`sa_mask`** — kiểm soát tường minh signal nào bị chặn khi handler chạy (chống đệ quy).
+- **`sa_flags`** — `SA_RESTART` (tự thử lại syscall), `SA_SIGINFO` (nhận thêm thông tin: ai gửi, địa chỉ gây lỗi), `SA_NOCLDWAIT` (kernel tự thu zombie).
+- Handler **không bị reset**, hành vi **giống nhau trên mọi hệ POSIX**.
+
+⚠️ **Nhưng `SA_RESTART` không phải "bật cho chắc".** Nó khiến syscall đang chặn **tự chạy lại** — nếu bạn đang dùng signal để đánh thức vòng lặp mà thoát, nó làm daemon **không tắt được** ([LNX-030](linux-sysprog.md)). Và nó **không bao giờ** restart `epoll_wait`/`select`/`poll`/`sleep` ([LNX-027](linux-sysprog.md)).
+
+**Chốt:** *"`signal()` cho hành vi khác nhau tuỳ hệ — kinh điển là handler bị reset nên lần Ctrl-C thứ hai giết chương trình. `sigaction` buộc khai báo rõ mask và flags nên xác định trên mọi hệ."*
 </details>
 
 #### LNX-007 · 🟡 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
-**Phân biệt stdio buffer, page cache, và fsync.**
+**Phân biệt stdio buffer, page cache và `fsync`. Thiết bị cầm tay mất điện ngay sau khi màn hình báo "Đã lưu" mà file config lại RỖNG 0 byte — dữ liệu đã đi tới đâu, và sửa thế nào?**
 <details><summary>Đáp án</summary>
 
-stdio buffer ở user space (libc), gom dữ liệu giảm số syscall; `fflush` đẩy xuống kernel. Page cache ở kernel, cache nội dung file trong RAM; `write` thành công chỉ đảm bảo tới page cache. `fsync` ép kernel ghi page cache xuống disk vật lý — quan trọng cho độ bền (embedded mất điện).
+**Ba tầng dữ liệu phải đi qua:**
+
+```
+   fprintf ──► ① buffer stdio (libc, USER space)
+                    │ fflush()  /  buffer đầy  /  fclose()  /  exit()
+                    ▼
+               ② page cache (KERNEL, trong RAM)      ← write() thành công CHỈ tới đây
+                    │ fsync()  /  kernel tự flush sau vài giây
+                    ▼
+               ③ đĩa / eMMC  ← chỉ tới đây mới sống sót qua mất điện
+```
+
+| Tầng | Ở đâu | Mất khi | Đẩy xuống bằng |
+|---|---|---|---|
+| ① stdio buffer | libc, user space | **Process chết** (kể cả `_exit`) | `fflush()` |
+| ② page cache | Kernel, RAM | **Mất điện / panic** | `fsync()` |
+| ③ Thiết bị | Flash/đĩa | — | — |
+
+**Trả lời tình huống — thủ phạm KHÔNG phải buffer, mà là cờ `"w"`:**
+
+`fopen(path, "w")` **cắt file về 0 byte NGAY LẬP TỨC**, trước khi bạn ghi byte nào. Cửa sổ chết nằm giữa lúc cắt và lúc dữ liệu mới xuống đĩa — mất điện trong đó thì **bản cũ đã mất, bản mới chưa có**. Đo thật:
+```
+ban cu tren dia                    -> 29 byte
+ngay sau fopen("w"), CHUA ghi gi   -> 0 byte   <-- mat dien o day = mat sach
+da fputs nhung CHUA fclose         -> 0 byte   (con trong buffer stdio)
+sau fclose                         -> 29 byte  (moi xuong page cache, VAN chua xuong dia)
+```
+
+**⇒ Sửa: thay thế nguyên tử (atomic replace via rename)** — `fsync` một mình **không đủ**:
+```c
+int fd = open("/data/config.json.tmp", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0644);
+write_all(fd, json, len);
+fsync(fd);                                              // ① nội dung MỚI chắc chắn trên đĩa
+close(fd);
+rename("/data/config.json.tmp", "/data/config.json");   // ② thay thế NGUYÊN TỬ
+int dfd = open("/data", O_RDONLY|O_DIRECTORY);
+fsync(dfd); close(dfd);                                 // ③ ép cả thao tác ĐỔI TÊN xuống đĩa
+```
+`rename()` trong cùng filesystem là **nguyên tử**: cái tên chỉ có thể trỏ tới inode **cũ** hoặc **mới**, không có trạng thái ở giữa. Mất điện trước ② ⇒ còn nguyên bản cũ; sau ② ⇒ có bản mới đầy đủ.
+
+**Ba chi tiết hay bị bỏ:**
+1. **Thiếu ① thì ② vô nghĩa** — đổi tên vào một file mà nội dung còn nằm trong page cache.
+2. **Bước ③ hay bị quên:** `fsync(fd)` chỉ đảm bảo **nội dung**, không đảm bảo **entry thư mục**.
+3. Đây đúng là mẫu `git`, `sqlite`, `dpkg` dùng.
+
+**Bẫy:** (1) `fwrite` thành công ≠ dữ liệu đã tới kernel (mới ở tầng ①); (2) `_exit()` **không flush stdio** ⇒ mất log shutdown ([LNX-030](linux-sysprog.md)); (3) `fsync` mỗi lần lưu làm thiết bị giật và **mòn flash** — cân nhắc gộp ghi, đừng `fsync` bừa.
+
+**Chốt:** *"`fflush` đưa dữ liệu từ libc xuống kernel, `fsync` đưa từ kernel xuống đĩa — nhưng cả hai vẫn không cứu được cờ `\"w\"` cắt file. Muốn an toàn phải ghi file tạm rồi `rename`."*
 </details>
 
 #### LNX-008 · 🟡 · concept · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
-**Cơ chế IPC nào nhanh nhất, đánh đổi gì?**
+**Cơ chế IPC nào nhanh nhất, đánh đổi gì? Và khi nào cái "nhanh nhất" đó KHÔNG đáng chọn?**
 <details><summary>Đáp án</summary>
 
-Shared memory — hai process map cùng vùng nhớ vật lý, đọc/ghi trực tiếp không copy qua kernel (các IPC khác copy 2 lần). Đánh đổi: kernel không tự đồng bộ, phải tự dùng semaphore/mutex để tránh race.
+**Shared memory** — hai process map cùng khung trang vật lý, đọc/ghi trực tiếp. **0 lần copy, 0 syscall** khi truyền. Mọi cơ chế khác (pipe, socket, mq) đều **copy 2 lần** (user→kernel→user) + 2 syscall.
+
+**Nhưng đây mới là câu trả lời đầy đủ — trả giá ba khoản:**
+
+| Trả giá | Cụ thể |
+|---|---|
+| **Tự đồng bộ** | Kernel không khoá hộ. Phải mutex/semaphore process-shared, và **bắt buộc** `PTHREAD_PROCESS_SHARED` (thiếu thì hỏng **im lặng**) |
+| ⭐ **Tự lo ca một bên chết** | Pipe/socket: kernel đóng fd hộ ⇒ bên kia nhận **EOF/EPIPE** và biết đường xử lý. Shared memory: chủ khoá chết ⇒ **khoá kẹt vĩnh viễn**, bên kia treo mãi. Chữa bằng `PTHREAD_MUTEX_ROBUST` (`EOWNERDEAD` + `pthread_mutex_consistent`), hoặc bỏ khoá ở đường nóng, hoặc watchdog |
+| **Không có cơ chế báo hiệu** | `mmap` không cho biết *"khi nào có dữ liệu mới"* ⇒ thực tế **shm hiếm khi đi một mình**, thường kèm `eventfd`/semaphore |
+
+**Khi nào KHÔNG đáng chọn — phép thử một câu: *"đã ĐO thấy copy là nút thắt chưa?"***
+- **Message nhỏ** (vài trăm byte): chi phí bị **syscall** chi phối, shm gần như **không nhanh hơn** mà vẫn trả đủ ba khoản trên.
+- **Hai bên hay crash / vòng đời độc lập** ⇒ cột "một bên chết" quan trọng hơn tốc độ.
+- **Có thể phải chạy khác máy** ⇒ socket ngay từ đầu.
+
+**Con số để quyết định:** ảnh 1920×1080 8-bit @30 fps ≈ **60 MB/s** — qua socket là **120 MB/s memcpy** liên tục, shm thắng rõ. Cùng hệ thống đó truyền **lệnh điều khiển vài chục byte** thì socket, đừng đụng shm.
+
+⇒ **Kiến trúc "chín" hay gặp: shm cho khối dữ liệu lớn + socket/eventfd cho tín hiệu và lệnh.** Lấy tốc độ ở chỗ cần, giữ an toàn ở chỗ còn lại.
+
+**Chốt:** *"Shared memory nhanh nhất vì 0 copy — nhưng nó trả lại cho bạn đúng phần kernel vẫn làm hộ: đồng bộ và dọn dẹp khi một bên chết. Chưa đo thì đừng chọn."*
 </details>
 
 #### LNX-009 · 🟠 · concept · ⭐ · [→ io-multiplexing](../../../04-linux-system-programming/io-multiplexing.md)
@@ -201,10 +378,47 @@ Các fd-based primitives: `signalfd` (nhận signal qua fd, tránh handler async
 </details>
 
 #### LNX-015 · 🔴 · design · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
-**Thiết kế giao tiếp hiệu năng cao giữa hai process trên cùng máy?**
+**Thiết kế kênh giao tiếp hiệu năng cao giữa hai process trên cùng máy — và làm sao nó sống sót khi một bên crash?**
 <details><summary>Đáp án</summary>
 
-Dùng shared memory cho dữ liệu lớn/tần suất cao (zero-copy): `shm_open` + `mmap`, tổ chức một ring buffer trong vùng shm cho producer–consumer, đồng bộ bằng POSIX semaphore process-shared hoặc mutex `PTHREAD_PROCESS_SHARED` đặt trong header của vùng shm. Nếu cần truyền message có ranh giới/điều khiển, kết hợp Unix domain socket (truyền được fd qua SCM_RIGHTS) hoặc eventfd để báo hiệu. Cân nhắc cache line alignment để tránh false sharing.
+**Khung thiết kế — dữ liệu đi một đường, tín hiệu đi đường khác:**
+
+| Thành phần | Chọn gì | Vì sao |
+|---|---|---|
+| **Đường dữ liệu lớn** | Shared memory (`shm_open` + `ftruncate` + `mmap`) | **0 copy, 0 syscall** — các IPC khác copy 2 lần qua kernel |
+| **Cấu trúc trong vùng shm** | Ring buffer + **header có magic/version** | Producer–consumer; magic để nhận biết vùng cũ còn sót lại sau crash |
+| **Báo hiệu** | **`eventfd`** (hoặc semaphore) | shm **không tự báo** có dữ liệu mới; eventfd cắm thẳng vào `epoll` |
+| **Kênh điều khiển** | **Unix domain socket** | Có ranh giới message, truyền được fd, kernel báo khi bên kia chết |
+
+⇒ **Đừng dùng shm cho mọi thứ.** Message nhỏ (lệnh, cấu hình) thì chi phí bị **syscall** chi phối, shm không nhanh hơn mà vẫn phải trả giá đồng bộ.
+
+**⭐ Phần quyết định: một bên crash thì sao?**
+
+Pipe/socket được kernel dọn hộ (bên kia nhận EOF/EPIPE). Shared memory thì **không** — mutex nằm **trong vùng nhớ**, kernel không biết nó là gì ⇒ chủ khoá chết là **khoá kẹt vĩnh viễn**. Đo thật:
+```
+mutex thuong    lock() -> ETIMEDOUT    <-- dung lock() thuong la TREO VINH VIEN
+ROBUST          lock() -> EOWNERDEAD   <-- cuu duoc, goi mutex_consistent()
+```
+
+```c
+pthread_mutexattr_setpshared(&a, PTHREAD_PROCESS_SHARED);   // ① BẮT BUỘC — thiếu thì hỏng IM LẶNG
+pthread_mutexattr_setrobust(&a, PTHREAD_MUTEX_ROBUST);      // ② sống sót khi chủ chết
+...
+if (pthread_mutex_lock(&hdr->lock) == EOWNERDEAD) {
+    repair_shared_state(hdr);                 // dữ liệu có thể DỞ DANG
+    pthread_mutex_consistent(&hdr->lock);
+}
+```
+
+**Hoặc bỏ hẳn khoá ở đường nóng** ⭐ — ring buffer với **chỉ số đọc/ghi riêng** mỗi bên: consumer chết thì producer vẫn chạy, chỉ đè lên ô cũ. Hợp nhất khi mất dữ liệu cũ là chấp nhận được (ảnh, mẫu cảm biến) — và tránh được toàn bộ lớp vấn đề stale lock.
+
+**Bẫy phải nêu:**
+1. **Quên `ftruncate`** ⇒ đối tượng cỡ 0, `mmap` vẫn **thành công**, chạm vào là **`SIGBUS`** (kiểm giá trị trả về của `mmap` không bắt được lỗi này).
+2. **Quên `shm_unlink`** ⇒ vùng shm **sống lâu hơn process**; lần khởi động sau gặp lại dữ liệu cũ + khoá cũ đang bị giữ.
+3. **Quên `PTHREAD_PROCESS_SHARED`** ⇒ mutex chỉ đúng trong một process, hai bên vẫn giẫm lên nhau mà **không báo lỗi**.
+4. **False sharing:** đặt chỉ số đọc và chỉ số ghi **cùng một cache line** ⇒ hai core bật qua lại cache line đó, mất phần lớn hiệu năng vừa giành được.
+
+**Chốt:** *"shm cho khối dữ liệu + eventfd cho tín hiệu + socket cho lệnh. Và câu hỏi thật không phải 'nhanh cỡ nào' mà là 'một bên chết thì bên kia có treo không' — đó là thứ shm bắt bạn tự lo."*
 </details>
 
 #### LNX-016 · 🟡 · concept · ⭐ · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
@@ -215,10 +429,30 @@ Message queue cho **ranh giới message rõ ràng**, có priority, và decouple 
 </details>
 
 #### LNX-017 · 🟡 · design · ⭐ · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
-**Message queue đầy thì xử lý sao?**
+**Sensor bắn 200 mẫu/giây vào message queue, luồng xử lý chỉ kịp 50/giây. Sau vài phút `mq_send` bắt đầu chặn và kéo trễ cả luồng đọc sensor. Xử lý thế nào?**
 <details><summary>Đáp án</summary>
 
-Mặc định `mq_send` block; `O_NONBLOCK` trả `EAGAIN`. Nhưng nếu chỉ **giá trị đích mới nhất** quan trọng (vd ramp độ sáng), giải pháp đúng là **coalescing/latest-value-wins** (giữ ô giá trị đích, consumer nội suy) hoặc **drop-oldest** (ghi đè giá trị cũ vì giá trị mới phản ánh trạng thái chính xác hơn), kèm **rate limiting** ở producer. Tránh để block làm trễ phản ứng.
+**Cơ chế:** mặc định `mq_send` **chặn** khi hàng đầy; `O_NONBLOCK` thì trả `-1`/`EAGAIN`.
+
+⚠️ Nhưng **đổi cờ chưa phải lời giải** — nó chỉ đổi *cách hỏng*. Câu hỏi thật là **nghiệp vụ**: *dữ liệu này mất được không?*
+
+| Loại dữ liệu | Đầy thì làm gì | Vì sao |
+|---|---|---|
+| **Trạng thái** (ánh sáng, nhiệt độ, vị trí, tốc độ) | ⭐ **Đè cái cũ** — latest-value-wins / drop-oldest | Mẫu cũ đã **SAI** so với hiện tại; giữ nó lại là giữ rác **và** làm hệ phản ứng theo dữ liệu quá khứ |
+| **Sự kiện / lệnh** (job in, phím bấm, giao dịch) | **Chặn / backpressure / lưu bền** | Mỗi phần tử là một việc phải làm; mất là **sai nghiệp vụ** |
+
+**Áp vào ca này:** độ sáng là **trạng thái** ⇒ đè cái cũ. Consumer chỉ cần **giá trị mới nhất** để ramp tới, không cần lịch sử 4 mẫu đã lỗi thời.
+
+**Ba việc phải làm cùng lúc:**
+1. **Đè cái cũ** — hoặc dùng một ô "giá trị đích" (không cần hàng đợi), hoặc ring buffer ghi đè.
+2. ⭐ **Đếm số mẫu bị bỏ** (`dropped_count`). Mất dữ liệu thì được, **không biết mình mất** thì không — không có biến này thì sau không ai chứng minh được hệ có bỏ mẫu hay không.
+3. **Giảm ngay từ nguồn** (rate limiting). 200 Hz cho một cái đèn nền là **thừa** — hạ tần số lấy mẫu rẻ hơn mọi cách xử lý phía sau.
+
+**⚠️ Vì sao "cứ để nó chặn" là lựa chọn tệ ở đây:** chặn `mq_send` làm **luồng đọc sensor trễ theo**, nên nó bỏ lỡ luôn các mẫu **tương lai** — tức là bạn vẫn mất dữ liệu, nhưng mất **ngẫu nhiên và không đếm được**, lại còn phá timing của luồng đọc. Chặn chỉ đúng khi phía trên **có thể chậm lại thật** (backpressure lan tới tận nguồn).
+
+**Bẫy:** (1) giới hạn mặc định của POSIX mq rất thấp — `msg_max` **10**, nâng cần root ⇒ hàng đầy sớm hơn tưởng; (2) tăng kích thước hàng để "hết đầy" chỉ **dời thời điểm hỏng** và **tăng độ trễ** (dữ liệu càng cũ khi tới tay consumer); (3) quên rằng consumer chậm là **vấn đề gốc** — nếu nó chậm vĩnh viễn thì không chính sách hàng đợi nào cứu được.
+
+**Chốt:** *"Hàng đầy không phải lỗi kỹ thuật mà là câu hỏi nghiệp vụ: dữ liệu trạng thái thì đè cái cũ và đếm số bỏ; dữ liệu sự kiện thì phải backpressure. Và luôn hỏi vì sao producer nhanh gấp 4 lần consumer."*
 </details>
 
 #### LNX-018 · 🟡 · concept · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
@@ -236,10 +470,46 @@ Pipe/FIFO: byte stream đơn giản, 1 chiều. Message queue: có ranh giới m
 </details>
 
 #### LNX-020 · 🟡 · concept · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
-**Pipe và FIFO (named pipe) khác nhau thế nào?**
+**Pipe và FIFO khác nhau thế nào? Process con đã thoát mà `read()` của cha vẫn không trả về EOF — vì sao?**
 <details><summary>Đáp án</summary>
 
-Cả hai là byte stream một chiều. **Pipe** (`pipe()`) ẩn danh — chỉ dùng được giữa các process **có quan hệ** (chia sẻ fd qua fork), sống theo fd, đó là cách shell nối `a | b`. **FIFO** (`mkfifo`) có **tên trên filesystem** → hai process **không quan hệ** cũng mở được qua đường dẫn. Chung: ghi vào pipe đầy thì block (hoặc EAGAIN nếu nonblock); ghi khi không còn reader → `SIGPIPE`/`EPIPE`; ghi ≤ `PIPE_BUF` là atomic.
+| | **Pipe** (`pipe()`) | **FIFO** (`mkfifo()`) |
+|---|---|---|
+| Tên | Ẩn danh | **Có tên trên filesystem** |
+| Ai dùng được | Chỉ process **có quan hệ** (chia sẻ fd qua `fork`) | Hai process **bất kỳ**, mở qua đường dẫn |
+| Vòng đời | Sống theo fd | File tên còn lại tới khi `unlink` |
+| Điển hình | Shell nối `a | b` | Hai chương trình rời nhau |
+
+Cả hai là **byte stream một chiều**, **không có ranh giới message** ⇒ phải tự framing.
+
+**⭐ EOF xảy ra khi nào — luật hay bị hiểu sai nhất:**
+
+> `read()` trả `0` (EOF) chỉ khi **MỌI fd trỏ tới đầu GHI đã đóng** — không phải khi process con thoát.
+
+```c
+int p[2]; pipe(p);
+if (fork() == 0) { dup2(p[1], STDOUT_FILENO); close(p[0]); execlp("tool","tool",NULL); }
+close(p[1]);                     // ✅✅ THIẾU DÒNG NÀY LÀ TREO VĨNH VIỄN
+while ((n = read(p[0], buf, sizeof buf)) > 0) { /* ... */ }
+```
+Cha `fork` xong vẫn giữ **bản sao** của `p[1]`. Kernel thấy còn writer ⇒ không bao giờ báo EOF, dù con đã chết từ lâu. Đo thật:
+```
+cha QUEN close(p[1])   -> TREO vinh vien trong read()
+cha CO   close(p[1])   -> doc xong, thay EOF, thoat sach
+```
+⇒ **Quy tắc: sau `fork`, mỗi bên đóng NGAY đầu pipe mình không dùng.** Đây là bug pipe phổ biến số một.
+
+**Ca ngược lại — ghi khi không còn reader ⇒ mặc định CHẾT.** Kernel gửi **`SIGPIPE`**, hành vi mặc định là **giết process** — im lặng, không log. Đây là lý do daemon "tự nhiên biến mất" khi client ngắt giữa chừng:
+```c
+signal(SIGPIPE, SIG_IGN);   // ✅ gần như bắt buộc cho mọi daemon
+if (write(fd, buf, n) < 0 && errno == EPIPE) { /* peer đã đóng */ }
+```
+
+**Sức chứa & nguyên tử:** pipe chứa **64 KB** (đầy thì chặn — đây là **backpressure miễn phí**); ghi **≤ `PIPE_BUF` = 4096 byte** là **nguyên tử**, trên ngưỡng đó **bị xé** và nhiều nguồn ghi chung sẽ trộn vào nhau.
+
+**Bẫy deadlock hai chiều:** cha ghi cho con qua pipe A, con ghi cho cha qua pipe B, không ai đọc ⇒ cả hai đầy 64 KB ⇒ **cả hai cùng chặn khi ghi**. Cùng họ: đọc `stdout` của con bằng vòng `read` trong khi con xả rất nhiều ra `stderr` mà không ai đọc ⇒ con chặn, cha chờ mãi. Chữa bằng `poll`/`epoll` trên **cả hai** đầu.
+
+**Chốt:** *"Pipe chỉ báo EOF khi đầu ghi CUỐI CÙNG đóng — nên quên `close(p[1])` ở cha là treo vĩnh viễn. Và ghi vào pipe không còn reader thì mặc định bạn CHẾT, không phải nhận lỗi."*
 </details>
 
 #### LNX-021 · 🟡 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
@@ -266,11 +536,42 @@ Cả hai là byte stream một chiều. **Pipe** (`pipe()`) ẩn danh — chỉ 
 `R` running/runnable, `S` sleep ngắt được (chờ sự kiện, nhận signal), `D` **uninterruptible sleep** (chờ I/O, *không* nhận signal), `T` stopped, `Z` zombie. **`D` state**: process kẹt trong syscall I/O ở kernel không thể bị đánh thức/kill (kể cả `kill -9`) tới khi I/O xong — nếu I/O treo (NFS chết, disk hỏng) process **kẹt vĩnh viễn**, load average tăng vọt dù CPU rảnh. Thấy nhiều process `D` = nghi tầng storage/driver. Xem cột STAT trong `ps`, `/proc/<pid>/stack` để biết kẹt ở đâu.
 </details>
 
-#### LNX-023 · 🟡 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
-**`/proc` và `/sys` là gì, khác nhau thế nào?**
+#### LNX-023 · 🟡 · concept · ⭐ · [→ tools](../../../09-debugging/tools.md), [kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)
+**Thiết bị nhúng rootfs tối giản: không có `lsof`, không có `strace`. Bạn cần biết một daemon đang mở fd nào và đang kẹt ở đâu trong kernel. Lấy thông tin đó ở đâu, và vì sao "đọc file" lại ra được trạng thái sống của kernel?**
 <details><summary>Đáp án</summary>
 
-Cả hai là **virtual filesystem** (nội dung sinh bởi kernel lúc đọc, không nằm trên disk) — "everything is a file" áp cho trạng thái kernel. `/proc`: thông tin **process** (`/proc/<pid>/…`: maps, fd, status, cmdline) + nhiều thông tin hệ thống lịch sử (`/proc/meminfo`, `/proc/interrupts`, `/proc/cpuinfo`). `/sys` (sysfs): mô hình **thiết bị/driver** có cấu trúc (device model — bus/device/driver/class), một giá trị/file, dùng để đọc & cấu hình driver (gpio, pwm, cpufreq). Đại khái: `/proc` cũ + tạp, `/sys` mới + có cấu trúc cho device.
+**Cơ chế trước — chúng KHÔNG phải file.**
+
+`/proc` và `/sys` là **virtual filesystem**: **không có byte nào nằm trên đĩa**. Khi bạn `read()`, kernel **chạy một hàm sinh nội dung ngay tại thời điểm đó** rồi trả về. Mỗi lần đọc là một lần chụp trạng thái mới.
+
+⇒ Đó là *"everything is a file"* áp cho **trạng thái kernel**: tra được mọi thứ chỉ bằng `open`/`read`, **không cần syscall riêng, không cần cài công cụ**.
+
+**Hệ quả ăn điểm:** `ps` và `top` **không có syscall riêng** — không tồn tại `get_process_list()`. Chúng chỉ **duyệt `/proc/<pid>/`**. Nghĩa là bạn luôn tự làm được việc của chúng, kể cả trên rootfs trống trơn.
+
+**Phân vai hai thư mục:**
+
+| | `/proc` | `/sys` (sysfs) |
+|---|---|---|
+| Về cái gì | **Process** + thông tin hệ thống lịch sử | **Thiết bị & driver** — device model (bus/device/driver/class) |
+| Cấu trúc | tạp, mỗi file một định dạng riêng | có cấu trúc, **một giá trị / một file** |
+| Sinh ra khi nào | Unix cổ, gom dần đủ thứ vào | Sau này, để dọn đúng phần device |
+| Ví dụ | `/proc/<pid>/fd/`, `/proc/<pid>/stack`, `/proc/<pid>/maps`, `/proc/meminfo`, `/proc/interrupts` | `/sys/class/gpio/`, `/sys/class/thermal/thermal_zone0/temp`, `/sys/bus/i2c/devices/` |
+
+**Thay công cụ khi không có công cụ:**
+
+| Muốn biết | Công cụ quen | Thay bằng |
+|---|---|---|
+| Process mở fd nào | `lsof` | `ls -l /proc/<pid>/fd/` |
+| Process `D` kẹt ở đâu trong kernel | `strace` (không dùng được — nó **không** trace được process đã kẹt) | `cat /proc/<pid>/stack`, `/proc/<pid>/wchan` |
+| Bản đồ bộ nhớ / rò mmap | `pmap` | `cat /proc/<pid>/maps` |
+| IRQ nào bắn, bắn bao nhiêu | — | `cat /proc/interrupts` (đọc 2 lần, lấy hiệu) |
+| Bật GPIO, đọc nhiệt độ CPU | — | **`/sys`** |
+
+**Bẫy:** (1) tưởng `/proc` đọc từ đĩa nên "chậm, tránh dùng" — sai, nó là hàm kernel, rẻ; (2) dùng `strace` để soi process đang `D` — vô ích, `ptrace` cần process **nhận được signal**, mà `D` thì không; đúng chỗ phải xem `/proc/<pid>/stack`; (3) coi `/proc/<pid>/fd/` là bản sao — nó là **symlink sống**, đếm được cả socket và pipe (dùng để bắt **rò fd**).
+
+**Chốt:** *"Thiết bị nhúng không có công cụ gì thì vẫn còn `/proc` và `/sys` — kernel tự phơi trạng thái ra dưới dạng file, và `ps`/`top` cũng chỉ đang đọc chỗ đó."*
+
+> 🎤 Viết lại 2026-08-13 sau khi ứng viên được **0 điểm** (trắng cả 2 lần hỏi) — bản cũ là đoạn khẳng định 588 ký tự, không dựng lại được lập luận. Link nguồn cũ trỏ `→ file-io` là **sai**: file đó không có mục nào về hai filesystem này.
 </details>
 
 #### LNX-024 · 🟠 · concept · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
@@ -337,20 +638,60 @@ Vì đó là **hai syscall**, và giữa chúng process khác chen vào được
 **Chốt:** *hễ hai syscall không được để ai chen vào giữa, hãy tìm cờ hoặc syscall gộp cả hai.* Mẫu này còn sinh ra `O_CLOEXEC`, `accept4()`, `epoll_create1()`, `sigsuspend()`, `rename()`.
 </details>
 
-#### LNX-029 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
-**Đo khoảng thời gian / đặt timeout nên dùng clock nào? Vì sao?**
+#### LNX-029 · 🟡 · concept · ⭐ · [→ TLPI cụm 03 §5](../../../15-book-summaries/the-linux-programming-interface/03-signals-and-timers.md)
+**Thiết bị nhúng KHÔNG có RTC pin nuôi — mất điện là đồng hồ về mốc mặc định, tới khi NTP đồng bộ được (30–60 s sau boot). Đoạn timeout này sinh ra HAI triệu chứng ngược nhau ngoài hiện trường. Vì sao?**
+
+```c
+time_t start = time(NULL);
+send_scan_command();
+while (!scan_done()) {
+    if (time(NULL) - start > 5) { log("timeout"); return -1; }
+}
+```
+- ① Đôi khi **timeout ngay lập tức** dù module trả lời bình thường.
+- ② Đôi khi **treo hàng giờ** mới chịu timeout.
+
 <details><summary>Đáp án</summary>
 
-**`CLOCK_MONOTONIC`**, không phải `CLOCK_REALTIME`.
+**Cơ chế — `time()` đọc `CLOCK_REALTIME`, mà giờ theo lịch thì NHẢY ĐƯỢC.**
 
-- `CLOCK_REALTIME` = giờ thực theo lịch — **nhảy được**: NTP chỉnh, admin đổi giờ, đổi múi giờ/DST.
-- `CLOCK_MONOTONIC` = đếm đơn điệu từ một mốc bất kỳ (thường là lúc boot) — **không bao giờ nhảy lùi**.
+Một triệu chứng thì dễ đoán; **hai triệu chứng ngược nhau từ cùng một dòng code** chính là chữ ký của *"có ai đó sửa đồng hồ giữa hai lần đọc"*:
 
-**Hỏng thế nào nếu chọn sai:** NTP chỉnh lùi 1 giây giữa hai lần đo → khoảng thời gian ra **số âm**, hoặc timeout chờ thêm rất lâu. Trên thiết bị nhúng **không có RTC pin**, đồng hồ **nhảy vọt** khi NTP đồng bộ lần đầu sau boot — đúng lúc các service đang khởi động với timeout.
+| | NTP chỉnh **tiến** (nhảy vọt lên) | NTP chỉnh **lùi** |
+|---|---|---|
+| `time(NULL) - start` | vọt lên hàng nghìn giây | thành số **âm** / rất nhỏ |
+| Triệu chứng | ① **timeout ngay lập tức** | ② **treo hàng giờ** |
 
-**Quy tắc:** cần *"lúc mấy giờ"* (timestamp log, mtime) → `REALTIME`; cần *"bao lâu"* (timeout, đo hiệu năng, lập lịch định kỳ) → `MONOTONIC`.
+Điều kiện của đề — **không RTC**, NTP đồng bộ 30–60 s sau boot — làm cú nhảy **gần như chắc chắn xảy ra**, đúng lúc mọi service đang khởi động với timeout. Trên thiết bị nhúng đây là ca **mặc định**, không phải ca hiếm.
 
-Trong C++ đúng cùng nguyên tắc: **`std::chrono::steady_clock`** cho đo khoảng, `system_clock` cho thời điểm theo lịch — `steady_clock` tồn tại chính vì lý do này.
+**Ai sửa được `CLOCK_REALTIME`:** NTP, admin đổi giờ, đổi múi giờ/DST, leap second.
+**`CLOCK_MONOTONIC`:** đếm đơn điệu từ một mốc bất kỳ (thường là lúc boot) — **không ai chỉnh được, không bao giờ nhảy lùi**.
+
+```c
+// ✅ Đo khoảng thời gian
+struct timespec t0, t1;
+clock_gettime(CLOCK_MONOTONIC, &t0);
+...
+clock_gettime(CLOCK_MONOTONIC, &t1);
+double elapsed = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9;
+```
+
+**Quy tắc chọn — hỏi đúng một câu:**
+
+| Bạn đang hỏi gì | C | C++ |
+|---|---|---|
+| *"bây giờ là mấy giờ"* — timestamp log, mtime, hạn chứng chỉ | `CLOCK_REALTIME` | `std::chrono::system_clock` |
+| *"bao lâu"* — timeout, đo hiệu năng, lập lịch định kỳ | **`CLOCK_MONOTONIC`** | **`std::chrono::steady_clock`** |
+
+> 💡 `steady_clock` tồn tại song song với `system_clock` trong C++ **chính vì lý do này** — đây là câu hỏi C++ hay được hỏi kèm.
+
+**Bẫy:** (1) dùng `system_clock` cho `condition_variable::wait_for` — NTP nhảy làm wait sai/treo; (2) tưởng `CLOCK_MONOTONIC` đếm cả lúc máy **suspend** — không, cần `CLOCK_BOOTTIME` nếu thiết bị có ngủ; (3) lấy hiệu hai `time_t` rồi gán vào biến **unsigned** — số âm hoá thành số khổng lồ, timeout gần như vĩnh viễn.
+
+**Chốt:** *"Hỏi 'mấy giờ' thì REALTIME. Hỏi 'bao lâu' thì MONOTONIC. Nhầm chỗ là sinh timeout âm hoặc timeout vô tận."*
+
+> 🎤 Viết lại 2026-08-13 sau khi ứng viên đạt **1 điểm** (trắng, phải thu hẹp mới ra được epoch + 1 triệu chứng). Link nguồn cũ trỏ `→ processes-signals` không có mục clock; nội dung thật ở TLPI cụm 03 §5.
+
+*(NTP = Network Time Protocol — giao thức đồng bộ đồng hồ máy qua mạng. Nó **chỉnh giờ hệ thống**, đó là toàn bộ lý do câu này tồn tại.)*
 </details>
 
 #### LNX-030 · 🟡 · concept · ⭐ · 🎤 2026-08-13 · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
@@ -409,6 +750,245 @@ if (n < 0 && errno == EINTR) {
 **Chốt:** *"`EINTR` không phải lỗi cần dập — nó là cách signal gọi bạn dậy. Dập nó bằng `SA_RESTART` là tự làm daemon không tắt được."*
 
 > 🔬 Kiểm chứng chạy thật + bản sửa đầy đủ: [coding-arena/reviewed/2026-08-13--OS-020--sigterm-handler.cpp](../coding-arena/reviewed/2026-08-13--OS-020--sigterm-handler.cpp)
+</details>
+
+#### LNX-031 · 🟠 · concept · ⭐ · 🎤 2026-08-13 · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**Ta vẫn dạy "signal handler chỉ nên set cờ". Nhưng mẫu chuẩn để thu hồi zombie lại là một VÒNG LẶP đặt ngay trong handler. Mâu thuẫn ở đâu — và nó có thật không?**
+
+```c
+void on_sigchld(int) {
+    while (waitpid(-1, NULL, WNOHANG) > 0) { }   // vòng lặp trong handler — ổn không?
+}
+```
+
+<details><summary>Đáp án</summary>
+
+**Không mâu thuẫn. "Chỉ set cờ" là kinh nghiệm rút gọn, không phải luật gốc.**
+
+Ba luật thật của một handler:
+
+| Luật | Vòng lặp `waitpid` có vi phạm? |
+|---|---|
+| ① Chỉ gọi hàm **async-signal-safe** | ❌ Không — `waitpid(2)` **có** trong `man 7 signal-safety` |
+| ② **Không bao giờ chặn** | ❌ Không — `WNOHANG` đảm bảo trả về ngay |
+| ③ **Bảo toàn `errno`** | ⚠️ **Có rủi ro — chỗ nguy hiểm thật sự** |
+
+Vòng lặp **hữu hạn và tự dừng**: mỗi vòng thu một con đã thoát; hết con thì `waitpid` trả `0` và thoát. Nó là O(số con vừa chết). **"Ngắn" đo bằng *có chặn không*, không đo bằng số dòng.**
+
+So sánh handler hỏng ở [OS-020](os.md): `printf` giữ khoá stdio, `free` giữ khoá heap ⇒ vi phạm luật ①, có thể **deadlock vĩnh viễn**. Khác **bản chất**, không phải khác độ dài.
+
+### ⚠️ Luật ③ — bug thật, chạy ra được
+
+`waitpid` **ghi đè `errno`** (đặt `ECHILD` khi hết con). Handler chen vào lúc main vừa gặp lỗi mà chưa kịp đọc `errno`:
+
+```
+KHONG khoi phuc errno  -> main doc errno = No child processes (that ra la No such file or directory) <-- SAI
+CO khoi phuc errno     -> main doc errno = No such file or directory                                  OK
+```
+
+```c
+void on_sigchld(int) {
+    int saved = errno;                             // ✅ bắt buộc
+    while (waitpid(-1, NULL, WNOHANG) > 0) { }
+    errno = saved;
+}
+```
+
+### Chỗ vòng-lặp-trong-handler HẾT ổn
+
+Không phải vì dài, mà vì **nó chỉ làm được đúng một việc: thu xác**. Cần làm gì đó *với* exit status — cập nhật bảng job, log job nào hỏng, giải phóng tài nguyên — thì cần `malloc`/khoá/`printf`, **tất cả đều cấm**. Handler đụng trần ngay tại đó.
+
+**Thang bốn bậc, chọn theo *bạn cần gì ở exit status*:**
+
+| Bậc | Cách | Dùng khi | Giá |
+|---|---|---|---|
+| 0 | `SIG_IGN` / `SA_NOCLDWAIT` — kernel tự thu | **Không cần** exit status | Mất sạch exit status |
+| 1 | Vòng `waitpid(WNOHANG)` **trong handler** | Chỉ chống zombie | Phải bảo toàn `errno` |
+| 2 | Handler set cờ → main loop vét cạn | Cần xử lý exit status nhẹ | Trễ tới vòng lặp kế |
+| 3 ⭐ | **`signalfd`** / self-pipe → vét cạn ở event loop | Daemon thật, đã có `epoll` | Thêm một fd |
+
+**Bậc 3 là câu trả lời sạch về triết lý:** không còn handler nào cả — `SIGCHLD` thành một fd bình thường trong `epoll`, `waitpid` chạy ở ngữ cảnh bình thường, gọi gì cũng được.
+
+⚠️ **Bẫy ở bậc 2:** vòng lặp `while (waitpid(...WNOHANG) > 0)` **vẫn phải có** ở main loop — cờ chỉ nói *"có ít nhất một con chết"*, không nói mấy con, vì **`SIGCHLD` không xếp hàng** ([LNX-004](linux-sysprog.md)). Né vòng lặp là không né được; chỉ chọn được nó chạy **ở đâu**.
+
+**Chốt:** *"Handler bị cấm CHẶN và cấm gọi hàm không AS-safe — không bị cấm LẶP. Nhưng vòng lặp trong handler là bậc thấp nhất còn dùng được; cần hơn 'thu xác' thì phải lên signalfd."*
+
+> Nguồn: ứng viên tự đặt sau phiên 2026-08-13 khi phát hiện mâu thuẫn biểu kiến giữa [OS-020](os.md) và [LNX-004](linux-sysprog.md). Câu hỏi tốt — giữ lại.
+</details>
+
+#### LNX-032 · 🟡 · concept · 📦 2026-08-13 · [→ file-io](../../../04-linux-system-programming/file-io.md)
+**`read()` và `fread()` khác nhau ở đâu? Khi nào chọn cái nào — và vì sao trộn hai thứ trên cùng một file là bug?**
+<details><summary>Đáp án</summary>
+
+**Khác nhau về TẦNG, không phải về tính năng:**
+
+```
+   fread()  ──► buffer stdio (libc, user space)  ──► read() ──► page cache (kernel) ──► đĩa
+   read()   ──────────────────────────────────────────────────► page cache (kernel) ──► đĩa
+```
+
+| | `read()` (syscall) | `fread()` (stdio) |
+|---|---|---|
+| Tầng | Kernel — **syscall trần** | libc, có **buffer riêng** ở user space |
+| Đọc 1 byte × 1000 lần | **1000 syscall** | ~**1 syscall** (nạp cả buffer rồi phát dần) |
+| Trả về | Số **byte** (có thể ít hơn — short read) | Số **phần tử** đọc đủ |
+| Báo lỗi | `-1` + `errno` | `NULL`/ngắn + `ferror()`/`feof()` |
+| Async-signal-safe | ✅ **Có** | ❌ **Không** (khoá stdio) |
+
+**Chọn cái nào:**
+- **`fread`/`fprintf`** khi đọc/ghi **nhiều lần với khối nhỏ** (parse text theo dòng) — buffer gom lại giúp giảm syscall, đây là toàn bộ lý do stdio tồn tại.
+- **`read`/`write`** khi: khối **lớn** (buffer stdio chỉ thêm một lần copy thừa) · cần **kiểm soát chính xác** thời điểm dữ liệu xuống kernel · làm việc với **socket/pipe/thiết bị** · trong **signal handler** · cần `O_*` flags và fd thật.
+
+**⚠️ Vì sao KHÔNG được trộn hai thứ trên cùng file:** mỗi bên giữ **vị trí riêng**. `fread` đã nạp sẵn 4 KB vào buffer stdio thì offset của fd đã nhảy 4 KB; gọi `read(fileno(f), ...)` xen vào sẽ đọc **từ sau chỗ đó**, và dữ liệu trong buffer stdio bị bỏ qua ⇒ **mất dữ liệu, không báo lỗi**. Buộc phải trộn thì `fflush()` trước, và ý thức rằng vị trí đã dịch.
+
+**Bẫy khác:** (1) `fwrite` **thành công không có nghĩa dữ liệu đã tới kernel** — mới vào buffer libc; cần `fflush()` (→ kernel) rồi `fsync()` (→ đĩa) ([LNX-007](linux-sysprog.md)); (2) `exit()` flush stdio nhưng **`_exit()` thì không** ⇒ mất log; (3) stdio **đổi kiểu buffer theo đích**: line-buffered khi ra terminal, **full-buffered (4 KB) khi ra pipe/file** — nên log chạy dưới systemd (stdout là pipe) hành xử khác hẳn lúc chạy tay.
+
+**Chốt:** *"`fread` là `read` cộng thêm một buffer ở user space để gom syscall. Chọn theo kích thước khối và mức kiểm soát cần — và đừng bao giờ trộn hai tầng trên cùng một file."*
+</details>
+
+#### LNX-033 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ io-multiplexing](../../../04-linux-system-programming/io-multiplexing.md)
+**I/O multiplexing giải quyết vấn đề gì? Vì sao hai cách "hiển nhiên" đều không dùng được?**
+<details><summary>Đáp án</summary>
+
+**Vấn đề:** một chương trình cần phục vụ **nhiều fd cùng lúc** (nhiều kết nối, cộng timer, cộng signal). Nhưng `read()` chặn **trên một fd** — đang chờ fd A thì fd B có dữ liệu cũng không biết.
+
+**Hai cách ngây thơ và vì sao hỏng:**
+
+| Cách | Hỏng ở đâu |
+|---|---|
+| **Một thread chặn / kết nối** | 10.000 kết nối = 10.000 thread. Mỗi thread ~8 KB kernel stack + không gian ảo; và **context switch** giữa chúng ăn hết CPU. Cache liên tục bị thổi bay |
+| **Non-blocking + quét vòng tròn** (busy-poll) | Đúng về logic nhưng **đốt 100% CPU** để hỏi 10.000 fd *"có gì chưa?"* trong khi 9.990 cái đang rỗng |
+
+**Lời giải:** hỏi kernel **một câu duy nhất** — *"trong tập fd này, cái nào đã sẵn sàng?"* — rồi **ngủ** cho tới khi có câu trả lời. CPU bằng 0 lúc chờ, và chỉ đụng vào fd thật sự có việc.
+
+⇒ Đây là bài toán **C10K**, và là nền của Nginx/Redis/Node.js. Ba thế hệ API: `select` → `poll` → **`epoll`** (Linux), khác nhau ở chỗ *ai giữ danh sách fd* ([LNX-009](linux-sysprog.md)).
+
+**Hai điều kiện bắt buộc đi kèm — hay bị quên:**
+1. **fd phải non-blocking.** epoll chỉ nói *"có vẻ sẵn sàng"*; đọc thật vẫn có thể không có gì (spurious wakeup, dữ liệu bị checksum loại). fd blocking ⇒ treo cả loop.
+2. **Không bao giờ được chặn trong loop** — kể cả tính toán nặng, `malloc` lớn, tra DNS đồng bộ, hay một mutex có thể bị giữ lâu. Một chỗ chặn 100 ms là **mọi** kết nối cùng trễ 100 ms.
+
+**Bẫy:** multiplexing **không** làm I/O nhanh hơn — nó chỉ cho phép **một thread chờ nhiều thứ**. Tải **CPU-bound** thì nó không giúp gì (cần thread pool), và **file thường** thì nó vô dụng vì file luôn báo "sẵn sàng" ([io-multiplexing.md §7](../../../04-linux-system-programming/io-multiplexing.md)).
+
+**Chốt:** *"Chặn thì chỉ chờ được một fd; busy-poll thì đốt CPU. Multiplexing là cách hỏi kernel một câu rồi ngủ — trả lời được cả hai vấn đề bằng một syscall."*
+</details>
+
+#### LNX-034 · 🔴 · design · ⭐ · 🏗️ · 📦 2026-08-13 · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
+**Process `scanner` đọc ảnh 1920×1080 8-bit @30fps (~60 MB/s) đưa cho process `decoder` giải mã. Tách hai process vì decoder hay crash, không được kéo scanner chết theo. Chọn IPC nào?**
+<details><summary>Đáp án</summary>
+
+Trả lời theo **bốn trục** ([ipc-linux.md §2](../../../04-linux-system-programming/ipc-linux.md)), đừng nhảy thẳng vào tên cơ chế.
+
+**① Băng thông:** 60 MB/s qua socket/pipe nghĩa là **120 MB/s memcpy** liên tục (copy 2 lần) cộng 2 syscall mỗi khung. Ở mức này chi phí copy là **thật** ⇒ **shared memory** hợp lý. *(Ngược lại: lệnh điều khiển vài chục byte thì socket, đừng đụng shm.)*
+
+**② Một bên chết — đề đã cài sẵn bẫy ở đây.** *"decoder hay crash"*: nếu đồng bộ bằng mutex process-shared thường, decoder chết khi **đang giữ khoá** ⇒ scanner gọi `lock()` và **treo vĩnh viễn**.
+
+⇒ **Nghịch lý phải nói ra được:** tách hai process để crash bên này không giết bên kia — rồi đặt một mutex chung vào giữa, **nối lại đúng thứ vừa tách**.
+
+| Cách xử lý | Cơ chế | Đánh đổi |
+|---|---|---|
+| **Robust mutex** | `PTHREAD_MUTEX_ROBUST` ⇒ `lock()` trả **`EOWNERDEAD`** thay vì treo; gọi `pthread_mutex_consistent()` | Phải viết code khôi phục — dữ liệu có thể **dở dang** |
+| **Bỏ khoá ở đường nóng** ⭐ | Ring buffer, chỉ số đọc/ghi **riêng** mỗi bên; consumer chết thì producer vẫn chạy, chỉ đè khung cũ | Khó hơn — nhưng **hợp nhất bài này** vì mất khung ảnh cũ là chấp nhận được |
+| **Watchdog** | Giám sát thấy decoder chết ⇒ reset vùng shm + khởi động lại | Đơn giản nhất, có gián đoạn |
+
+**③ Báo hiệu:** shm **không tự báo** có khung mới ⇒ kèm **`eventfd`** để đánh thức, cắm thẳng vào `epoll`. Thiếu ý này là trả lời cụt.
+
+**④ Khác máy?** Không ⇒ khỏi cần socket cho đường dữ liệu.
+
+**Kiến trúc chốt:** **shm cho khung ảnh + eventfd cho tín hiệu + ring buffer không khoá, đè khung cũ khi consumer chậm, kèm biến đếm khung mất.** Lệnh điều khiển đi Unix socket riêng.
+
+⚠️ Nhớ hai chi tiết dễ mất điểm: vùng shm phải `ftruncate` trước khi `mmap` (thiếu ⇒ **`SIGBUS`** lúc chạm), và shm **sống lâu hơn process** ⇒ phải quyết định lúc khởi động là dùng lại hay xoá làm mới (đặt magic + version ở header).
+
+**Chốt:** *"60 MB/s thì shm đáng giá, nhưng 'decoder hay crash' mới là vế quyết định — phải chọn cơ chế đồng bộ sống sót được khi một bên chết, nếu không thì việc tách process thành vô nghĩa."*
+</details>
+
+#### LNX-035 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
+**Unix domain socket hơn TCP loopback và hơn pipe ở chỗ nào? Vì sao nó nên là lựa chọn MẶC ĐỊNH cho IPC cùng máy?**
+<details><summary>Đáp án</summary>
+
+**Hơn TCP loopback:** không đi qua stack TCP/IP — không checksum, không định tuyến, không cửa sổ tắc nghẽn, không handshake ⇒ nhanh và trễ thấp hơn. Nhưng **cùng API socket**, nên đổi sang TCP chỉ là đổi address family. **Cộng thêm:** kernel biết được **UID/PID của bên kia** (`SO_PEERCRED`) — xác thực cục bộ mà TCP không cho.
+
+**Hơn pipe — ba thứ pipe không có:**
+
+| | Vì sao quan trọng |
+|---|---|
+| **Hai chiều + nhiều client** | Pipe một chiều, chỉ giữa process họ hàng (FIFO thì bất kỳ nhưng vẫn một chiều) |
+| **`SOCK_SEQPACKET`** | **Giữ nguyên ranh giới message** *và* vẫn tin cậy, đúng thứ tự — điểm giữa của `SOCK_STREAM` (phải tự framing) và `SOCK_DGRAM`. Ít người biết, rất đáng dùng |
+| ⭐ **Truyền được file descriptor** (`SCM_RIGHTS`) | Process A `accept` một kết nối rồi **chuyển hẳn fd đó** cho worker B. **Không cơ chế IPC nào khác làm được.** Nền của systemd socket activation và của việc truyền `memfd` để zero-copy |
+
+**Vì sao nên là mặc định:** nó cân bằng tốt nhất bốn trục quyết định — giữ được ranh giới message, **kernel dọn dẹp hộ khi một bên chết** (bên kia nhận EOF/EPIPE thay vì treo), đủ nhanh cho hầu hết tải, và đổi sang mạng gần như miễn phí. Shared memory là **tối ưu hoá** cho ca băng thông cao, chỉ dùng sau khi **đo** ([LNX-008](linux-sysprog.md)).
+
+**Bẫy:** (1) `sun_path` chỉ **108 byte** — đường dẫn dài bị cắt **âm thầm**; (2) file socket **ở lại trên đĩa** sau khi process chết ⇒ lần khởi động sau `bind` lỗi `EADDRINUSE`, phải `unlink` trước — hoặc dùng **abstract namespace** (`sun_path[0]='\0'`, Linux-only) để khỏi đụng filesystem và tự biến mất; (3) quên chặn `SIGPIPE` ⇒ peer đóng là **process chết im lặng**.
+
+**Chốt:** *"Unix socket giữ ranh giới (SEQPACKET), truyền được cả fd, và kernel báo cho bạn khi bên kia chết — đó là lý do nó nên là mặc định, còn shared memory chỉ là tối ưu hoá sau khi đo."*
+</details>
+
+#### LNX-036 · 🟡 · concept · 📦 2026-08-13 · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)
+**POSIX IPC và System V IPC khác nhau? Nên dùng cái nào, vì sao?**
+<details><summary>Đáp án</summary>
+
+| | **POSIX** (nên dùng) | **System V** (legacy) |
+|---|---|---|
+| Shared memory | `shm_open` + `mmap` | `shmget`/`shmat` |
+| Message queue | `mq_open` | `msgget`/`msgsnd` |
+| Semaphore | `sem_open`/`sem_init` | `semget`/`semop` |
+| Định danh | Tên dạng **`/name`** | **key** (`ftok`) + ID số |
+| Là fd? | ✅ Phần lớn ⇒ **cắm được vào `epoll`** | ❌ Không |
+| Dọn dẹp | `*_unlink`, thấy được trong `/dev/shm` | `ipcrm` — **dễ rò**, không thấy trong filesystem |
+
+**Ba lý do thật để chọn POSIX** (không phải "vì nó mới hơn"):
+1. ⭐ **Là fd** ⇒ gộp được vào event loop cùng socket/timer/signal. System V dùng ID riêng nên **không thể** chờ nó cùng lúc với các nguồn sự kiện khác — buộc phải thêm thread hoặc polling.
+2. **Vòng đời rõ ràng:** đối tượng POSIX hiện ra trong namespace filesystem, thấy được và xoá được bằng công cụ thường.
+3. **`ftok()` có thể ĐỤNG key.** Nó băm từ (inode, device) ⇒ hai ứng dụng khác nhau có thể **vô tình sinh ra cùng key** và giẫm lên nhau — hỏng theo kiểu cực khó lần. POSIX dùng tên tường minh nên không có lớp lỗi này.
+
+**Biết System V để làm gì:** đọc và bảo trì code cũ. Và một điểm System V thực sự có mà POSIX không: **semaphore set** (thao tác nguyên tử trên **nhiều** semaphore cùng lúc) — hiếm cần, nhưng nếu gặp code cũ dùng nó thì đừng vội "hiện đại hoá".
+
+**Bẫy:** cả hai loại đối tượng đều **sống lâu hơn process** — chết mà quên unlink thì lần khởi động sau gặp lại trạng thái cũ (khoá đang bị giữ, dữ liệu cũ). Đây là lỗi chung, không phải lỗi riêng của System V.
+
+**Chốt:** *"Chọn POSIX vì nó là fd — cắm được vào epoll, thấy được, xoá được. Còn `ftok` của System V có thể đụng key giữa hai ứng dụng không liên quan."*
+</details>
+
+#### LNX-037 · 🟢 · concept · 📦 2026-08-13 · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**Signal nào không thể bắt, chặn hay bỏ qua? Vì sao?**
+<details><summary>Đáp án</summary>
+
+**`SIGKILL` (9)** và **`SIGSTOP` (19)**. Kernel từ chối mọi `sigaction`/`sigprocmask` lên chúng.
+
+**Vì sao:** để hệ điều hành **luôn** còn đường giết hoặc dừng một tiến trình bất trị. Nếu chặn được thì một tiến trình lỗi (hoặc độc hại) có thể tự làm mình bất tử.
+
+**Hệ quả thực tế:** `SIGKILL` **không cho tiến trình cơ hội dọn dẹp** — không chạy handler, không flush buffer, không xoá file tạm, không nhả khoá trong shared memory. Vì vậy trình tự đúng luôn là **`SIGTERM` trước, `SIGKILL` sau** (systemd làm đúng vậy: gửi `SIGTERM`, chờ `TimeoutStopSec`, rồi mới `SIGKILL`).
+
+⚠️ **Ngoại lệ hay bị quên:** tiến trình ở **`D` state** (uninterruptible sleep) **không chết ngay cả với `SIGKILL`** — signal chỉ được xử lý khi tiến trình quay về user space, mà nó đang kẹt trong kernel chờ I/O ([LNX-022](linux-sysprog.md)).
+
+**Chốt:** *"`SIGKILL`/`SIGSTOP` không chặn được để OS luôn còn quyền cuối — đổi lại chúng không cho dọn dẹp, nên luôn `SIGTERM` trước."*
+</details>
+
+#### LNX-038 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
+**Cờ dùng chung giữa signal handler và main loop phải khai `volatile sig_atomic_t`. Bỏ `volatile` thì hỏng gì? Bỏ `sig_atomic_t` thì hỏng gì?**
+<details><summary>Đáp án</summary>
+
+Hai từ khoá chữa **hai bệnh khác nhau** — đây chính là điều câu hỏi kiểm tra.
+
+**① Bỏ `volatile` ⇒ vòng lặp không bao giờ thấy cờ đổi.**
+```c
+int stop = 0;                     // ❌ thiếu volatile
+while (!stop) { do_work(); }
+```
+Compiler thấy trong vòng lặp **không ai gán `stop`**, nên được phép nạp nó vào **thanh ghi một lần** rồi kiểm thanh ghi mãi mãi. Handler ghi vào **bộ nhớ**, vòng lặp đọc **thanh ghi** ⇒ chạy vĩnh viễn. `volatile` buộc **đọc lại từ bộ nhớ mỗi lần**.
+⚠️ Triệu chứng đặc trưng: **bản `-O0` chạy đúng, bản `-O2` treo** — bug chỉ xuất hiện khi bật tối ưu.
+
+**② Bỏ `sig_atomic_t` ⇒ handler có thể chen vào GIỮA một phép ghi.**
+Handler chạy trên **cùng thread**, chen vào tại điểm bất kỳ — kể cả giữa hai lệnh máy của một phép gán. Kiểu rộng hơn thanh ghi (vd `long long` trên máy 32-bit) được ghi làm **nhiều lệnh** ⇒ main loop có thể đọc được **giá trị lai** chưa từng tồn tại. `sig_atomic_t` là kiểu mà chuẩn C **đảm bảo đọc/ghi bằng một lệnh không chia cắt**.
+
+| Thiếu | Bệnh | Khi nào lộ |
+|---|---|---|
+| `volatile` | Cờ đổi mà không ai thấy | Bật `-O2`, chạy release |
+| `sig_atomic_t` | Đọc trúng giá trị dở dang | Kiểu rộng, kiến trúc hẹp — hiếm nhưng thật |
+
+**⚠️ `volatile` KHÔNG phải công cụ đa luồng.** Nó chỉ chống **compiler tối ưu**, hoàn toàn **không** cho đảm bảo nguyên tử hay hàng rào bộ nhớ giữa các **thread** (CPU vẫn được sắp xếp lại). Chia sẻ giữa thread phải dùng `std::atomic`/mutex. `volatile sig_atomic_t` đúng ở đây **chỉ vì** handler chạy trên cùng thread — không có chuyện hai core cùng chạm.
+
+**Kiến trúc tốt hơn cả cờ:** **`signalfd`** hoặc **self-pipe** — signal thành một fd trong `epoll`, không còn handler, không còn `volatile`, không còn `EINTR` ([LNX-030](linux-sysprog.md)).
+
+**Chốt:** *"`volatile` chống compiler cache biến vào thanh ghi; `sig_atomic_t` đảm bảo ghi không bị cắt đôi. Hai bệnh khác nhau — và `volatile` không bao giờ là công cụ đồng bộ đa luồng."*
 </details>
 
 ---

@@ -184,25 +184,14 @@ public:
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Singleton là gì? Vì sao thường bị coi là anti-pattern khi lạm dụng?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Singleton đảm bảo một class chỉ có một instance và cung cấp điểm truy cập toàn cục tới nó (vd logger, config). Trong C++11+ cách gọn và an toàn nhất là Meyers' Singleton — một `static` local trong hàm `instance()`, được chuẩn đảm bảo khởi tạo lazy và thread-safe. Nó bị coi là anti-pattern khi lạm dụng vì thực chất là **global state trá hình**: tạo coupling ẩn (mọi nơi đều có thể truy cập, khó lần dependency), khó test (không thay được bằng mock/stub vì truy cập trực tiếp), và gây vấn đề thứ tự khởi tạo/hủy của các static (static init order fiasco). Chỉ nên dùng khi thật sự bắt buộc một instance (vd một tài nguyên phần cứng duy nhất), và cân nhắc dependency injection để dễ test hơn.
-</details>
-
-<details><summary>2) Factory pattern giải quyết vấn đề gì? Liên hệ với nguyên lý SOLID nào?</summary>
-
-Factory tách việc **quyết định tạo loại object nào** ra khỏi code sử dụng: client làm việc qua một interface chung và gọi factory (truyền enum/chuỗi/tham số) để nhận về object, thay vì tự `new` các class cụ thể. Nhờ đó client không phụ thuộc vào class cụ thể (Dependency Inversion — phụ thuộc abstraction), và khi thêm một loại mới chỉ cần sửa factory ở một chỗ chứ không phải mọi nơi dùng (Open/Closed — mở rộng không sửa code client). Factory rất hay dùng cho kiến trúc plugin, nơi loại object cụ thể chỉ biết lúc runtime. Trong C++ hiện đại factory thường trả về `std::unique_ptr` để thể hiện ownership rõ ràng.
-</details>
-
-<details><summary>3) Builder pattern dùng khi nào? C++ hiện đại có cách thay thế không?</summary>
-
-Builder dùng khi cần xây một object phức tạp có nhiều tham số (đặc biệt nhiều optional), nhằm tránh "telescoping constructor" — constructor với quá nhiều tham số khó đọc và dễ nhầm thứ tự (vd không rõ `30` và `3` nghĩa là gì). Builder cho phép set từng thuộc tính có tên theo kiểu chuỗi gọi (fluent), bỏ qua tham số không cần, và validate khi `build()`. Trong C++ hiện đại, với trường hợp đơn giản có thể thay bằng một struct cấu hình kết hợp **designated initializers** (C++20): `Config{.timeout=30, .retries=3}` — đạt được sự rõ ràng tương tự mà gọn hơn, không cần class Builder riêng. Builder vẫn hữu ích khi quá trình xây cần logic/validate phức tạp hoặc tạo ra immutable object.
-</details>
-
-<details><summary>4) Object pool có lợi gì cho embedded?</summary>
-
-Object pool cấp phát sẵn một tập object cố định và cho "mượn"/"trả" thay vì tạo/hủy động liên tục. Trong embedded điều này rất giá trị vì tránh được cấp phát động ở runtime — vốn gây heap fragmentation (malloc có thể thất bại dù còn bộ nhớ) và có thời gian cấp phát không tất định, cả hai đều nguy hiểm cho hệ chạy lâu dài/realtime với RAM hạn chế. Pool thường được cấp phát tĩnh nên footprint biết trước lúc biên dịch, thời gian "mượn/trả" tất định, và phù hợp với các tiêu chuẩn embedded hạn chế cấp phát động sau giai đoạn khởi tạo.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DP-009](../14-prep/mock-interview/bank/design-patterns.md) | Singleton là gì? Vì sao thường bị coi là anti-pattern khi lạm dụng? |
+| [DP-004](../14-prep/mock-interview/bank/design-patterns.md) | Factory pattern giải quyết vấn đề gì? Liên hệ với nguyên lý SOLID nào? |
+| [SD-021](../14-prep/mock-interview/bank/system-design.md) | Builder pattern dùng khi nào? C++ hiện đại có cách thay thế không? |
+| [DP-015](../14-prep/mock-interview/bank/design-patterns.md) | Object pool có lợi gì cho embedded? |
 
 ---
 ⬅️ [solid-principles.md](solid-principles.md) · ➡️ Tiếp theo: [structural.md](structural.md)

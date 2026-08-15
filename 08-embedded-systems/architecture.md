@@ -201,30 +201,15 @@ REG = (REG & ~FIELD_MASK) | ((value & 0x7u) << 4);   // ⚠️ read-modify-write
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) SoC là gì và khác gì kiến trúc PC truyền thống?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-SoC (System on Chip) tích hợp CPU, bộ nhớ (cache, đôi khi cả RAM/flash) và nhiều peripheral controller (UART, I2C, SPI, GPIO, timer, USB, Ethernet MAC, đôi khi GPU/DSP/NPU) lên **một chip duy nhất**. Khác với PC truyền thống nơi CPU, RAM, chipset, GPU là các linh kiện rời trên bo mạch. Lợi ích của SoC: nhỏ gọn, ít linh kiện, tiêu thụ điện thấp, chi phí thấp khi sản xuất lớn — rất phù hợp embedded. Hệ quả là phần cứng tích hợp không tự khai báo nên cần device tree để mô tả cho kernel.
-</details>
-
-<details><summary>2) Phân biệt MCU và MPU.</summary>
-
-MCU (microcontroller, vd STM32, ESP32, Cortex-M) tích hợp RAM và flash ngay trên chip với dung lượng nhỏ (KB–MB), thường không có MMU (chỉ có MPU bảo vệ vùng nhớ), tiêu thụ điện rất thấp, và chạy bare-metal hoặc RTOS — phù hợp điều khiển realtime, sensor node. MPU (microprocessor/application processor, vd i.MX, Cortex-A, Raspberry Pi) mạnh hơn, dùng RAM và storage ngoài (MB–GB), **có MMU** nên chạy được OS đầy đủ như Linux/Android, tiêu thụ điện cao hơn — phù hợp giao diện, mạng, xử lý nặng. Sự có/không MMU là yếu tố quyết định chạy được Linux hay không.
-</details>
-
-<details><summary>3) Memory-mapped I/O là gì? Vì sao phải dùng volatile khi truy cập thanh ghi?</summary>
-
-Memory-mapped I/O là cơ chế trong đó các thanh ghi của peripheral được ánh xạ vào không gian địa chỉ bộ nhớ của CPU; đọc/ghi tại các địa chỉ đó thực chất là đọc trạng thái hoặc điều khiển phần cứng, dù cú pháp giống truy cập bộ nhớ thường. Phải dùng `volatile` vì: (1) giá trị thanh ghi có thể thay đổi do phần cứng ngoài tầm kiểm soát của CPU (vd status register), nên compiler không được cache giá trị đã đọc; (2) hành động ghi có side effect (kích hoạt phần cứng), nên compiler không được loại bỏ hay gộp các lần ghi tưởng như "thừa". `volatile` buộc mỗi truy cập diễn ra đúng như viết. Với thứ tự giữa nhiều truy cập còn cần thêm memory barrier vì CPU có thể reorder.
-</details>
-
-<details><summary>4) So sánh UART, I2C, SPI. Khi nào chọn cái nào?</summary>
-
-UART: 2 dây (TX/RX), bất đồng bộ không cần clock chung, point-to-point, đơn giản, tốc độ thấp-trung bình — dùng cho console/debug, GPS, module. I2C: 2 dây (SDA/SCL), đồng bộ, hỗ trợ **nhiều slave** trên cùng bus nhờ địa chỉ, half-duplex, có cơ chế ACK, tốc độ trung bình — dùng cho sensor, EEPROM, RTC. SPI: 4+ dây (MOSI/MISO/SCLK/CS), đồng bộ, **full-duplex**, tốc độ cao, master chọn slave bằng chân CS riêng — dùng cho flash, ADC nhanh, màn hình. Chọn: cần ít chân và nhiều thiết bị địa chỉ hóa → I2C; cần tốc độ cao và full-duplex → SPI; giao tiếp point-to-point đơn giản hoặc console → UART.
-</details>
-
-<details><summary>5) DMA là gì? Lợi ích và vấn đề cần lưu ý?</summary>
-
-DMA (Direct Memory Access) là cơ chế dùng một controller chuyên dụng để chuyển dữ liệu giữa peripheral và RAM (hoặc RAM–RAM) **mà không cần CPU sao chép từng byte**: CPU chỉ cấu hình nguồn, đích, kích thước rồi làm việc khác, DMA phát interrupt khi hoàn tất. Lợi ích: giải phóng CPU, tăng throughput lớn (audio, video, mạng, ADC tốc độ cao) và tiết kiệm điện. Vấn đề cần lưu ý: **cache coherency** — DMA ghi thẳng RAM không qua cache CPU, nên phải flush/invalidate cache đúng lúc để CPU và DMA thấy dữ liệu nhất quán; ngoài ra buffer DMA thường yêu cầu căn lề và đặt ở vùng nhớ phù hợp (non-cacheable hoặc được quản lý cache cẩn thận).
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [EMB-033](../14-prep/mock-interview/bank/embedded-fundamentals.md) | SoC là gì và khác gì kiến trúc PC truyền thống? |
+| [DRV-004](../14-prep/mock-interview/bank/drivers-embedded.md) | Phân biệt MCU và MPU. |
+| [DRV-008](../14-prep/mock-interview/bank/drivers-embedded.md) | Memory-mapped I/O là gì? Vì sao phải dùng volatile khi truy cập thanh ghi? |
+| [BUS-001](../14-prep/mock-interview/bank/drivers-embedded.md) | So sánh UART, I2C, SPI. Khi nào chọn cái nào? |
+| [DRV-012](../14-prep/mock-interview/bank/drivers-embedded.md) | DMA là gì? Lợi ích và vấn đề cần lưu ý? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [boot-process.md](boot-process.md)

@@ -138,35 +138,16 @@ Nguyên tắc: **một phong cách nhất quán** trong cùng một API. Tài li
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Nguyên tắc cốt lõi của một API tốt là gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-API tốt nên "dễ dùng đúng và khó dùng sai": tối thiểu (chỉ phơi bày những gì cần, vì mọi thứ public là cam kết phải duy trì), che giấu chi tiết triển khai (để tự do thay đổi bên trong mà không ảnh hưởng người dùng), nhất quán (quy ước đặt tên, thứ tự tham số, cách báo lỗi đồng nhất để người dùng đoán được), dùng kiểu mạnh và RAII để ngăn lỗi (vd `enum class` thay `bool` mơ hồ, smart pointer để không quên dọn dẹp, `[[nodiscard]]`), và thiết kế để tiến hóa được mà không phá vỡ API/ABI. Tài liệu hóa rõ hợp đồng: tiền/hậu điều kiện, ownership, thread-safety.
-</details>
-
-<details><summary>2) Pimpl idiom là gì? Giải quyết vấn đề gì?</summary>
-
-Pimpl (pointer to implementation) là kỹ thuật đưa toàn bộ data member và chi tiết triển khai của một class ra một struct `Impl` định nghĩa trong file `.cpp`, còn header công khai chỉ giữ một `std::unique_ptr<Impl>` và forward declaration. Nó giải quyết hai vấn đề: (1) **bảo vệ ABI** — `sizeof` của class public không đổi (luôn là một con trỏ), nên thêm/bớt field trong `Impl` không thay đổi layout mà client thấy, tránh ABI break; (2) **giảm thời gian biên dịch** — header không cần include các dependency của triển khai, nên thay đổi nội bộ không buộc rebuild lan truyền tới mọi nơi include header. Đánh đổi: một lần truy cập gián tiếp qua con trỏ và một cấp phát heap, cần cân nhắc ở hot path.
-</details>
-
-<details><summary>3) Vì sao shared library hệ thống thường phơi bày C API thay vì C++ trực tiếp?</summary>
-
-Vì C++ ABI không ổn định giữa các compiler và thậm chí giữa các phiên bản của cùng compiler (khác biệt về name mangling, layout object/vtable, cách xử lý exception, cài đặt thư viện chuẩn). Một C API `extern "C"` với kiểu POD và opaque handle tạo ra ABI ổn định và xác định: gọi được từ C và nhiều ngôn ngữ khác (Python, Rust...), không vỡ khi client dùng compiler khác, và bề mặt nhỏ dễ giữ tương thích lâu dài. Bên trong thư viện vẫn cài đặt bằng C++ đầy đủ; chỉ lớp biên giới là C. Đổi lại mất đi sự tiện lợi và an toàn kiểu của C++ ở mặt tiếp xúc (phải quản lý lỗi bằng mã lỗi, ownership thủ công).
-</details>
-
-<details><summary>4) Những quy tắc nào cần tuân thủ ở biên giới C của một thư viện C++?</summary>
-
-(1) Chỉ truyền kiểu POD hoặc con trỏ opaque qua biên giới — không để class C++, `std::string`, `std::vector` hay tham chiếu vượt biên vì layout/ABI của chúng không đảm bảo chéo compiler. (2) Không cho exception C++ thoát qua hàm `extern "C"` — phải bắt hết bên trong và chuyển thành mã lỗi (exception vượt biên C là UB). (3) Cấp phát và giải phóng tài nguyên phải cùng phía thư viện: cung cấp cặp create/destroy và caller phải gọi destroy của thư viện, không tự `free`/`delete`, vì allocator hai bên có thể khác nhau. (4) Giữ giao diện ổn định và versioning rõ ràng. Bên trong vẫn dùng C++ thoải mái.
-</details>
-
-<details><summary>5) Làm sao thể hiện ownership rõ ràng qua kiểu trong API C++?</summary>
-
-Dùng kiểu để mã hóa ý định sở hữu: trả về `std::unique_ptr<T>` (hoặc theo trị giá) khi caller nhận quyền sở hữu object mới; nhận `std::unique_ptr<T>` theo trị (move-in) khi hàm tiếp quản sở hữu; nhận `const T&` khi chỉ đọc và không giữ object quá lời gọi; dùng `std::string_view`/`std::span` cho tham chiếu vùng dữ liệu không sở hữu (lưu ý không lưu lại quá thời gian sống của nguồn). Tránh trả con trỏ thô mơ hồ về vòng đời; nếu buộc phải, tài liệu hóa rõ ai chịu trách nhiệm giải phóng. Nguyên tắc là người đọc chữ ký hàm hiểu được ngay ai sở hữu cái gì, giảm leak và double-free.
-</details>
-
-<details><summary>6) Nên chọn exception hay mã lỗi cho thư viện? Vì sao phải nhất quán?</summary>
-
-Tùy ngữ cảnh: exception phù hợp API thuần C++ với lỗi mang tính ngoại lệ/hiếm — giữ happy-path sạch, khó bỏ sót xử lý; nhưng không được để thoát qua biên giới C và có thể bị cấm trong môi trường embedded/no-exceptions hoặc hot path nhạy hiệu năng. Mã lỗi (int/enum) tường minh, không overhead, phù hợp biên giới C và embedded, nhưng dễ bị quên kiểm tra (giảm thiểu bằng `[[nodiscard]]`). `std::expected`/`optional` buộc xử lý kết quả mà không cần exception. Quan trọng là **nhất quán** trong cùng một API: trộn lẫn các phong cách khiến người dùng khó biết phải kiểm tra lỗi thế nào, dễ bỏ sót và gây bug; nên chọn một cách, tài liệu hóa, và áp dụng đồng đều.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [SD-009](../14-prep/mock-interview/bank/system-design.md) | Nguyên tắc cốt lõi của một API tốt là gì? |
+| [SD-021](../14-prep/mock-interview/bank/system-design.md) | Pimpl idiom là gì? Giải quyết vấn đề gì? |
+| [SD-022](../14-prep/mock-interview/bank/system-design.md) | Vì sao shared library hệ thống thường phơi bày C API thay vì C++ trực tiếp? |
+| [SD-022](../14-prep/mock-interview/bank/system-design.md) | Những quy tắc nào cần tuân thủ ở biên giới C của một thư viện C++? |
+| [SD-023](../14-prep/mock-interview/bank/system-design.md) | Làm sao thể hiện ownership rõ ràng qua kiểu trong API C++? |
+| [SD-024](../14-prep/mock-interview/bank/system-design.md) | Nên chọn exception hay mã lỗi cho thư viện? Vì sao phải nhất quán? |
 
 ---
 ⬅️ [abi-versioning.md](abi-versioning.md) · ➡️ Tiếp theo: [08-embedded-systems/](../08-embedded-systems/)

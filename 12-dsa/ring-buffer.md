@@ -485,76 +485,16 @@ Trực giao với lựa chọn trên: dữ liệu là **byte stream** → dùng 
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Ring buffer là gì và giải quyết vấn đề gì mà queue thường không giải quyết được?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Ring buffer là hàng đợi FIFO cài trên một **mảng kích thước cố định**, với hai chỉ số `head` (ghi) và `tail` (đọc) quay vòng khi chạm mép mảng. Push và pop đều O(1) worst-case và **không cấp phát bộ nhớ khi chạy**.
-
-Vấn đề nó giải: khi producer nhanh hơn consumer, một queue không giới hạn (`std::queue`, linked list) sẽ **phình vô hạn** cho tới khi hết RAM — trên thiết bị nhúng nghĩa là OOM killer bắn nhầm process khác, lúc 3h sáng ngoài field. Ring buffer buộc ta **quyết định trước** chuyện gì xảy ra khi đầy: từ chối (backpressure) hay đè cái cũ nhất. Ngoài ra, vì không có `new`/`malloc` khi chạy, nó dùng được ở nơi cấm cấp phát: ISR, ngữ cảnh atomic trong kernel, đường dữ liệu realtime — nơi O(1) **worst-case** mới có ý nghĩa, chứ không phải O(1) amortized.
-</details>
-
-<details><summary>2) Làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho head == tail?</summary>
-
-Ba cách, chọn theo ràng buộc:
-
-1. **Hy sinh một ô**: coi là đầy khi `(head+1) % N == tail`, tức chứa tối đa N−1 phần tử. Chỉ cần 2 biến, và quan trọng là **dùng được cho lock-free** vì mỗi biến chỉ có một người ghi. Đây là bản nên viết trong phỏng vấn.
-2. **Thêm biến `count`**: dùng hết N ô, dễ đọc nhất. Nhược điểm quyết định: `count` bị **cả producer lẫn consumer ghi**, nên bắt buộc phải có khoá — không nâng lên lock-free SPSC được.
-3. **Chỉ số chạy tự do + mask**: `head`/`tail` đếm *tổng số lần* push/pop và không bao giờ modulo; vị trí thật là `head & (N-1)`. Khi đó `size = head - tail`, đầy khi `size == N`. Dùng hết N ô **và** lock-free được. Điều kiện: N là luỹ thừa của 2 — không chỉ để thay `%` bằng `&`, mà vì phép trừ unsigned chỉ cho đúng hiệu khi 2ⁿ chia hết cho N.
-</details>
-
-<details><summary>3) Vì sao ring buffer thường ép kích thước là luỹ thừa của 2?</summary>
-
-Hai lý do, lý do thứ hai quan trọng hơn nhưng ít người nói:
-
-1. **Tốc độ**: `% N` với N không phải hằng luỹ thừa 2 biên dịch ra **lệnh chia** (~20–40 chu kỳ trên Cortex-M/A), còn `& (N-1)` chỉ 1 chu kỳ. Trên đường dữ liệu chạy hàng triệu lần mỗi giây, đây là khác biệt đo được.
-2. **Tính đúng của chỉ số chạy tự do**: khi `head`/`tail` cứ tăng và cho tràn tự nhiên, `head - tail` chỉ cho đúng số phần tử nếu **2ⁿ chia hết cho N** — tức N phải là luỹ thừa của 2. Nếu không, đúng lúc chỉ số tràn qua 0 thì `size()` cho giá trị rác, và bug ấy chỉ xuất hiện sau khi hệ chạy nhiều giờ.
-
-Đây là lý do `kfifo` của kernel bắt buộc kích thước luỹ thừa 2.
-</details>
-
-<details><summary>4) SPSC lock-free hoạt động thế nào, và vì sao "một producer một consumer" lại đủ để bỏ khoá?</summary>
-
-Mấu chốt: với đúng một luồng mỗi phía, **mỗi biến chỉ có đúng một người ghi** — producer ghi `head` và chỉ đọc `tail`, consumer ghi `tail` và chỉ đọc `head`. Không có read-modify-write tranh chấp trên biến chung, nên không cần mutex cũng không cần CAS; chỉ cần load/store atomic với memory order đúng.
-
-Có **hai** cặp release/acquire, mỗi cặp công bố một thứ khác nhau:
-- **Cặp 1 công bố dữ liệu**: producer ghi `buf[head]` **trước**, rồi `head.store(release)`. Consumer `head.load(acquire)` rồi mới đọc `buf[tail]` — nhờ vậy chắc chắn thấy dữ liệu đã ghi xong, không phải rác.
-- **Cặp 2 công bố chỗ trống**: consumer đọc xong rồi `tail.store(release)`. Producer `tail.load(acquire)` trước khi ghi đè — nhờ vậy không đè lên ô consumer đang đọc dở.
-
-Biến của chính mình thì `relaxed` là đủ (không ai khác ghi nó). Thêm `alignas(64)` cho `head`/`tail` để chúng không nằm chung cache line — nếu chung thì mỗi lần producer ghi `head` sẽ invalidate cache line ở core của consumer dù consumer không dùng biến đó (**false sharing**), đúng logic nhưng chậm nhiều lần.
-
-Cần nói rõ ranh giới: bản này **sai ngay** nếu có hai producer, vì lúc đó `head++` trở thành read-modify-write tranh chấp — trường hợp MPMC cần CAS hoặc khoá.
-</details>
-
-<details><summary>5) Khi nào dùng lock-free, khi nào dùng mutex + condition variable?</summary>
-
-Mặc định là **mutex + condition variable**: đúng với số luồng bất kỳ, consumer ngủ khi rỗng (0% CPU thay vì poll), dễ debug, TSan và gdb hiểu được, và người bảo trì sau đọc là hiểu.
-
-Chuyển sang lock-free SPSC chỉ khi có một trong ba lý do thật:
-1. **Một đầu ở ngữ cảnh không được ngủ** — ISR, kernel atomic context. Ở đó mutex không phải chậm, mà là **không dùng được**.
-2. **Đã đo** và profiler chỉ ra contention trên mutex là điểm nghẽn.
-3. Yêu cầu **tail latency** chặt (p99/p99.9), nơi một lần rơi vào futex syscall là đủ trượt ngân sách.
-
-Cái giá phải nói ra: bản lock-free chỉ đúng cho **1 producer + 1 consumer**, consumer phải poll hoặc cần thêm cơ chế báo (eventfd), và sai memory order thì **không lộ ra trên x86** nhưng hỏng trên ARM — tức máy dev sạch mà thiết bị lỗi.
-</details>
-
-<details><summary>6) Buffer đầy thì nên làm gì?</summary>
-
-Đây là **quyết định thiết kế theo bản chất dữ liệu**, không phải chi tiết cài đặt:
-
-- **Từ chối / backpressure** (push trả `false`): dùng khi **mất dữ liệu là sai** — lệnh điều khiển, giao dịch, gói tin có thứ tự. Producer phải xử lý được `false`: đợi, retry, hoặc báo lỗi lên trên. Đổi lại, áp lực dồn ngược lên phía trên, nên phải thiết kế cả đường dồn ngược đó.
-- **Đè cái cũ nhất / drop-oldest** (đẩy `tail` lên rồi ghi): dùng khi **dữ liệu mới có giá trị hơn dữ liệu cũ** — đo lường, telemetry, log, khung hình. Nhiệt độ của 5 giây trước không còn ích gì khi ta đã có giá trị hiện tại. `dmesg` chính là kiểu này.
-
-Kèm theo, gần như luôn cần: **đếm số lần drop và đưa con số đó ra ngoài** (log/metric/sysfs). Không có nó, hệ trông vẫn chạy êm trong khi đang mất dữ liệu — `perf` in "*events lost*" chính vì lý do này. Và kích thước N nên xuất phát từ *burst lớn nhất × thời gian consumer bận nhất*, có ghi lại lý do, chứ không phải một con số chọn bừa.
-</details>
-
----
-
-## Ôn tập (bank) & liên kết
-
-- Bank: [COD-006 Ring Buffer](../14-prep/mock-interview/bank/coding.md) (đề coding), [OS-012 condition variable predicate](../14-prep/mock-interview/bank/os.md), [CPP-019 memory order](../14-prep/mock-interview/bank/cpp.md), [EMB-010 volatile & ISR](../14-prep/mock-interview/bank/embedded-fundamentals.md).
-- Bản MCU/ISR (tắt ngắt vs ring buffer): [08/interrupts-bare-metal.md §3.1](../08-embedded-systems/interrupts-bare-metal.md).
-- Đồng bộ & memory order: [02/concurrency.md](../02-modern-cpp/concurrency.md), [03/sync-primitives.md](../03-operating-system/sync-primitives.md).
-- IPC & shared memory: [04/ipc-linux.md](../04-linux-system-programming/ipc-linux.md).
-- Dùng trong thiết kế hệ thống: [10/system-design.md](../10-thinking/system-design.md).
+| ID | Câu hỏi |
+|----|---------|
+| [COD-006](../14-prep/mock-interview/bank/coding.md) | Ring buffer là gì và giải quyết vấn đề gì mà queue thường không giải quyết được? |
+| [DSA-013](../14-prep/mock-interview/bank/dsa.md) | Làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho head == tail? |
+| [COD-006](../14-prep/mock-interview/bank/coding.md) | Vì sao ring buffer thường ép kích thước là luỹ thừa của 2? |
+| [DSA-014](../14-prep/mock-interview/bank/dsa.md) | SPSC lock-free hoạt động thế nào, và vì sao "một producer một consumer" lại đủ để bỏ khoá? |
+| [DSA-014](../14-prep/mock-interview/bank/dsa.md) | Khi nào dùng lock-free, khi nào dùng mutex + condition variable? |
+| [LNX-017](../14-prep/mock-interview/bank/linux-sysprog.md) | Buffer đầy thì nên làm gì? |
 
 ---
 ⬅️ [Về index topic](README.md) · Trước đó: [algorithm-patterns.md](algorithm-patterns.md)

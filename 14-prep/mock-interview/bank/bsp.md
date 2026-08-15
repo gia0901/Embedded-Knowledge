@@ -324,5 +324,81 @@ Trả lời theo 4 lớp:
 API kernel thay đổi/deprecate giữa các phiên bản → driver phải sửa khớp (chữ ký hàm đổi, header dời, cơ chế cũ bị gỡ). Quy trình: đọc changelog → build bắt lỗi compile → sửa từng API → test trên target → đảm bảo `dmesg` không còn warning. *(Nên kèm 1 ví dụ API cụ thể nếu nhớ được — vd đổi `gpio_*` sang gpiod, thay đổi chữ ký `.remove` callback, header của `class_create`.)*
 </details>
 
+#### BSP-028 · 🔴 · design · ⭐ · 🏗️ · 📦 2026-08-13 · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
+**Kiến trúc kết hợp RTOS + Linux trên cùng một thiết bị hoạt động thế nào, và giải quyết vấn đề gì?**
+<details><summary>Đáp án</summary>
+
+**Vấn đề:** sản phẩm cần **cả hai** thứ mà một hệ điều hành khó cho cùng lúc — **điều khiển tất định** (vòng lặp servo 10 kHz, không được trễ) **và** tính năng phong phú (màn hình, mạng, cập nhật OTA, filesystem). Linux giỏi vế sau, dở vế trước ([BSP-021](bsp.md)); RTOS thì ngược lại.
+
+**Ba cách hiện thực, từ đơn giản tới phức tạp:**
+
+| Cách | Mô hình | Đánh đổi |
+|---|---|---|
+| **Hai chip** | MCU riêng chạy RTOS + SoC chạy Linux, nối qua SPI/UART/Ethernet | Đơn giản nhất, **cách ly thật sự**; tốn linh kiện và không gian bo |
+| ⭐ **SoC không đối xứng (AMP)** | Một SoC có **nhiều nhân khác loại** — nhân Cortex-A chạy Linux, nhân Cortex-M chạy RTOS, chia sẻ bộ nhớ | Phổ biến nhất hiện nay; một chip, cách ly vẫn tốt |
+| **Hypervisor / đồng nhân** | Lớp ảo hoá hoặc lớp thời gian thực chen dưới Linux | Mạnh nhưng phức tạp, khó gỡ lỗi |
+
+**Giao tiếp giữa hai bên** — đây là phần thiết kế thật:
+- **Shared memory + hàng đợi vòng** cho dữ liệu tần suất cao, kèm cơ chế báo hiệu bằng ngắt liên nhân.
+- **Nguyên tắc bất di dịch: phía realtime KHÔNG BAO GIỜ được chặn chờ phía Linux.** Hàng đợi phải **không khoá** hoặc ít nhất không cho phía RT chờ; Linux chậm hay treo thì vòng điều khiển **vẫn phải chạy đúng hạn**.
+- Dữ liệu trạng thái ⇒ **đè cái cũ**, đừng chặn ([LNX-017](linux-sysprog.md)).
+
+**Bốn vấn đề phải giải quyết ngay từ thiết kế:**
+1. **Phân chia tài nguyên:** ngoại vi nào thuộc bên nào? Hai bên cùng chạm một khối ngoại vi là nguồn bug rất khó lần.
+2. **Băng thông bộ nhớ dùng chung** — Linux quét bộ nhớ mạnh có thể làm **trễ** phía RT dù hai nhân độc lập.
+3. **Khởi động và giám sát:** ai boot trước, ai nạp firmware cho ai, một bên chết thì bên kia làm gì.
+4. **Gỡ lỗi và cập nhật** cho hai môi trường khác nhau — thường bị đánh giá thấp.
+
+**Chốt:** *"Tách phần tất định sang RTOS (chip riêng hoặc nhân riêng) và để Linux lo phần phong phú, nối bằng shared memory + ring buffer. Luật quan trọng nhất: phía realtime không bao giờ được chặn chờ phía Linux."*
+</details>
+
+#### BSP-029 · 🟡 · concept · 📦 2026-08-13 · [→ boot-process](../../../08-embedded-systems/boot-process.md)
+**`initramfs` để làm gì? Thiết bị nhúng có luôn cần nó không?**
+<details><summary>Đáp án</summary>
+
+**`initramfs` là một filesystem tối giản nằm trong RAM**, được bootloader nạp cùng kernel. Kernel mount nó làm root **tạm thời**, chạy một script khởi động, rồi **chuyển sang** rootfs thật.
+
+**Vấn đề nó giải quyết — bài toán con gà quả trứng:** để mount được rootfs, kernel cần **driver** cho thiết bị lưu trữ (và có khi cả LVM, RAID, mã hoá, mạng). Nhưng nếu driver đó nằm dạng **module trong chính rootfs** thì kernel không đọc được nó ⇒ kẹt. initramfs mang sẵn các module đó trong RAM để phá vòng lặp.
+
+**Vì sao bản phân phối desktop luôn dùng:** một kernel phải chạy trên **mọi** máy ⇒ không thể biên dịch thẳng mọi driver lưu trữ vào kernel (quá lớn) ⇒ đóng chúng thành module và dùng initramfs nạp đúng cái cần.
+
+**⭐ Thiết bị nhúng thì thường KHÔNG cần:** bạn **biết trước** phần cứng ⇒ **biên dịch thẳng driver lưu trữ vào kernel** rồi bỏ initramfs. Lợi ích thật:
+- **Boot nhanh hơn** — bớt một giai đoạn nạp và chuyển đổi.
+- **Ít thứ hỏng hơn** — mất một thành phần trong chuỗi boot.
+- Ảnh hệ thống đơn giản hơn, dễ kiểm chứng.
+
+**Khi nhúng vẫn nên dùng:** cần logic phức tạp trước khi mount (chọn A/B partition, kiểm chữ ký, mở khoá mã hoá, phục hồi khi rootfs hỏng) — lúc đó initramfs là **nơi đặt chính sách khởi động**, và giá trị của nó không còn là "nạp driver" nữa.
+
+**Bẫy:** (1) quên cập nhật initramfs sau khi đổi driver ⇒ kernel mới chạy với module cũ, lỗi rất khó hiểu; (2) nhét quá nhiều vào initramfs ⇒ tốn RAM vĩnh viễn nếu không giải phóng đúng cách; (3) tưởng nó là bắt buộc — nhiều BSP nhúng chạy hoàn toàn không có nó.
+
+**Chốt:** *"initramfs phá thế con-gà-quả-trứng: cần driver để mount rootfs mà driver lại nằm trong rootfs. Thiết bị nhúng biết trước phần cứng nên thường biên dịch thẳng driver vào kernel và bỏ hẳn nó — boot nhanh hơn, ít thứ hỏng hơn."*
+</details>
+
+#### BSP-030 · 🟡 · concept · 📦 2026-08-13 · [→ boot-process](../../../08-embedded-systems/boot-process.md)
+**Tiến trình `init` (PID 1) là gì và vai trò của nó? Điều gì xảy ra nếu nó chết?**
+<details><summary>Đáp án</summary>
+
+**PID 1 là tiến trình đầu tiên kernel tạo ra ở user space**, và là **tổ tiên của mọi tiến trình khác**. Kernel nạp nó rồi rút lui khỏi việc quản lý user space.
+
+**Ba vai trò:**
+1. **Khởi động hệ thống** — mount filesystem, cấu hình mạng, chạy các service theo đúng thứ tự phụ thuộc.
+2. ⭐ **Nhận nuôi tiến trình mồ côi.** Cha chết trước con ⇒ con được **PID 1 nhận nuôi**, và PID 1 phải `wait()` để thu hồi ⇒ **ngăn zombie tích tụ** toàn hệ thống ([OS-009](os.md)).
+3. **Giám sát và khởi động lại** service chết (với init hiện đại như systemd).
+
+**⚠️ PID 1 chết ⇒ KERNEL PANIC.** Kernel coi đó là lỗi không thể phục hồi — vì không còn ai nhận nuôi tiến trình mồ côi và không còn ai quản lý user space. Đây là lý do PID 1 phải cực kỳ đơn giản và ổn định.
+
+**Trên thiết bị nhúng — ba lựa chọn:**
+
+| | Ưu | Nhược |
+|---|---|---|
+| **BusyBox init** | Rất nhỏ, đơn giản, dễ hiểu toàn bộ | Ít tính năng: không phụ thuộc thứ tự, giám sát yếu |
+| **systemd** | Phụ thuộc theo thứ tự, khởi động song song (**boot nhanh hơn**), giám sát + watchdog, log tập trung | Lớn, phức tạp, kéo theo nhiều thứ |
+| **Script riêng** | Kiểm soát tuyệt đối | Phải tự viết lại mọi thứ, dễ thiếu ca biên |
+
+⚠️ **Bẫy đặc thù nhúng:** nếu bạn chạy **ứng dụng của mình làm PID 1** (một số thiết bị làm vậy cho nhanh) thì phải tự gánh cả **vai trò 2** — không thu hồi tiến trình con là zombie tích tụ tới cạn PID; và ứng dụng crash là **panic cả máy**, không có ai khởi động lại nó.
+
+**Chốt:** *"PID 1 khởi động hệ thống, nhận nuôi tiến trình mồ côi và giám sát service. Nó chết là kernel panic — nên nếu đặt ứng dụng của mình làm PID 1 thì phải tự thu hồi zombie và tự lo chuyện không được phép crash."*
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

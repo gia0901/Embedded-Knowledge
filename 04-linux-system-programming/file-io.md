@@ -231,59 +231,17 @@ Giữa `open()` và `fcntl(F_SETFD)` có **khe hở**: thread khác `fork()`+`ex
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) File descriptor là gì? "Everything is a file" nghĩa là gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-File descriptor là một số nguyên không âm, là chỉ mục vào bảng file descriptor riêng của mỗi process; mỗi entry trỏ tới một open file description trong kernel (giữ offset, cờ) và từ đó tới đối tượng thực (inode, socket...). "Everything is a file" là triết lý Unix: hầu hết tài nguyên I/O — file thường, terminal, pipe, socket, device dưới `/dev` — đều được trừu tượng thành "file" và thao tác qua cùng bộ syscall (`read`/`write`/`close`), giúp API thống nhất và dễ kết hợp. fd 0/1/2 mặc định là stdin/stdout/stderr.
-</details>
-
-<details><summary>2) Khác nhau giữa read() syscall và fread() của stdio? Khi nào dùng cái nào?</summary>
-
-`read()` là syscall gọi thẳng kernel — mỗi lần gọi là một lần chuyển user→kernel, không có buffer. `fread()` thuộc stdio (thư viện user space) bọc quanh `read()` và thêm **buffer trong user space**: nó gom nhiều thao tác nhỏ thành ít syscall hơn nên nhanh hơn rõ rệt cho I/O kích thước nhỏ/nhiều lần, và tiện hơn (định dạng, `FILE*`). Dùng stdio cho I/O thông thường, văn bản; dùng syscall trực tiếp khi cần kiểm soát chính xác (non-blocking, socket, fd đặc biệt) hoặc tự quản buffer.
-</details>
-
-<details><summary>3) Blocking và non-blocking I/O khác nhau thế nào? Non-blocking giải quyết vấn đề gì?</summary>
-
-Với blocking I/O (mặc định), `read` trên fd chưa có dữ liệu sẽ làm thread ngủ chờ tới khi có dữ liệu hoặc EOF. Với non-blocking (`O_NONBLOCK`), `read` trả về ngay; nếu chưa có dữ liệu nó trả -1 với `errno == EAGAIN/EWOULDBLOCK`. Non-blocking cho phép **một thread phục vụ nhiều fd** mà không bị kẹt ở một fd, là nền tảng cho mô hình event-driven kết hợp `epoll` — thay vì phải dùng một thread cho mỗi kết nối (mô hình blocking tốn tài nguyên khi có hàng nghìn kết nối).
-</details>
-
-<details><summary>4) read() trả về ít byte hơn yêu cầu có phải lỗi không? Xử lý ra sao?</summary>
-
-Không phải lỗi — đó là "short read", hoàn toàn hợp lệ: `read`/`write` trả về số byte **thực sự** xử lý, có thể ít hơn yêu cầu (vd pipe/socket mới có một phần dữ liệu, bị tín hiệu ngắt). Phải xử lý bằng vòng lặp: tiếp tục gọi cho phần còn lại tới khi đủ hoặc gặp EOF (0) / lỗi (-1). Cũng cần xử lý `errno == EINTR` (bị signal ngắt) bằng cách thử lại.
-</details>
-
-<details><summary>5) Vì sao cần <code>O_APPEND</code>? <code>lseek()</code> rồi <code>write()</code> sai ở đâu?</summary>
-
-Vì `lseek()` + `write()` là **hai syscall**, và giữa chúng process khác chen vào được:
-
-```
-   Process A                      Process B
-   lseek(fd, 0, SEEK_END) → 1000
-                                  lseek(fd, 0, SEEK_END) → 1000
-                                  write(fd, "B", 1)       → file dài 1001
-   write(fd, "A", 1)      → ghi tại 1000, ĐÈ MẤT "B"
-```
-
-`O_APPEND` khiến kernel thực hiện **"nhảy tới cuối rồi ghi" như MỘT thao tác nguyên tử** — không ai chen được vào giữa. Đó là lý do `>>` của shell và nhiều process cùng ghi một log file hoạt động đúng.
-
-Cùng mẫu tư duy xuất hiện ở:
-- **`O_CREAT | O_EXCL`** — "tạo chỉ khi chưa tồn tại" nguyên tử, thay cho `open` rồi kiểm tra `ENOENT` (đây cũng là cách làm lock file).
-- **`pread()`/`pwrite()`** — đọc/ghi tại offset chỉ định **mà không đụng offset chung**; đặc biệt quan trọng khi **nhiều thread dùng chung fd**, vì các thread chia sẻ offset.
-- **`O_CLOEXEC`, `accept4()`, `epoll_create1()`** — đặt cờ ngay lúc tạo thay vì `fcntl()` sau đó.
-
-**Câu chốt:** *hễ hai syscall không được để ai chen vào giữa, hãy tìm cờ hoặc syscall gộp cả hai.*
-
-⚠️ Lưu ý: `O_APPEND` **không** đảm bảo nguyên tử trên **NFS** ở các bản cũ, vì NFS không hỗ trợ ngữ nghĩa append phía server.
-</details>
-
-<details><summary>6) Điều gì xảy ra với file descriptor qua fork và exec?</summary>
-
-Qua `fork`, process con kế thừa một bản sao bảng fd, và các fd của cha/con trỏ tới **cùng open file description** trong kernel (do đó chia sẻ chung offset). Qua `exec`, các fd vẫn được **giữ nguyên** sang chương trình mới, trừ khi fd được đánh dấu close-on-exec (`O_CLOEXEC`/`FD_CLOEXEC`) thì sẽ tự đóng. Đặt CLOEXEC là thực hành tốt để tránh rò rỉ fd nhạy cảm vào tiến trình con.
-</details>
-
-<details><summary>7) Phân biệt stdio buffer, page cache, và fsync.</summary>
-
-stdio buffer nằm trong **user space** (thuộc thư viện C), gom dữ liệu để giảm số syscall; `fflush` đẩy nó xuống kernel (qua `write`). Page cache nằm trong **kernel**, cache nội dung file trong RAM để tăng tốc đọc/ghi; `write` thành công chỉ đảm bảo dữ liệu tới page cache, chưa chắc đã xuống disk vật lý. `fsync(fd)` (hoặc `fdatasync`) ép kernel ghi page cache của file xuống thiết bị lưu trữ thật — quan trọng cho độ bền dữ liệu (vd trước khi báo "đã lưu", hoặc hệ embedded có nguy cơ mất điện).
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [LNX-001](../14-prep/mock-interview/bank/linux-sysprog.md) | File descriptor là gì? "Everything is a file" nghĩa là gì? |
+| [LNX-032](../14-prep/mock-interview/bank/linux-sysprog.md) | Khác nhau giữa read() syscall và fread() của stdio? Khi nào dùng cái nào? |
+| [LNX-003](../14-prep/mock-interview/bank/linux-sysprog.md) | Blocking và non-blocking I/O khác nhau thế nào? Non-blocking giải quyết vấn đề gì? |
+| [LNX-005](../14-prep/mock-interview/bank/linux-sysprog.md) | read() trả về ít byte hơn yêu cầu có phải lỗi không? Xử lý ra sao? |
+| [LNX-028](../14-prep/mock-interview/bank/linux-sysprog.md) | Vì sao cần `O_APPEND`? `lseek()` rồi `write()` sai ở đâu? |
+| [LNX-012](../14-prep/mock-interview/bank/linux-sysprog.md) | Điều gì xảy ra với file descriptor qua fork và exec? |
+| [LNX-007](../14-prep/mock-interview/bank/linux-sysprog.md) | Phân biệt stdio buffer, page cache, và fsync. |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [processes-signals.md](processes-signals.md)

@@ -181,40 +181,17 @@ int result = fut.get();   // chờ & lấy kết quả (block tới khi xong)
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Data race là gì? Hậu quả?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Data race xảy ra khi ≥2 thread truy cập đồng thời cùng một vùng nhớ, ít nhất một thao tác là ghi, và không có đồng bộ hóa nào giữa chúng. Theo chuẩn C++ đây là **Undefined Behavior** — không chỉ là kết quả sai số mà chương trình có thể làm bất cứ gì. Sửa bằng mutex (bảo vệ vùng tới hạn) hoặc dùng `std::atomic` cho biến đơn.
-</details>
-
-<details><summary>2) Khi nào dùng mutex, khi nào dùng atomic?</summary>
-
-`std::atomic` cho thao tác trên **một biến đơn** (counter, flag, con trỏ) — không khóa, hiệu năng cao, không thể chia cắt. Mutex cho **vùng tới hạn phức tạp**: cập nhật nhiều biến liên quan phải nhất quán với nhau, hoặc thao tác phức hợp không thể biểu diễn bằng một atomic op. Nếu chỉ tăng một counter thì atomic; nếu cập nhật một cấu trúc dữ liệu (vd thêm node vào list rồi cập nhật size) thì mutex.
-</details>
-
-<details><summary>3) Deadlock là gì, 4 điều kiện và cách tránh?</summary>
-
-Deadlock là tình trạng các thread chờ lẫn nhau giải phóng tài nguyên (mutex) nên kẹt vĩnh viễn. Bốn điều kiện Coffman cần đủ cả: mutual exclusion, hold-and-wait, no preemption, circular wait. Cách tránh: luôn khóa nhiều mutex theo **cùng một thứ tự cố định** (phá circular wait); dùng `std::scoped_lock` để khóa nhiều mutex an toàn; giữ critical section nhỏ; tránh gọi hàm không kiểm soát khi đang giữ lock; tránh nested lock.
-</details>
-
-<details><summary>4) Vì sao luôn dùng lock_guard/unique_lock thay vì lock()/unlock() thủ công?</summary>
-
-Vì RAII: lock được giải phóng tự động khi object lock ra scope, kể cả khi có exception hoặc nhiều đường return. Gọi `unlock()` thủ công dễ bị bỏ sót ở một nhánh hoặc khi exception ném giữa critical section → mutex bị giữ mãi → deadlock. `lock_guard` đơn giản; `unique_lock` linh hoạt hơn (defer, unlock sớm, dùng với condition_variable).
-</details>
-
-<details><summary>5) Memory order để làm gì? Mặc định nên dùng cái nào?</summary>
-
-CPU/compiler có thể reorder lệnh để tối ưu; trong đa luồng điều này khiến thread khác quan sát thứ tự ghi khác kỳ vọng. Memory order quy định ràng buộc sắp xếp quanh các thao tác atomic: `seq_cst` (nhất quán tuần tự toàn cục, dễ suy luận nhất, chi phí cao), `acquire/release` (đồng bộ cặp đôi cho producer/consumer), `relaxed` (chỉ đảm bảo atomicity). Mặc định nên dùng `seq_cst`; chỉ hạ xuống khi đã đo hiệu năng và thật sự hiểu, vì đây là vùng cực dễ sai.
-</details>
-
-<details><summary>6) Vì sao cv.wait nên dùng kèm predicate?</summary>
-
-Vì hai lý do: (1) **spurious wakeup** — condition variable có thể đánh thức thread mà không có notify; predicate kiểm tra lại điều kiện thật để bỏ qua lần thức giả. (2) **lost wakeup / kiểm tra điều kiện trước khi chờ** — nếu điều kiện đã đúng trước khi gọi wait thì không chờ. Dạng `cv.wait(lock, pred)` lặp kiểm tra predicate, nhả lock khi ngủ và giành lại khi thức, đảm bảo đúng đắn.
-</details>
-
-<details><summary>7) std::thread bị hủy khi còn joinable thì sao? jthread khác gì?</summary>
-
-Nếu một `std::thread` còn joinable (chưa `join()` cũng chưa `detach()`) mà destructor chạy, nó gọi `std::terminate()` làm chương trình chết. Vì vậy phải luôn join hoặc detach trước khi thread object ra scope. `std::jthread` (C++20) khắc phục bằng cách **tự join** trong destructor và hỗ trợ cooperative cancellation qua `stop_token`, an toàn và tiện hơn.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [CPP-056](../14-prep/mock-interview/bank/cpp.md) | Data race là gì? Hậu quả? |
+| [CPP-018](../14-prep/mock-interview/bank/cpp.md) | Khi nào dùng mutex, khi nào dùng atomic? |
+| [OS-003](../14-prep/mock-interview/bank/os.md) | Deadlock là gì, 4 điều kiện và cách tránh? |
+| [CPP-027](../14-prep/mock-interview/bank/cpp.md) | Vì sao luôn dùng lock_guard/unique_lock thay vì lock()/unlock() thủ công? |
+| [CPP-019](../14-prep/mock-interview/bank/cpp.md) | Memory order để làm gì? Mặc định nên dùng cái nào? |
+| [OS-012](../14-prep/mock-interview/bank/os.md) | Vì sao cv.wait nên dùng kèm predicate? |
+| [CPP-057](../14-prep/mock-interview/bank/cpp.md) | std::thread bị hủy khi còn joinable thì sao? jthread khác gì? |
 
 ---
 ⬅️ [lambdas-functional.md](lambdas-functional.md) · ➡️ Tiếp theo: [03-operating-system/](../03-operating-system/)

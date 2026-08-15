@@ -119,35 +119,16 @@ Nguyên tắc: **giữ kernel tối thiểu** (chỉ những gì *bắt buộc* 
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Vì sao cần tách kernel space và user space? Cơ chế nào thực thi?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Để bảo vệ và ổn định: nếu mọi code chạy đặc quyền thì một bug ứng dụng có thể phá OS/phần cứng. Phần cứng thực thi việc tách bằng các mức đặc quyền CPU (kernel mode/ring 0 truy cập mọi thứ; user mode/ring 3 bị cấm lệnh đặc quyền và truy cập trực tiếp phần cứng) cùng MMU chặn user truy cập bộ nhớ kernel hoặc của process khác. Ứng dụng muốn làm việc đặc quyền phải nhờ kernel qua cổng kiểm soát là syscall (hoặc qua interrupt/exception), không thể tự thực hiện.
-</details>
-
-<details><summary>2) Syscall hoạt động thế nào và vì sao có chi phí?</summary>
-
-Ứng dụng gọi wrapper libc (vd `read`), wrapper đặt số hiệu syscall và tham số rồi thực thi một lệnh trap (`syscall`); CPU chuyển từ user mode sang kernel mode và nhảy tới syscall handler tương ứng, kernel kiểm tra tham số, thực hiện công việc đặc quyền, rồi trả kết quả và chuyển lại user mode. Chi phí đến từ việc chuyển ngữ cảnh user↔kernel (lưu/khôi phục trạng thái, đổi mức đặc quyền, làm lạnh cache/pipeline) và đôi khi kéo theo context switch. Vì vậy gộp nhiều thao tác nhỏ thành ít syscall (buffer, `writev`, mmap) là cách tối ưu hiệu năng I/O.
-</details>
-
-<details><summary>3) Vì sao driver không được dereference con trỏ user trực tiếp? Dùng gì thay thế?</summary>
-
-Con trỏ từ user nằm trong address space user, có thể không hợp lệ, trỏ vào vùng kernel (tấn công), hoặc thuộc page đã bị swap ra (gây fault). Dereference trực tiếp trong kernel có thể gây oops hoặc lỗ hổng bảo mật (truy cập bộ nhớ tùy ý). Thay vào đó driver dùng `copy_from_user`/`copy_to_user` (hoặc `get_user`/`put_user`) — các hàm này xác thực vùng địa chỉ thuộc về user, xử lý page fault an toàn, và trả lỗi `-EFAULT` nếu không hợp lệ.
-</details>
-
-<details><summary>4) ioctl và sysfs khác nhau? Khi nào dùng cái nào?</summary>
-
-ioctl là một syscall cho phép gửi lệnh điều khiển tùy biến kèm struct tham số tới driver qua một mã lệnh — rất linh hoạt cho thao tác không hợp với mô hình read/write, nhưng dễ trở thành API thiếu chuẩn hóa, khó khám phá và khó dùng từ shell. sysfs phơi bày mỗi thuộc tính thành một file văn bản dưới `/sys`, một giá trị mỗi file, đọc/ghi gọi hàm show/store của driver — dễ dùng từ script (`echo`/`cat`), tự tài liệu hóa. Dùng sysfs cho các thuộc tính cấu hình/trạng thái đơn giản; dùng ioctl cho lệnh phức tạp, truyền struct, hoặc thao tác giao dịch mà sysfs không biểu diễn gọn được.
-</details>
-
-<details><summary>5) Khi nào dùng mmap để giao tiếp với driver?</summary>
-
-Khi cần truyền **lượng dữ liệu lớn, tần suất cao** mà copy qua syscall mỗi lần trở thành nút cổ chai (vd framebuffer, video capture, DMA buffer). Driver hỗ trợ thao tác `.mmap` để ánh xạ vùng nhớ thiết bị hoặc buffer của driver thẳng vào address space của user (qua `remap_pfn_range`/`dma_mmap_*`); sau đó user đọc/ghi trực tiếp như truy cập mảng, không tốn syscall cho mỗi lần truy cập (zero-copy). Đây là cơ chế của `/dev/fb0`, V4L2, DMA-BUF.
-</details>
-
-<details><summary>6) Nguyên tắc quyết định đặt chức năng ở kernel hay user space?</summary>
-
-Nguyên tắc là giữ kernel **tối thiểu**: chỉ đưa vào kernel những gì bắt buộc cần đặc quyền hoặc hiệu năng — truy cập thanh ghi phần cứng, xử lý interrupt, lập lịch, quản lý bộ nhớ vật lý. Phần còn lại (logic nghiệp vụ, giao thức cấp cao) nên ở user space vì dễ debug, crash được cô lập (không sập hệ thống), phát triển nhanh hơn. Linux còn cung cấp khung cho phép viết phần lớn driver ở user space — UIO (xử lý IRQ tối thiểu trong kernel), VFIO, libusb, i2c-dev/spidev — để giảm rủi ro và lượng code chạy đặc quyền.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [DRV-033](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao cần tách kernel space và user space? Cơ chế nào thực thi? |
+| [LNX-002](../14-prep/mock-interview/bank/linux-sysprog.md) | Syscall hoạt động thế nào và vì sao có chi phí? |
+| [DRV-006](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao driver không được dereference con trỏ user trực tiếp? Dùng gì thay thế? |
+| [DRV-009](../14-prep/mock-interview/bank/drivers-embedded.md) | ioctl và sysfs khác nhau? Khi nào dùng cái nào? |
+| [DRV-034](../14-prep/mock-interview/bank/drivers-embedded.md) | Khi nào dùng mmap để giao tiếp với driver? |
+| [DRV-035](../14-prep/mock-interview/bank/drivers-embedded.md) | Nguyên tắc quyết định đặt chức năng ở kernel hay user space? |
 
 ---
 ⬅️ [driver-basics.md](driver-basics.md) · ➡️ Tiếp theo: [device-tree.md](device-tree.md)

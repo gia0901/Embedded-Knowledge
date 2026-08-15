@@ -83,30 +83,15 @@ libmath.so           # linker name (symlink) — dùng lúc build (-lmath)
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Static library và shared library khác nhau thế nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Static library (`.a`) là tập hợp object file; lúc **build**, linker copy phần cần dùng vào executable, nên binary tự chứa và chạy độc lập, nhưng kích thước lớn và muốn cập nhật thư viện phải rebuild lại app. Shared library (`.so`) được liên kết lúc **load/runtime**: executable chỉ ghi nhận cần thư viện nào, hệ thống nạp `.so` khi chạy; nhiều process chia sẻ chung một bản code trong RAM, binary nhỏ, và có thể cập nhật `.so` mà không rebuild app (miễn ABI tương thích) — đổi lại có phụ thuộc runtime (phải có đúng `.so`) và rủi ro lệch phiên bản.
-</details>
-
-<details><summary>2) Vì sao shared library tiết kiệm bộ nhớ khi nhiều chương trình dùng?</summary>
-
-Vì phần code (text segment) của một `.so` chỉ cần tồn tại **một bản duy nhất trong RAM vật lý**, và được map read-only vào không gian địa chỉ ảo của mọi process dùng nó thông qua virtual memory. Do đó dù 100 process cùng dùng `libc.so`, RAM chỉ giữ một bản code libc. Với static library, mỗi executable nhúng bản sao riêng của code thư viện, nên tốn cả dung lượng đĩa lẫn RAM tỉ lệ với số chương trình. (Phần dữ liệu ghi được của thư viện thì mỗi process vẫn có bản riêng qua copy-on-write.)
-</details>
-
-<details><summary>3) -fPIC là gì và vì sao shared library cần nó?</summary>
-
-`-fPIC` (Position-Independent Code) sinh mã có thể chạy đúng bất kể được nạp vào địa chỉ nào trong bộ nhớ, bằng cách truy cập biến/hàm toàn cục qua bảng gián tiếp (GOT/PLT) thay vì địa chỉ tuyệt đối cố định. Shared library cần PIC vì nó có thể được map vào địa chỉ khác nhau trong mỗi process (và với ASLR thì địa chỉ còn ngẫu nhiên), nên không thể giả định một địa chỉ nạp cố định; nhờ PIC, cùng một bản code `.so` chia sẻ được giữa các process với các vị trí map khác nhau. Static link vào executable thì thường không bắt buộc PIC (trừ khi build PIE).
-</details>
-
-<details><summary>4) Khi nào nên chọn static, khi nào chọn shared?</summary>
-
-Chọn static khi muốn binary tự chứa và triển khai đơn giản (một file, không lo thiếu `.so`), khi chỉ một/ít chương trình dùng thư viện (không tận dụng được chia sẻ bộ nhớ), khi cần tất định tuyệt đối về phiên bản, hoặc khi muốn tối ưu (loại code chết, LTO inline cross-module). Chọn shared khi nhiều chương trình dùng chung thư viện (tiết kiệm RAM/disk), khi cần vá lỗi/cập nhật thư viện mà không rebuild mọi app (đặc biệt vá bảo mật), hoặc khi dùng plugin/`dlopen`. Trong embedded còn cân nhắc dung lượng flash và nhu cầu cập nhật từng phần qua OTA.
-</details>
-
-<details><summary>5) "DLL hell" / vấn đề phiên bản của shared library là gì?</summary>
-
-Là các vấn đề phát sinh từ phụ thuộc runtime vào shared library: app cần một `.so` với phiên bản/ABI tương thích phải có mặt lúc chạy, nhưng hệ thống có thể thiếu nó, có phiên bản sai, hoặc một bản cập nhật làm thay đổi ABI khiến app cũ crash hoặc hành xử sai. Nhiều app cần các phiên bản khác nhau của cùng thư viện cũng gây xung đột. Giải pháp gồm: versioning đúng (soname theo major version), symbol versioning, giữ ABI tương thích ngược, và các cơ chế cô lập (container, rpath, hoặc liên kết tĩnh khi cần độc lập tuyệt đối).
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [SD-025](../14-prep/mock-interview/bank/system-design.md) | Static library và shared library khác nhau thế nào? |
+| [SD-030](../14-prep/mock-interview/bank/system-design.md) | Vì sao shared library tiết kiệm bộ nhớ khi nhiều chương trình dùng? |
+| [SD-030](../14-prep/mock-interview/bank/system-design.md) | -fPIC là gì và vì sao shared library cần nó? |
+| [SD-031](../14-prep/mock-interview/bank/system-design.md) | Khi nào nên chọn static, khi nào chọn shared? |
+| [SD-010](../14-prep/mock-interview/bank/system-design.md) | "DLL hell" / vấn đề phiên bản của shared library là gì? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [linking-loading.md](linking-loading.md)

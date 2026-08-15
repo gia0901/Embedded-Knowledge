@@ -126,37 +126,46 @@ Chi phí gồm phần trực tiếp (lưu/khôi phục) + gián tiếp (cache/TL
 
 ---
 
+## 8. 💰 Chi phí thật & ⚠️ bẫy
+
+**Con số để quyết định** (mốc điển hình Linux x86-64 — nhớ **tỉ lệ**, không nhớ con số tuyệt đối):
+
+| | Thread | Process |
+|---|---|---|
+| Tạo mới | **~10–30 µs** | **~100–300 µs** (`fork` + COW page table) |
+| Context switch | **~1–2 µs** | **~2–5 µs** — đắt hơn vì **đổi bảng trang ⇒ TLB nguội** |
+| Bộ nhớ mỗi cái | stack **8 MB *ảo*** (mặc định Linux), thực tế chỉ tốn trang đã chạm | Toàn bộ không gian riêng |
+| Chia sẻ dữ liệu | Mặc định (chung không gian địa chỉ) | Phải có IPC |
+| Một cái crash | **Kéo cả process chết** | Bên kia sống |
+
+⇒ **Chênh lệch context switch không nằm ở việc lưu thanh ghi** (vài trăm ns, giống nhau) mà ở **TLB và cache bị nguội** sau khi đổi bảng trang. Đó là lý do "thread rẻ hơn process" — và cũng là lý do 10.000 thread vẫn tệ: mỗi lần switch vẫn thổi bay cache.
+
+**⚠️ Bẫy:**
+
+**① `fork()` trong chương trình đa luồng — chỉ an toàn nếu con `exec()` ngay.** Con chỉ thừa hưởng **thread đang gọi `fork`**; các thread khác biến mất *giữa chừng* — kèm theo mọi mutex chúng đang giữ, **kẹt vĩnh viễn** trong bản sao. Con gọi `malloc` (cần khoá heap) là treo. ⇒ Giữa `fork` và `exec` chỉ được gọi hàm **async-signal-safe** ([OS-021](../14-prep/mock-interview/bank/os.md)).
+
+**② Nhiều thread ≠ nhanh hơn.** Quá số core thì chỉ thêm context switch và tranh chấp cache. Với việc **CPU-bound**, mốc hợp lý là ~số core; với **I/O-bound** thì có thể nhiều hơn — nhưng lúc đó nên hỏi ngược: *đã cân nhắc event loop chưa?* ([04/io-multiplexing.md](../04-linux-system-programming/io-multiplexing.md)).
+
+**③ Stack 8 MB là ẢO, không phải RAM thật** — chỉ trang đã chạm mới tốn khung vật lý. Nhưng 10.000 thread vẫn ăn **80 GB không gian địa chỉ** và thật sự tốn ~8 KB kernel stack mỗi cái. Trên **hệ nhúng không MMU** thì đây là RAM **thật** ⇒ phải đặt kích thước stack từng task bằng tay.
+
+**④ Detached thread sống lâu hơn dữ liệu nó dùng.** `t.detach()` rồi hàm tạo ra dữ liệu return ⇒ thread đọc bộ nhớ đã chết. Mặc định nên `join`; muốn detach thì dữ liệu phải sống độc lập (`shared_ptr`, copy vào).
+
+**⑤ Zombie ăn PID chứ không ăn RAM** — `fork()` trả `-1` trong khi `free` vẫn đẹp là chữ ký của việc quên `wait()` ([OS-009](../14-prep/mock-interview/bank/os.md)).
+
+---
+
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Process và thread khác nhau thế nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Process là một chương trình đang chạy với **không gian địa chỉ riêng** và tài nguyên riêng (fd, bộ nhớ), được OS cô lập với nhau. Thread là luồng thực thi bên trong một process, **chia sẻ** code/data/heap/fd với các thread cùng process nhưng có stack và register riêng. Hệ quả: thread tạo và giao tiếp rẻ (qua bộ nhớ chung) nhưng dễ data race và một thread lỗi có thể sập cả process; process cô lập tốt, fault containment cao, nhưng tạo và giao tiếp (IPC) đắt hơn.
-</details>
-
-<details><summary>2) Thread chia sẻ gì và có riêng gì?</summary>
-
-Chia sẻ (cùng process): code/text, data/bss, heap, file descriptor, các handler signal, working directory. Riêng mỗi thread: stack, tập thanh ghi (gồm program counter và stack pointer), `errno`, thread-local storage (TLS), trạng thái lập lịch của thread. Chính vì heap/global chia sẻ nên truy cập đồng thời cần đồng bộ.
-</details>
-
-<details><summary>3) Context switch là gì? Vì sao switch process tốn hơn switch thread?</summary>
-
-Context switch là quá trình OS lưu trạng thái CPU (register, PC, SP) của tác vụ đang chạy và khôi phục trạng thái của tác vụ kế tiếp. Switch giữa hai process còn phải **đổi không gian địa chỉ** (đổi page table) và thường **flush TLB**, khiến TLB/cache lạnh sau đó → chi phí cao. Switch giữa hai thread cùng process dùng chung address space nên bỏ qua bước này, rẻ hơn nhiều.
-</details>
-
-<details><summary>4) fork() làm gì? Copy-on-write là gì?</summary>
-
-`fork()` tạo một process con là bản sao gần như y hệt process cha (address space, file descriptor...). Nó trả về 0 trong con, trả về PID con trong cha (và -1 nếu lỗi). Copy-on-write: thay vì sao chép toàn bộ bộ nhớ ngay, kernel cho cha/con cùng tham chiếu các page ở chế độ read-only; chỉ khi một bên **ghi** vào một page thì page đó mới được nhân bản. Nhờ vậy fork nhanh và tiết kiệm bộ nhớ, đặc biệt khi con gọi `exec()` ngay sau đó.
-</details>
-
-<details><summary>5) Zombie process và orphan process là gì?</summary>
-
-Zombie: process con đã kết thúc nhưng process cha chưa gọi `wait()`/`waitpid()` để đọc exit status, nên entry của con vẫn còn trong bảng process (giữ PID + status). Tích nhiều zombie làm cạn bảng process. Orphan: process cha kết thúc trước con; con bị "mồ côi" và được `init`/`systemd` (PID 1) nhận làm cha nuôi, PID 1 sẽ `wait()` thu hồi khi con kết thúc.
-</details>
-
-<details><summary>6) Khi nào nên dùng nhiều process thay vì nhiều thread?</summary>
-
-Dùng process khi cần cô lập/độ tin cậy cao (một thành phần crash không kéo sập phần khác — vd browser tách tab thành process riêng), khi các thành phần độc lập hoặc cần quyền hạn/bảo mật khác nhau, hoặc khi muốn fault containment mạnh. Dùng thread khi cần chia sẻ dữ liệu lớn thường xuyên, song song trong cùng ứng dụng, và muốn giảm overhead tạo/giao tiếp. Đánh đổi cốt lõi: cô lập & an toàn (process) so với nhẹ & chia sẻ nhanh (thread).
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [OS-001](../14-prep/mock-interview/bank/os.md) | Process và thread khác nhau thế nào? |
+| [OS-002](../14-prep/mock-interview/bank/os.md) | Thread chia sẻ gì và có riêng gì? |
+| [OS-005](../14-prep/mock-interview/bank/os.md) | Context switch là gì? Vì sao switch process tốn hơn switch thread? |
+| [OS-013](../14-prep/mock-interview/bank/os.md) | fork() làm gì? Copy-on-write là gì? |
+| [OS-009](../14-prep/mock-interview/bank/os.md) | Zombie process và orphan process là gì? |
+| [OS-017](../14-prep/mock-interview/bank/os.md) | Khi nào nên dùng nhiều process thay vì nhiều thread? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [scheduling.md](scheduling.md)

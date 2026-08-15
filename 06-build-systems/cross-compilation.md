@@ -108,35 +108,16 @@ Cả hai đều tự sinh **cross toolchain + sysroot** phù hợp, giải quy�
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Cross-compilation là gì và vì sao cần trong embedded?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Cross-compilation là biên dịch trên một máy (host build, vd PC x86-64) để tạo ra binary chạy trên một máy có kiến trúc khác (target, vd board ARM). Cần trong embedded vì board target thường yếu (CPU chậm, ít RAM/flash) hoặc thiếu toolchain, khiến biên dịch native trên board rất chậm hoặc bất khả thi; dùng máy host mạnh để build nhanh rồi copy binary sang board là cách thực tế. Nó đòi hỏi một cross toolchain (compiler sinh mã cho target) và sysroot (header + thư viện của target để link đúng).
-</details>
-
-<details><summary>2) Phân biệt build, host, target machine.</summary>
-
-build là máy thực hiện việc biên dịch (nơi compiler chạy). host là máy mà binary tạo ra sẽ chạy trên đó. target là kiến trúc mà binary tạo ra sẽ **sinh mã cho** — khái niệm này chỉ có ý nghĩa khi sản phẩm build chính là một compiler/toolchain (vd build một cross-compiler). Trong cross-compile ứng dụng thông thường, ta chỉ cần phân biệt build (vd x86-64) khác host (vd ARM); target trùng host. Trường hợp build = host là biên dịch native.
-</details>
-
-<details><summary>3) Sysroot là gì và vì sao quan trọng khi cross-compile?</summary>
-
-Sysroot là một thư mục chứa bản sao hệ thống file của target — chủ yếu là header và thư viện (giống cây `/usr`, `/lib` của board). Khi cross-compile, compiler và linker phải tìm header/thư viện của **target** trong sysroot, chứ không phải của máy host (vốn là kiến trúc khác). Nếu thiếu sysroot hoặc cấu hình sai, build dễ vô tình link với thư viện x86-64 của host → lỗi "wrong architecture" hoặc binary crash trên board. Sysroot đảm bảo toàn bộ quá trình link khớp với môi trường target.
-</details>
-
-<details><summary>4) CMake cross-compile bằng cách nào?</summary>
-
-Qua một **toolchain file** truyền vào lúc configure bằng `-DCMAKE_TOOLCHAIN_FILE=...`. File này khai báo `CMAKE_SYSTEM_NAME` (đặt giá trị này báo cho CMake biết đang cross-compile), `CMAKE_SYSTEM_PROCESSOR`, đường dẫn cross compiler (`CMAKE_C_COMPILER`/`CMAKE_CXX_COMPILER`), `CMAKE_SYSROOT`, và các `CMAKE_FIND_ROOT_PATH_MODE_*` để buộc `find_package`/`find_library` tìm trong sysroot của target thay vì host. Nhờ tách cấu hình môi trường ra toolchain file, cùng một CMakeLists.txt build được cả native lẫn nhiều target khác nhau.
-</details>
-
-<details><summary>5) Những khó khăn đặc thù khi cross-compile là gì?</summary>
-
-Một số điểm chính: (1) không chạy được binary target trên host nên test phải qua giả lập QEMU hoặc trực tiếp trên board, và các bước build cần "chạy thử" phải khai kết quả thủ công. (2) Khác biệt endianness, word size (32/64-bit), alignment giữa host và target làm code phụ thuộc layout nhị phân dễ lỗi. (3) Mọi thư viện phụ thuộc phải có bản đã cross-compiled cho target trong sysroot — không dùng package của host được. (4) Phải khớp ABI, đặc biệt hard-float vs soft-float; lẫn lộn gây lỗi link hoặc runtime. Các hệ như Yocto/Buildroot ra đời để quản lý những phức tạp này một cách hệ thống.
-</details>
-
-<details><summary>6) Yocto và Buildroot khác nhau thế nào?</summary>
-
-Cả hai là build system tạo ra hệ điều hành Linux nhúng hoàn chỉnh (toolchain + kernel + rootfs) cho target. Buildroot đơn giản, cấu hình kiểu `menuconfig`, học nhanh và tạo image gọn — phù hợp sản phẩm nhỏ, prototyping, khi yêu cầu tùy biến vừa phải. Yocto Project phức tạp hơn với mô hình layer + recipe (BitBake), học khó nhưng rất linh hoạt và mạnh cho môi trường công nghiệp: quản lý nhiều biến thể phần cứng, tạo SDK, package feed, bảo trì dài hạn và tái lập build. Chọn Buildroot khi cần nhanh gọn; chọn Yocto khi cần tùy biến sâu và quy mô lớn.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [BLD-013](../14-prep/mock-interview/bank/build-systems.md) | Cross-compilation là gì và vì sao cần trong embedded? |
+| [BLD-013](../14-prep/mock-interview/bank/build-systems.md) | Phân biệt build, host, target machine. |
+| [BLD-014](../14-prep/mock-interview/bank/build-systems.md) | Sysroot là gì và vì sao quan trọng khi cross-compile? |
+| [BLD-003](../14-prep/mock-interview/bank/build-systems.md) | CMake cross-compile bằng cách nào? |
+| [BLD-015](../14-prep/mock-interview/bank/build-systems.md) | Những khó khăn đặc thù khi cross-compile là gì? |
+| [BSP-017](../14-prep/mock-interview/bank/bsp.md) | Yocto và Buildroot khác nhau thế nào? |
 
 ---
 ⬅️ [cmake.md](cmake.md) · ➡️ Tiếp theo: [07-shared-libraries/](../07-shared-libraries/)

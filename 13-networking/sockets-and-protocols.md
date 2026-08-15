@@ -118,35 +118,16 @@ Câu này hay vì nó xâu chuỗi toàn bộ stack: DNS → TCP → TLS → HTT
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Mô tả luồng tạo một TCP server bằng socket API.</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Server: `socket()` tạo một socket TCP (`AF_INET`, `SOCK_STREAM`); `bind()` gắn nó vào một địa chỉ IP và port; `listen()` chuyển socket sang chế độ thụ động chờ kết nối (với một backlog hàng đợi); `accept()` chặn tới khi có client kết nối và trả về một **file descriptor mới** dành riêng cho client đó (socket nghe vẫn tiếp tục nhận kết nối khác); rồi dùng `read`/`write` trên fd client để trao đổi dữ liệu; cuối cùng `close` fd client và socket nghe khi xong. Phía client đơn giản hơn: `socket()` rồi `connect()` tới địa chỉ server, sau đó `write`/`read` và `close`. Để phục vụ nhiều client đồng thời, kết hợp accept với thread-per-connection hoặc event loop + epoll.
-</details>
-
-<details><summary>2) TCP là luồng byte — điều này gây vấn đề gì khi lập trình? Giải quyết thế nào?</summary>
-
-Vì TCP là luồng byte liên tục **không có ranh giới message**, một lời gọi `read` có thể trả về chỉ một phần của message, hoặc nhiều message gộp lại, hoặc một message rưỡi — không tương ứng một-một với các `write` của bên gửi. Nếu giả định "một read = một message" thì code sẽ lỗi. Giải quyết bằng **framing** ở tầng ứng dụng: thêm tiền tố độ dài (length prefix) trước mỗi message để bên nhận biết đọc bao nhiêu byte, hoặc dùng ký tự phân tách (delimiter) như `\n`, hoặc giao thức tự mô tả độ dài (như HTTP dùng Content-Length). Đồng thời phải xử lý short read (lặp đọc cho tới khi đủ một frame) và buffer phần dư cho lần sau. UDP thì giữ ranh giới datagram nên không có vấn đề này (nhưng không đảm bảo tin cậy).
-</details>
-
-<details><summary>3) Làm sao một server xử lý hàng nghìn kết nối đồng thời?</summary>
-
-Không dùng mô hình một thread blocking cho mỗi kết nối vì hàng nghìn thread tốn quá nhiều RAM (mỗi stack vài MB) và context switch. Cách scale là mô hình **event-driven**: đặt socket ở chế độ non-blocking và dùng I/O multiplexing (epoll trên Linux) để một thread theo dõi nhiều fd, chỉ xử lý những fd đã sẵn sàng. Vòng lặp sự kiện gọi `epoll_wait`, rồi với mỗi fd sẵn sàng thì accept kết nối mới hoặc đọc/ghi non-blocking — một thread phục vụ rất nhiều kết nối với ít tài nguyên (kiến trúc của Nginx/Redis). Nguyên tắc cốt lõi: không bao giờ block trong event loop; tác vụ CPU nặng đẩy sang thread pool. Có thể mở rộng thêm bằng nhiều event loop trên nhiều core. (Xem io-multiplexing để biết chi tiết epoll, level vs edge triggered.)
-</details>
-
-<details><summary>4) HTTP là gì? "Stateless" nghĩa là gì?</summary>
-
-HTTP là giao thức ứng dụng theo mô hình request/response chạy trên TCP: client gửi request (method như GET/POST, đường dẫn, headers, tùy chọn body), server trả response (status code, headers, body). Status code phân nhóm: 2xx thành công, 3xx redirect, 4xx lỗi phía client, 5xx lỗi phía server. "Stateless" nghĩa là **mỗi request độc lập, server không tự nhớ trạng thái giữa các request** — server không lưu ngữ cảnh từ request trước trong giao thức. Trạng thái (như đăng nhập) được duy trì bằng cơ chế ở tầng trên: cookie, session token, hoặc JWT gửi kèm mỗi request. Tính stateless giúp HTTP đơn giản và dễ scale ngang (request có thể đi tới bất kỳ server nào), đổi lại phải truyền thông tin trạng thái mỗi lần.
-</details>
-
-<details><summary>5) TLS cung cấp gì? HTTPS hoạt động thế nào ở mức cao?</summary>
-
-TLS (Transport Layer Security) là lớp bảo mật nằm giữa TCP và giao thức ứng dụng, cung cấp ba đảm bảo: **bảo mật** (mã hóa dữ liệu nên bên nghe lén không đọc được), **toàn vẹn** (phát hiện dữ liệu bị sửa đổi), và **xác thực** (xác minh danh tính server qua certificate, tùy chọn cả client). HTTPS chính là HTTP chạy trên TLS. Ở mức cao: sau khi thiết lập TCP, hai bên thực hiện TLS handshake — server gửi certificate (được CA ký) để client xác thực danh tính, hai bên thỏa thuận thuật toán và trao đổi khóa để tạo ra một **khóa phiên đối xứng**; sau đó toàn bộ dữ liệu HTTP được mã hóa bằng khóa phiên này. Nhờ vậy dữ liệu nhạy cảm (mật khẩu, thông tin cá nhân) được bảo vệ trên đường truyền. Trong embedded thường dùng thư viện nhẹ như mbedTLS.
-</details>
-
-<details><summary>6) Giao thức nào phù hợp cho thiết bị IoT/embedded và vì sao?</summary>
-
-MQTT là lựa chọn phổ biến nhất: giao thức publish/subscribe nhẹ trên TCP, trong đó thiết bị publish dữ liệu lên một broker và các bên quan tâm subscribe theo topic. Nó tiết kiệm băng thông (header nhỏ), hỗ trợ kết nối không ổn định (QoS levels, last-will message), và tách rời bên gửi/nhận — rất hợp thiết bị tài nguyên ít và mạng chập chờn. CoAP là một lựa chọn khác, giống HTTP về mô hình request/response nhưng chạy trên UDP và cực nhẹ, cho thiết bị hạn chế hơn nữa. Lý do chung: các giao thức web đầy đủ (HTTP/1.1 text, TCP stack đầy đủ) quá nặng về băng thông và bộ nhớ cho nhiều thiết bị nhúng; các giao thức IoT được thiết kế tối giản để vừa tài nguyên hạn chế, tiết kiệm điện và chịu được mạng không ổn định. Embedded cũng thường dùng stack nhẹ như lwIP + mbedTLS thay vì stack đầy đủ.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [NET-003](../14-prep/mock-interview/bank/networking.md) | Mô tả luồng tạo một TCP server bằng socket API. |
+| [NET-007](../14-prep/mock-interview/bank/networking.md) | TCP là luồng byte — điều này gây vấn đề gì khi lập trình? Giải quyết thế nào? |
+| [NET-009](../14-prep/mock-interview/bank/networking.md) | Làm sao một server xử lý hàng nghìn kết nối đồng thời? |
+| [NET-006](../14-prep/mock-interview/bank/networking.md) | HTTP là gì? "Stateless" nghĩa là gì? |
+| [NET-011](../14-prep/mock-interview/bank/networking.md) | TLS cung cấp gì? HTTPS hoạt động thế nào ở mức cao? |
+| [NET-012](../14-prep/mock-interview/bank/networking.md) | Giao thức nào phù hợp cho thiết bị IoT/embedded và vì sao? |
 
 ---
 ⬅️ [tcp-ip.md](tcp-ip.md) · ➡️ Về [README chính](../README.md)

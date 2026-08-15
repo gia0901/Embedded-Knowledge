@@ -146,34 +146,56 @@ flowchart TD
 - Nhiều kết nối, Linux, cần hiệu năng → **`epoll`** (LT trước cho đơn giản, ET khi cần tối ưu).
 - Đừng tự viết từ đầu cho production nếu có thể dùng **libuv/libevent/asio** — chúng đã trừu tượng hóa epoll/kqueue/IOCP và xử lý vô số ca biên.
 
+### ⚠️ Khi nào KHÔNG dùng epoll
+
+| Tình huống | Vì sao | Dùng gì thay |
+|---|---|---|
+| **Ít fd** (vài chục) | Ưu thế của epoll đến từ *"đa số fd idle"*. Với n nhỏ, `epoll_ctl` + cấu trúc kernel **đắt hơn** một vòng quét | `poll` — đơn giản hơn, di động hơn |
+| Cần chạy trên **BSD/macOS** | epoll **chỉ có trên Linux** | `kqueue`, hoặc libuv/libevent |
+| Tải **CPU-bound** | Nút thắt là tính toán, không phải chờ I/O. Event loop không giúp gì | Thread pool |
+| **File thường trên đĩa** | ⭐ File thường **LUÔN** báo "sẵn sàng" với epoll — kể cả khi đọc nó sẽ chặn hàng ms. epoll **vô dụng** với file | Thread pool, hoặc `io_uring` |
+
+⚠️ Ô cuối là bẫy thật: người ta cắm fd của file vào epoll rồi tưởng đã có I/O bất đồng bộ — thực ra vòng lặp **vẫn bị chặn** ở `read()`, chỉ là chặn ở chỗ khác.
+
+---
+
+## 8. ⚠️ Bẫy thực chiến
+
+**① `close(fd)` tự động gỡ fd khỏi epoll set — nhưng CHỈ khi đó là tham chiếu cuối cùng.**
+Đây là bug kinh điển và rất khó lần. Nếu fd đã được `dup()` (hoặc thừa hưởng qua `fork`), thì `close()` **không** gỡ nó khỏi epoll — **open file description vẫn sống** ⇒ `epoll_wait` tiếp tục trả về sự kiện cho một fd bạn tưởng đã đóng, và số fd đó có thể đã được cấp lại cho một kết nối **khác**.
+⇒ **Luôn `epoll_ctl(EPOLL_CTL_DEL)` một cách tường minh TRƯỚC khi `close()`.** Đừng dựa vào hành vi tự động.
+
+**② Thundering herd — nhiều thread/process cùng chờ một listening socket.**
+Kết nối tới ⇒ kernel **đánh thức tất cả**, chỉ một cái `accept` được, số còn lại thức dậy vô ích rồi ngủ lại. Lãng phí tăng theo số worker. Xảy ra khi epoll instance được kế thừa qua `fork` (mẫu pre-fork của Nginx).
+⇒ Chữa bằng cờ **`EPOLLEXCLUSIVE`** khi đăng ký listening socket (kernel chỉ đánh thức một), hoặc dùng **`SO_REUSEPORT`** để mỗi worker có hàng đợi accept riêng.
+
+**③ Một fd, hai thread cùng xử lý — dùng `EPOLLONESHOT`.**
+Với nhiều thread cùng gọi `epoll_wait` trên một epoll set, **hai thread có thể cùng nhận sự kiện của một fd** ⇒ cùng đọc một kết nối, dữ liệu xen kẽ, trạng thái hỏng.
+⇒ `EPOLLONESHOT`: sau khi báo một lần, kernel **tắt** fd đó cho tới khi bạn `EPOLL_CTL_MOD` bật lại ⇒ đảm bảo mỗi lúc chỉ một thread sở hữu fd. Nhớ **bật lại sau khi xử lý xong**, quên là kết nối im lặng vĩnh viễn.
+
+**④ Chỉ vét cạn phía đọc mà quên phía ghi.** Với `EPOLLET`, `EPOLLOUT` cũng là edge: ghi tới khi `EAGAIN` mới thôi. Quên ⇒ dữ liệu tồn trong buffer ứng dụng mà không bao giờ được bơm tiếp.
+
+**⑤ Backpressure — bug "OOM ở nhà khách".**
+Consumer chậm hơn producer thì dữ liệu chưa gửi được **dồn vào buffer ứng dụng**. Không giới hạn ⇒ buffer phình tới khi hết RAM. Với 10.000 kết nối thì chỉ cần mỗi cái vài trăm KB là đủ chết.
+⇒ Đặt **trần cho buffer gửi mỗi kết nối**; vượt trần thì **ngừng đọc** từ nguồn (bỏ `EPOLLIN` khỏi fd nguồn) để đẩy áp lực ngược về phía gửi — hoặc ngắt kết nối. **Không bao giờ để buffer lớn vô hạn.**
+
+**⑥ Một handler chậm làm chết TOÀN BỘ kết nối.** Nguyên tắc *"không bao giờ block trong event loop"* bao gồm cả: gọi hàm tính toán nặng, `malloc` khối lớn, tra DNS đồng bộ, ghi log đồng bộ xuống flash chậm, và **mọi mutex có thể bị giữ lâu**. Một chỗ chặn 100 ms là 10.000 kết nối cùng trễ 100 ms.
+
+**⑦ `EINTR`.** `epoll_wait` **không bao giờ** tự restart, kể cả với `SA_RESTART` — vòng lặp `EINTR` là bắt buộc (§6).
+
 ---
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) I/O multiplexing giải quyết vấn đề gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Vấn đề là làm sao một (hoặc ít) thread theo dõi và phục vụ **nhiều fd/kết nối** cùng lúc mà không lãng phí. Mô hình một-thread-blocking-mỗi-kết-nối tốn quá nhiều RAM và context switch khi có hàng nghìn kết nối (C10K); còn busy-poll từng fd thì đốt CPU. I/O multiplexing (select/poll/epoll) cho phép hỏi kernel "fd nào trong tập này đã sẵn sàng đọc/ghi" và chỉ xử lý những cái sẵn sàng, kết hợp với non-blocking I/O — phục vụ nhiều kết nối với rất ít thread.
-</details>
-
-<details><summary>2) epoll khác select/poll thế nào và vì sao scale tốt hơn?</summary>
-
-`select`/`poll` yêu cầu truyền toàn bộ tập fd vào kernel mỗi lần gọi và kernel quét tuyến tính tất cả để tìm cái sẵn sàng → O(n) theo tổng số fd; `select` còn giới hạn ~1024 fd. `epoll` cho **đăng ký fd một lần** (`epoll_ctl`), kernel tự duy trì tập theo dõi và một danh sách sẵn sàng; `epoll_wait` chỉ trả về các fd **đã sẵn sàng** nên chi phí tỉ lệ số fd sẵn sàng (k) chứ không phải tổng (n). Khi phần lớn trong hàng chục nghìn kết nối đang idle, epoll hiệu quả hơn hẳn — nền tảng cho Nginx/Redis. Đổi lại epoll chỉ có trên Linux.
-</details>
-
-<details><summary>3) Level-triggered và edge-triggered khác nhau ra sao? Khi dùng ET cần lưu ý gì?</summary>
-
-Level-triggered (mặc định): epoll báo fd sẵn sàng **liên tục** chừng nào còn dữ liệu chưa đọc — nếu lần này đọc chưa hết, lần `epoll_wait` sau vẫn báo, nên dễ lập trình đúng. Edge-triggered (`EPOLLET`): chỉ báo **một lần khi trạng thái chuyển** sang sẵn sàng (vd dữ liệu mới đến); nếu không xử lý hết sẽ không được báo lại. Vì vậy với ET phải dùng fd **non-blocking** và đọc/ghi trong vòng lặp **tới khi `EAGAIN`** để vét cạn dữ liệu, nếu không sẽ bị "treo" sự kiện. ET giảm số lần gọi epoll_wait nên hiệu năng cao hơn nhưng dễ sai hơn.
-</details>
-
-<details><summary>4) Event loop hoạt động thế nào? Vì sao Nginx/Redis dùng nó?</summary>
-
-Event loop kết hợp non-blocking I/O với epoll: vòng lặp gọi `epoll_wait` để ngủ tới khi có fd sẵn sàng, rồi với mỗi fd sẵn sàng thì accept kết nối mới hoặc đọc/ghi non-blocking và xử lý, sau đó quay lại chờ. Một thread phục vụ rất nhiều kết nối nên tốn ít RAM và rất ít context switch so với mô hình thread-mỗi-kết-nối. Nginx/Redis dùng nó vì workload chủ yếu là I/O-bound với nhiều kết nối đồng thời — mô hình này cho thông lượng cao và độ trễ thấp. Nguyên tắc cốt lõi: không bao giờ block trong event loop; tác vụ CPU nặng phải đẩy sang thread riêng.
-</details>
-
-<details><summary>5) Tại sao edge-triggered phải dùng với non-blocking fd?</summary>
-
-Vì ET chỉ báo một lần khi có chuyển biến, nên khi nhận sự kiện ta phải đọc (hoặc ghi) lặp lại cho tới khi vét cạn dữ liệu — nhận biết bằng `read`/`write` trả về `EAGAIN/EWOULDBLOCK`. Nếu fd ở chế độ **blocking**, lần đọc cuối khi không còn dữ liệu sẽ **block** thread vô thời hạn (thay vì trả `EAGAIN`), làm treo event loop. Do đó fd phải non-blocking để vòng lặp đọc kết thúc đúng lúc.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [LNX-033](../14-prep/mock-interview/bank/linux-sysprog.md) | I/O multiplexing giải quyết vấn đề gì? |
+| [LNX-009](../14-prep/mock-interview/bank/linux-sysprog.md) | epoll khác select/poll thế nào và vì sao scale tốt hơn? |
+| [LNX-010](../14-prep/mock-interview/bank/linux-sysprog.md) | Level-triggered và edge-triggered khác nhau ra sao? Khi dùng ET cần lưu ý gì? |
+| [LNX-013](../14-prep/mock-interview/bank/linux-sysprog.md) | Event loop hoạt động thế nào? Vì sao Nginx/Redis dùng nó? |
+| [LNX-010](../14-prep/mock-interview/bank/linux-sysprog.md) | Tại sao edge-triggered phải dùng với non-blocking fd? |
 
 ---
 ⬅️ [processes-signals.md](processes-signals.md) · ➡️ Tiếp theo: [ipc-linux.md](ipc-linux.md)

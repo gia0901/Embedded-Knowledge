@@ -299,5 +299,107 @@ Cả hai là giao diện **debug/lập trình phần cứng** cho MCU: nạp fir
 Hard fault = CPU gặp lỗi nghiêm trọng (truy cập bộ nhớ sai, lệnh không hợp lệ, chia 0 nếu bật, unaligned access, escalate từ fault khác). Điều tra: (1) đọc **fault status registers** (CFSR/HFSR/MMFAR/BFAR trên Cortex-M) — cho biết *loại* lỗi (bus fault? usage fault? địa chỉ nào); (2) lấy **stacked frame** mà CPU đẩy khi vào fault (R0–R3, R12, **LR, PC, xPSR**) — **PC** cho biết lệnh gây lỗi, LR đường về; đọc từ stack trong fault handler; (3) map PC → dòng source bằng map file/`addr2line`/debugger. Nguyên nhân hay gặp: dereference con trỏ null/dangling, **stack overflow** đè vùng khác, gọi qua con trỏ hàm rác, unaligned access, truy cập peripheral chưa bật clock. Viết một **HardFault_Handler** in các thanh ghi này ra UART là công cụ vàng ngoài field.
 </details>
 
+#### EMB-033 · 🟢 · concept · 📦 2026-08-13 · [→ architecture](../../../08-embedded-systems/architecture.md)
+**SoC là gì và khác kiến trúc PC truyền thống ở đâu?**
+<details><summary>Đáp án</summary>
+
+**SoC (System on Chip)** gói **gần như cả hệ thống lên một con chip**: CPU (thường nhiều nhân), GPU, bộ điều khiển bộ nhớ, và **hàng loạt ngoại vi tích hợp** (UART, I2C, SPI, USB, Ethernet, ADC, timer, DMA).
+
+| | **PC truyền thống** | **SoC nhúng** |
+|---|---|---|
+| Thành phần | CPU + chipset + card rời, nối qua **bus chuẩn** (PCIe) | **Tất cả trên một die**, nối qua bus nội bộ |
+| Phát hiện thiết bị | **Tự liệt kê** (PCIe/USB tự khai báo mình) | **Không tự liệt kê** ⇒ phải **mô tả bằng device tree** ([DRV-007](drivers-embedded.md)) |
+| Truy cập ngoại vi | Qua driver + bus chuẩn | **Memory-mapped I/O** — đọc/ghi thẳng thanh ghi ([DRV-008](drivers-embedded.md)) |
+| Nâng cấp | Thay linh kiện | **Không** — cố định khi sản xuất |
+| Tiêu thụ / giá | Cao | **Thấp** — đó là lý do tồn tại |
+
+**⭐ Hệ quả quan trọng nhất cho người viết phần mềm:** SoC **không tự liệt kê được**, nên kernel **không có cách nào tự biết** trên bo có gì. Đó chính là lý do thế giới ARM cần **device tree**, còn PC thì không ([DRV-032](drivers-embedded.md)).
+
+Hệ quả thứ hai: mọi thứ dùng **chung băng thông bộ nhớ và chung nguồn** ⇒ bật thêm một khối ngoại vi có thể ảnh hưởng hiệu năng và điện năng của phần còn lại — thứ không xảy ra khi các card rời có tài nguyên riêng.
+
+**Chốt:** *"SoC gói CPU và toàn bộ ngoại vi lên một die để rẻ và tiết kiệm điện — nhưng vì ngoại vi không tự liệt kê được nên phải mô tả bằng device tree, đó là khác biệt lớn nhất so với PC."*
+</details>
+
+#### EMB-034 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
+**"Realtime" nghĩa là gì — có phải là chạy nhanh không? Phân biệt hard và soft realtime.**
+<details><summary>Đáp án</summary>
+
+⭐ **Realtime KHÔNG phải là nhanh — mà là ĐÚNG HẠN, một cách CÓ THỂ ĐẢM BẢO.**
+
+Hệ realtime được đánh giá bằng **thời gian xấu nhất**, không phải thời gian trung bình. Một hệ chạy trung bình 1 ms nhưng **thỉnh thoảng** 50 ms là **tệ hơn** một hệ luôn luôn mất đúng 5 ms — dù hệ thứ hai "chậm hơn" theo mọi phép đo thông thường.
+
+⇒ Vì thế **tất định (predictability) quan trọng hơn tốc độ**. Và vì thế mọi cơ chế "tăng tốc trung bình nhưng gây bất định" đều là kẻ thù: cache, page fault, cấp phát động, GC.
+
+| | **Hard realtime** | **Soft realtime** |
+|---|---|---|
+| Trễ hạn thì | **Hỏng hệ thống** — có thể gây tai nạn | Chất lượng giảm, vẫn dùng được |
+| Ví dụ | Túi khí, điều khiển động cơ, phanh ABS, máy trợ thở | Phát video, giao diện người dùng, ghi âm |
+| Cần chứng minh | **Có** — phân tích lịch biểu, đo worst-case | Không, đủ tốt là được |
+| Nền tảng | RTOS, bare-metal | Linux thường là đủ |
+
+**Ba câu hỏi để phân loại một yêu cầu thực tế:**
+1. *"Trễ một chu kỳ thì chuyện gì xảy ra?"* — mất một khung hình hay gãy một cánh tay robot?
+2. *"Hạn chót là bao nhiêu, và đo từ sự kiện nào?"* — không có con số thì không phải yêu cầu realtime, chỉ là mong muốn.
+3. *"Bạn cần đảm bảo hay chỉ cần thường xuyên đạt?"* — đây chính là ranh giới hard/soft.
+
+**Bẫy:** (1) nói *"hệ của tôi cần realtime"* rồi ý là "cần nhanh" — hai chuyện khác nhau, và cách giải cũng khác; (2) đo trung bình rồi kết luận đạt — phải đo **max** qua thời gian dài ([08/hardware-debug.md](../../../08-embedded-systems/hardware-debug.md)); (3) tưởng chuyển sang ưu tiên realtime là thành hệ realtime — nó không chữa được trễ do I/O, page fault hay priority inversion ([OS-026](os.md)).
+
+**Chốt:** *"Realtime là đúng hạn có đảm bảo, không phải nhanh — đánh giá bằng thời gian xấu nhất. Hard là trễ thì hỏng hệ thống và phải chứng minh được; soft là trễ thì giảm chất lượng."*
+</details>
+
+#### EMB-035 · 🟠 · design · ⭐ · 📦 2026-08-13 · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Làm sao đảm bảo tính realtime ở mức LẬP TRÌNH? Kể những thứ bạn phải loại khỏi đường tới hạn.**
+<details><summary>Đáp án</summary>
+
+**Nguyên tắc: loại bỏ mọi thứ có thời gian KHÔNG CHẶN TRÊN được** khỏi đường tới hạn (critical path).
+
+| Phải loại | Vì sao bất định | Thay bằng |
+|---|---|---|
+| **Cấp phát động** (`malloc`/`new`) | Thời gian phụ thuộc trạng thái phân mảnh; có thể thất bại sau nhiều tuần | Cấp trước lúc khởi động, **pool cỡ cố định** ([DRV-016](drivers-embedded.md)) |
+| **Page fault** | Một lệnh gán có thể chờ I/O hàng ms | `mlockall()` + **chạm trước** toàn bộ vùng nhớ và stack ([OS-010](os.md)) |
+| **Chờ khoá không chặn trên** | Priority inversion ⇒ trễ vô hạn | Mutex có **priority inheritance**; hoặc bỏ khoá, dùng hàng đợi một chiều |
+| **I/O đồng bộ** (log ra flash, mạng) | Hàng ms tới hàng giây | Đẩy sang task ưu tiên thấp qua hàng đợi |
+| **Exception / RTTI / `std::function`** | Unwind không chặn trên; `std::function` có thể cấp phát ẩn | Mã lỗi; callback qua template hoặc con trỏ hàm ([CPP-059](cpp.md)) |
+| **Vòng lặp không chặn trên** | Số vòng phụ thuộc dữ liệu | Đặt trần lặp tường minh |
+| **Đệ quy** | Độ sâu stack không đoán được | Khử đệ quy |
+
+**Ba việc phải làm ngoài việc "loại":**
+1. ⭐ **ĐO worst-case, không đo trung bình.** Chạy nhiều giờ và giữ giá trị **max**. Cách đo không làm nhiễu: **nhấp một chân GPIO** rồi xem bằng scope — `printf` sẽ phá chính phép đo ([08/hardware-debug.md](../../../08-embedded-systems/hardware-debug.md)).
+2. **Giữ ISR cực ngắn.** Chỉ đọc dữ liệu và đặt cờ/đẩy vào hàng đợi; xử lý thật ở task ([EMB-009](embedded-fundamentals.md), [EMB-016](embedded-fundamentals.md)).
+3. **Kiểm tra lịch biểu có khả thi không** — tổng tải CPU và phân tích Rate Monotonic ([EMB-018](embedded-fundamentals.md)). Không phân tích thì "đo thấy chạy được" chỉ đúng với tải hôm nay.
+
+⚠️ **Cạm bẫy tinh vi:** những thứ *"nhanh trung bình"* lại là kẻ thù lớn nhất — cache làm trung bình đẹp nhưng **cache miss** mới quyết định worst-case; tương tự với dự đoán nhánh và tần số CPU động.
+
+**Chốt:** *"Realtime ở mức lập trình là loại mọi thứ không chặn trên được khỏi đường tới hạn — cấp phát động, page fault, khoá, I/O đồng bộ — rồi ĐO worst-case bằng GPIO+scope chứ không đo trung bình."*
+</details>
+
+#### EMB-036 · 🟡 · design · 📦 2026-08-13 · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Firmware vượt quá dung lượng flash/RAM của chip. Bạn giảm thế nào — theo thứ tự nào?**
+<details><summary>Đáp án</summary>
+
+**Bước 0 — ĐO trước, đừng đoán.** Xem bản đồ kích thước theo **section** và theo **symbol**: `.text` (mã) trong flash, `.rodata` (hằng) trong flash, `.data` (biến có giá trị đầu) chiếm **cả hai**, `.bss` (biến 0) chỉ RAM ([EMB-005](embedded-fundamentals.md)). Thủ phạm gần như luôn nằm ở vài symbol lớn bất ngờ.
+
+**Theo thứ tự hiệu quả trên mỗi đơn vị công sức:**
+
+| # | Việc | Thường thu được |
+|---|---|---|
+| **1** | Bật **tối ưu theo kích thước** (`-Os`) và **loại bỏ mã/dữ liệu không dùng** (mỗi hàm một section + linker gỡ section thừa) | Rất nhiều — làm trước tiên |
+| **2** | ⭐ **Bỏ `printf` họ đầy đủ.** Bản hỗ trợ `%f` và mọi định dạng có thể ăn **hàng chục KB flash** và ngốn stack | Thường là thủ phạm số một |
+| **3** | Bỏ **số thực** nếu chip không có FPU ⇒ kéo theo cả thư viện phần mềm ([EMB-024](embedded-fundamentals.md)) | Lớn |
+| **4** | Chuyển bảng hằng, chuỗi sang **`const`** để nằm ở **flash** thay vì bị copy vào RAM | Cứu RAM |
+| **5** | Xem lại **C++**: exception và RTTI kéo theo bảng thông tin lớn; template khởi tạo nhiều biến thể gây **phình mã** | Trung bình–lớn |
+| **6** | Giảm **kích thước buffer/stack** — nhưng phải **đo mức dùng cao nhất** trước, không cắt mù ([EMB-017](embedded-fundamentals.md)) | Cứu RAM |
+| **7** | Nén dữ liệu tài nguyên, giải nén lúc chạy | Đổi flash lấy RAM + CPU |
+
+**Ba đánh đổi phải nêu:**
+1. **`-Os` có thể chậm hơn `-O2`** — chấp nhận được ở phần lớn nơi, nhưng **không** ở đường tới hạn.
+2. **Cắt stack quá tay = tràn stack im lặng** — nguy hiểm hơn hết flash, vì nó hỏng ngẫu nhiên ở chỗ khác.
+3. **Nén** đổi flash lấy **RAM và thời gian khởi động**.
+
+⚠️ **Việc cần làm sớm nhất trong dự án:** đặt **ngưỡng kích thước trong CI** và cho fail khi vượt. Phát hiện phình dần theo từng commit rẻ hơn nhiều so với việc phải cắt gấp 30% vào tuần cuối trước khi phát hành.
+
+**Chốt:** *"Đo theo section và symbol trước, rồi: bật `-Os` + gỡ mã không dùng, bỏ printf đầy đủ, bỏ float nếu không có FPU, đẩy hằng vào flash. Và đặt ngưỡng kích thước trong CI để không phải cắt gấp lúc cuối."*
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

@@ -163,62 +163,17 @@ Process chạy nền không gắn terminal. Quy trình cổ điển: `fork` (cha
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) fork và exec khác nhau thế nào? Vì sao thường dùng chung?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-`fork` tạo một process con là bản sao (copy-on-write) của process cha — sau đó có hai process. `exec*` **không** tạo process mới: nó thay thế toàn bộ image (code/data/heap/stack) của process hiện tại bằng một chương trình khác, giữ nguyên PID, và không trả về nếu thành công. Dùng chung (fork rồi con gọi exec) để chạy một chương trình mới mà vẫn giữ process cha; khoảng giữa hai bước cho phép con tùy biến môi trường (redirect fd, đổi uid, set env) trước khi exec — chính là cách shell thực hiện `ls`, `cmd > file`, pipe.
-</details>
-
-<details><summary>2) wait/waitpid để làm gì? Không gọi thì sao?</summary>
-
-`wait`/`waitpid` cho process cha thu hồi process con đã kết thúc và đọc exit status của nó (qua các macro `WIFEXITED`, `WEXITSTATUS`...). Nếu cha không wait, entry của con đã chết vẫn nằm trong bảng process dưới dạng **zombie** (giữ PID và status); tích lũy nhiều zombie sẽ cạn bảng process. Có thể thu hồi bất đồng bộ bằng cách xử lý `SIGCHLD` và gọi `waitpid(-1, ..., WNOHANG)` trong vòng lặp.
-</details>
-
-<details><summary>3) Vì sao nên dùng sigaction thay vì signal?</summary>
-
-`signal()` có ngữ nghĩa không thống nhất giữa các nền tảng — một số hệ reset handler về mặc định ngay sau lần kích hoạt đầu (System V), một số tự cài lại (BSD), và không kiểm soát rõ signal mask hay restart syscall. `sigaction` có hành vi xác định, di động: cho phép chỉ định mask (chặn signal nào trong lúc handler chạy), cờ như `SA_RESTART` (tự thử lại syscall bị ngắt) và `SA_SIGINFO` (nhận thêm thông tin). Nên luôn dùng `sigaction`.
-</details>
-
-<details><summary>4) Vì sao trong signal handler chỉ được gọi hàm async-signal-safe?</summary>
-
-Vì signal handler chạy bất đồng bộ, có thể chen vào giữa bất kỳ chỗ nào của chương trình — kể cả khi đang ở giữa một hàm không reentrant như `malloc`/`printf` (đang giữ khóa nội bộ hoặc trạng thái dở dang). Nếu handler gọi lại chính hàm đó, có thể gây deadlock hoặc hỏng dữ liệu (UB). Vì vậy chỉ được gọi các hàm async-signal-safe (như `write`, `_exit`). Pattern an toàn: handler chỉ set một cờ `volatile sig_atomic_t`, còn xử lý thật để ở main loop; hoặc dùng `signalfd` để nhận signal qua fd.
-</details>
-
-<details><summary>5) <code>EINTR</code> là gì? Đặt <code>SA_RESTART</code> có giải quyết hết không?</summary>
-
-**`EINTR`** = syscall đang **chặn** thì bị signal handler cắt ngang, nên trả `-1` với `errno == EINTR`. **Không phải lỗi thật** — chỉ là "bị ngắt, chưa làm xong". Code coi mọi `-1` là lỗi sẽ **chết ngẫu nhiên** khi có signal tới đúng lúc.
-
-**`SA_RESTART` KHÔNG giải quyết hết** — đây là ý phân loại. Nhóm **không bao giờ** được restart dù đặt cờ:
-
-- **`select()`, `pselect()`, `poll()`, `ppoll()`**
-- **`epoll_wait()`, `epoll_pwait()`**
-- **`sleep()`, `nanosleep()`, `clock_nanosleep()`**
-- **`pause()`, `sigsuspend()`, `sigwaitinfo()`**
-- `semop()`, `msgrcv()`, `msgsnd()`; `read()` từ fd inotify
-
-⇒ **Vòng lặp `EINTR` quanh `epoll_wait`/`select`/`poll` là bắt buộc**, không có cờ thay thế:
-
-```c
-int n;
-do { n = epoll_wait(epfd, evlist, MAX_EVENTS, -1); }
-while (n == -1 && errno == EINTR);
-```
-
-Hai chi tiết ăn điểm thêm:
-- `read()`/`write()` chỉ restart trên **"thiết bị chậm"** (terminal, pipe, FIFO, socket). **File trên đĩa không thuộc nhóm này** → bug `EINTR` **không lộ khi test với file**, chỉ lộ khi chạy với socket/pipe thật.
-- Nếu `read()`/`write()` **đã chuyển được một phần** rồi mới bị cắt, nó **không** restart mà **trả về thành công với số byte đã chuyển**.
-
-Cần chờ fd **và** signal cùng lúc mà không có race → `pselect()`/`ppoll()`/`epoll_pwait()` đặt signal mask **nguyên tử** với việc đi ngủ; hoặc dùng **`signalfd`** để kéo signal vào chính event loop.
-</details>
-
-<details><summary>6) Signal nào không thể bắt hoặc chặn? Vì sao?</summary>
-
-`SIGKILL` (giết ngay) và `SIGSTOP` (tạm dừng) không thể bắt, chặn, hay ignore. Lý do: để hệ điều hành/quản trị viên luôn có cách dứt khoát kết thúc hoặc dừng một process bất kể nó được lập trình thế nào — nếu process có thể chặn mọi signal thì sẽ không thể kiểm soát được process treo/lỗi.
-</details>
-
-<details><summary>7) volatile sig_atomic_t là gì và vì sao cờ trong handler dùng kiểu này?</summary>
-
-`sig_atomic_t` là kiểu được đảm bảo đọc/ghi bằng một thao tác không thể chia cắt (atomic) đối với signal — handler có thể chen vào nên cập nhật cờ không được "nửa chừng". `volatile` báo compiler rằng biến có thể thay đổi ngoài luồng thực thi bình thường (bởi handler), nên không được cache vào thanh ghi hay tối ưu bỏ việc đọc lại — main loop phải đọc giá trị mới nhất mỗi lần. Kết hợp lại cho phép truyền tín hiệu "đã nhận signal" từ handler ra main loop một cách an toàn.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [LNX-004](../14-prep/mock-interview/bank/linux-sysprog.md) | fork và exec khác nhau thế nào? Vì sao thường dùng chung? |
+| [OS-009](../14-prep/mock-interview/bank/os.md) | wait/waitpid để làm gì? Không gọi thì sao? |
+| [LNX-006](../14-prep/mock-interview/bank/linux-sysprog.md) | Vì sao nên dùng sigaction thay vì signal? |
+| [LNX-011](../14-prep/mock-interview/bank/linux-sysprog.md) | Vì sao trong signal handler chỉ được gọi hàm async-signal-safe? |
+| [LNX-027](../14-prep/mock-interview/bank/linux-sysprog.md) | `EINTR` là gì? Đặt `SA_RESTART` có giải quyết hết không? |
+| [LNX-037](../14-prep/mock-interview/bank/linux-sysprog.md) | Signal nào không thể bắt hoặc chặn? Vì sao? |
+| [LNX-038](../14-prep/mock-interview/bank/linux-sysprog.md) | volatile sig_atomic_t là gì và vì sao cờ trong handler dùng kiểu này? |
 
 ---
 ⬅️ [file-io.md](file-io.md) · ➡️ Tiếp theo: [io-multiplexing.md](io-multiplexing.md)

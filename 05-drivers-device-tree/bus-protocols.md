@@ -149,56 +149,15 @@ Khi thiết bị "không lên": thứ tự kiểm tra là **DT có node chưa �
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) So sánh UART, I2C, SPI — khi nào chọn cái nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-**UART** bất đồng bộ, 2 dây, điểm-điểm: không có clock chung nên hai bên phải thoả thuận baud rate; dùng cho console/log, GPS, modem. Không mở rộng nhiều thiết bị vì không có địa chỉ.
-
-**I2C** đồng bộ, 2 dây **dùng chung**, đa thiết bị theo địa chỉ 7-bit, open-drain + pull-up, có ACK/NACK từng byte. Tốc độ trung bình (100k–1M Hz), half-duplex. Dùng khi cần nối *nhiều* IC tốc độ thấp mà *ít dây*: sensor, EEPROM, RTC, PMIC. Thêm thiết bị **không tốn thêm dây**.
-
-**SPI** đồng bộ, 4 dây, full-duplex, nhanh nhất (chục MHz), mỗi slave một chân CS. Dùng khi cần băng thông cao: flash, LCD, ADC nhanh. Không có ACK, và mỗi slave thêm một chân.
-
-Trục đánh đổi: **số dây ↔ số thiết bị ↔ tốc độ**. Câu chốt: I2C tiết kiệm chân, SPI tiết kiệm thời gian, UART tiết kiệm công sức.
-</details>
-
-<details><summary>2) Vì sao I2C bắt buộc có điện trở pull-up?</summary>
-
-Vì SDA/SCL là **open-drain**: thiết bị chỉ có transistor kéo dây **xuống 0**, không ai đẩy lên 1 — điện trở pull-up làm việc đó. Hệ quả trực tiếp: hai thiết bị phát cùng lúc **không gây xung đột điện** (một bên kéo xuống, bên kia thả nổi, dây ra mức thấp), thay vì đấu ngắn nguồn với đất như push-pull.
-
-Chính đặc tính này là nền cho ba cơ chế của I2C: **ACK** (bên nhận kéo SDA xuống), **clock stretching** (slave giữ SCL thấp để bắt master chờ), và **arbitration** (master ghi 1 mà đọc lại thấy 0 thì biết mình thua và rút lui, không mất dữ liệu bên thắng).
-
-Chọn giá trị: quá lớn → cạnh lên chậm (RC), sai ở 400 kHz trở lên; quá nhỏ → tốn dòng và slave có thể không kéo nổi xuống mức thấp hợp lệ. Thường 2.2k–10k tuỳ tốc độ và điện dung bus.
-</details>
-
-<details><summary>3) Clock stretching là gì? Nó gây ra lỗi kiểu nào?</summary>
-
-Là việc **slave** chủ động giữ SCL ở mức THẤP để buộc master chờ, khi nó chưa sẵn sàng — ví dụ ADC đang chuyển đổi, hoặc EEPROM đang ghi vào ô nhớ. Vì SCL là open-drain nên slave "giữ" được clock dù master mới là bên phát.
-
-Master đúng chuẩn phải: nhả SCL lên, **rồi đọc lại xem SCL có thật sự lên mức cao chưa**; nếu chưa thì đợi. Master bit-bang tự viết hay bỏ bước kiểm tra này và cứ đếm giờ mà chạy tiếp → đọc trúng lúc slave chưa sẵn sàng → **dữ liệu rác hoặc treo bus**. Một số controller I2C phần cứng cũng hỗ trợ thiếu hoặc có erratum ở phần này, nên datasheet SoC hay ghi rõ.
-
-Triệu chứng điển hình: đọc sensor lúc được lúc không, hoặc bus kẹt ở mức thấp. Cách xác nhận nhanh nhất là **soi SCL bằng logic analyzer** — thấy clock bị kéo dài bất thường là đúng nó.
-</details>
-
-<details><summary>4) CPOL/CPHA là gì? Sai thì hiện tượng ra sao?</summary>
-
-Hai bit cấu hình quyết định quan hệ giữa clock và dữ liệu trong SPI, tạo thành 4 mode (0–3). **CPOL** = mức nghỉ của clock (0: nghỉ thấp, 1: nghỉ cao). **CPHA** = dữ liệu được lấy mẫu ở cạnh **thứ nhất** (0) hay **thứ hai** (1) sau khi CS tích cực.
-
-Master và slave **bắt buộc cùng mode**. Sai mode nghĩa là master lấy mẫu ở đúng lúc dữ liệu đang chuyển tiếp → đọc ra rác: thường là **lệch một bit** (giá trị bị nhân/chia đôi so với kỳ vọng) hoặc toàn `0x00`/`0xFF`.
-
-Trong Linux, mode khai trong device tree bằng `spi-cpol`/`spi-cpha` (hoặc trong `spi_device->mode`). Cách xác định nhanh khi bring-up: đọc datasheet slave, và nếu vẫn nghi thì **bắt SCLK + MOSI + CS bằng logic analyzer** rồi so cạnh — nhanh hơn thử lần lượt 4 mode.
-</details>
-
-<details><summary>5) Thiết bị I2C không phản hồi — bạn debug thế nào?</summary>
-
-Đi từ ngoài vào, mỗi bước loại bỏ một tầng:
-
-1. **`i2cdetect -y <bus>`** — nếu địa chỉ không hiện, nghĩa là gọi địa chỉ không ai ACK. Vấn đề ở tầng điện/địa chỉ, chưa cần đụng driver.
-2. **Nguồn và chân**: IC đã được cấp nguồn chưa (regulator/PMIC đã bật?), chân có đúng là bus đó không (pinmux trong device tree), có **pull-up** không.
-3. **Địa chỉ**: datasheet ghi địa chỉ 8-bit hay 7-bit? Linux dùng **7-bit** — nhầm chỗ này làm lệch một bit là chuyện rất hay xảy ra. Có IC nào **trùng địa chỉ** trên cùng bus không.
-4. **Logic analyzer trên SDA/SCL**: có thấy START + byte địa chỉ không? Có ACK không? SCL có bị **kéo thấp kéo dài** (clock stretching / bus kẹt) không? Cạnh lên có bị bo tròn (pull-up quá lớn) không?
-5. **Tầng phần mềm**: node device tree đã có chưa, driver đã `probe` chưa (`dmesg`), có `EPROBE_DEFER` vì regulator/clock chưa sẵn sàng không.
-
-Điểm cần thể hiện: **tách lỗi phần mềm khỏi lỗi phần cứng càng sớm càng tốt** — `i2cdetect` và logic analyzer làm được việc đó trong vài phút, thay vì đọc code driver hàng giờ.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [BUS-001](../14-prep/mock-interview/bank/drivers-embedded.md) | So sánh UART, I2C, SPI — khi nào chọn cái nào? |
+| [BUS-005](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao I2C bắt buộc có điện trở pull-up? |
+| [BUS-006](../14-prep/mock-interview/bank/drivers-embedded.md) | Clock stretching là gì? Nó gây ra lỗi kiểu nào? |
+| [BUS-004](../14-prep/mock-interview/bank/drivers-embedded.md) | CPOL/CPHA là gì? Sai thì hiện tượng ra sao? |
+| [BUS-007](../14-prep/mock-interview/bank/drivers-embedded.md) | Thiết bị I2C không phản hồi — bạn debug thế nào? |
 
 ---
 ⬅️ [Về index topic](README.md) · Liên quan: [device-tree.md](device-tree.md) · [driver-basics.md](driver-basics.md) · [08/hardware-debug.md](../08-embedded-systems/hardware-debug.md)

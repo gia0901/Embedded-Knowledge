@@ -100,30 +100,15 @@ Người phỏng vấn không đọc được suy nghĩ — họ chấm **quá t
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Khi gặp một vấn đề kỹ thuật chưa từng thấy, bạn tiếp cận thế nào?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Tôi theo một quy trình: trước hết **làm rõ** vấn đề thực sự là gì (phân biệt triệu chứng với gốc rễ), xác định ràng buộc (tài nguyên, thời gian, scale, tương thích) và tiêu chí thành công (tối ưu cho tốc độ, bộ nhớ, đơn giản hay độ tin cậy) — tránh lao vào giải sai bài. Sau đó **chia nhỏ** vấn đề lớn thành các phần giải được, **phác thảo vài hướng** và so sánh đánh đổi để chọn (thường bắt đầu từ giải pháp đơn giản nhất chạy được rồi tối ưu), **triển khai từng phần** với kiểm chứng liên tục, và cuối cùng **đánh giá** xem đã đúng và đủ tốt cho ràng buộc chưa, còn cải thiện gì. Xuyên suốt tôi suy luận từ bản chất (first principles) thay vì áp khuôn máy móc, và nêu rõ các đánh đổi đang chấp nhận.
-</details>
-
-<details><summary>2) "Suy luận từ first principles" nghĩa là gì? Cho ví dụ.</summary>
-
-Là quay về các nguyên lý cơ bản nhất và suy luận lên, thay vì sao chép giải pháp/khuôn mẫu một cách máy móc ("cargo cult"). Cách làm là liên tục hỏi "tại sao" cho tới khi chạm nguyên lý không thể chia nhỏ hơn, rồi xây giải pháp từ đó. Ví dụ: thay vì mặc định "cần mutex để bảo vệ biến này", hỏi tại sao cần mutex — vì có dữ liệu chia sẻ bị nhiều thread ghi đồng thời; từ đó nhận ra nếu thiết kế để mỗi thread giữ bản dữ liệu riêng (không chia sẻ trạng thái mutable) thì loại bỏ được nhu cầu khóa hoàn toàn, vừa đúng vừa nhanh hơn. Hoặc khi tối ưu: thay vì đoán thuật toán chậm, đo và phát hiện thời gian tốn ở số lần truy cập I/O — vấn đề gốc khác hẳn giả định ban đầu.
-</details>
-
-<details><summary>3) Vì sao nói "không có giải pháp tốt nhất, chỉ có đánh đổi"? Cho vài trục đánh đổi.</summary>
-
-Vì mọi quyết định kỹ thuật đều hy sinh mặt này để được mặt kia, và "tốt nhất" chỉ có nghĩa trong một ngữ cảnh/ràng buộc cụ thể — một giải pháp tối ưu trên server có thể tệ trên MCU 64KB RAM. Các trục đánh đổi kinh điển: thời gian chạy ↔ bộ nhớ (lookup table nhanh nhưng tốn RAM vs tính lại); hiệu năng ↔ đơn giản/dễ bảo trì; tốc độ phát triển ↔ mức tối ưu (dùng thư viện sẵn vs tự viết); linh hoạt ↔ đơn giản (cấu hình động vs hard-code); throughput ↔ latency (batch lớn vs đáp ứng nhanh từng item); tổng quát ↔ chuyên biệt. Kỹ sư giỏi nêu rõ đang tối ưu cho cái gì trong ràng buộc nào, thay vì giả vờ có lựa chọn hoàn hảo.
-</details>
-
-<details><summary>4) Khi bế tắc với một bài toán, bạn làm gì?</summary>
-
-Một số kỹ thuật tôi dùng: **đơn giản hóa** — giải một phiên bản dễ hơn (ít ràng buộc, input nhỏ) trước rồi tổng quát hóa; **đổi góc nhìn** — nghĩ ngược từ kết quả mong muốn lùi lại, hoặc đổi cách biểu diễn vấn đề (đồ thị, máy trạng thái); tìm **tương tự** với bài đã biết; xét **trường hợp biên** (rỗng, nhỏ nhất, lớn nhất) để lộ cấu trúc; **rubber duck** — giải thích thành lời cho người/vật khác để tự phát hiện lỗ hổng trong giả định; và **tách concern** để cô lập một khía cạnh thay vì giải mọi thứ cùng lúc. Quan trọng là không ngồi im đoán mò mà chủ động đổi cách tiếp cận và kiểm chứng.
-</details>
-
-<details><summary>5) Trong phỏng vấn, vì sao nên "think aloud"?</summary>
-
-Vì người phỏng vấn đánh giá **cách bạn tư duy**, không chỉ đáp án cuối — và họ không đọc được suy nghĩ trong đầu bạn. Nói ra giả định, hướng tiếp cận, lý do chọn/loại từng phương án cho thấy bạn suy luận có hệ thống và biết cân nhắc đánh đổi. Nên bắt đầu bằng làm rõ yêu cầu, trình bày giải pháp đơn giản trước rồi cải thiện dần, và khi gặp sai/bí thì nói rõ "tôi thử hướng khác vì..." để thể hiện khả năng tự sửa. Ngồi im giải trong đầu rồi đưa đáp án — kể cả đúng — thường mất điểm so với người trình bày rõ ràng quá trình, vì giao tiếp kỹ thuật là một phần năng lực của kỹ sư, đặc biệt ở cấp Senior.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [SD-001](../14-prep/mock-interview/bank/system-design.md) | Khi gặp một vấn đề kỹ thuật chưa từng thấy, bạn tiếp cận thế nào? |
+| [SD-003](../14-prep/mock-interview/bank/system-design.md) | "Suy luận từ first principles" nghĩa là gì? Cho ví dụ. |
+| [SD-002](../14-prep/mock-interview/bank/system-design.md) | Vì sao nói "không có giải pháp tốt nhất, chỉ có đánh đổi"? Cho vài trục đánh đổi. |
+| [SD-032](../14-prep/mock-interview/bank/system-design.md) | Khi bế tắc với một bài toán, bạn làm gì? |
+| [SD-033](../14-prep/mock-interview/bank/system-design.md) | Trong phỏng vấn, vì sao nên "think aloud"? |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [system-design.md](system-design.md)

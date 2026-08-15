@@ -189,35 +189,16 @@ Lợi ích: thông báo lỗi dễ đọc, interface tự tài liệu hóa, hỗ
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Template là gì và hoạt động lúc nào? Có chi phí runtime không?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Template là khuôn để compiler sinh ra code chuyên biệt cho từng kiểu cụ thể tại **thời điểm biên dịch** (instantiation). Không có chi phí runtime như đa hình virtual: code sinh ra như thể bạn viết tay cho kiểu đó, có thể inline. Đánh đổi là tăng thời gian biên dịch và có thể phình kích thước binary (code bloat).
-</details>
-
-<details><summary>2) Vì sao định nghĩa template phải nằm trong header?</summary>
-
-Vì compiler cần thấy toàn bộ định nghĩa template tại điểm sử dụng để instantiate code cho kiểu cụ thể. Nếu tách định nghĩa vào file `.cpp`, các translation unit khác chỉ có khai báo → không sinh được code → lỗi linker (undefined reference). Cách khác là explicit instantiation nhưng phải biết trước danh sách kiểu và ít dùng.
-</details>
-
-<details><summary>3) Phân biệt full specialization và partial specialization.</summary>
-
-Full specialization (`template <>`) cung cấp bản cài đặt riêng cho một bộ tham số template **cụ thể hoàn toàn** (vd `Foo<int>`); áp dụng cho cả function và class template. Partial specialization chuyên biệt cho một **nhóm** kiểu theo mẫu (vd mọi con trỏ `Foo<T*>`, hoặc `Foo<T, int>`); **chỉ class template** mới hỗ trợ partial specialization, function template thì không (phải dùng overload).
-</details>
-
-<details><summary>4) Khi nào dùng template, khi nào dùng đa hình virtual?</summary>
-
-Template khi tập kiểu biết lúc biên dịch và cần hiệu năng cao (STL, container, thuật toán generic) — quyết định lúc compile, inline được, không vtable. Virtual khi cần đa hình/mở rộng lúc runtime (plugin, danh sách object khác kiểu qua interface chung) — linh hoạt nhưng có chi phí gián tiếp. Hai cơ chế đôi khi kết hợp (type erasure, vd `std::function`).
-</details>
-
-<details><summary>5) Non-type template parameter là gì? Ví dụ ứng dụng embedded.</summary>
-
-Là tham số template mang **giá trị hằng** thay vì kiểu, vd `template <typename T, std::size_t N>`. Hữu ích cho embedded vì cho phép định nghĩa cấu trúc kích thước cố định lúc biên dịch mà không cấp phát động — chính là `std::array<T, N>`, buffer kích thước cố định, ma trận cố định... Tránh được heap, tốt cho hệ thống hạn chế tài nguyên/realtime.
-</details>
-
-<details><summary>6) Concepts (C++20) giải quyết vấn đề gì?</summary>
-
-Concepts cho phép đặt **ràng buộc** lên tham số template (vd "T phải là kiểu số", "T phải so sánh được"). Lợi ích: thông báo lỗi biên dịch rõ ràng, dễ đọc hơn (thay vì lỗi template lồng nhiều tầng), interface tự tài liệu hóa, và cho phép chọn overload theo ràng buộc thỏa mãn. Trước C++20 người ta phải dùng SFINAE/`enable_if` rườm rà để đạt mục tiêu tương tự.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [CPP-009](../14-prep/mock-interview/bank/cpp.md) | Template là gì và hoạt động lúc nào? Có chi phí runtime không? |
+| [CPP-009](../14-prep/mock-interview/bank/cpp.md) | Vì sao định nghĩa template phải nằm trong header? |
+| [CPP-063](../14-prep/mock-interview/bank/cpp.md) | Phân biệt full specialization và partial specialization. |
+| [CPP-017](../14-prep/mock-interview/bank/cpp.md) | Khi nào dùng template, khi nào dùng đa hình virtual? |
+| [CPP-064](../14-prep/mock-interview/bank/cpp.md) | Non-type template parameter là gì? Ví dụ ứng dụng embedded. |
+| [CPP-039](../14-prep/mock-interview/bank/cpp.md) | Concepts (C++20) giải quyết vấn đề gì? |
 
 ---
 ⬅️ [oop.md](oop.md) · ➡️ Tiếp theo: [02-modern-cpp/](../02-modern-cpp/)

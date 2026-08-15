@@ -150,30 +150,15 @@ Gọn hơn nhiều so với `.first/.second` hay `std::get<>`.
 
 ## Câu hỏi phỏng vấn liên quan
 
-<details><summary>1) Lambda là gì? Compiler biến nó thành cái gì?</summary>
+> Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
 
-Lambda là cú pháp tạo một object hàm ẩn danh (closure) ngay tại chỗ. Compiler sinh ra một class ẩn danh có `operator()` (và các member tương ứng với biến được capture). Vì vậy lambda là một object có trạng thái, không phải con trỏ hàm — đó là lý do lambda có capture không gán được vào function pointer.
-</details>
-
-<details><summary>2) Các kiểu capture của lambda? Bẫy nguy hiểm nhất là gì?</summary>
-
-`[=]` copy mọi biến dùng tới, `[&]` reference mọi biến, `[x]` copy x, `[&x]` ref x, `[this]` con trỏ this, `[z = expr]` init capture (C++14), capture-by-move `[p = std::move(x)]`. Bẫy nguy hiểm nhất là capture by reference (`[&]`) một biến local rồi để lambda sống lâu hơn biến đó (lưu lại, chạy async) → dangling reference, UB. Với lambda sống lâu nên capture by copy/move.
-</details>
-
-<details><summary>3) std::function khác lambda trực tiếp và function pointer thế nào?</summary>
-
-Function pointer chỉ trỏ được tới hàm tự do hoặc lambda **không capture**, overhead thấp. `std::function` là wrapper type-erased lưu được **bất kỳ** callable cùng chữ ký (lambda có capture, functor, function pointer), linh hoạt nhưng có overhead (gọi gián tiếp, có thể cấp phát heap). Truyền lambda qua tham số template (`template<typename F>`) cho phép inline, zero overhead nhưng mỗi kiểu callable là một kiểu khác nhau (khó lưu đồng nhất). Chọn template cho hot path, `std::function` khi cần lưu trữ/đồng nhất kiểu.
-</details>
-
-<details><summary>4) auto có copy hay giữ reference? Khi nào nên/không nên dùng?</summary>
-
-`auto` mặc định **suy ra kiểu giá trị, bỏ reference và top-level const** → `auto x = ref;` tạo bản copy. Muốn giữ tham chiếu phải viết `auto&` hoặc `const auto&`. Nên dùng `auto` khi kiểu dài/rườm rà (iterator), kiểu không gõ tay được (lambda), generic code, hoặc tên kiểu không thêm thông tin. Không nên khi nó che mất kiểu quan trọng khiến code khó hiểu, hoặc vô tình tạo copy đắt.
-</details>
-
-<details><summary>5) Khác nhau giữa enum và enum class?</summary>
-
-`enum` cũ (unscoped): tên hằng đổ vào scope bao quanh (dễ đụng tên), ngầm chuyển đổi sang int. `enum class` (scoped, C++11): tên nằm trong scope của enum (`Color::Red`), không tự convert sang int (an toàn kiểu hơn, tránh so sánh nhầm giữa hai enum khác nhau), có thể chỉ định kiểu nền (`enum class E : uint8_t`). Nên ưu tiên `enum class`.
-</details>
+| ID | Câu hỏi |
+|----|---------|
+| [CPP-058](../14-prep/mock-interview/bank/cpp.md) | Lambda là gì? Compiler biến nó thành cái gì? |
+| [CPP-015](../14-prep/mock-interview/bank/cpp.md) | Các kiểu capture của lambda? Bẫy nguy hiểm nhất là gì? |
+| [CPP-059](../14-prep/mock-interview/bank/cpp.md) | std::function khác lambda trực tiếp và function pointer thế nào? |
+| [CPP-040](../14-prep/mock-interview/bank/cpp.md) | auto có copy hay giữ reference? Khi nào nên/không nên dùng? |
+| [CPP-028](../14-prep/mock-interview/bank/cpp.md) | Khác nhau giữa enum và enum class? |
 
 ---
 ⬅️ [move-semantics.md](move-semantics.md) · ➡️ Tiếp theo: [concurrency.md](concurrency.md)

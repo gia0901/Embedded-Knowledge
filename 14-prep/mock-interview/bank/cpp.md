@@ -154,10 +154,29 @@ std::string b = std::move(a);   // copy 3 con trỏ (O(1)) thay vì memcpy 1MB (
 </details>
 
 #### CPP-009 · 🟡 · concept · [→ templates](../../../01-cpp-fundamentals/templates.md)
-**Template hoạt động lúc nào? Vì sao định nghĩa phải ở header?**
+**Template hoạt động lúc nào? Vì sao định nghĩa phải nằm trong header — và có chi phí runtime không?**
 <details><summary>Đáp án</summary>
 
-Template được compiler instantiate thành code chuyên biệt cho từng kiểu lúc **biên dịch** (không chi phí runtime). Định nghĩa phải ở header vì compiler cần thấy toàn bộ định nghĩa tại điểm sử dụng để sinh code; tách vào .cpp → các TU khác chỉ có khai báo → lỗi linker.
+**Template là bản THIẾT KẾ, không phải mã.** Compiler chỉ sinh mã thật khi bạn **dùng** nó với một kiểu cụ thể — gọi là **instantiation**, xảy ra **lúc biên dịch**.
+
+```cpp
+template<class T> T max(T a, T b) { return a > b ? a : b; }
+max(1, 2);        // ⇒ compiler sinh max<int>
+max(1.0, 2.0);    // ⇒ sinh thêm max<double>  (một bản mã KHÁC)
+```
+
+**⭐ Vì sao định nghĩa phải ở header:** để sinh `max<int>`, compiler cần thấy **toàn bộ thân hàm** tại đơn vị dịch đang dùng nó. Đặt định nghĩa trong `.cpp` riêng thì đơn vị dịch khác chỉ thấy **khai báo** ⇒ không sinh được mã ⇒ báo **undefined reference** ở bước link — một lỗi *link*, nhưng nguyên nhân lại thuộc về *compile* ([SD-026](system-design.md)).
+
+**Ngoại lệ:** biết trước tập kiểu hữu hạn thì dùng **explicit instantiation** trong `.cpp` (`template class Foo<int>;`) ⇒ giữ được định nghĩa trong `.cpp`, giấu cài đặt, và **giảm thời gian biên dịch**. Đây là kỹ thuật hữu ích khi làm thư viện.
+
+**Chi phí runtime: KHÔNG.** Template được phân giải hoàn toàn lúc biên dịch ⇒ `max<int>` sinh ra mã y hệt như bạn viết tay, **không** có lời gọi gián tiếp, **inline được**. Đây là khác biệt cốt lõi với đa hình virtual — cái sau trả giá bằng vtable và lời gọi gián tiếp ([CPP-017](cpp.md)).
+
+**⚠️ Nhưng có ba cái giá khác — trả bằng thứ khác, không phải runtime:**
+1. **Thời gian biên dịch tăng** — mã phải phân tích lại ở mọi đơn vị dịch dùng tới.
+2. **Code bloat** — mỗi kiểu một bản mã. Đáng lưu ý trên hệ nhúng flash nhỏ ([CPP-064](cpp.md)).
+3. **Thông báo lỗi khó đọc** — lỗi phát sinh sâu bên trong lúc instantiate. C++20 **concepts** sinh ra để chữa đúng điểm này ([CPP-039](cpp.md)).
+
+**Chốt:** *"Template được instantiate lúc biên dịch nên compiler phải thấy toàn bộ định nghĩa — vì thế nó nằm ở header, và thiếu thì lỗi hiện ra ở bước link. Không có chi phí runtime, nhưng trả bằng thời gian biên dịch và code bloat."*
 </details>
 
 #### CPP-010 · 🟡 · concept · ⭐ · [→ oop](../../../01-cpp-fundamentals/oop.md)
@@ -534,7 +553,36 @@ if (ready.load(memory_order_relaxed))   // thấy true, nhưng KHÔNG lập cặ
 **Rule of 0/3/5 là gì? Vì sao Rule of 0 được khuyến nghị?**
 <details><summary>Đáp án</summary>
 
-Liên quan 5 special member function. Rule of 3: cần tự viết 1 trong {destructor, copy ctor, copy assign} thì thường cần cả 3. Rule of 5: thêm move ctor + move assign. Rule of 0: thiết kế để không phải viết cái nào, bằng cách dùng member RAII (smart pointer, container) → compiler tự sinh đúng và an toàn, ít lỗi nhất.
+**Ba luật, theo thứ tự lịch sử:**
+
+| Luật | Nội dung |
+|---|---|
+| **Rule of 3** (C++98) | Nếu phải tự viết **một** trong: destructor · copy constructor · copy assignment ⇒ **gần như chắc chắn cần cả ba**. Vì viết một cái nghĩa là class đang quản lý tài nguyên thô |
+| **Rule of 5** (C++11) | Thêm **move constructor** và **move assignment** — nếu không có, mọi phép "move" **âm thầm rơi về copy** ⇒ mất hết lợi ích hiệu năng |
+| ⭐ **Rule of 0** | **Đừng viết cái nào cả.** Thiết kế class sao cho không quản lý tài nguyên thô ⇒ compiler sinh đủ cả năm, và sinh **đúng** |
+
+**Vì sao Rule of 0 được khuyến nghị — ba lý do:**
+1. **Không viết thì không viết sai.** Năm hàm này là nơi sinh ra double-free, tự gán vào chính mình, quên `noexcept`, và rò rỉ trên đường exception.
+2. **Tách trách nhiệm.** Cần quản lý tài nguyên thô ⇒ tách ra **một class chỉ làm mỗi việc đó** (hoặc dùng sẵn `unique_ptr`/`vector`/`string`). Class nghiệp vụ của bạn chỉ chứa các thành viên đã tự quản lý ⇒ nó tuân thủ Rule of 0 **miễn phí**.
+3. **Đúng cả khi thêm thành viên mới.** Tự viết năm hàm rồi thêm một thành viên là phải nhớ sửa cả năm chỗ; compiler thì không bao giờ quên.
+
+**⚠️ Bẫy chết người — quy tắc sinh tự động:**
+
+Khai báo **destructor** (kể cả một destructor rỗng, kể cả `= default`) sẽ **CHẶN compiler sinh move constructor/move assignment**. Class vẫn biên dịch, vẫn chạy đúng — nhưng mọi phép move **lặng lẽ thành copy**:
+
+```cpp
+class Buffer {
+    std::vector<char> data_;                 // 100 MB
+public:
+    ~Buffer() { log("destroyed"); }          // ❌ destructor "vô hại" → MẤT move
+};
+Buffer b2 = std::move(b1);                   // vẫn biên dịch — nhưng COPY 100 MB
+```
+Không có cảnh báo nào. Đây là bug hiệu năng im lặng điển hình ⇒ nếu buộc phải khai destructor thì phải **`= default` cả bốn hàm còn lại** ([CPP-048](cpp.md)).
+
+**Bẫy phụ:** khai copy constructor cũng chặn sinh move; và `= delete` copy **không** tự cho bạn move — phải khai move tường minh ([CPP-054](cpp.md)).
+
+**Chốt:** *"Rule of 0 là đích: đừng quản lý tài nguyên thô thì không phải viết hàm nào. Và nhớ rằng chỉ cần khai một destructor — dù rỗng — là compiler ngừng sinh move, mọi phép move âm thầm thành copy."*
 </details>
 
 #### CPP-021 · 🔴 · concept · [→ move-semantics](../../../02-modern-cpp/move-semantics.md)
@@ -1083,6 +1131,298 @@ explicit operator int() const;     // muốn lấy số thì gọi tên rõ: t.c
 Tốt hơn nữa cho API đo thời gian: dùng **kiểu mạnh** `std::chrono::milliseconds` — nó chặn lẫn đơn vị ngay từ hệ thống kiểu, `wait(500ms)` không thể nhầm với `retry(500)`.
 
 **Chốt:** *"Một chiều ngầm đã dễ sai; hai chiều thì object của bạn thành số nguyên trá hình — vừa lọt phép toán vô nghĩa, vừa sinh nhập nhằng mà một chiều không có."*
+</details>
+
+#### CPP-056 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ concurrency](../../../02-modern-cpp/concurrency.md)
+**Data race trong C++ là gì? Vì sao nó là *undefined behavior* chứ không chỉ là "kết quả có thể sai"?**
+<details><summary>Đáp án</summary>
+
+**Định nghĩa chuẩn — ba điều kiện phải đồng thời:**
+1. Hai thread truy cập **cùng một ô nhớ**,
+2. **ít nhất một** là ghi,
+3. **không có** quan hệ *happens-before* giữa chúng (không mutex, không atomic, không đồng bộ nào).
+
+⇒ Thiếu bất kỳ điều nào thì **không** phải data race. Hai thread cùng **đọc** thì không sao; có mutex thì không sao.
+
+**⭐ Vì sao là UB chứ không phải "giá trị bất định" — đây là chỗ phân biệt câu trả lời mid với senior:**
+
+Nếu chuẩn chỉ nói *"giá trị đọc được có thể là cũ hoặc mới"* thì hậu quả bị giới hạn. Nhưng chuẩn nói **UB**, nghĩa là compiler được phép **giả định data race KHÔNG BAO GIỜ xảy ra** — và tối ưu hoá dựa trên giả định đó:
+
+```cpp
+bool stop = false;                 // ❌ không atomic
+
+// thread A                        // thread B
+while (!stop) { work(); }          stop = true;
+```
+Compiler thấy trong vòng lặp không ai gán `stop` ⇒ được phép **nạp một lần vào thanh ghi** rồi lặp vĩnh viễn. Đây **không phải bug của compiler** — nó đang khai thác đúng cái quyền mà UB cho phép.
+
+Các hệ quả khác đều hợp lệ về mặt chuẩn: **đọc rách** (nửa giá trị cũ, nửa mới) · sắp xếp lại lệnh · **nhân bản phép đọc** (đọc hai lần ra hai giá trị khác nhau trong cùng biểu thức) · loại bỏ hẳn nhánh code.
+
+⇒ **Vì thế "thêm `volatile` cho chắc" không sửa được data race.** `volatile` chỉ chặn compiler cache biến vào thanh ghi; nó **không** cho nguyên tử và **không** cho hàng rào bộ nhớ giữa các core ([CPP-022](cpp.md)).
+
+**Sửa đúng:** `std::atomic<bool>` (nếu chỉ là cờ) hoặc mutex (nếu là bất biến gồm nhiều biến). Cả hai **tạo ra quan hệ happens-before** ⇒ điều kiện ③ không còn ⇒ hết là data race.
+
+**Bẫy:** (1) nhầm *data race* với *race condition* — data race là **UB ở mức ngôn ngữ**; race condition là **lỗi logic do thứ tự** và **vẫn có thể xảy ra** dù code hoàn toàn không có data race (vd `if (balance >= x) withdraw(x)` với mỗi phép đều đã khoá riêng); (2) tin rằng "test không lỗi" chứng minh không có race — nó chỉ chứng minh compiler và CPU hôm nay chưa khai thác quyền đó; (3) x86 che rất nhiều race, ARM thì không ([CPP-019](cpp.md)).
+
+**Chốt:** *"Data race là UB, nên compiler được phép giả định nó không xảy ra và tối ưu theo — đó là lý do vòng lặp cờ không atomic có thể chạy vĩnh viễn. Nó khác race condition: race condition là lỗi logic, data race là lỗi ngôn ngữ."*
+</details>
+
+#### CPP-057 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ concurrency](../../../02-modern-cpp/concurrency.md)
+**`std::thread` bị huỷ khi vẫn còn `joinable()` thì chuyện gì xảy ra? `std::jthread` khác gì?**
+<details><summary>Đáp án</summary>
+
+**Destructor của `std::thread` gọi `std::terminate()` — chương trình CHẾT NGAY**, không phải rò rỉ, không phải cảnh báo.
+
+```cpp
+void f() {
+    std::thread t(work);
+    if (error) return;          // ❌ t còn joinable → ~thread() → std::terminate()
+    t.join();
+}
+```
+Nguy hiểm nhất là **đường thoát sớm**: `return` giữa chừng, hoặc một **exception** ném ra trước `join()`. Code chạy đúng hàng năm rồi chết vào đúng ngày có lỗi.
+
+**⭐ Vì sao chuẩn chọn `terminate()` thay vì tự `join` hay tự `detach`?** Vì cả hai lựa chọn kia đều **âm thầm sai**:
+- Tự `join` ⇒ destructor **chặn** không xác định thời gian — không ai ngờ một dấu `}` lại treo chương trình.
+- Tự `detach` ⇒ thread chạy tiếp và **đọc biến cục bộ đã bị huỷ** ⇒ UB im lặng, tệ hơn nhiều.
+
+⇒ Chuẩn chọn cách **ồn ào nhất** để buộc lập trình viên quyết định tường minh. Đây là ví dụ đẹp của nguyên tắc *"lỗi phải to tiếng"*.
+
+**`std::jthread` (C++20) sửa hai thứ:**
+
+| | `std::thread` | `std::jthread` |
+|---|---|---|
+| Destructor khi còn joinable | **`terminate()`** | **Tự `request_stop()` rồi `join()`** |
+| Hỗ trợ huỷ | Không có | **`std::stop_token`** — hợp tác, thread tự kiểm và thoát |
+
+```cpp
+std::jthread t([](std::stop_token st){
+    while (!st.stop_requested()) { work(); }     // ✅ thoát sạch khi được yêu cầu
+});
+// hết scope: tự request_stop() + join()
+```
+
+**Chưa có C++20 thì làm gì:** bọc `std::thread` trong một class RAII tự `join` ở destructor (đây chính là ý tưởng `jthread`), và **luôn** quyết định `join` hay `detach` **ngay tại chỗ tạo** — không để nó phụ thuộc vào đường chạy.
+
+⚠️ **`detach` gần như luôn là lựa chọn tồi:** thread mất mọi ràng buộc vòng đời với dữ liệu nó đang dùng — đúng lớp bug "đối tượng chết trước người dùng nó" ([DBG-025](debugging.md)).
+
+**Chốt:** *"`~thread()` gọi `terminate()` nếu còn joinable — cố ý ồn ào, vì tự join sẽ treo bí ẩn còn tự detach sẽ sinh UB im lặng. `jthread` tự join và thêm stop_token để huỷ hợp tác."*
+</details>
+
+#### CPP-058 · 🟢 · concept · 📦 2026-08-13 · [→ lambdas-functional](../../../02-modern-cpp/lambdas-functional.md)
+**Lambda là gì? Compiler biến nó thành cái gì?**
+<details><summary>Đáp án</summary>
+
+Compiler sinh ra một **class ẩn danh** (*closure type*) có `operator()`, rồi tạo **một object** của class đó. Lambda **không phải** một loại con trỏ hàm — nó là một **object có trạng thái**.
+
+```cpp
+int n = 5;
+auto f = [n](int x) { return x + n; };
+```
+tương đương đại khái:
+```cpp
+class __Lambda {
+    int n;                                    // ← biến capture thành DATA MEMBER
+public:
+    explicit __Lambda(int n_) : n(n_) {}
+    int operator()(int x) const { return x + n; }   // ← const mặc định
+};
+__Lambda f{n};
+```
+
+**Ba hệ quả rút ra từ mô hình này:**
+1. **Capture = thành viên dữ liệu** ⇒ lambda có **kích thước** (`sizeof` phụ thuộc số thứ bắt); capture by reference thì thành viên là tham chiếu ⇒ **treo nếu đối tượng gốc chết trước** ([CPP-015](cpp.md)).
+2. **`operator()` là `const` mặc định** ⇒ sửa biến bắt theo giá trị sẽ **không biên dịch được**; muốn sửa thì thêm `mutable`.
+3. **Mỗi lambda là một KIỂU RIÊNG BIỆT**, kể cả hai lambda viết y hệt nhau ⇒ phải dùng `auto` để lưu; muốn lưu vào biến có kiểu cố định thì cần `std::function` ([CPP-059](cpp.md)).
+
+**Điểm ăn điểm:** lambda **không capture gì** chuyển đổi ngầm được sang **con trỏ hàm** — nên truyền được vào API C. Có capture thì **không**, vì con trỏ hàm không mang được trạng thái.
+
+**Chốt:** *"Lambda là một object của class ẩn danh có `operator()`; capture trở thành data member. Vì thế mỗi lambda là một kiểu riêng, `operator()` const mặc định, và chỉ lambda không capture mới thành con trỏ hàm được."*
+</details>
+
+#### CPP-059 · 🟠 · concept · ⭐ · 📦 2026-08-13 · [→ lambdas-functional](../../../02-modern-cpp/lambdas-functional.md)
+**`std::function` khác gì với việc dùng thẳng lambda, và khác gì con trỏ hàm? Cái giá của nó là gì?**
+<details><summary>Đáp án</summary>
+
+| | Con trỏ hàm | **Lambda dùng thẳng** (qua `auto`/template) | **`std::function`** |
+|---|---|---|---|
+| Mang được trạng thái? | ❌ Không | ✅ Có | ✅ Có |
+| Kiểu | Cố định | **Kiểu riêng của mỗi lambda** | **Một kiểu cho mọi callable cùng chữ ký** |
+| Gọi hàm | Gián tiếp | **Nội tuyến được** — thường bằng 0 chi phí | **Gián tiếp**, không inline được |
+| Cấp phát heap | Không | Không | **Có thể có** (khi capture lớn) |
+| Lưu vào container / thành viên class | Khó | Không (mỗi cái một kiểu) | ✅ **Được** |
+
+**`std::function` làm gì:** **type erasure** — gói bất kỳ thứ gì gọi được với đúng chữ ký vào **một kiểu duy nhất**. Đổi lại nó phải lưu đối tượng bị gói và gọi qua một tầng gián tiếp.
+
+**⚠️ Ba cái giá — đây là phần được chấm:**
+1. **Lời gọi gián tiếp, không inline được.** Lambda truyền vào template được compiler nội tuyến hoàn toàn; qua `std::function` thì thành một lời gọi ảo. Trong vòng lặp nóng, chênh lệch là thật.
+2. ⭐ **Có thể cấp phát heap.** Cài đặt thường có *small object optimization* — capture nhỏ thì nằm trong chính object; **vượt ngưỡng thì cấp phát động**. Ngưỡng **không được chuẩn hoá** ⇒ trên hệ nhúng/realtime, `std::function` là **nguồn cấp phát ẩn trong đường nóng** ([DRV-016](drivers-embedded.md)).
+3. **Có thể ném `std::bad_function_call`** nếu gọi khi rỗng.
+
+**Chọn thế nào:**
+- **Truyền callback đi ngay** (thuật toán, hàm nhận callback) ⇒ **template + `auto`**, để lambda giữ nguyên kiểu ⇒ nhanh nhất.
+- **Lưu lại** (thành viên class, `vector` các handler, đăng ký sự kiện) ⇒ **`std::function`** — vì cần một kiểu chung.
+- **Cần truyền sang API C** ⇒ con trỏ hàm; nếu cần trạng thái thì dùng mẫu `void* user_data` mà C API thường có.
+
+**Bẫy:** dùng `std::function` cho mọi callback "cho tiện" ⇒ mất inline và rước cấp phát ẩn vào chỗ nhạy cảm; đây là một trong những chi phí ẩn hay gặp nhất trong C++ hiện đại.
+
+**Chốt:** *"`std::function` là type erasure — mua được 'một kiểu cho mọi callable' bằng lời gọi gián tiếp và có thể cấp phát heap. Truyền đi ngay thì dùng template; chỉ dùng `std::function` khi cần LƯU lại."*
+</details>
+
+#### CPP-060 · 🟢 · coding · 📦 2026-08-13 · [→ memory-model](../../../01-cpp-fundamentals/memory-model.md)
+**Đoạn này có vấn đề gì? Vì sao nó thường "chạy được" khi bạn thử?**
+
+```cpp
+int* getValue() {
+    int x = 5;
+    return &x;
+}
+```
+<details><summary>Đáp án</summary>
+
+**Trả về địa chỉ của biến cục bộ** — `x` nằm trên **stack** và bị huỷ khi hàm return ⇒ con trỏ trả về là **dangling pointer**, dereference nó là **undefined behavior**.
+
+**⭐ Vì sao thường "chạy được" khi thử:** stack **không bị xoá** khi hàm return — chỉ có con trỏ stack lùi lại. Byte cũ vẫn nằm đó cho tới khi **lời gọi hàm tiếp theo** ghi đè lên. Nên:
+```cpp
+int* p = getValue();
+printf("%d\n", *p);        // thường in 5 — "có vẻ đúng"
+foo();                      // lời gọi này ghi đè vùng stack đó
+printf("%d\n", *p);        // giờ là rác
+```
+⇒ Đây là lý do lớp bug này **sống sót qua test** rồi nổ ở nhà khách khi thứ tự lời gọi thay đổi, hoặc khi bật tối ưu, hoặc khi đổi compiler.
+
+**Cách sửa, theo thứ tự nên dùng:**
+```cpp
+int  getValue()               { return 5; }              // ✅ trả theo giá trị — đơn giản nhất
+std::vector<int> makeData()   { return {...}; }          // ✅ container tự quản lý, có RVO
+std::unique_ptr<int> make()   { return std::make_unique<int>(5); }  // ✅ khi buộc phải cấp phát động
+static int x = 5; return &x;                             // ⚠️ được, nhưng dùng chung — cẩn thận đa luồng
+```
+
+**Cùng một lớp lỗi, các dạng khác hay gặp:** trả về `std::string_view`/`std::span` trỏ vào temporary · lambda **bắt tham chiếu** rồi chạy bất đồng bộ · giữ iterator sau khi `vector` reallocate · trả tham chiếu tới thành viên của đối tượng đã chết ([CPP-037](cpp.md), [DBG-025](debugging.md)).
+
+**Chốt:** *"Trả địa chỉ biến cục bộ là UB — và nó 'chạy được' vì stack chưa bị ghi đè ngay, nên bug lọt qua test rồi nổ khi thứ tự lời gọi đổi."*
+</details>
+
+#### CPP-061 · 🟢 · concept · 📦 2026-08-13 · [→ oop](../../../01-cpp-fundamentals/oop.md)
+**Pure virtual function và abstract class là gì? C++ có `interface` như Java không?**
+<details><summary>Đáp án</summary>
+
+**Pure virtual** = hàm virtual **không có cài đặt**, khai bằng `= 0`. Class chứa ít nhất một hàm như vậy là **abstract class** ⇒ **không thể tạo đối tượng** của nó; lớp dẫn xuất **bắt buộc** cài đặt mới dùng được.
+
+```cpp
+class Sensor {
+public:
+    virtual ~Sensor() = default;          // ⚠️ BẮT BUỘC virtual — xoá qua con trỏ base
+    virtual int read() = 0;               // pure virtual
+};
+```
+
+**C++ không có từ khoá `interface`** — nhưng **abstract class chỉ toàn pure virtual** đóng đúng vai trò đó, và mạnh hơn: C++ cho **đa kế thừa** nên một lớp có thể hiện thực nhiều "interface".
+
+**Ba điểm hay bị hỏi kèm:**
+1. ⭐ **Destructor phải `virtual`** (hoặc `protected` nếu không cho xoá qua base). Thiếu là **rò rỉ/UB** khi `delete` qua con trỏ base ([CPP-010](cpp.md)).
+2. **Pure virtual VẪN có thể có thân hàm** — cung cấp cài đặt mặc định mà lớp con phải gọi tường minh. Ít dùng nhưng là câu hỏi mẹo hay gặp.
+3. **Không gọi hàm virtual trong constructor/destructor** — lúc đó bảng ảo chưa/đã trỏ về lớp base ⇒ gọi nhầm phiên bản ([CPP-035](cpp.md)).
+
+⚠️ **Đánh đổi cần biết:** abstract class + virtual = **một lời gọi gián tiếp** và **một vtable pointer trong mỗi đối tượng**. Ở đường nóng hoặc trên MCU RAM ít, cân nhắc template/CRTP thay thế ([CPP-017](cpp.md)).
+
+**Chốt:** *"Pure virtual (`= 0`) làm class thành abstract, không tạo đối tượng được. C++ không có từ khoá `interface` nhưng abstract class toàn pure virtual chính là nó — và destructor phải virtual."*
+</details>
+
+#### CPP-062 · 🟠 · concept · 📦 2026-08-13 · [→ oop](../../../01-cpp-fundamentals/oop.md)
+**Diamond problem là gì? Giải quyết thế nào, và cái giá là gì?**
+<details><summary>Đáp án</summary>
+
+```
+        Base            D kế thừa B và C, cả hai cùng kế thừa Base
+       /    \      ⇒    D chứa HAI bản sao của Base
+      B      C          ⇒ d.value nhập nhằng; ép kiểu lên Base cũng nhập nhằng
+       \    /
+         D
+```
+
+**Hậu quả cụ thể:** truy cập thành viên của `Base` từ `D` gây **lỗi biên dịch do nhập nhằng**; và nếu `Base` có trạng thái thì `D` có **hai bản trạng thái độc lập** — sửa qua nhánh `B` không thấy ở nhánh `C`.
+
+**Giải bằng virtual inheritance:**
+```cpp
+class B : virtual public Base { };      // ✅ cả hai nhánh khai virtual
+class C : virtual public Base { };
+class D : public B, public C { };       // D giờ chỉ có MỘT Base
+```
+
+**⚠️ Cái giá — vì sao không dùng bừa:**
+1. **Chi phí runtime:** đối tượng phải giữ thêm con trỏ/offset để tìm phần base dùng chung ⇒ truy cập thành viên base **gián tiếp hơn**, đối tượng **lớn hơn**.
+2. **Ai khởi tạo base?** Với virtual inheritance, **lớp dẫn xuất cuối cùng (`D`)** chịu trách nhiệm gọi constructor của `Base` — **không phải** `B` hay `C`. Đây là quy tắc rất hay làm người ta bất ngờ và là nguồn lỗi khi refactor.
+3. Thứ tự khởi tạo/huỷ phức tạp hơn, khó suy luận.
+
+**⭐ Cách tránh tốt hơn — thiết kế lại:** diamond thật sự cần thiết là **hiếm**. Ba lựa chọn thường tốt hơn:
+- **Đa kế thừa chỉ với interface thuần ảo, không trạng thái** ⇒ không có gì để nhân đôi, không cần virtual inheritance.
+- **Composition thay kế thừa** — `D` **chứa** một `B` và một `C`.
+- Tách trách nhiệm để không cần cả hai nhánh.
+
+**Chốt:** *"Diamond làm lớp cuối chứa hai bản base; `virtual` kế thừa gộp lại thành một nhưng đổi bằng chi phí truy cập và luật 'lớp dẫn xuất cuối cùng khởi tạo base'. Tốt nhất là thiết kế để không có diamond — dùng interface không trạng thái hoặc composition."*
+</details>
+
+#### CPP-063 · 🟠 · concept · 📦 2026-08-13 · [→ templates](../../../01-cpp-fundamentals/templates.md)
+**Phân biệt full specialization và partial specialization của template.**
+<details><summary>Đáp án</summary>
+
+**Specialization = cung cấp cài đặt RIÊNG cho một số đối số template cụ thể**, thay cho bản tổng quát.
+
+```cpp
+template<class T, class U> struct Pair { /* bản tổng quát */ };
+
+template<> struct Pair<int, int> { };            // FULL: chốt HẾT mọi tham số
+template<class T> struct Pair<T, bool> { };      // PARTIAL: còn T tự do
+template<class T> struct Pair<T*, T*> { };       // PARTIAL: ràng buộc theo HÌNH DẠNG
+```
+
+| | **Full** | **Partial** |
+|---|---|---|
+| Chốt tham số | **Tất cả** | **Một phần** / theo hình dạng (con trỏ, mảng, tham chiếu) |
+| Còn là template? | Không — là một định nghĩa cụ thể | **Có** |
+| Áp dụng cho | class **và** hàm | **Chỉ class** (và biến từ C++14) |
+
+**⚠️ Hàm KHÔNG có partial specialization.** Muốn hiệu ứng tương đương thì dùng **overload** — và đó cũng là cách nên làm, vì overload tuân theo quy tắc phân giải rõ ràng hơn. Full specialization của hàm thì có, nhưng thường bị khuyên tránh vì tương tác khó lường với overload.
+
+**Compiler chọn thế nào:** tìm mọi specialization **khớp** rồi chọn cái **chuyên biệt nhất**; không có cái nào khớp thì dùng bản tổng quát. Nhiều cái "chuyên biệt ngang nhau" ⇒ **lỗi nhập nhằng**.
+
+**Dùng để làm gì trong thực tế:** tối ưu cho một kiểu cụ thể (vd `vector<bool>` lưu theo bit) · xử lý riêng con trỏ/mảng · làm **type trait** (`is_pointer`, `remove_const`…) — đây mới là ứng dụng phổ biến nhất.
+
+⚠️ **Từ C++17/20 thường có cách tốt hơn:** `if constexpr` cho rẽ nhánh theo kiểu, và **concepts** cho ràng buộc — dễ đọc và báo lỗi rõ hơn nhiều so với chuỗi specialization ([CPP-039](cpp.md)).
+
+**Chốt:** *"Full chốt hết tham số, partial chốt một phần hoặc theo hình dạng. Hàm không có partial — dùng overload. Và ngày nay `if constexpr`/concepts thường thay thế được, dễ đọc hơn."*
+</details>
+
+#### CPP-064 · 🟡 · concept · 📦 2026-08-13 · [→ templates](../../../01-cpp-fundamentals/templates.md)
+**Non-type template parameter là gì? Nêu ứng dụng trong embedded.**
+<details><summary>Đáp án</summary>
+
+Tham số template là một **giá trị** (số nguyên, con trỏ, `enum`, và từ C++20 là cả kiểu literal), **không phải kiểu**:
+
+```cpp
+template<std::size_t N>
+class RingBuffer {
+    std::array<uint8_t, N> buf_{};        // kích thước cố định LÚC BIÊN DỊCH
+    static_assert(N && (N & (N - 1)) == 0, "N phải là luỹ thừa của 2");
+public:
+    std::size_t mask() const { return N - 1; }   // ✅ dùng AND thay vì chia dư
+};
+RingBuffer<256> rx;                        // N là hằng số, compiler biết
+```
+
+**⭐ Vì sao rất hợp embedded — bốn lợi ích cụ thể:**
+1. **Không cấp phát động.** Kích thước biết lúc biên dịch ⇒ bộ đệm nằm ở vùng tĩnh hoặc trên stack, không đụng heap ([DRV-016](drivers-embedded.md)).
+2. **Kiểm tra ràng buộc lúc BIÊN DỊCH** bằng `static_assert` — sai cấu hình là **fail build**, không phải fail ngoài hiện trường.
+3. **Compiler tối ưu mạnh hơn** vì biết hằng số: thay `% N` bằng phép AND (khi N là luỹ thừa của 2), mở vòng lặp, gấp hằng số.
+4. **Kiểu khác nhau ⇒ không lẫn nhau.** `RingBuffer<64>` và `RingBuffer<256>` là **hai kiểu khác nhau** ⇒ compiler chặn việc truyền nhầm.
+
+**Ứng dụng điển hình khác:** ma trận/vector cỡ cố định · bảng tra sinh lúc biên dịch (`constexpr`) · đơn vị đo an toàn kiểu · số bit của một trường thanh ghi.
+
+⚠️ **Cái giá:** mỗi giá trị khác nhau sinh ra **một bản mã riêng** (code bloat). Dùng `RingBuffer<64>`, `<128>`, `<256>` là có **ba** bản. Trên chip flash nhỏ, đây là đánh đổi thật ⇒ hoặc thống nhất một cỡ, hoặc tách phần logic không phụ thuộc N ra một lớp base không template ([EMB-036](embedded-fundamentals.md)).
+
+**Chốt:** *"Tham số template là giá trị chứ không phải kiểu — cho phép bộ đệm cỡ cố định không heap, kiểm ràng buộc bằng `static_assert` lúc build, và tối ưu theo hằng số. Trả bằng code bloat vì mỗi giá trị sinh một bản mã."*
 </details>
 
 ---

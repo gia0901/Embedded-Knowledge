@@ -46,6 +46,7 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
      - Điểm **< 3 → kéo thẳng về bảng sổ yếu** (regression). Điểm ≥ 3 → dời lịch +2 tuần.
 - Người dùng có thể yêu cầu **kiểm tra toàn diện** (hỏi bất kỳ câu nào đã từng trả lời, bất kể điểm) — khi đó ưu tiên nguồn 2 + 3; `comprehensive` mặc định đã trộn cả 3 nguồn.
 - Sau khi ứng viên trả lời, **BẮT BUỘC hỏi đào sâu / follow-up ≥1 lần** kể cả khi trả lời đúng (§6 luật ④), **nhưng chưa đưa nhận xét đúng/sai**. Chỉ ghi nhận và chuyển câu tiếp (hoặc đào sâu). Giữ giọng interviewer: trung tính, thúc đẩy suy nghĩ.
+  - 🚫 **NGOẠI LỆ — phiên type `rapid`:** luật follow-up bắt buộc **KHÔNG áp dụng**. Tối đa **1 probe ngắn** và chỉ khi đáp án lửng. Xem **§6 → “Ngoại lệ duy nhất của luật ① và ④ — phiên `rapid`”**.
   - ⚠️ **Đào sâu tới đâu thì dừng:** tới hết **T2** ở phiên mặc định. Được phép probe T3 một lần để dò trần, nhưng **không truy tiếp** và **không tính điểm** (§6 → Trần độ sâu).
 - Với câu **coding**: yêu cầu ứng viên viết code vào [coding-arena/](coding-arena/) (đặt tên file rõ), interviewer đọc file đó khi review.
 - Đếm câu tới khi đạt **số câu định sẵn** của interview type → sang Bước 3. Ứng viên có thể chủ động gõ **"xong" / "review"** để kết thúc sớm.
@@ -66,8 +67,10 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 - Cập nhật [weak-register.md](weak-register.md): thêm câu điểm ≤ 2, gỡ/hạ câu đã trả lời vững (≥ 3) qua ≥ 2 lần.
   - ⚠️ **Gỡ một câu = BẮT BUỘC thêm một dòng vào bảng [🔁 Lịch kiểm tra lại](weak-register.md)** — ghi ngày gỡ, hạn kiểm tra (**tuần gỡ + 2**), **góc đã dùng** (để lần sau không lặp) và góc mới đề xuất. Gỡ mà không xếp lịch = câu đó biến mất vĩnh viễn khỏi vùng được hỏi; đó là lỗi.
   - Câu vừa kiểm tra retention: cập nhật cột KQ (✅ dời +2 tuần · 🔻 kéo về bảng sổ yếu) và **ghi góc vừa dùng vào cột "góc đã dùng"**.
-- **Với phiên có bài coding — ghi bản đã review (BẮT BUỘC):** tạo `coding-arena/reviewed/YYYY-MM-DD--<ID>--<slug>.cpp` (`<ID>` = ID bank của câu sinh ra bài code — thường `COD-*`, nhưng câu `concept` bắt viết code theo luật ⑤ thì dùng chính ID đó, vd `CPP-045`) gồm (1) header điểm + danh sách ✅/❌ có đánh nhãn, (2) **bản ứng viên nộp giữ nguyên từng dòng**, chỉ chèn comment review tại đúng dòng, (3) **bản sửa** giữ mọi quyết định thiết kế hợp lý của ứng viên, chỉ vá lỗi đã đánh nhãn. File phải **compile + chạy** (`g++ -std=c++17 -Wall`). Chi tiết: [coding-arena/README.md](coding-arena/README.md). Đây là vùng git-track — nháp ở thư mục gốc vẫn ignore, để lần sau còn làm lại được từ file trống.
+- **Với phiên có bài coding — ghi bản đã review (BẮT BUỘC):** tạo `coding-arena/reviewed/YYYY-MM-DD--<ID>--<slug>.cpp` (`<ID>` = ID bank của câu sinh ra bài code — thường `COD-*`, nhưng câu `concept` bắt viết code theo luật ⑤ thì dùng chính ID đó, vd `CPP-045`) gồm (1) header điểm + danh sách ✅/❌ có đánh nhãn, (2) **bản ứng viên nộp giữ nguyên từng dòng**, chỉ chèn comment review tại đúng dòng, (3) **bản sửa** giữ mọi quyết định thiết kế hợp lý của ứng viên, chỉ vá lỗi đã đánh nhãn. File phải **compile + chạy sạch** (`g++ -std=c++17 -Wall -Wextra`, **không warning** — cùng bộ cờ với luật ⑥). Chi tiết: [coding-arena/README.md](coding-arena/README.md). Đây là vùng git-track — nháp ở thư mục gốc vẫn ignore, để lần sau còn làm lại được từ file trống.
 - **Đồng bộ ngân hàng:** nếu trong phiên interviewer đặt câu **chưa có trong [bank/](bank/)** (câu tự phát/mở rộng), **thêm câu đó vào đúng file bank** (gán ID kế tiếp, metadata, đáp án) — xem §3. Đây là cơ chế giữ bank luôn là nguồn duy nhất và lớn dần theo thực chiến.
+- **Nâng cấp đáp án câu vừa hỏi (BẮT BUỘC với câu ≤ 2 điểm):** nếu câu vừa hỏi là **🟡 nặng cơ chế / 🟠 / 🔴** mà đáp án trong bank vẫn là **đoạn khẳng định ngắn** (chưa có khung 5 phần của [bank/README.md](bank/README.md)), **viết lại đáp án đó ngay trong Bước 4** — nội dung đã soạn cho phần review là sẵn có, chỉ việc chuyển vào bank.
+  - ⚠️ **Vì sao (2026-08-13):** đo thật thấy bank **chỉ dày lên ở chỗ có phiên mock chạm tới** — 21/31 câu `LNX` còn là đoạn ngắn, và toàn bộ 10 câu "đầy đủ" đều là câu từng đi qua mock. Không có luật này thì ứng viên trả lời 0 điểm xong, mở bank ra ôn vẫn gặp đúng đoạn tóm tắt không giúp được gì. Ngoại lệ: câu **🟢 giữ trần cứng 30–60 từ**, không giãn.
 
 ---
 
@@ -78,7 +81,7 @@ Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
 | Type | Số câu | Trần | Cơ cấu | Thời lượng ước |
 |---|---|---|---|---|
 | `daily` | 6 | T2 | 2 rapid + 3 concept (mix 🟢🟡) + 1 revisit (weak-register). Code = **snippet 5–10′** | 15–20′ |
-| `rapid` | 12 | T2 | 🟢🟡 concept, đáp án ngắn | ~15′ |
+| `rapid` | 12 | T2 · **chỉ T1** | 🟢🟡 concept, hỏi thẳng khái niệm, đáp án ngắn. 🚫 **Không follow-up, không a/b/c** — **§6 → Ngoại lệ `rapid`** | ~15′ (**~1′/câu**) |
 | `comprehensive` | 16 | T2 | 1 track chính, đủ 🟢→🔴. **Cộng đúng 16:** 3🟢 + 5🟡 + 3 design + **1 coding cỡ vừa** + 2 revisit + 2 retention/xuyên-topic | ~60′ |
 | `by-level` | 10 | T2 | cùng 1 level (🟢/🟡/🟠/🔴) trong track chọn | 20–40′ |
 | `coding` | 3 | T2 | 3 bài **cỡ nhỏ 10–15′** viết vào coding-arena | 30–45′ |
@@ -92,11 +95,24 @@ Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
 ## 3. Ngân hàng — ID & cách thêm câu
 
 - Bank là **một** ngân hàng, đặt tại [bank/](bank/), chia file theo **domain** cho dễ đọc nhưng ID **xuyên suốt toàn bank**.
-- **ID = `<DOMAIN>-<NNN>`** (số 3 chữ số, tăng dần, không tái sử dụng). Domain: `CPP`, `OS`, `LNX`, `DRV`, `BUS`, `BSP`, `DBG`, `DP`, `DSA`, `NET`, `SD`, `BEH`, `COD`. Xem [bank/README.md](bank/README.md).
-- Mỗi câu có **dòng metadata**: `#### <ID> · <level> · <type> · [· ⭐] · [→ link nguồn]`.
-  - level ∈ 🟢 cơ bản / 🟡 trung bình / 🟠 khó / 🔴 senior.
-  - type ∈ `concept` / `coding` / `design`. (rapid-fire là *chế độ phiên*, rút từ câu `concept` 🟢🟡; không phải type riêng.)
-  - ⭐ = xác suất gặp cao với JD.
+- **ID = `<DOMAIN>-<NNN>`** (số 3 chữ số, tăng dần, không tái sử dụng). **15 domain** (khớp đúng file trong [bank/](bank/)):
+
+  | Domain | File | Domain | File |
+  |---|---|---|---|
+  | `CPP` | cpp.md | `BLD` | build-systems.md |
+  | `OS` | os.md | `EMB` | embedded-fundamentals.md |
+  | `LNX` | linux-sysprog.md | `DBG` | debugging.md |
+  | `DRV` · `BUS` | drivers-embedded.md | `DP` | design-patterns.md |
+  | `BSP` | bsp.md | `DSA` | dsa.md |
+  | `SD` | system-design.md | `NET` | networking.md |
+  | `BEH` | behavioral.md | `COD` | coding.md |
+
+- Mỗi câu có **dòng metadata**: `#### <ID> · <level> · <type> [· ⭐] [· 🏗️] [· 🎤 <ngày>] · [→ link nguồn]`
+  - **level** ∈ 🟢 cơ bản / 🟡 trung bình / 🟠 khó / 🔴 senior.
+  - **type** ∈ `concept` / `coding` / `design`. (rapid-fire là *chế độ phiên*, rút từ câu `concept` 🟢🟡; không phải type riêng.)
+  - **⭐** = xác suất gặp cao với JD.
+  - **🏗️** = câu **mở / tình huống** — chấm theo *khung tiếp cận*, chấp nhận nhiều hướng đúng, **không có đáp án duy nhất** (§5).
+  - **🎤 `<ngày>`** = câu sinh ra từ một phiên mock, không phải soạn sẵn.
 - **Thêm câu mới** (khi interviewer tự phát trong phiên): mở file domain phù hợp, lấy ID kế tiếp, thêm block đầy đủ (metadata + câu + `<details>` đáp án), đánh dấu `🎤 <ngày>` cuối dòng metadata để biết câu đến từ mock. Không tạo bank thứ hai, không để câu sống ngoài bank.
 
 ---
@@ -115,7 +131,25 @@ Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
 >
 > **Kịch trần = 4 khi T1+T2 đầy đủ.** Không được giữ ứng viên ở 3 chỉ vì họ không biết `abidiff` hay `alignas(64)`. Muốn T3 tính điểm thì phải chạy `deep-dive` / `--deep`.
 
+### 🚫 Thang chấm riêng cho phiên `rapid` — BẮT BUỘC đọc kèm
+
+Thang trên định nghĩa điểm theo **T1/T2**. Nhưng phiên `rapid` **cố ý không hỏi T2** ⇒ áp thang trên nguyên xi thì **mọi câu đều kịch trần ở 2–3**, kể cả khi ứng viên trả lời hoàn hảo. Đó là lỗi số học, không phải đánh giá.
+
+**Trong phiên `rapid`, neo lại thang vào thứ đang thực sự đo — độ trôi chảy của T1:**
+
+| Điểm | Nghĩa trong `rapid` |
+|---|---|
+| 0 | Không trả lời được |
+| 1 | Nhớ lõm bõm / có ý sai |
+| 2 | Đúng ý chính nhưng **lòng vòng, phải gợi mới ra**, hoặc thiếu một nửa |
+| 3 | **Đúng + đủ ý chính, nói ra được ngay** — đạt mức mid |
+| 4 | Đúng + **gọn, chính xác, bật ra tức thì**, không thừa chữ nào |
+
+⚠️ **Không trừ điểm vì thiếu T2 trong phiên `rapid`** — nó không được hỏi thì không được chấm. Ngược lại, **lan man cũng bị trừ**: ở màn screen thật, trả lời đúng nhưng dài dòng là điểm trừ, vì nó chiếm thời gian của interviewer.
+
 Ngưỡng: câu **≤ 2** → vào [weak-register.md](weak-register.md). Câu **≥ 3** hai lần liên tiếp → gỡ khỏi weak-register (**và bắt buộc xếp lịch kiểm tra lại** — §1 Bước 4).
+
+> ⚠️ **Câu tụt điểm ở `rapid` KHÔNG tự động là lỗ hổng kiến thức.** Điểm 2 ở đây có thể chỉ nghĩa là *"biết nhưng diễn đạt chậm"*. Khi ghi vào weak-register, **nói rõ là lỗ hổng DIỄN ĐẠT hay lỗ hổng KIẾN THỨC** — hai thứ này ôn bằng hai cách khác nhau, và lần sau phải hỏi lại bằng hai kiểu phiên khác nhau.
 
 ---
 
@@ -192,6 +226,39 @@ Trước khi khẳng định *"dòng này compile được"* / *"cái này lỗi
 
 ---
 
+### ⚠️ NGOẠI LỆ DUY NHẤT của luật ① và ④ — phiên `rapid`
+
+> **Vì sao có mục này (2026-08-13):** một phiên `/mock rapid` bị chạy đúng theo luật ①+④ → 12 câu tình huống nhiều tầng, 2–6 follow-up mỗi câu, kéo dài gấp nhiều lần ngân sách 15′. Ứng viên nhận xét: *"không có sự xuất hiện hỏi về khái niệm trước"*. **Đúng** — và nguyên nhân là **config tự mâu thuẫn**: [interview-types.md](interview-types.md) ghi `rapid` = *"đáp án ngắn gọn, ít follow-up"*, còn §6 luật ① ghi *"MỌI câu đều có follow-up mở rộng"*. Không chỗ nào nói ai thắng, nên interviewer tự chọn — và chọn sai.
+
+**`rapid` đo thứ KHÁC với mọi loại phiên còn lại.** Nó không đo chiều sâu; nó đo **độ trôi chảy khi diễn đạt** — đúng thứ interviewer thật test ở màn screen qua điện thoại và 5–10 phút đầu vòng technical. Ở phỏng vấn thật, **khái niệm hỏi trước, tình huống hỏi sau**; ấp úng khi bị hỏi *"file descriptor là gì"* trong 20 giây đọc rất xấu, kể cả khi ứng viên giải được tình huống khó — vì nó phát tín hiệu *"làm được nhưng không nói được"*.
+
+| | `rapid` | Mọi loại khác |
+|---|---|---|
+| Dạng câu | **Hỏi thẳng khái niệm/so sánh** — được phép hỏi *"X là gì"* | Tình huống + đọc code (luật ②) |
+| Follow-up | **Tối đa 1 probe ngắn**, chỉ khi đáp án lửng. Không leo tầng | ≥1, không giới hạn trên (luật ④) |
+| Cấu trúc a/b/c | **Không dùng** | Bắt buộc (luật ③) |
+| Ngân sách | **~1 phút/câu** — quá 15′ tổng là chạy sai | Theo type |
+| Điểm chấm | Đúng + **gọn + trôi chảy**. Lan man = trừ | Chiều sâu, đánh đổi |
+
+⇒ **Trong phiên `rapid`, luật ① và ④ KHÔNG áp dụng.** Luật ②③⑤ cũng tạm ngưng. Chỉ **luật ⑥ (kiểm chứng bằng compiler ở Bước 3)** vẫn giữ nguyên.
+
+⚠️ **Không được "bù" bằng cách hỏi sâu vài câu giữa phiên rapid.** Muốn sâu thì đổi type — đó là lý do có `daily`/`comprehensive`. Trộn hai chế độ làm hỏng cả hai: không đo được độ trôi chảy, cũng không đủ thời gian đào sâu.
+
+**Phạm vi áp dụng — chính xác ở đâu:**
+
+| Ngữ cảnh | Có áp ngoại lệ? |
+|---|---|
+| Phiên type **`rapid`** (12 câu) | ✅ **Toàn phiên** |
+| **2 câu "rapid" mở màn** trong phiên `daily` (§2) | ✅ Áp cho **đúng 2 câu đó**; 4 câu còn lại theo luật ①–⑤ như thường |
+| **3 câu 🟢 khởi động** trong `comprehensive` (§2) | ❌ **Không** — §2 ghi rõ *"hỏi nhanh, **vẫn có ≥1 follow-up**"* |
+| Mọi phiên khác | ❌ Không |
+
+**Chấm điểm:** dùng **§4 → “Thang chấm riêng cho phiên `rapid`”** — **không** áp thang T1/T2 mặc định, vì T2 không được hỏi thì không được chấm.
+
+> **Hệ quả cho lịch ôn:** `rapid` là loại phiên **duy nhất** luyện năng lực *nói gọn một khái niệm*. Bỏ nó = luyện thiếu một nửa vòng phỏng vấn. Chạy xen kẽ, đừng chỉ chạy `comprehensive`/`deep-dive`.
+
+---
+
 ### 🎚️ TRẦN ĐỘ SÂU theo loại phiên — sâu tới đâu thì DỪNG
 
 > **Vì sao có mục này (2026-08-10):** một phiên `comprehensive` đã bị chạy ở đúng độ sâu của `deep-dive` — đáp án liệt kê `nm -D`/`abidiff`/`readelf`/`LD_DEBUG`, và bài coding là lock-free SPSC ring buffer (30–45′ riêng nó). Ứng viên phản hồi *"nặng thuộc lệnh"* và *"đi quá xa so với mức interview"* — **đúng**. §6 chống phiên **nông**; mục này chống phiên **lệch tầng**. Hai lỗi khác nhau, đều làm hỏng phiên.
@@ -259,8 +326,8 @@ Hai lỗi ngược nhau, §6 chặn cả hai:
 | *"Làm sao khoanh vùng khi khách copy `.so` mới rồi crash?"* | Tên công cụ (`abidiff`, `readelf -d`, `LD_DEBUG`) |
 | *"Giấu state sau con trỏ để `sizeof` không đổi"* | Tên pattern (*Pimpl*), tên flag (`-fvisibility=hidden`) |
 | *"Đầy thì đè cái cũ, và phải đếm được số mất"* | `alignas(64)` chống false sharing, mask thay `%` |
+| *"Move ctor và move assign khác nhau chỗ nào?"* | Số hiệu Item/§ trong sách |
 
 **Phép thử nhanh khi phân vân:** *"Không biết thứ này thì ứng viên có ra quyết định SAI trong công việc không?"* — Có ⟹ T2. Không, chỉ diễn đạt chậm hơn ⟹ T3.
-| *"Move ctor và move assign khác nhau chỗ nào?"* | Số hiệu Item/§ trong sách |
 
 Khi ứng viên phản hồi *"câu này quá sâu"*: **phân định từng ý** (đồng ý / nửa đồng ý / không đồng ý), ghi kết luận vào [weak-register.md](weak-register.md) mục calibration, và **điều chỉnh thang chấm** — như đã làm ngày 2026-08-07 và 2026-08-10. Đừng gật đại, cũng đừng bảo vệ câu hỏi bằng mọi giá.
