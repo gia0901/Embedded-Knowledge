@@ -578,7 +578,50 @@ if (write(fd, buf, n) < 0 && errno == EPIPE) { /* peer đã đóng */ }
 **Namespaces và cgroups là gì? Vì sao là nền tảng của container?**
 <details><summary>Đáp án</summary>
 
-**Namespaces** = *cô lập tầm nhìn*: mỗi loại (pid, mount, net, uts, ipc, user) cho process một "vũ trụ" riêng — pid namespace khiến process thấy mình là PID 1 và không thấy process ngoài; net namespace cho stack mạng riêng. **cgroups** = *giới hạn & hạch toán tài nguyên*: đặt trần CPU/RAM/IO cho một nhóm process (memory limit + OOM cục bộ, cpu quota). Container = **namespaces (cô lập) + cgroups (giới hạn) + rootfs riêng** — không phải máy ảo, vẫn chung kernel host. Docker/LXC/systemd-nspawn đều dựng trên hai cơ chế này.
+**Hai cơ chế độc lập, giải quyết hai vấn đề khác nhau** — trộn lẫn chúng là lỗi phổ biến nhất:
+
+| | **Namespaces** | **cgroups** |
+|---|---|---|
+| Câu hỏi nó trả lời | *"Process này **THẤY** được gì?"* | *"Process này được **DÙNG** bao nhiêu?"* |
+| Bản chất | **Cô lập tầm nhìn** | **Giới hạn & hạch toán tài nguyên** |
+| Các loại | pid · mount · net · uts · ipc · user | memory · cpu · io · pids |
+| Thiếu nó thì | App lạ thấy/giết được process của bạn, đụng cổng, đụng `/tmp` | App lạ ăn hết RAM/CPU, kéo cả máy chết |
+
+### Tình huống điển hình — vì sao cần CẢ HAI
+
+Thiết bị chạy daemon của bạn + app đối tác. App đối tác rò bộ nhớ ⇒ RAM cạn ⇒ **OOM killer giết nhầm daemon của bạn** (nó chọn nạn nhân theo điểm số, không theo "ai có lỗi").
+
+| Triệu chứng | Cơ chế xử lý | Hiệu quả |
+|---|---|---|
+| Rò RAM giết nhầm process khác | **cgroup memory limit** | OOM trở thành **cục bộ trong nhóm đó** — kernel giết đúng thủ phạm |
+| Ghi log đầy `/tmp` | **mount namespace** | `/tmp` riêng, đầy cũng chỉ đầy của nó |
+| Mở trùng cổng TCP | **net namespace** | Stack mạng riêng hoàn toàn |
+| `kill` nhầm process của bạn | **pid namespace** | Không nhìn thấy thì không giết được |
+| Fork bomb | **cgroup `pids`** | Trần số task |
+
+### Container là gì, phát biểu chính xác
+
+> **Container = namespaces (cô lập) + cgroups (giới hạn) + rootfs riêng.** Vẫn **chung kernel host** — không phải máy ảo, không có hypervisor, không boot kernel riêng.
+
+Đó là lý do container **khởi động trong mili-giây** (chỉ là process bình thường có tầm nhìn bị cắt) nhưng **không cô lập bằng VM** (thủng kernel là thủng tất cả).
+
+### 🎯 Trên embedded: bạn gặp nó qua systemd, không phải Docker
+
+Đây là dạng gặp thật nhất trên thiết bị — cùng hai cơ chế, gói trong unit file:
+
+```ini
+[Service]
+MemoryMax=64M                      # cgroup memory -> OOM cuc bo
+CPUQuota=20%                       # cgroup cpu
+TasksMax=32                        # cgroup pids   -> chong fork bomb
+PrivateTmp=yes                     # mount namespace -> /tmp rieng
+ProtectSystem=strict               # mount namespace -> rootfs read-only
+RestrictAddressFamilies=AF_UNIX    # han che mang
+```
+
+**Bẫy:** (1) tưởng namespace giới hạn được tài nguyên — **không**, cô lập tầm nhìn không ngăn app ăn hết RAM; (2) tưởng cgroup cô lập được — **không**, cùng cgroup vẫn thấy và giết nhau được; (3) tưởng container an toàn như VM — chung kernel, một lỗ hổng kernel là chung số phận; (4) đặt `MemoryMax` rồi tưởng xong — process bị OOM trong cgroup vẫn **chết**, phải kèm `Restart=on-failure` thì dịch vụ mới tự hồi.
+
+**Chốt:** *"Namespace trả lời 'thấy được gì', cgroup trả lời 'dùng được bao nhiêu'. Cần cả hai mới cô lập được một app không tin cậy — và trên embedded thì systemd unit file là cách dùng chúng, không phải Docker."*
 </details>
 
 #### LNX-025 · 🟡 · concept · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
@@ -592,7 +635,54 @@ Daemon "cổ điển" (double-fork): `fork` + parent thoát (con thành orphan, 
 **Đọc/ghi file qua `mmap` lợi/hại gì so với `read`/`write`? Vai trò `msync`.**
 <details><summary>Đáp án</summary>
 
-`mmap` truy cập file như mảng bộ nhớ → **không copy user↔kernel mỗi lần** (read/write copy qua buffer), tốt cho **truy cập ngẫu nhiên** file lớn và chia sẻ giữa process; code gọn (con trỏ thay vì lseek+read). Hại: chi phí thiết lập mapping + page fault mỗi trang lần đầu chạm (kém cho quét tuần tự một lần — read tuần tự + readahead thắng); lỗi I/O biến thành **SIGBUS** khó xử; không hợp file nhỏ/streaming; ghi phải `msync` (đẩy trang bẩn xuống disk) để đảm bảo độ bền, và cẩn thận khi file bị truncate dưới chân mapping. Chọn theo mẫu truy cập: ngẫu nhiên/chia sẻ → mmap; tuần tự/streaming/nhỏ → read/write.
+**`mmap` không phải "read nhanh hơn". Nó đổi hai thứ cùng lúc — và cả hai đều có thể lỗ:**
+
+| | `read()`/`write()` | `mmap` |
+|---|---|---|
+| Chuyển dữ liệu | Copy kernel ↔ user mỗi lần | **Không copy** — truy cập thẳng page cache |
+| Chi phí lặp lại | 1 syscall / lần đọc | **1 page fault / 4 KB** chạm lần đầu |
+| Báo lỗi I/O | **Giá trị trả về** (`-1`, `errno`) — xử lý được | **`SIGBUS`** — mặc định là chết |
+| Nhảy lung tung | `lseek` + `read` mỗi lần | Con trỏ, không tốn gì thêm |
+| Chia sẻ giữa process | Mỗi process một bản trong RAM | **Một** bản vật lý, mọi process dùng chung |
+
+### ⚠️ Vì sao quét tuần tự một lần thì `mmap` KHÔNG thắng
+
+Đây là ca hay bị hiểu sai nhất — "bỏ được copy" nghe như luôn thắng, nhưng:
+
+- **`read()` có readahead.** Kernel nhận ra mẫu tuần tự, **nạp trước** các block kế tiếp ⇒ I/O chồng lấn với xử lý ⇒ phần copy 64 KB gần như miễn phí.
+- **`mmap` trả page fault theo từng trang.** File 300 MB / 4 KB = **~76.800 lần trap vào kernel**, cộng áp lực TLB. Nhiều hơn hẳn 4.800 syscall của vòng `read()` buffer 64 KB.
+
+⇒ Đọc **một lần, tuần tự**: `read()` thắng. Đây là con số nên tự tính ra trong đầu khi có người nói *"zero-copy nên nhanh hơn"*.
+
+### `SIGBUS` đến từ đâu — hai kịch bản thật
+
+```
+1. FILE CO LAI DUOI CHAN MAPPING
+   process A: mmap(file, 300MB) ... dang doc o offset 200MB
+   process B: ftruncate(file, 50MB)
+   process A: cham trang 200MB  -> khong con ung voi du lieu nao -> SIGBUS
+
+2. LOI DOC THIET BI (flash mon, the SD hong)
+   cham trang -> kernel doc block -> I/O error
+   -> mmap KHONG CO gia tri tra ve o moi lan cham
+   -> khong con duong nao bao loi  -> SIGBUS
+```
+
+**Đây là khác biệt bản chất đáng nhớ nhất:** đổi mô hình truy cập là **đổi luôn mô hình báo lỗi**. Với `read()` bạn kiểm `errno` rồi xử lý; với `mmap` bạn phải bắt signal hoặc chấp nhận chết. Cũng giải thích vì sao lớp bug này **chỉ nổ ở hiện trường**: flash mòn và tiến trình cập nhật chạy song song đều không có ở bàn làm việc.
+
+### `msync` — và vì sao ghi bằng mmap khó hơn đọc
+
+Ghi vào vùng map chỉ làm trang thành **dirty**; kernel tự đẩy xuống đĩa **lúc nào nó muốn**. Muốn đảm bảo độ bền phải `msync(addr, len, MS_SYNC)`. Mất điện giữa chừng ⇒ **không có thứ tự nào được đảm bảo** giữa các trang — khác với `write()`+`fsync()` nơi bạn kiểm soát được điểm chốt. Với dữ liệu cần toàn vẹn sau mất điện (log giao dịch, config), `write`+`fsync`+`rename` nguyên tử là mẫu an toàn hơn.
+
+### Tiêu chí quyết định — một câu
+
+> Chọn theo **mẫu truy cập**: **ngẫu nhiên** hoặc **chia sẻ giữa process** → `mmap`; **tuần tự / streaming / file nhỏ** → `read`/`write`.
+
+Chữ **ngẫu nhiên** là chìa khoá (bỏ được `lseek`+`read` mỗi lần nhảy, và chỉ nạp đúng trang chạm tới). **Chia sẻ** là lý do thứ hai: 5 process map cùng file 100 MB = **100 MB** trong RAM, không phải 500 MB.
+
+**Bẫy:** (1) `mmap` file đang bị process khác ghi ⇒ `SIGBUS` hoặc đọc ra dữ liệu nửa vời; (2) map file lớn trên hệ 32-bit ⇒ hết không gian địa chỉ ảo dù RAM còn thừa; (3) quên `msync` rồi tưởng đã ghi xong; (4) dùng `mmap` cho file nhỏ ⇒ chi phí thiết lập mapping át mọi lợi ích; (5) đo hiệu năng lần chạy **thứ hai** ⇒ page cache đã nóng, cả hai cách đều nhanh, kết luận sai.
+
+**Chốt:** *"`mmap` đổi copy lấy page fault, và đổi mã lỗi lấy signal. Truy cập ngẫu nhiên hoặc chia sẻ thì hai vế đều lãi; quét tuần tự một lần thì cả hai đều lỗ."*
 </details>
 
 #### LNX-027 · 🟡 · concept · ⭐ · [→ processes-signals](../../../04-linux-system-programming/processes-signals.md)
@@ -989,6 +1079,193 @@ Handler chạy trên **cùng thread**, chen vào tại điểm bất kỳ — k�
 **Kiến trúc tốt hơn cả cờ:** **`signalfd`** hoặc **self-pipe** — signal thành một fd trong `epoll`, không còn handler, không còn `volatile`, không còn `EINTR` ([LNX-030](linux-sysprog.md)).
 
 **Chốt:** *"`volatile` chống compiler cache biến vào thanh ghi; `sig_atomic_t` đảm bảo ghi không bị cắt đôi. Hai bệnh khác nhau — và `volatile` không bao giờ là công cụ đồng bộ đa luồng."*
+</details>
+
+#### LNX-039 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-08-15 · [→ io-multiplexing §8⑤](../../../04-linux-system-programming/io-multiplexing.md)
+**Gateway đọc từ nhiều nguồn rồi đẩy lên uplink chậm. Sau vài phút process bị OOM killer giết. TCP vốn đã có cửa sổ nhận để điều tiết — vì sao nó không cứu được?**
+
+```c
+void on_readable(int in_fd) {
+    ssize_t n = read(in_fd, buf, sizeof buf);
+    if (n > 0) queue_push(&uplink_queue, buf, n);   // hàng đợi userspace, không trần
+}
+void on_writable(int uplink_fd) {
+    // lấy từ uplink_queue ra, write() ra uplink
+}
+```
+*Đầu vào ~2 MB/s · uplink (4G sóng yếu) 500 KB/s · thiết bị 256 MB RAM.*
+
+<details><summary>Đáp án</summary>
+
+**Tên bệnh: thiếu backpressure.** Producer nhanh hơn consumer, phần chênh **dồn vào buffer ứng dụng**. Không có trần ⇒ phình tới hết RAM. Số học: chênh 1,5 MB/s trên máy 256 MB ⇒ chết trong khoảng 3 phút.
+
+### Vì sao TCP không cứu — chỗ hiểu sai phổ biến nhất
+
+TCP **có** flow control và nó **vẫn đang chạy hoàn hảo**. Vấn đề là **chính bạn đã vô hiệu hoá nó**:
+
+```
+read() vo dieu kien:
+  kernel recv buffer  --read()-->  queue cua ban (khong tran)
+         ^                                ^
+    LUON TRONG                       PHINH MAI
+         |
+  => kernel quang cao cua so DAY => ben gui cu gui het toc luc
+
+khong goi read():
+  kernel recv buffer  ---X
+         ^
+     DAY DAN => cua so co ve 0 => ben gui TU DUNG   <- backpressure MIEN PHI
+```
+
+> **Bạn không mất backpressure — bạn dời chỗ tắc từ kernel (có trần cứng, có kiểm soát) sang heap của mình (không trần).**
+
+### Hai hướng xử lý — khác nhau về BẢN CHẤT
+
+| | ① Bỏ dữ liệu (ring buffer đè cái cũ) | ② Chặn nguồn (bounded queue + backpressure) |
+|---|---|---|
+| Hy sinh | **Mất dữ liệu** — phải đếm được số mất | **Độ trễ** dồn ngược về nguồn |
+| Hợp với | Telemetry, video preview, log — *"mới nhất là quan trọng nhất"* | **Giao dịch không được mất** — mã vạch, thanh toán, đo lường |
+| Bẫy | Mất im lặng, không ai biết ⇒ **bắt buộc có counter** | Nguồn cũng đầy ⇒ áp lực lùi tiếp về sensor |
+
+**Với máy quét mã vạch: chọn ②** — một lần quét mất là một giao dịch mất.
+
+### Cách thi hành ② trong event loop
+
+```c
+if (queue_bytes(&q) > HIGH_WATER)          // vd 4 MB
+    epoll_ctl(ep, EPOLL_CTL_MOD, in_fd, &(struct epoll_event){ .events = 0 });  // gỡ EPOLLIN
+...
+if (queue_bytes(&q) < LOW_WATER)           // vd 1 MB — HAI ngưỡng, không phải một
+    epoll_ctl(ep, EPOLL_CTL_MOD, in_fd, &(struct epoll_event){ .events = EPOLLIN });
+```
+
+⚠️ **Phải là hysteresis hai ngưỡng.** Một ngưỡng duy nhất ⇒ queue dao động quanh nó ⇒ bật/tắt `EPOLLIN` mỗi vòng ⇒ **syscall storm**, đổi bug OOM lấy bug CPU.
+
+**Chuỗi áp lực đúng thiết kế:** uplink chậm → queue đầy → gỡ `EPOLLIN` → kernel buffer đầy → cửa sổ về 0 → thiết bị gửi bị chặn → *nó* quyết định bỏ frame nào. **Chỗ tắc hiện ra ở nơi có đủ thông tin để xử lý.**
+
+**Bẫy:** (1) đặt trần theo **số phần tử** thay vì **số byte** — 10.000 message 1 byte khác hẳn 10.000 message 1 MB; (2) chỉ đặt trần mà không log khi chạm trần ⇒ mất tín hiệu sớm nhất báo hệ thống quá tải; (3) tưởng `SO_RCVBUF` nhỏ là đủ — không, chừng nào còn `read()` vô điều kiện thì buffer kernel luôn trống.
+
+**Chốt:** *"Mọi buffer userspace không có trần đều là bom hẹn giờ. TCP đã cho sẵn backpressure — `read()` vô điều kiện chính là hành động vứt nó đi."*
+</details>
+
+#### LNX-040 · 🟠 · concept · ⭐ · 🎤 2026-08-15 · [→ tcp-ip](../../../13-networking/tcp-ip.md)
+**Server đã `SIG_IGN` SIGPIPE và kiểm `EPIPE` đầy đủ. Một client BỊ RÚT DÂY MẠNG — không `close()`, không FIN, không RST. Server vẫn `write()`. Bao lâu thì nó biết?**
+
+<details><summary>Đáp án</summary>
+
+**① `write()` đầu tiên: THÀNH CÔNG**, trả về đủ số byte.
+
+`EPIPE` là câu trả lời sai — và sai vì một lý do đáng nhớ: **`EPIPE` cần một RST bay về**, mà ở đây **không có gì bay về cả**. Máy đã biến mất.
+
+> `write()` chỉ có nghĩa *"đã chép vào buffer gửi của kernel"*, **không bao giờ** có nghĩa *"bên kia đã nhận"*.
+
+Ghi tiếp cho tới khi buffer gửi đầy ⇒ lúc đó mới `EAGAIN` (non-blocking) hoặc chặn (blocking).
+
+**② Ai phát hiện, sau bao lâu:** kernel **retransmit theo thang tăng gấp đôi** (~200 ms, 400 ms, 800 ms, 1,6 s…) tới hết số lần cho phép, rồi `write()`/`read()` trả **`ETIMEDOUT`**. Với mặc định Linux: **khoảng 15–20 phút**.
+
+| Ca | Server biết sau | Vì sao |
+|---|---|---|
+| Client `close()` sạch | **tức thì** | FIN → `read()` trả 0 |
+| Client crash (OS còn sống) | **tức thì** | OS gửi RST → `EPIPE`/`ECONNRESET` |
+| **Rút dây / mất sóng / máy chết** | **~15 phút** | Không ai gửi gì cả — chỉ còn timeout |
+| Client treo nhưng TCP sống | **không bao giờ** | TCP hoàn toàn khoẻ mạnh |
+
+**Hàng cuối là hàng quan trọng nhất:** TCP không biết gì về việc app bên kia còn xử lý được hay không.
+
+### ③ Hai cách rút ngắn — hai tầng khác nhau
+
+| Tầng | Cách | Được | Mất |
+|---|---|---|---|
+| **Kernel/socket** | `SO_KEEPALIVE` + `TCP_KEEPIDLE` / `KEEPINTVL` / `KEEPCNT` (vd 30 s + 5 s × 3 ⇒ ~45 s) | Không phải sửa protocol, áp cho mọi kết nối | Tham số Linux per-socket; **chỉ phát hiện đường chết**, không phát hiện app treo |
+| **Application** | **Heartbeat**: hai bên ping định kỳ, thiếu N nhịp thì tự đóng | Phát hiện **cả app treo mà TCP vẫn sống**; di động mọi OS; đo được cả độ trễ | Phải sửa protocol; tốn băng thông (đáng lưu ý trên 4G tính tiền theo byte) |
+
+**Chọn thế nào:** thiết bị nhiều, mạng di động, cần biết *app* còn sống ⇒ **heartbeat**. Chỉ cần dọn kết nối chết để giải phóng tài nguyên ⇒ **keepalive** là đủ và rẻ hơn.
+
+**Bẫy:** (1) đặt keepalive quá ngắn cho hàng nghìn kết nối trên mạng tính tiền theo byte ⇒ hoá đơn + hao pin; (2) tưởng `write()` thành công là bên kia đã nhận — sai cả với mạng khoẻ; (3) quên rằng **nửa kết nối vẫn ghi được**: peer `close()` rồi, `write()` đầu tiên vẫn OK, phải tới lần sau mới `EPIPE`.
+
+**Chốt:** *"TCP không có tín hiệu 'đối tác còn sống'. **Im lặng và khoẻ mạnh trông giống hệt nhau.** Muốn biết bên kia còn sống thì phải chủ động hỏi."*
+</details>
+
+#### LNX-041 · 🟠 · concept · 🎤 2026-08-15 · [→ io-multiplexing §5, §8](../../../04-linux-system-programming/io-multiplexing.md)
+**Event loop `epoll` level-triggered ăn 100% CPU một core dù không client nào gửi gì. Chỉ đúng dòng gây ra, rồi sửa bằng HAI cách khác nhau về bản chất.**
+
+```c
+ev.events = EPOLLIN | EPOLLOUT;                    // đăng ký một lần lúc accept
+epoll_ctl(epfd, EPOLL_CTL_ADD, conn_fd, &ev);
+...
+if (events[i].events & EPOLLOUT) do_write(fd);     // không có gì gửi thì return luôn
+```
+
+<details><summary>Đáp án</summary>
+
+**Dòng gây bệnh: `ev.events = EPOLLIN | EPOLLOUT` đăng ký thường trực.**
+
+**Bản chất — một câu:** `EPOLLOUT` nghĩa là ***có chỗ trống để ghi***, **không** phải ***có dữ liệu để ghi***. Socket vừa mở thì buffer gửi trống rỗng ⇒ **luôn** sẵn sàng ghi ⇒ LT báo **mỗi vòng** ⇒ `epoll_wait` không bao giờ ngủ.
+
+> LT báo theo **mức**: *"còn ghi được là còn nhắc"* — mà socket thì gần như luôn ghi được. Đây là lý do `EPOLLOUT` **khác hẳn** `EPOLLIN` về cách dùng: `EPOLLIN` thường trực là đúng, `EPOLLOUT` thường trực là bug.
+
+**Chạy thật** (socketpair, đăng ký `EPOLLOUT`, không ghi gì, `epoll_wait` 5 vòng):
+```
+LT  (EPOLLOUT):              epoll_wait bao san sang 5/5 vong   <- busy-loop
+ET  (EPOLLOUT|EPOLLET):      epoll_wait bao san sang 1/5 vong   <- chi canh dau tien
+```
+
+### Hai cách sửa
+
+| | ① `EPOLL_CTL_MOD` bật/tắt theo nhu cầu | ② `EPOLLOUT \| EPOLLET` |
+|---|---|---|
+| Cách làm | Chỉ đăng ký `EPOLLOUT` khi **có dữ liệu chờ gửi**; gửi hết thì gỡ ra | Đăng ký một lần; ET chỉ báo lúc **chuyển trạng thái** "đầy → có chỗ" |
+| Chi phí | **2 syscall** mỗi lượt gửi | 0 syscall thừa |
+| Rủi ro | Thấp, dễ đúng | Quên vét cạn `write` tới `EAGAIN` ⇒ **kẹt vĩnh viễn** |
+| Chọn khi | **Mặc định** | Tải rất cao, đã có kỷ luật vét cạn cả hai chiều |
+
+⚠️ **Cùng một luật ET áp cho cả hai chiều.** Nhiều người nhớ *"ET phải đọc tới `EAGAIN`"* nhưng không chuyển được sang *"ET phải **ghi** tới `EAGAIN`"* — trong khi cơ chế giống hệt: không vét cạn thì không có sườn tiếp theo.
+
+**Bẫy:** (1) "sửa" bằng cách thêm timeout cho `epoll_wait` ⇒ giấu triệu chứng, CPU vẫn cháy; (2) gỡ `EPOLLOUT` mà quên gắn lại khi có dữ liệu mới ⇒ response không bao giờ được gửi; (3) bật/tắt `EPOLLOUT` theo **từng byte** thay vì theo **trạng thái hàng đợi rỗng/không rỗng** ⇒ syscall storm.
+
+**Chốt:** *"`EPOLLIN` hỏi 'có gì để đọc không' — đăng ký thường trực là đúng. `EPOLLOUT` hỏi 'có chỗ để ghi không' — câu trả lời gần như luôn là CÓ, nên đăng ký thường trực là busy-loop."*
+</details>
+
+#### LNX-042 · 🟠 · concept · 🎤 2026-08-15 · [→ ipc-linux §4.3](../../../04-linux-system-programming/ipc-linux.md)
+**Bạn đặt một `pthread_mutex_t` vào vùng shared memory cho hai process dùng chung, nhưng QUÊN `PTHREAD_PROCESS_SHARED`. Hai process đang thao tác lên MỘT mutex hay HAI bản sao — và chuyện gì xảy ra?**
+
+<details><summary>Đáp án</summary>
+
+**MỘT.** Hai process `mmap` cùng vùng ⇒ cùng **một trang vật lý** ⇒ đúng một đối tượng mutex, không có bản sao nào cả. Đây là chỗ trực giác hay sai: *"mỗi process một không gian địa chỉ"* đúng với **địa chỉ ảo**, nhưng shm cố tình cho hai địa chỉ ảo khác nhau **trỏ về cùng RAM vật lý**.
+
+**Vậy cờ đó đổi cái gì?** Nó không tạo/không nhân bản gì — nó **cấm thư viện dùng các tối ưu chỉ đúng trong một process**:
+
+```
+PROCESS_PRIVATE (mac dinh):  futex "private"
+     -> khoa duoc danh theo KHONG GIAN DIA CHI cua process
+     -> process A ngu tren khoa K_A, process B danh thuc khoa K_B
+     -> HAI KHOA KHAC NHAU cho cung mot dia chi vat ly  => MAT WAKEUP
+
+PROCESS_SHARED:              futex "shared"
+     -> khoa danh theo TRANG VAT LY  => hai ben khop nhau
+```
+
+**Mặc định là `PTHREAD_PROCESS_PRIVATE`** — tức **mặc định là cái sai** khi đặt mutex vào shm.
+
+**Vì sao nguy hiểm hơn một lỗi bình thường:**
+
+> ⚠️ Thiếu cờ thì mutex chỉ đúng trong **một** process — hai process vẫn chạy song song vào vùng dữ liệu mà **không hề báo lỗi**. Đây là **bug im lặng**, rất khó lần. — [ipc-linux.md §4.3](../../../04-linux-system-programming/ipc-linux.md)
+
+Không crash, không mã lỗi, không log. `pthread_mutex_lock` vẫn trả về 0. Nó **chạy đúng phần lớn thời gian** (khi hai bên không thật sự tranh chấp), rồi thỉnh thoảng hỏng dữ liệu — Heisenbug kinh điển.
+
+**Khai báo đúng, đủ cả hai cờ:**
+```c
+pthread_mutexattr_t a;
+pthread_mutexattr_init(&a);
+pthread_mutexattr_setpshared(&a, PTHREAD_PROCESS_SHARED);   // ① bắt buộc cho shm
+pthread_mutexattr_setrobust(&a, PTHREAD_MUTEX_ROBUST);      // ② cứu khi một bên chết
+pthread_mutex_init(&hdr->lock, &a);
+```
+① mà thiếu ② thì một bên chết khi đang giữ khoá ⇒ bên kia **treo vĩnh viễn** (xem [LNX-015](linux-sysprog.md)).
+
+**Cùng luật này áp cho:** `pthread_cond_t`, `pthread_rwlock_t`, semaphore — mọi primitive đặt trong shm đều cần `pshared`.
+
+**Chốt:** *"Đặt mutex vào shm là chia sẻ đúng một đối tượng — nhưng thư viện không tự biết điều đó, và mặc định nó giả định ngược lại. Quên cờ là mất đồng bộ trong im lặng."*
 </details>
 
 ---
