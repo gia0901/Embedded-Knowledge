@@ -111,7 +111,7 @@ while ((n = read(p[0], buf, sizeof buf)) > 0) { /* ... */ }
 Kernel gửi **`SIGPIPE`**, mà hành vi mặc định của `SIGPIPE` là **giết process** — im lặng, không log, không core dump. Đây là lý do daemon "tự nhiên biến mất" khi client ngắt kết nối giữa chừng.
 
 ```c
-signal(SIGPIPE, SIG_IGN);      // ✅ gần như BẮT BUỘC cho mọi daemon/server
+signal(SIGPIPE, SIG_IGN);      // ✅ ignore, gần như BẮT BUỘC cho mọi daemon/server
 ...
 if (write(fd, buf, n) < 0 && errno == EPIPE) { /* peer đã đóng — dọn dẹp */ }
 ```
