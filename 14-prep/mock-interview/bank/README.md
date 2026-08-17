@@ -38,8 +38,12 @@
 ```
 
 - **level:** 🟢 cơ bản · 🟡 trung bình · 🟠 khó · 🔴 senior.
-- **type:** `concept` · `coding` · `design`.
+- **type:** `concept` · `coding` · `design` · **`lab` 🧪**.
 - **⭐** = xác suất gặp cao với JD (BSP / C++ system). **🏗️** = câu mở/tình huống, chấm theo khung. **🎤 ngày** = câu được thêm từ một phiên mock.
+- **🧪 `lab`** = **câu NGỒI MÁY LÀM**, không phải câu trả lời miệng. Cấu trúc riêng: code có bug thật (tự chép ra file, build được ngay) → **nhiệm vụ đánh số** → `<details>` chứa **lệnh cần gõ + OUTPUT THẬT đã chạy** + phần *"vì sao"*.
+  - **Luật bắt buộc:** output trong câu `lab` phải là **output chạy thật, dán nguyên văn** — không được viết tay, không được phỏng đoán. Người học đối chiếu màn hình của mình với nó; sai một chữ là hỏng mục đích.
+  - **Vì sao có loại này (2026-08-17):** đo được **T1 3.67 / T2 2.1** qua hai phiên liên tiếp ⇒ ứng viên *biết* công cụ nhưng *chưa dùng* công cụ. Câu `concept` không vá được khoảng cách đó — chỉ có ngồi gõ và nhìn output mới vá được.
+  - **Không dùng ở phiên mock miệng** (`rapid`/`daily`/`comprehensive`) — đây là bài tự luyện ngoài phiên. Phiên mock hỏi câu `concept` tương ứng.
 - **→ nguồn** = link tài liệu để ôn lại (dùng khi review).
 
 ## ✍️ Tiêu chí viết đáp án (áp cho câu mới **và** khi sửa câu cũ)

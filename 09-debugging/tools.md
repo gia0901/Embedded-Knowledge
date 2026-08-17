@@ -127,5 +127,14 @@ Trên Linux: `journalctl`/`syslog`; embedded thường ring buffer + xuất qua 
 | [LNX-023](../14-prep/mock-interview/bank/linux-sysprog.md) | /proc/<PID>/ cung cấp thông tin gì hữu ích cho debug? |
 | [DBG-029](../14-prep/mock-interview/bank/debugging.md) | Vì sao logging quan trọng và một hệ thống log tốt cần gì? |
 
+### 🧪 Bài NGỒI MÁY LÀM
+
+> Khác với bảng trên: đây **không phải câu trả lời miệng**. Mỗi bài có code có bug thật + nhiệm vụ + **output thật đã chạy** để bạn đối chiếu với màn hình của mình. Làm 10–15′/bài, chạy trên Linux.
+
+| ID | Bài | Vá lỗ hổng |
+|----|-----|-----------|
+| [DBG-030](../14-prep/mock-interview/bank/debugging.md) 🧪 | Daemon chết câm khi khởi động → dùng `strace` tìm file thiếu trong 60″ (và phân biệt `ENOENT` thật với `ENOENT` của loader) | DBG-005 |
+| [DBG-031](../14-prep/mock-interview/bank/debugging.md) 🧪 | Chứng minh rò fd + chỉ ra **rò loại fd nào**, chỉ bằng `/proc`, không `lsof` | LNX-023 |
+
 ---
 ⬅️ [gdb.md](gdb.md) · ➡️ Tiếp theo: [memory-bugs.md](memory-bugs.md)

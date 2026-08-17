@@ -644,7 +644,7 @@ Trả lời được ⇒ sửa nguyên nhân. Trả lời *"không rõ, nhưng t
 | Điều kiện | Vì sao | Thiếu thì làm gì |
 |---|---|---|
 | **Tái hiện được ổn định** | Bạn phải trả lời tốt/xấu **chắc chắn** cho mỗi commit | Bug ngẫu nhiên ⇒ chạy N lần mỗi bước và định nghĩa "xấu" theo tỉ lệ |
-| **Mỗi commit build & chạy được** | Commit hỏng giữa chừng làm gãy chuỗi | Đánh dấu `skip` — bisect vẫn chạy nhưng kém chính xác hơn |
+| **Mỗi commit build & chạy được** | Commit không build ⇒ bạn **không trả lời good/bad được** ⇒ bước đó không chia đôi được khoảng | `git bisect skip` ⇒ nó thử commit lân cận. Nhưng nếu **cả một vùng** không build được, bisect không thu hẹp được vùng đó và cuối cùng báo *"There are only 'skip'ped commits left to test"* — trả về **một DANH SÁCH commit khả nghi** thay vì một commit duy nhất |
 | **Biết một mốc TỐT** | Không có cận dưới thì không có khoảng để chia | Lùi dần theo cấp số nhân (10, 100, 1000 commit) tới khi tìm được mốc tốt |
 
 **Điểm mạnh ít người khai thác: tự động hoá.** Viết một script trả về 0 (tốt) / khác 0 (xấu) rồi cho bisect **tự chạy** — nó tìm ra commit thủ phạm mà bạn đi làm việc khác. Với bug hiếm, script cho chạy 200 lần rồi báo xấu nếu lỗi xuất hiện ≥1 lần.
@@ -703,6 +703,597 @@ Khác ở **ranh giới mà chúng chặn**:
 ⚠️ **Và log không thay được số đo.** Bug tích tụ (rò bộ nhớ, rò fd) lộ ra ở **xu hướng**, không ở một dòng log ⇒ phải ghi **định kỳ các chỉ số** (RAM trống, số fd, độ sâu hàng đợi) để nhìn được đồ thị đi lên **trước khi** crash.
 
 **Chốt:** *"Ở production log là bằng chứng duy nhất, nên phải thiết kế trước: có mức, có timestamp monotonic, có ID nối chuyện, và giữ riêng phút cuối trước khi chết. Nhưng phải trả giá bằng mòn flash và đổi timing — nên ghi quyết định, đừng ghi dấu chân."*
+</details>
+
+#### DBG-030 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-17 · [→ tools](../../../09-debugging/tools.md)
+**🧪 NGỒI MÁY LÀM. Daemon chết ngay khi khởi động, chỉ in một dòng vô dụng. Dùng `strace` tìm ra nguyên nhân trong dưới 60 giây.**
+
+```c
+// scannerd.c  —  gcc -Wall -Wextra -g -o scannerd scannerd.c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    FILE *f = fopen("/etc/scannerd/scannerd.conf", "r");
+    if (!f) {
+        fprintf(stderr, "scannerd: khoi dong that bai\n");   // hết. không nói vì sao
+        return 1;
+    }
+    printf("scannerd: dang chay\n");
+    fclose(f);
+    return 0;
+}
+```
+
+**Nhiệm vụ:** ① chạy `./scannerd`, xác nhận nó vô dụng cỡ nào · ② dùng `strace` chỉ ra **chính xác file nào đang thiếu** · ③ trả lời: trong output có **3 lời gọi trả `ENOENT`** — vì sao chỉ **một** cái là bug?
+
+<details><summary>Cách làm · Output thật · Vì sao</summary>
+
+**① Chạy thẳng — đây là tất cả những gì bạn có:**
+```
+$ ./scannerd
+scannerd: khoi dong that bai
+$ echo $?
+1
+```
+
+**② `strace` — nguyên tắc: NHÌN SYSCALL CUỐI CÙNG TRƯỚC KHI CHẾT.**
+```
+$ strace ./scannerd 2>&1 | wc -l
+41                                     <- chi 41 dong, dung so
+$ strace ./scannerd 2>&1 | tail -6
+brk(0x5a2ffeefa000)                     = 0x5a2ffeefa000
+openat(AT_FDCWD, "/etc/scannerd/scannerd.conf", O_RDONLY) = -1 ENOENT (No such file or directory)
+write(2, "scannerd: khoi dong that bai\n", 29) = 29
+exit_group(1)                           = ?
++++ exited with 1 +++
+```
+Đọc từ dưới lên: thoát mã 1 ← in thông báo lỗi ← **`openat` thất bại**. Ba dòng, xong việc.
+
+**Lọc hẹp khi output dài** (chương trình thật ra hàng nghìn dòng):
+```
+$ strace -e trace=openat,access ./scannerd
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)    <- BINH THUONG
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/etc/scannerd/scannerd.conf", O_RDONLY) = -1 ENOENT              <- THU PHAM
++++ exited with 1 +++
+```
+
+**③ Vì sao chỉ một `ENOENT` là bug — phần quan trọng nhất của bài này.**
+
+`ENOENT` **không đồng nghĩa với lỗi**. Dynamic loader **luôn** thử `/etc/ld.so.preload` và một loạt đường dẫn thư viện; trượt là chuyện thường ngày, nó thử tiếp chỗ khác. Người mới dùng `strace` hay báo động nhầm ở đúng chỗ này.
+
+Ba dấu hiệu phân biệt `ENOENT` thật:
+
+| | `ENOENT` bình thường | `ENOENT` là thủ phạm |
+|---|---|---|
+| Vị trí | Đầu output, giai đoạn nạp thư viện | **Sát ngay trước `write(2,…)` + `exit_group`** |
+| Đường dẫn | `ld.so.preload`, `ld.so.cache`, đường dẫn thư viện | **File của ứng dụng** (config, socket, device) |
+| Sau đó | Chương trình **chạy tiếp** | Chương trình **chết** |
+
+⇒ Quy tắc một câu: *"đọc ngược từ `exit_group` lên, syscall thất bại đầu tiên gặp được chính là nó."*
+
+**Ba lệnh đáng thuộc cho ca này:**
+```
+strace ./prog 2>&1 | tail -20            # 90% ca giải quyết ở đây
+strace -e trace=openat,access ./prog     # loc theo nhom syscall
+strace -f -o /tmp/t.log ./prog           # -f: theo ca process con; ghi ra file
+```
+
+**Chuyển sang việc thật:** cùng cách này áp cho `EACCES` (sai quyền), `ECONNREFUSED` (service chưa lên), `ENODEV` (thiếu device node) — ba lỗi khởi động hay gặp nhất trên thiết bị.
+
+**Chốt:** *"strace biến 'không khởi động được' thành một dòng chỉ đúng tên file đang thiếu. Đọc ngược từ `exit_group` lên, và đừng hoảng vì `ENOENT` của loader."*
+</details>
+
+#### DBG-031 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-17 · [→ tools](../../../09-debugging/tools.md), [kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)
+**🧪 NGỒI MÁY LÀM. Chứng minh một process đang rò fd, và chỉ ra rò LOẠI fd nào — chỉ bằng `/proc`, không `lsof`, không cài gì thêm.**
+
+```c
+// gwd.c  —  gcc -Wall -Wextra -g -o gwd gwd.c
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+
+static void handle_request(void) {
+    int fd = open("/etc/hostname", O_RDONLY);      // mỗi request mở một lần
+    char buf[64];
+    if (read(fd, buf, sizeof buf) < 0) perror("read");
+    /* QUÊN close(fd) */
+    int s = socket(AF_INET, SOCK_STREAM, 0);       // và một socket
+    (void)s;                                        /* QUÊN close(s) */
+}
+
+int main(void) {
+    printf("gwd pid=%d\n", getpid());  fflush(stdout);
+    for (int i = 0; i < 200; i++) { handle_request(); usleep(20000); }
+    return 0;
+}
+```
+
+**Nhiệm vụ:** ① chạy nền, **đo số fd hai lần cách nhau vài giây** · ② chỉ ra **rò loại gì** · ③ tìm **trần** fd của process · ④ trả lời: vì sao *"nhiều fd"* **chưa** chứng minh được có rò?
+
+<details><summary>Cách làm · Output thật · Vì sao</summary>
+
+**① Đo xu hướng — một lần đo là vô nghĩa, phải hai lần:**
+```
+$ ./gwd &
+gwd pid=4936
+$ ls /proc/4936/fd | wc -l
+99                     <- t = 1s
+$ sleep 2; ls /proc/4936/fd | wc -l
+293                    <- t = 3s   => TANG DON DIEU, khong he tra ve
+```
+
+**② Rò loại gì — đây là chỗ `/proc/<pid>/fd` hơn hẳn con số đếm:**
+```
+$ ls -l /proc/4936/fd | tail -5
+lr-x------ 1 gia gia 64 ... 95 -> /etc/hostname
+lrwx------ 1 gia gia 64 ... 96 -> socket:[10904]
+lr-x------ 1 gia gia 64 ... 97 -> /etc/hostname
+lrwx------ 1 gia gia 64 ... 98 -> socket:[10905]
+lr-x------ 1 gia gia 64 ... 99 -> /etc/hostname
+```
+Mỗi fd là một **symlink trỏ tới thứ nó đang mở**. Đọc được ngay: rò **xen kẽ hai loại** — file `/etc/hostname` và `socket:[...]` ⇒ thủ phạm là một hàm mở **cả hai** trong cùng một lượt. Đó là manh mối chỉ thẳng vào `handle_request()`, không cần đọc hết codebase.
+
+> Gom nhóm nhanh khi có hàng nghìn fd:
+> ```
+> ls -l /proc/<pid>/fd | awk '{print $NF}' | sort | uniq -c | sort -rn | head
+> ```
+
+**③ Trần:**
+```
+$ grep "Max open files" /proc/4936/limits
+Max open files            1048576              1048576              files
+```
+Đây là **`RLIMIT_NOFILE` của process**, không phải hằng số của máy — systemd đặt qua `LimitNOFILE=`, shell qua `ulimit -n`. Hai process trên cùng máy có thể có trần khác nhau.
+
+**④ Vì sao "nhiều fd" chưa chứng minh gì:**
+
+Một server 5.000 kết nối **đúng ra phải** có ~5.000 fd. Con số tuyệt đối không nói lên điều gì. Ba tiêu chí mới kết luận được:
+
+| Dấu hiệu | Ý nghĩa |
+|---|---|
+| **Tăng đơn điệu, không bao giờ giảm** | ✅ Rò — đây là tiêu chí chính |
+| Tăng rồi giảm theo tải | ❌ Bình thường |
+| Tăng **tỉ lệ với số request đã xử lý** | ✅ Rò, và cho biết rò ở đường xử lý request |
+
+⇒ Cùng logic với chẩn đoán memory leak bằng RSS: **xem xu hướng, không xem một thời điểm**.
+
+**Vì sao `/proc` là công cụ đúng trên thiết bị:** nó **không phải file trên đĩa** — kernel sinh nội dung ngay lúc bạn `read()`, từ struct đang sống. Nên nó có sẵn trên mọi thiết bị Linux kể cả busybox trần, không cài được gì thêm, không tốn chỗ. `lsof` chỉ là chương trình đọc lại chính `/proc/*/fd` rồi trình bày đẹp hơn.
+
+**Hai file cùng họ đáng nhớ:**
+```
+/proc/<pid>/status     # VmRSS (rò RAM), Threads, State
+/proc/<pid>/wchan      # process dang ket o syscall nao (state D)
+```
+
+**Chốt:** *"Rò fd chứng minh bằng **xu hướng**, khoanh vùng bằng **đích của symlink**. `/proc/<pid>/fd` cho cả hai, trên mọi thiết bị, không cần cài gì."*
+</details>
+
+#### DBG-032 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-17 · [→ memory-bugs](../../../09-debugging/memory-bugs.md)
+**🧪 NGỒI MÁY LÀM. Chương trình chạy ra kết quả ĐÚNG, không crash, không warning. Chứng minh nó vẫn hỏng — và đọc được report của ASan.**
+
+```c
+// parse.c  —  gcc -Wall -Wextra -g -o parse parse.c   (KHONG warning nao)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static char *copy_barcode(const char *src) {
+    size_t n = strlen(src);
+    char *dst = malloc(n);          // cấp n byte
+    memcpy(dst, src, n);
+    dst[n] = '\0';                  // ghi vào byte thứ n+1
+    return dst;
+}
+
+int main(void) {
+    char *s = copy_barcode("8935001234567");
+    printf("ma vach: %s\n", s);
+    free(s);
+    return 0;
+}
+```
+
+**Nhiệm vụ:** ① build thường, chạy — nhận xét · ② build lại với ASan, chạy · ③ đọc report: trả lời **ghi bao nhiêu byte, ở đâu, vùng cấp phát ở dòng nào** · ④ trả lời: vì sao bản build thường lại "chạy đúng"?
+
+<details><summary>Cách làm · Output thật · Vì sao</summary>
+
+**① Build thường — không có một dấu hiệu nào:**
+```
+$ gcc -Wall -Wextra -g -o parse parse.c        # KHONG warning
+$ ./parse
+ma vach: 8935001234567                          # dung ket qua
+$ echo $?
+0                                               # thoat sach
+```
+`-Wall -Wextra` **không bắt được** — vì đây không phải lỗi cú pháp, nó là lỗi **lúc chạy**, phụ thuộc giá trị `strlen()` mà compiler không biết trước.
+
+**② Bật ASan — một cờ:**
+```
+$ gcc -Wall -Wextra -g -fsanitize=address -o parse_asan parse.c
+$ ./parse_asan
+```
+
+**③ Report thật, đọc theo bốn mốc:**
+```
+==5029==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x50200000001d ...
+WRITE of size 1 at 0x50200000001d thread T0                                    <-- (1) GHI 1 byte
+    #0 ... in copy_barcode /tmp/lab/parse.c:10                                 <-- (2) TAI DAY
+    #1 ... in main /tmp/lab/parse.c:15
+
+0x50200000001d is located 0 bytes to the right of 13-byte region [0x502000000010,0x50200000001d)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 <-- (3) NGAY SAT SAU vung 13 byte
+allocated by thread T0 here:
+    #0 ... in __interceptor_malloc
+    #1 ... in copy_barcode /tmp/lab/parse.c:8                                  <-- (4) VUNG DO CAP O DAY
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /tmp/lab/parse.c:10 in copy_barcode
+```
+
+| Mốc | Đọc ra gì |
+|---|---|
+| **(1)** `WRITE of size 1` | **Ghi** (không phải đọc), đúng **1 byte** — khớp `dst[n] = '\0'` |
+| **(2)** `parse.c:10` | Dòng vi phạm — chính xác tới số dòng |
+| **(3)** `0 bytes to the right of 13-byte region` | Tràn **ngay sát sau** vùng 13 byte ⇒ off-by-one kinh điển (`strlen`=13, cần **14**) |
+| **(4)** `parse.c:8` | Vùng nhớ đó **cấp phát ở đâu** — nối được thủ phạm với nguồn gốc |
+
+**Sửa:** `malloc(n + 1)` — hoặc bỏ hẳn `malloc` thủ công, dùng `std::string` (C++).
+
+**④ Vì sao bản thường "chạy đúng" — phần đáng giá nhất của bài.**
+
+`malloc(13)` thực tế lấy từ heap một khối **lớn hơn 13** (glibc làm tròn theo bậc, tối thiểu ~24–32 byte, cộng metadata). Byte thứ 14 bạn ghi đè rơi vào **phần đệm chưa ai dùng** ⇒ không ai phát hiện. Nó sẽ nổ khi:
+
+- kích thước đầu vào đổi ⇒ rơi đúng vào metadata của khối kế tiếp ⇒ **crash trong `free()` hoặc `malloc()` sau đó**, cách xa chỗ gây lỗi;
+- đổi compiler/phiên bản glibc/kiến trúc ⇒ bố cục heap đổi;
+- chạy trên thiết bị có allocator khác (embedded thường dùng allocator riêng, đệm ít hơn).
+
+⇒ Đây chính là *"nguyên nhân và triệu chứng cách xa nhau"* ở dạng cụ thể nhất: **test xanh không chứng minh được gì** với lỗi bộ nhớ, vì đó là **undefined behavior**.
+
+**Cách dùng thật (không phải chạy tay một lần):**
+```
+CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer -g
+```
+Bật trong **build debug + CI**, không bật ở bản release (ASan làm chậm ~2× và tốn RAM ~3×). Thêm `detect_leaks=1` (mặc định bật trên Linux) để bắt luôn leak.
+
+⚠️ **Trên embedded:** ASan cần RAM gấp ~3× — thiết bị nhỏ có thể không chạy nổi. Khi đó chạy ASan ở **bản host/unit test** (nơi phần lớn logic vẫn chạy được), rồi mới cross-compile bản sạch cho thiết bị.
+
+**Chốt:** *"`-Wall` bắt lỗi compiler nhìn thấy; ASan bắt lỗi chỉ tồn tại lúc chạy. Chương trình chạy đúng không có nghĩa nó đúng — với lỗi bộ nhớ, nó chỉ có nghĩa là phần đệm heap đang che cho bạn."*
+</details>
+
+#### DBG-033 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-17 · [→ gdb](../../../09-debugging/gdb.md)
+**🧪 NGỒI MÁY LÀM. Chương trình segfault. Shell báo `(core dumped)` — nhưng KHÔNG có file core nào. Tìm cho ra thủ phạm.**
+
+```c
+// crashd.c  —  gcc -Wall -Wextra -g -O0 -o crashd crashd.c   (KHONG warning)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+struct Cfg { char name[16]; int timeout; };
+
+static struct Cfg *load(const char *s) {
+    struct Cfg *c = NULL;                     // không cấp phát
+    if (strlen(s) > 100) c = malloc(sizeof *c);   // điều kiện không bao giờ đúng
+    strcpy(c->name, s);                       // nổ ở đây
+    return c;
+}
+int main(void) { struct Cfg *c = load("scanner-01"); printf("%s\n", c->name); return 0; }
+```
+
+**Nhiệm vụ:** ① `ulimit -c unlimited` rồi chạy — tìm file core · ② giải thích vì sao **không có** core dù shell nói *"core dumped"* · ③ lấy backtrace bằng đường khác · ④ trả lời: **frame #0 nằm trong libc — có phải libc có bug không?**
+
+<details><summary>Cách làm · Output thật · Vì sao</summary>
+
+**① + ② Bẫy đầu tiên, và nó làm rất nhiều người bỏ cuộc:**
+```
+$ ulimit -c unlimited
+$ ./crashd
+/bin/bash: line 27:  6067 Segmentation fault      (core dumped) ./crashd
+$ ls -la core*
+KHONG co core trong thu muc hien tai            <-- shell noi "core dumped" ma khong co file
+$ ulimit -c
+unlimited                                        <-- gioi han DA mo
+```
+
+Vì sao? **`ulimit -c unlimited` chỉ là điều kiện CẦN.** Nơi core đi tới do kernel quyết định:
+```
+$ cat /proc/sys/kernel/core_pattern
+|/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -F%F -- %E
+```
+Dấu `|` ở đầu = **không ghi ra file, mà bơm vào một chương trình**. Ở đây là `apport` (Ubuntu), và apport **bỏ qua binary tự build** (nó chỉ xử lý gói của distro):
+```
+$ ls /var/crash/*crashd*
+apport KHONG luu binary tu build                 <-- core bi vut di hoan toan
+```
+
+**Cách sửa (cần root):**
+```
+echo 'core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern   # ghi ra file trong cwd
+# hoac dung systemd-coredump:  coredumpctl list ; coredumpctl gdb <pid>
+```
+⚠️ Trên **thiết bị embedded** thì ngược lại — thường *chưa* có ai đặt `core_pattern`, nên phải chủ động đặt trong init script, kèm giới hạn dung lượng (core của process 200 MB là file 200 MB trên flash).
+
+**③ Không có root vẫn lấy được backtrace — chạy thẳng trong gdb:**
+```
+$ gdb -q -batch -ex run -ex bt ./crashd
+Program received signal SIGSEGV, Segmentation fault.
+__strcpy_evex () at ../sysdeps/x86_64/multiarch/strcpy-evex.S:614
+#0  __strcpy_evex () at ../sysdeps/x86_64/multiarch/strcpy-evex.S:614
+#1  0x00005555555551f4 in load (s=0x555555556004 "scanner-01") at crashd.c:8
+#2  0x0000555555555215 in main () at crashd.c:11
+```
+
+**④ Frame #0 trong libc — libc KHÔNG có bug. Đây là bài học chính.**
+
+| Frame | Ở đâu | Đọc thế nào |
+|---|---|---|
+| `#0 __strcpy_evex` | Trong libc, **không có source** | Nơi **phát hiện** ra lỗi, hầu như không bao giờ là nơi **gây** lỗi |
+| `#1 load (…) at crashd.c:8` | **Code của bạn** | ⭐ **Thủ phạm** — dòng 8, và gdb in luôn tham số `s="scanner-01"` |
+| `#2 main () at crashd.c:11` | Code của bạn | Ngữ cảnh gọi |
+
+> **Quy tắc:** đọc `bt` từ trên xuống, **dừng ở frame ĐẦU TIÊN thuộc code của bạn**. Đó là chỗ bắt đầu điều tra.
+
+Ở đây: `strcpy` nổ vì `c == NULL` — điều kiện `strlen(s) > 100` không bao giờ đúng nên `malloc` không bao giờ chạy. `-Wall -Wextra` **không bắt được**, vì về mặt cú pháp mọi thứ hợp lệ.
+
+**Lệnh đi tiếp khi đã ở frame đúng:**
+```
+(gdb) frame 1        # nhay toi frame cua minh
+(gdb) list           # xem code quanh do
+(gdb) print c        # => $1 = (struct Cfg *) 0x0   <-- bang chung
+(gdb) info locals
+```
+
+**Chốt:** *"`(core dumped)` không có nghĩa là có file core — `core_pattern` mới quyết định. Và frame #0 trong libc không phải bug của libc: đọc `bt` xuống tới dòng code đầu tiên của mình."*
+</details>
+
+#### DBG-034 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-08-17 · [→ tools](../../../09-debugging/tools.md), [kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)
+**🧪 NGỒI MÁY LÀM. Daemon TREO — không crash, không core, không log thêm dòng nào. Xác định nó đang kẹt ở đâu.**
+
+```c
+// hangd.c  —  gcc -Wall -Wextra -g -o hangd hangd.c
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+int main(void) {
+    printf("hangd pid=%d\n", getpid()); fflush(stdout);
+    int fd = open("/tmp/lab/fifo", O_RDONLY);    // chặn, chờ bên ghi
+    char b[8]; read(fd, b, sizeof b);
+    printf("khong bao gio toi day\n");
+    return 0;
+}
+```
+*Chuẩn bị: `mkfifo /tmp/lab/fifo` rồi `./hangd &`*
+
+**Nhiệm vụ:** ① xác định process đang **ngủ hay quay CPU** · ② tìm ra nó kẹt ở **chỗ nào trong kernel** · ③ thử `gdb -p <pid>` · ④ trả lời: vì sao ở ca này `/proc` **thắng** gdb?
+
+<details><summary>Cách làm · Output thật · Vì sao</summary>
+
+**① Ngủ hay quay CPU — quyết định hướng điều tra:**
+```
+$ grep -E "^(Name|State)" /proc/6157/status
+Name:	hangd
+State:	S (sleeping)
+```
+
+| State | Nghĩa | Nghi gì |
+|---|---|---|
+| `R` | đang chạy | vòng lặp vô hạn, busy-wait ⇒ dùng `perf`/gdb |
+| **`S`** | ngủ, **đánh thức được** | **chờ I/O hoặc chờ khoá** ⇒ xem `wchan` |
+| `D` | ngủ, **không đánh thức được** | kẹt I/O tầng driver/ổ đĩa — thường là phần cứng/NFS |
+| `Z` | zombie | cha quên `wait()` |
+
+**② Kẹt ở đâu — một dòng là ra:**
+```
+$ cat /proc/6157/wchan
+wait_for_partner
+```
+`wait_for_partner` là hàm **trong kernel** đang giữ process. Tên nói thẳng: đang chờ *đối tác* của một FIFO — tức kẹt trong `open()` của pipe, chờ bên ghi mở. Không cần đọc code, không cần symbol, không cần debugger.
+
+Kiểm chứng chéo bằng fd:
+```
+$ ls -l /proc/6157/fd
+... 0 -> /dev/pts/3    1 -> ...    2 -> ...
+```
+⭐ **Chú ý cái KHÔNG có:** không thấy fd nào trỏ tới `fifo`. Vì process còn kẹt **bên trong** `open()` — fd chưa được tạo ra. Sự vắng mặt cũng là bằng chứng.
+
+**③ `gdb -p` — bẫy môi trường thật:**
+```
+$ gdb -q -p 6157 -batch -ex bt
+Could not attach to process.  If your uid matches the uid of the target
+process, check the setting of /proc/sys/kernel/yama/ptrace_scope, or try
+again as the root user.
+ptrace: Inappropriate ioctl for device.
+```
+```
+$ cat /proc/sys/kernel/yama/ptrace_scope
+1
+```
+`ptrace_scope = 1` (mặc định trên Ubuntu và nhiều distro desktop) = **chỉ được ptrace tiến trình con của chính mình**. Ba cách gỡ:
+```
+sudo gdb -p <pid>                                        # nhanh nhat
+echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope      # tam thoi, ca may
+gdb ./hangd  ->  run                                      # chay TU TRONG gdb, khong can quyen
+```
+
+**④ Vì sao `/proc` thắng gdb ở ca này — bài học chính:**
+
+| | `/proc/<pid>/wchan` | `gdb -p` |
+|---|---|---|
+| Quyền | **Không cần gì** | Cần root hoặc sửa `ptrace_scope` |
+| Có sẵn trên thiết bị? | **Luôn có** | Thường không cài |
+| Ảnh hưởng process | **Không đụng vào** | **Dừng process lại** — với daemon đang phục vụ là gây sự cố |
+| Cho biết | Đang kẹt ở hàm kernel nào | Toàn bộ stack userspace, biến, frame |
+
+⇒ Trên thiết bị hiện trường, **`/proc` là bước 1, gdb là bước 2** — và rất nhiều ca dừng luôn ở bước 1. Với daemon đang chạy sản xuất, việc gdb **đóng băng process** khi attach còn là rủi ro thật, không chỉ bất tiện.
+
+**Bộ ba đáng thuộc cho ca treo:**
+```
+cat /proc/<pid>/status | grep State     # ngu hay quay CPU
+cat /proc/<pid>/wchan                   # ket o ham kernel nao
+ls -l /proc/<pid>/fd                    # dang cam nhung gi (va thieu gi)
+```
+
+**Chốt:** *"Treo thì hỏi `/proc` trước, không hỏi debugger. `State` cho biết loại bệnh, `wchan` cho biết chỗ kẹt — miễn phí, không quyền, không làm process dừng."*
+</details>
+
+#### DBG-035 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-08-17 · [→ memory-bugs](../../../09-debugging/memory-bugs.md), [concurrency](../../../02-modern-cpp/concurrency.md)
+**🧪 NGỒI MÁY LÀM. Chương trình đa luồng cho kết quả SAI — nhưng không phải lúc nào cũng sai. Chứng minh có data race.**
+
+```cpp
+// race.cpp  —  g++ -std=c++17 -Wall -Wextra -O0 -o race race.cpp -pthread
+#include <thread>
+#include <vector>
+#include <cstdio>
+static long counter = 0;                      // không atomic, không mutex
+static void worker(int n) { for (int i = 0; i < n; i++) counter++; }
+int main() {
+    std::vector<std::thread> ts;
+    for (int i = 0; i < 4; i++) ts.emplace_back(worker, 100000);
+    for (auto &t : ts) t.join();
+    printf("counter = %ld (dung ra phai 400000)\n", counter);
+}
+```
+
+**Nhiệm vụ:** ① chạy **5 lần**, ghi lại kết quả · ② dùng TSan chỉ ra dòng gây race · ③ trả lời: nếu một lần chạy ra **đúng 400000** thì kết luận được gì?
+
+<details><summary>Cách làm · Output thật · Vì sao</summary>
+
+**① Chạy 5 lần — chú ý lần thứ 2:**
+```
+$ for i in 1 2 3 4 5; do ./race; done
+counter = 385630 (dung ra phai 400000)
+counter = 400000 (dung ra phai 400000)      <-- DUNG! va no chung minh dung SO KHONG
+counter = 322237 (dung ra phai 400000)
+counter = 375613 (dung ra phai 400000)
+counter = 172556 (dung ra phai 400000)
+```
+
+⚠️ **Bẫy build:** với `-O2`, compiler gộp cả vòng lặp thành **một phép cộng** (`counter += n`) ⇒ cửa sổ chen ngang gần như biến mất và **5/5 lần đều ra 400000**. Tôi đã đo. Bug vẫn còn nguyên, chỉ là không lộ. Đây chính là lý do *"chạy thử thấy ổn"* không có giá trị chứng minh với race.
+
+**② TSan — nhưng có một bẫy môi trường trước đã:**
+```
+$ g++ -std=c++17 -g -fsanitize=thread -o race_tsan race.cpp -pthread
+$ ./race_tsan
+FATAL: ThreadSanitizer: unexpected memory mapping 0x5b90ecda1000-0x5b90ecda2000
+```
+Không phải code sai — **TSan xung đột với ASLR của kernel mới** (≥ 6.x, `vm.mmap_rnd_bits` lớn). Sửa bằng cách tắt ASLR cho riêng lần chạy đó, **không cần root**:
+```
+$ setarch -R ./race_tsan
+==================
+WARNING: ThreadSanitizer: data race (pid=6292)
+  Read of size 8 at 0x55555555b020 by thread T2:
+    #0 worker /tmp/lab/race.cpp:5 (race_tsan+0x143c)
+    ...
+  Previous write of size 8 at 0x55555555b020 by thread T1:
+    #0 worker /tmp/lab/race.cpp:5 (race_tsan+0x1456)
+```
+
+Đọc report theo ba mốc: **hai thao tác** (`Read` T2 / `Previous write` T1) · **cùng một địa chỉ** (`0x55555555b020`) · **cùng dòng `race.cpp:5`** — tức `counter++` đọc-sửa-ghi không nguyên tử, hai luồng dẫm lên nhau.
+
+**③ Một lần ra đúng 400000 kết luận được gì? — KHÔNG GÌ CẢ.**
+
+Đây là ý quan trọng nhất của bài. Data race là **undefined behavior**; kết quả đúng chỉ có nghĩa là lần đó các luồng tình cờ không chen vào nhau. Nó phụ thuộc: số core, tải máy, quyết định của scheduler, mức tối ưu, kiến trúc CPU (x86 mạnh về memory ordering hơn ARM ⇒ **code "chạy tốt" trên máy dev x86 vẫn hỏng trên thiết bị ARM**).
+
+> ⇒ Với race, **test không chứng minh được sự vắng mặt của bug**. Chỉ có hai thứ chứng minh được: **công cụ phân tích** (TSan) hoặc **lập luận về đồng bộ** (biến này được bảo vệ bởi khoá nào / là `atomic` nào).
+
+**Cách sửa, theo thứ tự ưu tiên:**
+```cpp
+static std::atomic<long> counter{0};   // ✅ dung nhat cho bo dem: khong khoa, khong race
+// hoac: std::mutex + std::lock_guard   khi can bao ve NHIEU bien cung luc
+```
+
+**Giá phải trả của TSan:** chậm ~5–15×, RAM ~5–10× ⇒ chạy ở **CI và unit test**, không bật trên thiết bị. Và TSan chỉ thấy race **trên đường code thực sự chạy** — nên nó cần test có độ phủ đa luồng tốt, không phải phép màu.
+
+**Chốt:** *"Race không chứng minh được bằng cách chạy thử — chạy đúng chỉ nghĩa là lần này may. Chứng minh bằng TSan, hoặc bằng lập luận biến này được bảo vệ bởi cái gì."*
+</details>
+
+#### DBG-036 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-08-17 · [→ memory-bugs](../../../09-debugging/memory-bugs.md)
+**🧪 NGỒI MÁY LÀM. Một bug mà `-Wall -Wextra` KHÔNG thấy và **ASan cũng KHÔNG báo** — nhưng nó vẫn là bug thật. Tìm công cụ bắt được nó.**
+
+```c
+// cfg.c  —  gcc -Wall -Wextra -g -O0 -o cfg cfg.c   (KHONG warning)
+#include <stdio.h>
+#include <stdlib.h>
+struct Cfg { int timeout_ms; int retries; };
+
+static struct Cfg *make_cfg(int t) {
+    struct Cfg *c = malloc(sizeof *c);
+    c->timeout_ms = t;
+    /* QUÊN: c->retries không được gán */
+    return c;
+}
+int main(void) {
+    struct Cfg *c = make_cfg(500);
+    if (c->retries > 3)                       // đọc field chưa khởi tạo
+        printf("retry nhieu: %d\n", c->retries);
+    else
+        printf("retry it: %d\n", c->retries);
+    free(c);
+    return 0;
+}
+```
+
+**Nhiệm vụ:** ① chạy bản thường 3 lần · ② build lại với **ASan** và chạy — quan sát **kỹ** · ③ chạy `valgrind --track-origins=yes` · ④ trả lời: vì sao ASan **không báo**, và điều đó nói gì về việc chọn công cụ?
+
+<details><summary>Cách làm · Output thật · Vì sao</summary>
+
+**① Bản thường — trông hoàn toàn bình thường, còn ổn định nữa:**
+```
+$ gcc -Wall -Wextra -g -O0 -o cfg cfg.c        # KHONG warning
+$ for i in 1 2 3; do ./cfg; done
+retry it: 0
+retry it: 0
+retry it: 0                                     <- deu tam tap, nhu the la dung
+```
+
+**② Bản ASan — đây là chỗ bất ngờ, đọc kỹ hai dòng:**
+```
+$ gcc -Wall -Wextra -g -O0 -fsanitize=address -o cfg_asan cfg.c
+$ ./cfg_asan
+retry it: -1094795586        <-- GIA TRI RAC hien ra
+$ echo $?
+0                            <-- nhung ASan KHONG BAO GI CA, thoat sach
+```
+
+⭐ **ASan làm bug LỘ RA mà không PHÁT HIỆN ra nó.** Con số `-1094795586` chính là `0xbebebebe` — ASan tô vùng nhớ vừa `malloc` bằng mẫu `0xbe` để lỗi dễ lộ. Nhưng nó **không theo dõi** việc bạn *đọc* một byte chưa được ghi ⇒ không có report, mã thoát 0, CI xanh.
+
+**③ valgrind memcheck — bắt được, và chỉ luôn nguồn gốc:**
+```
+$ valgrind -q --track-origins=yes ./cfg
+==6755== Conditional jump or move depends on uninitialised value(s)
+==6755==    at 0x1091D9: main (cfg.c:13)                    <-- NOI DOC:   if (c->retries > 3)
+==6755==  Uninitialised value was created by a heap allocation
+==6755==    at 0x4848899: malloc
+==6755==    by 0x1091A1: make_cfg (cfg.c:6)                 <-- NOI SINH RA: malloc o day
+==6755==    by 0x1091CA: main (cfg.c:12)
+```
+Hai nửa của report là hai câu hỏi khác nhau: **đọc ở đâu** (`cfg.c:13`) và **giá trị rác đó sinh ra từ đâu** (`cfg.c:6`). Nửa sau chỉ có khi bật `--track-origins=yes` — chậm hơn nhưng gần như luôn đáng.
+
+*(Sẽ có thêm vài report nữa từ `printf` — cùng một giá trị rác lan xuống. Sửa gốc là hết cả chùm.)*
+
+**④ Vì sao ASan mù — và bảng chọn công cụ:**
+
+Chúng **đo hai thứ khác nhau**. ASan canh **biên và vòng đời** của vùng nhớ (ghi ra ngoài? dùng sau khi free?). Nó không có khái niệm *"byte này đã được ghi lần nào chưa"*. Valgrind memcheck theo dõi **từng bit một** ở mức đó — nên nó bắt được, và nên nó chậm.
+
+| | **ASan** | **valgrind (memcheck)** |
+|---|---|---|
+| Biên (overflow) · UAF · double-free | ✅ nhanh, report đẹp | ✅ |
+| Leak | ✅ (LeakSanitizer) | ✅ |
+| **Đọc biến CHƯA KHỞI TẠO** | ❌ **mù hoàn toàn** | ✅ **độc quyền** |
+| Cần build lại? | ✅ **bắt buộc** `-fsanitize=address` | ❌ **chạy trên binary có sẵn** |
+| Tốc độ | chậm ~2× | **chậm ~10–50×** |
+| RAM | ~3× | cao |
+
+⇒ **Quy tắc chọn:**
+- **Build lại được** → ASan là mặc định (bật luôn trong CI, `-fsanitize=address,undefined`).
+- **Nghi đọc biến chưa khởi tạo**, hoặc **có mỗi binary khách gửi, không build lại được** → valgrind.
+- Trên **thiết bị embedded**: ASan cần RAM ~3×, valgrind chậm 10–50× ⇒ cả hai thường **chỉ chạy ở host/unit test**, không chạy trên thiết bị đang phục vụ. Đó là lý do `strace` và `/proc` mới là bộ đồ hiện trường.
+
+**Phòng ngừa từ gốc** (rẻ hơn mọi công cụ): khởi tạo tại chỗ khai báo — `struct Cfg *c = calloc(1, sizeof *c);` hoặc trong C++ dùng `struct Cfg { int timeout_ms{}; int retries{}; };`.
+
+**Chốt:** *"ASan và valgrind không phải hai bản của cùng một thứ. ASan không biết 'byte này đã được ghi chưa' — đúng lớp lỗi đó là chỗ valgrind không thay thế được, và là lý do duy nhất đáng để chịu cái chậm 10–50×."*
 </details>
 
 ---

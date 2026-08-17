@@ -118,5 +118,14 @@ Bug bộ nhớ tốt nhất là bug **không bao giờ được tạo ra**:
 | [DBG-013](../14-prep/mock-interview/bank/debugging.md) | Làm sao phát hiện data race? Vì sao race khó debug bằng cách thông thường? |
 | [DBG-025](../14-prep/mock-interview/bank/debugging.md) | Làm sao phòng ngừa lỗi bộ nhớ ngay từ đầu trong C++ hiện đại? |
 
+### 🧪 Bài NGỒI MÁY LÀM
+
+> **Không phải câu trả lời miệng** — code có bug thật + nhiệm vụ + **output thật đã chạy** để đối chiếu. 10–15′/bài, chạy trên Linux.
+
+| ID | Bài | Vá lỗ hổng |
+|----|-----|-----------|
+| [DBG-032](../14-prep/mock-interview/bank/debugging.md) 🧪 | Chương trình chạy ra kết quả **đúng**, không warning, không crash — chứng minh nó vẫn hỏng, rồi đọc report ASan theo 4 mốc | DBG-024/025 |
+| [DBG-035](../14-prep/mock-interview/bank/debugging.md) 🧪 | Đa luồng cho kết quả sai **không đều** → TSan chỉ đúng dòng. Bẫy: `-O2` **giấu** race; TSan crash trên kernel mới, cần `setarch -R` | DBG-013 |
+
 ---
 ⬅️ [tools.md](tools.md) · ➡️ Tiếp theo: [kernel-debugging.md](kernel-debugging.md)

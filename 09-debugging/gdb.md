@@ -167,6 +167,15 @@ gdb-multiarch ./app                    # ← binary CÓ symbol (bản chưa stri
 
 ---
 
+## 🧪 Bài NGỒI MÁY LÀM
+
+> **Không phải câu trả lời miệng** — code có bug thật + nhiệm vụ + **output thật đã chạy** để đối chiếu. 10–15′/bài, chạy trên Linux.
+
+| ID | Bài | Bẫy môi trường bài dạy luôn |
+|----|-----|------------------------------|
+| [DBG-033](../14-prep/mock-interview/bank/debugging.md) 🧪 | Segfault, shell báo `(core dumped)` nhưng **không có file core** → lấy `bt` bằng đường khác; frame #0 nằm trong libc thì đọc thế nào | `core_pattern` pipe vào apport ⇒ `ulimit -c` một mình **không đủ** |
+| [DBG-034](../14-prep/mock-interview/bank/debugging.md) 🧪 | Daemon **treo**, không crash không log → `/proc` `State` + `wchan` định vị chỗ kẹt | `ptrace_scope=1` chặn `gdb -p` |
+
 ## Câu hỏi phỏng vấn liên quan
 
 > Đáp án sống trong [bank/](../14-prep/mock-interview/bank/) — **một đáp án, một chỗ** ([CLAUDE.md §4.7](../CLAUDE.md)). Tự trả lời trước khi mở.
