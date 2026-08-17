@@ -35,6 +35,18 @@
 | **TLPI summary** (userspace API sâu) | 🟢 | ⬜ | — (trong hàng đợi sách) | The Linux Programming Interface — bổ trợ topic 03–04. Đã lên kế hoạch, lùi ưu tiên sau BSP. |
 | **Networking chiều sâu** | 🟢 | 🟡 | [13-networking](../../13-networking/) | Topic 14 còn nhẹ. TLS handshake, HTTP/2, MQTT chi tiết nếu JD liên quan mạng. |
 
+### 🔎 Phát hiện từ phiên mock 15–17/08 — *lỗ hổng lộ ra khi bị hỏi, không phải khi đọc*
+
+> Đặc điểm chung: **câu bank 🟠 trỏ tới file topic không chứa nội dung đó**. Mẫu này đã lặp **4 lần** ⇒ luật mới ở [config §7](../mock-interview/config.md): kiểm link nguồn có thật sự chứa nội dung **trước khi** đưa câu vào pool ôn.
+
+| Chủ đề | Ưu tiên | Trạng thái | Hiện có ở đâu | Ghi chú / nên bổ sung |
+|--------|---------|-----------|---------------|----------------------|
+| **namespaces & cgroups** | 🔴 | ⬜ | **Không có tài liệu nào** — chỉ có bank [LNX-024](../mock-interview/bank/linux-sysprog.md) (đã viết lại 15/08) | `grep` toàn repo ra 0 kết quả. LNX-024 trỏ `→ ipc-linux.md` nhưng file đó chỉ có chữ "abstract namespace" của Unix socket — **chuyện khác hẳn**. Cần mục mới: ns (pid/mount/net/uts/ipc/user) vs cgroup (memory/cpu/io/pids), container = ns+cgroup+rootfs, **góc embedded: systemd unit** (`MemoryMax=`, `PrivateTmp=`, `TasksMax=`) chứ không phải Docker. Ứng viên **0 điểm** vì repo không dạy. |
+| **Phát hiện peer chết trên TCP** | 🔴 | ⬜ | **Không có tài liệu nào** — chỉ có bank [LNX-040](../mock-interview/bank/linux-sysprog.md) | `grep -rn "keepalive\|ETIMEDOUT"` toàn repo ra 0 kết quả liên quan. Cần thêm vào [13/tcp-ip.md](../../13-networking/tcp-ip.md) cạnh §6: `write()` thành công ≠ đã nhận · retransmit → `ETIMEDOUT` **~15–20 phút** · `SO_KEEPALIVE` + `TCP_KEEPIDLE/INTVL/CNT` vs **heartbeat** tầng ứng dụng + đánh đổi. Lớp lỗi thật của thiết bị cầm tay rời sóng. |
+| **LT + `EPOLLOUT` = busy-loop 100% CPU** | 🟡 | 🟡 | [04/io-multiplexing §8④](../../04-linux-system-programming/io-multiplexing.md) chỉ nói ET phía ghi | Bug phổ biến nhất của người mới viết event loop mà tài liệu **không nói**. Đã có bank [LNX-041](../mock-interview/bank/linux-sysprog.md) kèm số đo chạy thật (LT **5/5** vòng báo sẵn sàng · ET **1/5**). Nên đưa vào §8 của topic doc. |
+| **`mmap` chiều sâu** | 🟡 | 🟡 | [04/file-io.md](../../04-linux-system-programming/file-io.md) nói về `mmap` đúng **1 dòng** (dòng 227) | Thiếu: page fault theo trang (300 MB = ~76.800 fault), **readahead** của `read()`, `SIGBUS` (truncate dưới chân mapping · lỗi đọc flash), `msync` & thứ tự ghi khi mất điện. Bank [LNX-026](../mock-interview/bank/linux-sysprog.md) **đã viết đủ 15/08** ⇒ hoặc viết mục cho topic, hoặc **sửa link** cho trỏ đúng chỗ. |
+| **RSS nhắc lửng — bẫy chẩn đoán nhầm leak** | 🟡 | 🟡 | [09/memory-bugs.md:85](../../09-debugging/memory-bugs.md) một dòng bảng; phần *vì sao* nằm ở [03/memory-management.md](../../03-operating-system/memory-management.md) **không có link nối** | `free()` không trả RAM về OS (glibc giữ arena) ⇒ **RSS không giảm là BÌNH THƯỜNG**, phải xem *xu hướng* chứ không một thời điểm. Chỉ cần **thêm link chéo**. *(Ứng viên tự phát hiện khi ôn 16/08.)* |
+
 ---
 
 ## Nhóm chung (kỹ năng phỏng vấn)

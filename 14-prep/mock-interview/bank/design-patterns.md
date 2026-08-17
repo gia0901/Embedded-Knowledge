@@ -194,7 +194,7 @@ Cấp phát sẵn một tập object cố định + danh sách slot rảnh; `acq
 Decorator thêm hành vi cho object **động, từng lớp** bằng cách bọc nó trong các decorator **cùng interface**, có thể **xếp chồng** nhiều lớp (vd file ← nén ← mã hóa) — tránh bùng nổ lớp con cho mọi tổ hợp tính năng (`EncryptedCompressedStream`...). Mỗi decorator vừa *là* interface đó vừa *giữ* một con trỏ tới object được bọc để ủy nhiệm. Khác Proxy: cả hai đều bọc và cùng interface, nhưng **Proxy kiểm soát *truy cập*** tới một object (lazy load, quyền, cache) — thường một lớp; **Decorator thêm *chức năng*** và thiết kế để **chồng nhiều lớp**. Trong C++ có thể thay bằng template/composition khi tập tính năng biết lúc compile.
 </details>
 
-#### DP-016 · 🟡 · concept · 📦 2026-08-13 · [→ structural](../../../11-design-patterns/structural.md)
+#### DP-019 · 🟡 · concept · 📦 2026-08-13 · [→ structural](../../../11-design-patterns/structural.md)
 **Adapter pattern dùng khi nào? Cho ví dụ trong embedded.**
 <details><summary>Đáp án</summary>
 
@@ -243,7 +243,7 @@ Cả hai đều "bọc" thứ khác lại, nhưng **mục đích ngược nhau**
 | Câu hỏi nó trả lời | *"Làm sao ghép được?"* | *"Làm sao dùng cho đỡ mệt?"* |
 
 **Ví dụ trong embedded:**
-- **Adapter:** driver TMP102 của hãng → interface `ITempSensor` của bạn ([DP-016](design-patterns.md)).
+- **Adapter:** driver TMP102 của hãng → interface `ITempSensor` của bạn ([DP-019](design-patterns.md)).
 - **Facade:** `ScannerApi::scan()` — bên trong nó bật nguồn cảm biến, chờ ổn định, cấu hình phơi sáng, chụp, giải mã, tắt nguồn. Người dùng chỉ gọi **một hàm** thay vì biết cả bảy bước và thứ tự của chúng.
 
 **⭐ Facade thường là thứ bạn phơi ra ở BIÊN GIỚI THƯ VIỆN**: giấu hệ con phức tạp sau một interface nhỏ ⇒ vừa dễ dùng, vừa **giảm bề mặt ABI** phải giữ ổn định ([SD-020](system-design.md)).

@@ -30,17 +30,19 @@
 > **Luật:** gỡ ở tuần N → kiểm tra lại **tuần N+2** (~2 tuần, đúng khoảng quên). Rải vào **slot khởi động 🔁 5–10′ đầu mỗi buổi** ([datalogic-plan](../study-plans/datalogic-plan.md) nguyên tắc ②), không dồn hết vào CN.
 > **Hỏi theo config §6 luật ①:** nén phần nền còn 1 checkpoint, trọng số ở follow-up, **không lặp lại góc cũ**. Điểm **< 3 → kéo thẳng về bảng sổ yếu bên trên** (regression). Điểm ≥ 3 → dời lịch thêm 2 tuần hoặc coi như vững nếu hết plan.
 
-| ID | Gỡ ngày | 🔁 Kiểm tra lại | Góc đã dùng (**cấm lặp**) | Góc mới đề xuất | KQ |
-|----|---------|-----------------|---------------------------|-----------------|-----|
-| CPP-020 | 29/07 | **Tuần 4** (24–29/08) | ① Rule 0/3/5 là gì · ② class `unique_ptr`+`char*` lẫn lộn (10/08) · ③ dtor "vô hại" chỉ in log ⟹ mất move (13/08) | Cho class **có move tự viết** → hỏi copy bị gì; hoặc `= default` đặt ở header vs `.cpp` khác nhau ra sao | ✅ **4** (13/08) |
-| CPP-029 | 03/08 | **Tuần 4** (24–29/08) | ① khác nhau thế nào · ② ctor `explicit` lọt qua emplace (10/08) · ③ `emplace_back(new W)` rò rỉ + khi nào emplace vô ích (13/08) | `emplace_back` vào `vector<T>` khi T có ctor **nhiều đối số** + reallocate giữa chừng → thứ tự thao tác | ✅ **3** (13/08) |
-| CPP-009 | 07/08 | **Tuần 3** (17–23/08) | template ở header, vì sao | Link error thật khi tách template ra `.cpp` → đọc message, chẩn đoán | ⬜ |
-| DP-002 | 07/08 | **Tuần 3** (17–23/08) | Singleton Meyers, lazy + thread-safe | Singleton trong shared library `.so` — có còn *một* instance không? (mỗi `.so` một copy) | ⬜ |
-| OS-003 | 07/08 | **Tuần 3** (17–23/08) | 4 điều kiện Coffman | Cho 2 hàm lock 2 mutex ngược thứ tự → chỉ ra deadlock + sửa bằng `scoped_lock` | ⬜ |
-| OS-007 | 07/08 | **Tuần 3** (17–23/08) | mutex vs semaphore, ownership, PI | Cho tình huống RT: task ưu tiên cao kẹt sau task thấp → gọi tên hiện tượng + cơ chế cứu | ⬜ |
-| CPP-019 | 10/08 | **Tuần 4** (24–29/08) | 3 mức · release/acquire 3 ca · khi nào chọn acq/rel | **Đọc code**: đoạn producer/consumer thiếu nhãn ở một đầu → chỉ ra chỗ thiếu | ⬜ |
-| CPP-024 | 10/08 | **Tuần 4** (24–29/08) | 3 tầng · cách sửa hot-reload config | Cho **backtrace crash trong `free()`** → chẩn đoán ngược về race tầng 2 | ⬜ |
-| CPP-045 | 10/08 | **Tuần 4** (24–29/08) | link vs compile · viết lại class | **Code review**: đồng nghiệp đề xuất `private` không định nghĩa → phản biện | ⬜ |
+> ⚠️ **Cột hạn dùng NGÀY, không dùng "Tuần N"** *(sửa 2026-08-17)*: plan đã bỏ khung Tuần 1–4, chuyển sang [lịch D1–D14](../study-plans/datalogic-plan.md). Nhãn tuần cũ thành mồ côi — giữ ngày tuyệt đối thì không phụ thuộc plan nào đang chạy.
+
+| ID | Gỡ ngày | 🔁 Hạn kiểm tra lại | Góc đã dùng (**cấm lặp**) | Góc mới đề xuất | KQ |
+|----|---------|---------------------|---------------------------|-----------------|-----|
+| CPP-020 | 29/07 | **24–29/08** | ① Rule 0/3/5 là gì · ② class `unique_ptr`+`char*` lẫn lộn (10/08) · ③ dtor "vô hại" chỉ in log ⟹ mất move (13/08) | Cho class **có move tự viết** → hỏi copy bị gì; hoặc `= default` đặt ở header vs `.cpp` khác nhau ra sao | ✅ **4** (13/08) |
+| CPP-029 | 03/08 | **24–29/08** | ① khác nhau thế nào · ② ctor `explicit` lọt qua emplace (10/08) · ③ `emplace_back(new W)` rò rỉ + khi nào emplace vô ích (13/08) | `emplace_back` vào `vector<T>` khi T có ctor **nhiều đối số** + reallocate giữa chừng → thứ tự thao tác | ✅ **3** (13/08) |
+| CPP-009 | 07/08 | **17–23/08** ⏰ ĐẾN HẠN | template ở header, vì sao | Link error thật khi tách template ra `.cpp` → đọc message, chẩn đoán | ⬜ |
+| DP-002 | 07/08 | **17–23/08** ⏰ ĐẾN HẠN | Singleton Meyers, lazy + thread-safe | Singleton trong shared library `.so` — có còn *một* instance không? (mỗi `.so` một copy) | ⬜ |
+| OS-003 | 07/08 | **17–23/08** ⏰ ĐẾN HẠN | 4 điều kiện Coffman | Cho 2 hàm lock 2 mutex ngược thứ tự → chỉ ra deadlock + sửa bằng `scoped_lock` | ⬜ |
+| OS-007 | 07/08 | **17–23/08** ⏰ ĐẾN HẠN | mutex vs semaphore, ownership, PI | Cho tình huống RT: task ưu tiên cao kẹt sau task thấp → gọi tên hiện tượng + cơ chế cứu | ⬜ |
+| CPP-019 | 10/08 | **24–29/08** | 3 mức · release/acquire 3 ca · khi nào chọn acq/rel | **Đọc code**: đoạn producer/consumer thiếu nhãn ở một đầu → chỉ ra chỗ thiếu | ⬜ |
+| CPP-024 | 10/08 | **24–29/08** | 3 tầng · cách sửa hot-reload config | Cho **backtrace crash trong `free()`** → chẩn đoán ngược về race tầng 2 | ⬜ |
+| CPP-045 | 10/08 | **24–29/08** | link vs compile · viết lại class | **Code review**: đồng nghiệp đề xuất `private` không định nghĩa → phản biện | ⬜ |
 
 Ký hiệu KQ: ⬜ chưa hỏi · ✅ ≥3 (vững, dời +2 tuần) · 🔻 <3 (**kéo về sổ yếu**)
 

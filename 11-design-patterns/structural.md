@@ -154,7 +154,7 @@ Tránh **bùng nổ lớp con** cho mọi tổ hợp tính năng (`EncryptedComp
 
 | ID | Câu hỏi |
 |----|---------|
-| [DP-016](../14-prep/mock-interview/bank/design-patterns.md) | Adapter pattern dùng khi nào? |
+| [DP-019](../14-prep/mock-interview/bank/design-patterns.md) | Adapter pattern dùng khi nào? |
 | [DP-007](../14-prep/mock-interview/bank/design-patterns.md) | Pimpl liên quan thế nào tới Bridge pattern? Lợi ích của nó? |
 | [DP-017](../14-prep/mock-interview/bank/design-patterns.md) | Facade khác Adapter thế nào? |
 | [DP-018](../14-prep/mock-interview/bank/design-patterns.md) | Proxy pattern có những biến thể nào? Cho ví dụ ứng dụng. |

@@ -5,6 +5,22 @@
 
 ---
 
+## ⚖️ Luật ƯU TIÊN — file nào thắng khi mâu thuẫn (đọc trước tiên)
+
+> **Thứ tự thắng, cao xuống thấp:**
+> 1. **Người dùng nói trong phiên** (vd *"hỏi khó vào"*, *"bỏ qua câu này"*) — luôn thắng.
+> 2. **`config.md`** (file này) — hợp đồng vận hành.
+> 3. **`interview-types.md` · `tracks.md` · `bank/README.md`** — chi tiết hoá config, **không được trái config**.
+> 4. **`study-plans/*.md`** — lịch chạy; quyết định *hỏi cái gì, khi nào*, **không** quyết định *hỏi thế nào*.
+>
+> ⚠️ **Vì sao có mục này — hai sự cố thật, cùng một nguyên nhân:**
+> - *(13/08)* `interview-types.md` ghi `rapid` = *"ít follow-up"*, `config §6` ghi *"MỌI câu đều follow-up"*. **Không chỗ nào nói ai thắng** ⇒ interviewer tự chọn và chọn sai ⇒ phiên `rapid` chạy quá ngân sách nhiều lần.
+> - *(17/08)* `datalogic-plan` ghi *"`daily` đào T2 vào câu điểm thấp"*, trái với `config §4` (*"điểm thấp ở rapid có thể chỉ là lỗ hổng diễn đạt"*) và trái tinh thần §6. Plan là tầng 4, config là tầng 2 ⇒ **plan sai, đã sửa**.
+>
+> **Khi phát hiện mâu thuẫn: sửa file tầng thấp cho khớp file tầng cao, rồi ghi lại VÌ SAO** — đừng sửa im lặng, vì lần sau người khác sẽ sửa ngược lại.
+
+---
+
 ## 0. Mặc định (defaults)
 
 | Tham số | Giá trị mặc định | Ghi chú |
@@ -76,26 +92,26 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 
 ## 2. Số câu & cấu trúc theo interview type
 
-Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
+> ⚠️ **Cơ cấu chi tiết của từng type sống ở [interview-types.md](interview-types.md), KHÔNG chép lại ở đây.** Bảng dưới chỉ giữ **số câu + trần** — hai thứ ngắn, ổn định, cần tra nhanh lúc chốt phiên (Bước 1). *(Trước 2026-08-17 bảng này chép cả cột "Cơ cấu" — tức mô tả cơ cấu tồn tại ở hai file, đúng loại trùng lặp đã gây 4 sự cố trôi lệch. Đã bỏ.)*
 
-| Type | Số câu | Trần | Cơ cấu | Thời lượng ước |
-|---|---|---|---|---|
-| `daily` | 6 | T2 | 2 rapid + 3 concept (mix 🟢🟡) + 1 revisit (weak-register). Code = **snippet 5–10′** | 15–20′ |
-| `rapid` | 12 | T2 · **chỉ T1** | 🟢🟡 concept, hỏi thẳng khái niệm, đáp án ngắn. 🚫 **Không follow-up, không a/b/c** — **§6 → Ngoại lệ `rapid`** | ~15′ (**~1′/câu**) |
-| `comprehensive` | 16 | T2 | 1 track chính, đủ 🟢→🔴. **Cộng đúng 16:** 3🟢 + 5🟡 + 3 design + **1 coding cỡ vừa** + 2 revisit + 2 retention/xuyên-topic | ~60′ |
-| `by-level` | 10 | T2 | cùng 1 level (🟢/🟡/🟠/🔴) trong track chọn | 20–40′ |
-| `coding` | 3 | T2 | 3 bài **cỡ nhỏ 10–15′** viết vào coding-arena | 30–45′ |
-| `deep-dive` | 5 | 🔺 **T3** | 🟠🔴 design/tình huống 1 track; bài coding được phép **cỡ lớn 40′+** | ~40′ |
-| `weak-review` | toàn bộ weak-register (track chọn) | T2 | hỏi lại tới khi vững | linh hoạt |
-| `retention` | 8 | T2 | câu đến hạn ở bảng 🔁 Lịch kiểm tra lại, spaced review | ~20′ |
-| `full-review` | 12 | T2 | mọi câu đã hỏi (yếu + tốt) | ~45′ |
+| Type | Số câu | Trần |
+|---|---|---|
+| `daily` | 6 | T2 |
+| `rapid` | 12 | T2 · **thực tế chỉ chạm T1** — xem §6 Ngoại lệ |
+| `comprehensive` | 16 | T2 |
+| `by-level` | 10 | T2 |
+| `coding` | 3 | T2 |
+| `deep-dive` | 5 | 🔺 **T3** |
+| `weak-review` | toàn bộ weak-register (lọc theo track) | T2 |
+| `retention` | 8 | T2 |
+| `full-review` | 12 | T2 |
 
 ---
 
 ## 3. Ngân hàng — ID & cách thêm câu
 
 - Bank là **một** ngân hàng, đặt tại [bank/](bank/), chia file theo **domain** cho dễ đọc nhưng ID **xuyên suốt toàn bank**.
-- **ID = `<DOMAIN>-<NNN>`** (số 3 chữ số, tăng dần, không tái sử dụng). **15 domain** (khớp đúng file trong [bank/](bank/)):
+- **ID = `<DOMAIN>-<NNN>`** (số 3 chữ số, tăng dần, không tái sử dụng). **16 domain** (khớp đúng file trong [bank/](bank/)):
 
   | Domain | File | Domain | File |
   |---|---|---|---|
@@ -106,14 +122,26 @@ Chi tiết ở [interview-types.md](interview-types.md). Bảng nhanh:
   | `BSP` | bsp.md | `DSA` | dsa.md |
   | `SD` | system-design.md | `NET` | networking.md |
   | `BEH` | behavioral.md | `COD` | coding.md |
+  | **`RES`** | **resume.md** — bám [RESUME.tex](../../RESUME.tex) | | |
+
+  > ⚠️ **`RES` có dạng đáp án RIÊNG.** Chỉ ứng viên mới biết họ đã làm gì, nên đáp án **không phải "lời giải"** mà là **khung 4 phần**: *interviewer đang dò gì · câu trả lời tốt gồm · nền kỹ thuật phải nắm · bẫy*. Chấm theo **khung tiếp cận** (🏗️), không theo đáp án duy nhất.
 
 - Mỗi câu có **dòng metadata**: `#### <ID> · <level> · <type> [· ⭐] [· 🏗️] [· 🎤 <ngày>] · [→ link nguồn]`
   - **level** ∈ 🟢 cơ bản / 🟡 trung bình / 🟠 khó / 🔴 senior.
-  - **type** ∈ `concept` / `coding` / `design`. (rapid-fire là *chế độ phiên*, rút từ câu `concept` 🟢🟡; không phải type riêng.)
+  - **type** ∈ `concept` / `coding` / `design` / **`lab` 🧪**. (rapid-fire là *chế độ phiên*, rút từ câu `concept` 🟢🟡; không phải type riêng.)
+    - **`lab` 🧪 = bài NGỒI MÁY LÀM**, không hỏi trong phiên mock miệng. Code có bug thật + nhiệm vụ đánh số + `<details>` chứa lệnh cần gõ và **OUTPUT THẬT đã chạy, dán nguyên văn** (cấm viết tay/phỏng đoán). Không chấm điểm, không vào weak-register; theo dõi *đã làm hay chưa* ở **§📍 plan**. Phiên mock hỏi câu `concept` tương ứng. Quy ước đầy đủ: [bank/README.md](bank/README.md).
   - **⭐** = xác suất gặp cao với JD.
   - **🏗️** = câu **mở / tình huống** — chấm theo *khung tiếp cận*, chấp nhận nhiều hướng đúng, **không có đáp án duy nhất** (§5).
   - **🎤 `<ngày>`** = câu sinh ra từ một phiên mock, không phải soạn sẵn.
 - **Thêm câu mới** (khi interviewer tự phát trong phiên): mở file domain phù hợp, lấy ID kế tiếp, thêm block đầy đủ (metadata + câu + `<details>` đáp án), đánh dấu `🎤 <ngày>` cuối dòng metadata để biết câu đến từ mock. Không tạo bank thứ hai, không để câu sống ngoài bank.
+
+  ⚠️ **BẮT BUỘC lấy ID bằng LỆNH, không bằng mắt** — và kiểm trùng sau khi thêm:
+  ```bash
+  cd 14-prep/mock-interview/bank
+  grep -oh "^#### LNX-[0-9]*" linux-sysprog.md | sed 's/.*-//' | sort -n | tail -1   # ID lon nhat
+  grep -oh "^#### [A-Z]*-[0-9]*" *.md | sed 's/#### //' | sort | uniq -d            # PHAI rong
+  ```
+  > **Vì sao (2026-08-17):** rà soát phát hiện **3 ID trùng** — `DP-016`, `DSA-013`, `DSA-014` mỗi cái bị gán cho **hai câu khác nhau**, tồn tại lặng lẽ 4 ngày. Cả ba đều sinh từ đợt di trú 13/08: người thêm câu **nhìn bằng mắt** ID cuối file thay vì đếm, mà file đó có câu chèn giữa. Hậu quả: link `[DSA-014]` trỏ tới **hai đích khác nhau**, log phiên cũ tham chiếu sai câu. Đã đánh số lại thành `DP-019`, `DSA-015`, `DSA-016` (giữ ID cũ cho câu **có trước**, vì log lịch sử đã trỏ vào đó).
 
 ---
 
@@ -215,6 +243,13 @@ Trả lời đúng **không** kết thúc câu hỏi. Kỹ thuật hiệu quả:
 - **Hỏi ngược để kiểm tra ranh giới:** ứng viên nói *"phải đổi sang seq_cst"* → hỏi *"nêu ca mà `relaxed` là ĐỦ, ranh giới nằm ở đâu?"*
 - **Chỉ vào một dòng cụ thể:** *"tại thời điểm dòng 22 chạy, `fd_` mang giá trị gì? Nó đến từ đâu?"*
 - **Truy tiếp khi câu trả lời sai mà không gợi ý** — hỏi cụ thể hơn (2–3 lần), sai vẫn không sửa giữa phiên. Chỗ đó chính là lỗ hổng thật, để dành cho Bước 3.
+
+> ⚠️ **Phân biệt "truy tiếp TRONG một câu" với "xếp lịch đào sâu một chủ đề"** *(bổ sung 2026-08-17 — ứng viên phát hiện mâu thuẫn trong plan)*:
+> - **Trong một câu đang hỏi:** trả lời sai thì **vẫn truy tiếp 2–3 lần** để lộ ranh giới hiểu biết. Đó là luật ④ ở trên, giữ nguyên.
+> - **Khi xếp phiên SAU cho cùng chủ đề đó:** ❌ **KHÔNG** đưa câu vừa đạt **0–2 điểm** vào phiên đào T2. T1 chưa có thì hỏi T2 lên trên **không đo được gì và không dạy được gì**. Đường đúng của câu đó là: **đọc lại tài liệu → hỏi lại ở T1, góc khác**.
+> - **Câu đưa lên T2 phải là câu đã đạt 3–4** — T1 chắc mới sẵn sàng cho vận dụng. Phỏng vấn thật cũng vậy: trả lời khái niệm gọn ⇒ interviewer follow-up sâu hơn; ú ớ ở khái niệm ⇒ họ **chuyển câu khác**.
+>
+> **Vì sao có mục này:** Giai đoạn 1 của [datalogic-plan](../study-plans/datalogic-plan.md) mắc đúng lỗi này — ứng viên phản ánh *"khái niệm chưa cứng, thậm chí chưa hỏi, đã phải trả lời câu chuyên sâu"*. Đo lại thấy phủ bank chỉ **29%** trong khi các phiên toàn chạy `by-level 🟠`/`deep-dive`.
 
 **⑤ Bắt VIẾT CODE rồi review chính code đó — kể cả phiên không phải type `coding`.**
 Một bug thật trong code ứng viên tự viết có giá trị hơn mười câu lý thuyết. Câu hỏi về RAII / move / API design / concurrency: yêu cầu viết vào [coding-arena/](coding-arena/) rồi đọc file. **Lỗi ứng viên tự tạo ra mà không nhận ra là dữ liệu chẩn đoán tốt nhất của cả phiên.**
@@ -331,3 +366,38 @@ Hai lỗi ngược nhau, §6 chặn cả hai:
 **Phép thử nhanh khi phân vân:** *"Không biết thứ này thì ứng viên có ra quyết định SAI trong công việc không?"* — Có ⟹ T2. Không, chỉ diễn đạt chậm hơn ⟹ T3.
 
 Khi ứng viên phản hồi *"câu này quá sâu"*: **phân định từng ý** (đồng ý / nửa đồng ý / không đồng ý), ghi kết luận vào [weak-register.md](weak-register.md) mục calibration, và **điều chỉnh thang chấm** — như đã làm ngày 2026-08-07 và 2026-08-10. Đừng gật đại, cũng đừng bảo vệ câu hỏi bằng mọi giá.
+
+---
+
+## 7. 📊 ĐỘ PHỦ — chống "đào sâu một góc, bỏ trắng phần còn lại" (BẮT BUỘC)
+
+> **Vì sao có mục này (2026-08-17):** rà soát tình cờ phát hiện sau **15/28 ngày** của plan, phủ bank chỉ **114/397 = 29%** — và lệch nặng: `CPP` **71%**, `LNX` **59%**, nhưng **`DRV` 0%** (42 câu, **trụ lớn nhất của JD**, chưa hỏi một câu nào), `BSP` 6%, `NET`/`BEH`/`RES` 0%.
+>
+> **Không có luật nào bắt đo, nên không ai đo.** Mỗi phiên đều "tốt" khi nhìn riêng lẻ; chỉ khi cộng lại mới thấy hai tuần đã đi vào một góc. Đây là lỗi **chỉ nhìn thấy ở mức tổng**, nên phải có luật riêng.
+
+**Ba tình huống BẮT BUỘC đo:**
+1. **Trước khi bắt đầu một giai đoạn/tuần mới** của plan.
+2. **Mỗi 5 phiên** — dù plan có nói gì.
+3. **Khi ứng viên hỏi "ôn tới đâu rồi"** — trả lời bằng số, không bằng cảm nhận.
+
+**Lệnh đo:**
+```bash
+cd 14-prep/mock-interview
+# So cau DA TUNG HOI (rut tu log phien)
+grep -oh "\b\(CPP\|OS\|LNX\|DRV\|BUS\|BSP\|SD\|BEH\|BLD\|EMB\|DBG\|DP\|DSA\|NET\|COD\|RES\)-[0-9]\{3\}" \
+  sessions/*.md | sort -u | sed 's/-[0-9]*//' | sort | uniq -c
+# So cau CO trong bank
+grep -c "^#### " bank/*.md
+```
+
+**Đọc kết quả — ngưỡng hành động:**
+
+| Tình trạng | Nghĩa | Việc phải làm |
+|---|---|---|
+| Domain 🎯 **trụ JD** phủ **< 20%** | 🔴 Rủi ro cao nhất | **Dừng đào sâu**, chuyển sang `rapid` quét rộng domain đó ngay |
+| Một domain > 60% trong khi domain khác < 10% | 🟠 Lệch | Cân lại lịch — xem [datalogic-plan §🔄](../study-plans/datalogic-plan.md) |
+| Tổng phủ < 50% khi đã dùng > 50% quỹ thời gian | 🔴 Không kịp | Cắt `deep-dive`/`by-level`, ưu tiên `rapid` + `daily` |
+
+⚠️ **Phủ KHÔNG phải mục tiêu tự thân.** Hỏi qua loa 397 câu vô dụng ngang hỏi sâu 100 câu rồi bỏ trắng phần còn lại. Luật này chỉ để **phát hiện lệch**, còn quyết định vẫn theo *xác suất bị hỏi × độ yếu hiện tại*. Domain ngoài JD (vd `EMB` cụm RTOS/bare-metal) **cố ý** để phủ thấp — ghi rõ lý do ở plan thay vì cố kéo lên.
+
+**Ghi kết quả ở đâu:** bảng phủ trong **§📍 của plan đang chạy** — không tạo file thứ hai, không chép số vào `bank/README.md` (đó chính là lỗi *"một sự thật, hai chỗ"* đã xảy ra 4 lần).

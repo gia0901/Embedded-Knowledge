@@ -30,7 +30,11 @@
     **Bộ công cụ lõi đã chốt:** `gdb` · `strace` · ASan · `/proc`+`/sys` · valgrind (đúng một việc: biến chưa khởi tạo) · TSan (đa luồng). **Cắt hẳn:** `perf`, `ltrace`, `gdbserver`/`addr2line` bài riêng — giữ ở mức câu `concept` là đủ. Lý do cắt: phỏng vấn embedded hỏi *"nó crash/treo"* nhiều hơn hẳn *"nó chậm"*.
     **⚠️ Ba bẫy môi trường đã đo thật và viết thẳng vào bài** (đây là thứ làm người ta bỏ cuộc, không phải kiến thức debug): `core_pattern` pipe vào apport ⇒ `ulimit -c` một mình **không đủ**, apport còn **vứt luôn** core của binary tự build · `ptrace_scope=1` chặn `gdb -p` · **TSan chết ngay khi khởi động trên kernel 6.x** vì xung đột ASLR, phải `setarch -R`.
     **📌 Phát hiện đáng nhớ:** cùng một data race, build `-O2` thì **5/5 lần chạy đều ra kết quả ĐÚNG** (compiler gộp vòng lặp thành một phép cộng), `-O0` thì sai 4/5. Và ASan **làm lộ** giá trị rác (`0xbebebebe`) nhưng **không báo lỗi**, thoát mã 0.
-- **▶️ LÀM TIẾP:** **Tuần 2 Buổi 3 — phần test chính vẫn còn nợ.** 🧪 **Làm 3 bài lab TRƯỚC khi vào mock** — chúng đúng là dạng luyện tầng vận dụng mà chẩn đoán chỉ ra. Warm-up `rapid` đã chạy 16/08 và cho thấy **T1 debugging đã vững** ⇒ **bỏ qua phần đọc lại khái niệm**, vào thẳng tầng vận dụng: đọc [gdb](../../09-debugging/gdb.md) + [tools](../../09-debugging/tools.md) + [memory-bugs](../../09-debugging/memory-bugs.md) **theo lối "mỗi mục đọc xong tự viết ra dòng lệnh/dòng code sẽ gõ thật"** (chữa lỗ hổng ① — chẩn đoán được, sửa không được) → `/mock daily track debugging`.
+- **🔄 TÁI CẤU TRÚC PLAN 2026-08-17 — đọc [§🔄 Giai đoạn 2](#-giai-đoạn-2--phủ-rộng-trước-sâu-sau-tái-cấu-trúc-2026-08-17) trước khi làm tiếp.** Đo phủ bank: **114/397 = 29%**, trong đó **`DRV` 0%** (42 câu, trụ lớn nhất JD), `BSP` 6%, `EMB` 2%, `NET`/`BEH`/`RES` 0% — trong khi `CPP` 71%, `LNX` 59%. ⇒ **Bỏ khung Tuần 3/Tuần 4 cũ**, chuyển sang **lịch 14 ngày phủ rộng trước**: `rapid` quét rộng → `daily` đào T2 vào đúng câu điểm thấp. **TẠM DỪNG `by-level 🟠` và `deep-dive`** tới khi phủ ≥ 70%. Bài code nặng chuyển hẳn sang [7 bài 🧪 lab](../mock-interview/bank/debugging.md) (tự làm, không tính điểm mock).
+- **📄 BANK MỚI — domain `RES` bám RESUME** ([bank/resume.md](../mock-interview/bank/resume.md), 12 câu): phần **chắc chắn 100% bị hỏi** mà repo trắng hoàn toàn cho tới 17/08. Đáp án là **khung 4 phần** (*interviewer dò gì · trả lời tốt gồm · nền kỹ thuật · bẫy*), không phải lời giải. Chạy bằng `/mock ... track resume`. ⚠️ **Hai rủi ro đã soi ra từ [RESUME.tex](../../RESUME.tex):** ① con số *"giảm 70% thời gian"* sẽ bị hỏi **đo bằng cách nào** — không bảo vệ được thì mất niềm tin cho cả buổi ([RES-009](../mock-interview/bank/resume.md)); ② resume liệt kê **Debugging** như kỹ năng trong khi [CLAUDE.md §2](../../CLAUDE.md) ghi đó là điểm yếu tự nhận — interviewer sẽ khoan đúng đó ([RES-008](../mock-interview/bank/resume.md)), nên **7 bài 🧪 lab là việc gấp**. Resume cũng **không nhắc Yocto/I2C/SPI/PCI-USB** — chuẩn bị sẵn câu trả lời trung thực ([RES-012](../mock-interview/bank/resume.md)).
+- **▶️ LÀM TIẾP:** **Ngày D1 của [lịch 14 ngày](#lịch-14-ngày-còn-lại)** — đọc [driver-basics](../../05-drivers-device-tree/driver-basics.md) + [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md), rồi `/mock rapid track drivers-dt` (kéo `DRV` từ **0%** lên) → `/mock daily track drivers-dt`.
+  - 🔁 **5′ khởi động:** 4 câu retention **đã tới hạn 17–23/08** — `CPP-009` · `DP-002` · `OS-003` · `OS-007` (góc mới đã soạn sẵn ở [weak-register](../mock-interview/weak-register.md)).
+  - *(Buổi 3 cũ của Tuần 2 — `daily track debugging` — gộp vào **D12**: warm-up `rapid` 16/08 cho thấy **T1 debugging đã vững**, nên không còn ưu tiên. Phần vận dụng vá bằng **7 bài 🧪 lab**.)*
 - **Nợ lại:**
   - ① ⬜ **Bài coding** `SocketHandle` (CPP-054) + `ring_buffer_v2` bản mutex (COD-006) — chạy `/mock coding track cpp-system`, làm từ file trống. *(Cần một phiên mock, không tự làm hộ được.)*
   - ② ✅ **Xong 2026-08-13** — viết lại bank **DP-011** (DIP/HAL): 465 → 3.915 ký tự, thêm sơ đồ đảo chiều phụ thuộc, 3 kiểu seam (virtual · template/CRTP · link-time) kèm đánh đổi, 4 bẫy.
@@ -49,7 +53,7 @@
     - ✅ **Topic 08 xong** (22 câu): 7 câu mới (`EMB-033`…`036` — SoC vs PC · hard/soft realtime · realtime ở mức lập trình · giảm flash/RAM; `BSP-028`…`030` — RTOS+Linux kết hợp · initramfs · init PID 1), **7 câu làm dày** (`DRV-008/012/013/015/016/017/018`) — **5 trong số đó nằm luôn trong nợ ④**.
     - ✅ **Topic 01 xong** (19 câu): 5 câu mới (`CPP-060`…`064` — trả địa chỉ biến cục bộ · pure virtual/abstract · diamond problem · full vs partial specialization · non-type template parameter), 1 câu làm dày (`CPP-009`).
     - ✅ **Topic 06 xong** (17 câu): 9 câu mới (`BLD-011`…`019` — configure/build & out-of-source · `find_package` · cross-compile & build/host/target · **sysroot** · khó khăn cross-compile · các bước `.cpp`→exe · include guard · make incremental sai ở đâu · Makefile hay CMake). *(`undefined reference` và `Yocto vs Buildroot` đã có sẵn ở `SD-026`/`BSP-017`.)*
-    - ✅ **Bốn topic cuối xong** (52 câu): `11` (16) · `12` (15) · `13` (11) · `10` (10). 7 câu mới (`DP-016`…`018` Adapter/Facade/Proxy · `DSA-013` phân biệt đầy–rỗng · `DSA-014` SPSC lock-free 🔺T3 · `SD-032` khi bế tắc · `SD-033` think aloud). `13-networking` **không cần câu mới nào** — bank đã phủ đủ.
+    - ✅ **Bốn topic cuối xong** (52 câu): `11` (16) · `12` (15) · `13` (11) · `10` (10). 7 câu mới (`DP-017`/`018` Facade/Proxy + `DP-019` Adapter · `DSA-015` phân biệt đầy–rỗng · `DSA-016` SPSC lock-free 🔺T3 · `SD-032` khi bế tắc · `SD-033` think aloud). ⚠️ *Ba câu trong đợt này ban đầu bị gán **ID trùng** (`DP-016`, `DSA-013`, `DSA-014` — đã có chủ); phát hiện và đánh số lại 2026-08-17.* `13-networking` **không cần câu mới nào** — bank đã phủ đủ.
     - 🎉 **HOÀN TẤT: 262/262 câu · 47 file / 13 topic · bank 303 → 386 · 0 câu inline còn lại · 0 link hỏng.**
     - **Từ nay:** thấy `<details>` chứa đáp án trong tài liệu topic = **nợ kỹ thuật mới phát sinh**, phải chuyển về bank ngay ([CLAUDE.md §4.7](../../CLAUDE.md)). ⚠️ **KHÔNG tự động hoá được**: matcher tự động ánh xạ nhầm *"CPU-bound vs I/O-bound"* → `CPP-028` (câu C++) và bỏ sót `OS-015` đang có sẵn — với thao tác **xoá nội dung** thì tỉ lệ sai đó không chấp nhận được. Phải ánh xạ tay từng topic, theo 3 tầng: **A** bank đã đủ → thay link · **B** tài liệu đầy hơn bank → gộp vào bank rồi link · **C** chưa có trong bank → thêm câu mới rồi link.
     - Thứ tự đề xuất theo lịch ôn: `04` (25) → `09` (26) → `05` (24) → `08` (22) → `02` (24) → `07` (23) → `01` (19) → `06` (17) → `11` (16) → `12` (15) → `13` (11) → `10` (10).
@@ -59,14 +63,7 @@
     - ✅ **`io-multiplexing.md` — ĐÃ BỔ SUNG 2026-08-13:** 1.777 → **2.433 từ**. Thêm §7 *"Khi nào KHÔNG dùng epoll"* (kèm bẫy **file thường luôn báo sẵn sàng ⇒ epoll vô dụng với file**) và §8 với 7 bẫy: `close()` không gỡ fd khỏi epoll khi còn `dup` · thundering herd + `EPOLLEXCLUSIVE`/`SO_REUSEPORT` · `EPOLLONESHOT` cho đa luồng · quên vét cạn `EPOLLOUT` · **backpressure** (bug OOM ở nhà khách) · một handler chậm giết toàn bộ kết nối · `EINTR`.
     - ✅ **Rà soát `03` và `08` (2026-08-13).** `03`: **cả 5 file đều 0 bẫy, 3/5 không có con số nào** — yếu **đều**, là một khuôn viết (mỗi file ~1.500 từ, 8 mục, 6 câu). Đã thêm mục *"Chi phí thật & bẫy"* cho cả 5, mỗi mục 5–7 bẫy đánh số + bảng chi phí (`memory-management` từ 1 → **16** dẫn chứng định lượng; `sync-primitives` → 10). `08`: **phân cực** — `interrupts-bare-metal`/`architecture`/`rtos-*` đã tốt; đã bổ sung `boot-process` (thêm bảng **chẩn đoán theo chỗ chết** + 7 bẫy bring-up) và `constraints` (thêm bảng RAM/dòng điện/chu kỳ ghi flash, 23 dẫn chứng định lượng, 7 bẫy).
     - ⚠️ **`hardware-debug.md` — tôi chấm oan lúc đầu**: 886 từ nhưng **đặc** (sơ đồ scope đo latency vs thời gian ISR, lượng hoá 4 ns vs 700 µs, crash log `.noinit`). Đếm từ khoá không thay được việc đọc.
-  - ⑦ 🔴 **NỢ TÀI LIỆU phát sinh từ phiên 2026-08-15 — 4 lỗ hổng, 2 cái nặng.** Kiểm bằng `grep`, không phải cảm tính. Đây là **cùng một mẫu** với LNX-023/LNX-029 hôm 13/08: *câu bank 🟠 trỏ tới file topic không chứa nội dung đó* — nay đếm được **lần thứ 3 và 4**, nên phải coi là **lỗi hệ thống của bank, không phải sự cố lẻ**.
-    | # | Lỗ hổng | Bằng chứng | Việc phải làm |
-    |---|---|---|---|
-    | 1 | 🔴 **Không có tài liệu nào về namespaces/cgroups** trong toàn repo | `LNX-024` (🟠, nằm trong pool ôn Buổi 2) trỏ `→ ipc-linux.md`; file đó chỉ có 1 chữ "namespace" và là *abstract namespace của Unix socket* | Viết mục mới — đề xuất đặt ở [ipc-linux.md](../../04-linux-system-programming/ipc-linux.md) hoặc [03-operating-system/](../../03-operating-system/); nhấn **góc embedded: systemd unit (`MemoryMax=`, `PrivateTmp=`, `TasksMax=`)**, không phải Docker |
-    | 2 | 🔴 **Không có tài liệu nào về phát hiện peer chết** | `grep -rn "keepalive\|ETIMEDOUT"` toàn repo → 0 kết quả liên quan | Thêm mục vào [tcp-ip.md](../../13-networking/tcp-ip.md) *(cạnh §6 luồng byte đã viết 13/08)*: `write()` thành công ≠ đã nhận · retransmit → `ETIMEDOUT` ~15–20′ · `SO_KEEPALIVE` vs **heartbeat** + đánh đổi |
-    | 3 | 🟡 `io-multiplexing.md` thiếu **LT + `EPOLLOUT` thường trực = busy-loop 100% CPU** | §8④ chỉ nói ET phía ghi; bug phổ biến nhất của người mới viết event loop lại không có | Thêm vào §8, kèm số đo đã chạy thật: LT **5/5** vòng báo sẵn sàng · ET **1/5** |
-    | 4 | 🟡 `file-io.md` nói về `mmap` đúng **1 dòng** (dòng 227) nhưng `LNX-026` trỏ vào đó | Thiếu hết: page fault, readahead, `SIGBUS`, `msync` | Bank `LNX-026` **đã viết lại đầy đủ 15/08** → hoặc viết mục cho `file-io.md`, hoặc **sửa link** sang chỗ đúng |
-    | 5 | 🟡 **RSS bị nhắc lửng trong `09-debugging/`** *(phát hiện 16/08 — **ứng viên tự nêu**)* | `memory-bugs.md:85` chỉ có một dòng bảng *"theo dõi RSS qua thời gian"*; phần **vì sao** nằm ở topic khác và **không có link nối**: `free()` không trả RAM về OS, glibc giữ arena ⇒ **RSS không giảm là BÌNH THƯỜNG**, phải xem *xu hướng* chứ không xem một thời điểm ([03/memory-management.md](../../03-operating-system/memory-management.md)) | Thêm link chéo từ `memory-bugs.md` sang mục đó — đây là **bẫy chẩn đoán nhầm leak** rất hay gặp |
+  - ⑦ 🔴 **NỢ TÀI LIỆU (5 lỗ hổng, 2 cái nặng) — đã CHUYỂN sang [gap-register](gap-register.md)** §*"Phát hiện từ phiên mock 15–17/08"*, vì đó là sổ dành riêng cho lỗ hổng tài liệu; giữ bảng chi tiết ở **cả hai nơi** chính là lỗi *"một sự thật, hai chỗ"* mà repo đã dính 4 lần. Mức độ: 🔴 **namespaces/cgroups** (repo không có dòng nào) · 🔴 **phát hiện peer chết trên TCP** (keepalive/heartbeat — cũng không có dòng nào) · 🟡 LT+`EPOLLOUT` busy-loop · 🟡 `mmap` chiều sâu · 🟡 link chéo RSS.
     > **Luật rút ra (áp từ nay):** trước khi đưa một câu 🟠🔴 vào pool ôn của một buổi, **kiểm link nguồn có thật sự chứa nội dung không**. Câu không có tài liệu nền ⇒ hỏi ra chỉ đo được *"đã từng gặp ngoài đời chưa"*, không đo được kết quả ôn tập.
 - **Sổ yếu (11 câu):** **LNX-040 (0đ)** *(⚠️ repo chưa có tài liệu — viết doc trước khi hỏi lại)* · **LNX-026 (2đ)** · LNX-005 (2đ, **đứng yên 2 phiên** — lần sau **bắt viết code**) · LNX-029 (1→2đ) · CPP-016 · SD-016 · CPP-054 (chưa hỏi lại) · **LNX-024 (0→3** 🔼 1/2 lần ≥3 — nhưng mới đạt ở **T1**, lần sau phải hỏi T2**)** · LNX-023 (0→3, 1/2 lần ≥3) · OS-020 (1/2 lần ≥3) · CPP-032 (1/2 lần ≥3). Xem [weak-register](../mock-interview/weak-register.md).
 
@@ -137,33 +134,76 @@
 | 5 | Coding: bài low-level C | `/mock coding track cpp-system` (memcpy/strlen, endianness) |
 | CN | 🔁 Ôn dồn tích **T1+T2** | `/mock weak-review` + `/mock comprehensive track datalogic` (trộn C++ + Linux + debug) |
 
-## Tuần 3 — Kernel & drivers (I2C/SPI + PCI/USB) 🎯
+## 🔄 GIAI ĐOẠN 2 — PHỦ RỘNG TRƯỚC, SÂU SAU *(tái cấu trúc 2026-08-17)*
 
-*Trụ kernel + drivers của JD. Vùng bạn mạnh (kernel/DT) + lấp PCI/USB.* 🔁 **Khởi động mỗi buổi:** `/mock retention track linux-sysprog` + `weak-review` (kéo Linux/debug Tuần 2 quay lại).
+> **Vì sao đổi — đo được, không phải cảm tính.** Sau 15/28 ngày: `CPP` **71%**, `LNX` **59%** … nhưng **`DRV` 0%** (42 câu, trụ lớn nhất của JD, chưa hỏi một câu), `BSP` 6%, `EMB` 2%, `NET`/`BEH`/`RES` **0%**. Tổng phủ **114/397 = 29%**.
+>
+> **Chẩn đoán:** không phải "câu quá khó" — mà là **độ sâu ăn hết ngân sách thời gian**. Hai domain đầu bị đào tới 60–71% trong khi hai trụ JD còn trắng. Nguyên nhân gốc: [config §6](../mock-interview/config.md) viết để chống phiên nông (sự cố 10/08) đã bị **áp quá tay** — chọn toàn `by-level 🟠`/`comprehensive`/`deep-dive`, tức tự đẩy mọi phiên lên tầng sâu nhất, trong khi §6 vốn **đã miễn trừ `rapid`**.
+>
+> **Rủi ro nếu không đổi:** vào phòng phỏng vấn với C++/Linux userspace rất chắc, **drivers và Yocto gần như trắng** — đúng hai thứ JD ghi là trụ chính.
 
-| Buổi | Đọc/Hiểu | Test 🎤 |
+### Ba luật của giai đoạn 2
+
+**① `rapid` là phương tiện chính, không phải phụ.** Phỏng vấn thật mở màn *"em có biết về X không"* rồi mới follow-up 1–2 tầng. `rapid` (12 câu/~15′) đúng là thứ luyện điều đó, và là cách duy nhất kéo phủ lên kịp.
+
+**② TẠM DỪNG `by-level 🟠` và `deep-dive`** cho tới khi phủ ≥ 70%. Không phải vì chúng sai — vì **sai thời điểm**.
+
+**③ Mỗi domain đi HAI LƯỢT — nhưng lượt 2 PHÂN LOẠI THEO ĐIỂM, không phải "đào sâu chỗ yếu".**
+
+`rapid` quét rộng → rồi **một** `daily`, và `daily` đó **chỉ lấy câu đã đạt 3–4** để đào lên T2.
+
+| Điểm ở `rapid` | Nghĩa | Đi đường nào |
 |---|---|---|
-| 1 | - [ ] [driver-basics](../../05-drivers-device-tree/driver-basics.md), [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md) · *bổ đệm* [bare-metal-c](../../08-embedded-systems/bare-metal-c.md) phần `volatile`/register/bit-manip ([EMB-A](../mock-interview/bank/embedded-fundamentals.md)) — nền cho MMIO `readl/writel` | `/mock daily track drivers-dt` |
-| 2 | - [ ] 🎯 [device-tree](../../05-drivers-device-tree/device-tree.md) (cú pháp DTS, node/property, compatible→match, binding) + [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md) ôn lại. **Pool bank:** BSP-006…009 (probe, EPROBE_DEFER, pinctrl), DRV-001…010 | `/mock by-level 🟠 track bsp` |
-| 3 | - [ ] 🎯 **[pci-usb-drivers](../../05-drivers-device-tree/pci-usb-drivers.md)** (PCI config/BAR/MSI, USB descriptor/URB/gadget) | `/mock ... track drivers-dt` (DRV-019…027) |
-| 4 | - [ ] [interrupt/DMA](../mock-interview/bank/bsp.md) (BSP-010…013: threaded IRQ, coherent vs streaming DMA) · *bổ đệm* [interrupts-bare-metal](../../08-embedded-systems/interrupts-bare-metal.md) khái niệm ISR ([EMB-C](../mock-interview/bank/embedded-fundamentals.md)): không sleep trong ISR, critical section, reentrancy — chuyển thẳng sang top-half/bottom-half kernel. **Pool bank:** BSP-010…013, DRV-011…018 | `/mock deep-dive track bsp` |
-| 5 | - [ ] [lkd](../../15-book-summaries/lkd/) cụm driver/interrupt (đọc thêm) | `/mock comprehensive track drivers-dt` |
-| CN | 🔁 Ôn dồn tích **T1+T2+T3** | `/mock weak-review` + `/mock comprehensive track datalogic` (giờ trộn cả kernel/driver) |
+| **0–1** | T1 trắng — chưa biết | **Đọc lại tài liệu** → hỏi lại ở **T1, góc khác**. ❌ **KHÔNG đào T2** |
+| **2** | Biết nhưng lủng củng / thiếu nửa | Tách hai ca ([config §4](../mock-interview/config.md)): thiếu **kiến thức** → như trên · chỉ **diễn đạt chậm** → hỏi lại ở `rapid`, luyện nói gọn |
+| **3–4** | ✅ T1 chắc | ⭐ **Đây mới là câu đưa vào `daily` để đào T2** |
 
-> **Phạm vi `embedded-fundamentals` (EMB) cho JD này:** chỉ ôn **A** (C/thanh ghi/`volatile`/bit-manip) + **C** (khái niệm ISR) như *đệm* cho buổi 1 & 4 ở trên — vì chúng chuyển thẳng sang MMIO driver + kernel IRQ. **Hoãn** B (startup/linker chi tiết), **D (RTOS)**, F/G/H (CRC/MISRA, low-power, JTAG/SWD): JD là Embedded **Linux** (có MMU, không RTOS/bare-metal firmware) nên các phần này là "nice-to-have" ghi điểm nếu bị hỏi lan, không phải câu loại. Full EMB (domain `EMB` trong bank) để dành cho hồ sơ BSP tổng quát nếu sau này nhắm JD khác.
+> ⚠️ **Vì sao KHÔNG đào sâu câu điểm thấp** *(sửa 2026-08-17 — luật cũ ghi ngược, ứng viên phát hiện)*: hỏi T2 lên trên một nền T1 trống thì **không đo được gì và không dạy được gì** — người học chỉ ngồi im lần thứ hai. Đó đúng là căn bệnh của Giai đoạn 1: *"khái niệm chưa cứng đã phải trả lời câu chuyên sâu"*.
+>
+> Và nó bỏ phí đúng chỗ đáng đào nhất: **câu trả lời tốt mới là câu SẴN SÀNG cho T2**. Phỏng vấn thật cũng vận hành đúng vậy — trả lời khái niệm gọn ⇒ interviewer follow-up sâu hơn; ú ớ ở khái niệm ⇒ họ **chuyển câu khác**, không khoan tiếp.
+>
+> **Không câu nào bị bỏ rơi:** câu yếu → [weak-register](../mock-interview/weak-register.md), đọc lại rồi hỏi lại **T1 góc mới**. Câu mạnh → ngắn hạn lên T2 ở `daily`, dài hạn vào bảng 🔁 *Lịch kiểm tra lại* (retention, hạn = tuần gỡ + 2).
 
-## Tuần 4 — Yocto/CI + Design + Behavioral + tổng duyệt
+> **Đọc code / bài coding:** giữ **tối đa 1 snippet ngắn** mỗi phiên `comprehensive`, **không** ra bài code từ đầu ở phiên thường. Phần code nặng chuyển hẳn sang **[7 bài 🧪 lab](../mock-interview/bank/debugging.md)** — tự làm ngoài phiên, không tính điểm mock. Lý do: phỏng vấn embedded mid-level chủ yếu **giải thích miệng + whiteboard**, snippet ngắn có xuất hiện nhưng "ngồi code một class từ đầu" thì hiếm.
 
-*Yocto (JD) + kỹ năng "lead/design/review" + dress rehearsal.* 🔁 **Khởi động mỗi buổi:** `/mock retention track datalogic` (trộn cả 3 tuần trước) — tuần này nghiêng hẳn về **ôn lại + tổng duyệt**.
+### 📊 Bảng phủ — cập nhật sau mỗi phiên
 
-| Buổi | Đọc/Hiểu | Test 🎤 |
-|---|---|---|
-| 1 | - [ ] 🎯 **[yocto](../../06-build-systems/yocto.md)** — **tư duy** (layer/bbappend *để làm gì*, sstate *giải quyết gì*, DEPENDS vs RDEPENDS, devtool/SDK), **không** học thuộc cú pháp recipe + [BSP-017…019](../mock-interview/bank/bsp.md) | `/mock ... track build-systems` (BLD-004…010) |
-| 2 | - [ ] 🎯 [system-design](../../10-thinking/system-design.md) §5 hộp đồ nghề + §6 ví dụ giải mẫu (**OTA**, **máy quét mã vạch** — đúng chất Datalogic) + [07-shared-libraries](../../07-shared-libraries/) (ABI, API design) | `/mock deep-dive track system-design` (SD-012…016) |
-| 3 | - [ ] 🎯 **Behavioral cho JD**: [BEH](../mock-interview/bank/behavioral.md) + phần "lead junior / code review" (§ dưới) | `/mock ... track behavioral` |
-| 4 | Tổng duyệt vòng thật | `/mock comprehensive track datalogic` (16 câu) |
-| 5 | Kiểm tra toàn diện | `/mock full-review` (quét mọi câu đã hỏi) |
-| CN | Nghỉ + đọc lại [sessions/](../mock-interview/sessions/) | — |
+| Domain | Bank | Phủ 17/08 | Mục tiêu | Ưu tiên |
+|---|---|---|---|---|
+| **DRV** (+BUS) | 42 | **0%** | **60%** | 🔴 **1** — trụ JD, đang trắng |
+| **RES** | 12 | **0%** | **100%** | 🔴 **1** — chắc chắn 100% bị hỏi |
+| **BSP** | 30 | 6% | **60%** | 🔴 **2** — kernel/Yocto |
+| **BEH** | 9 | 0% | **100%** | 🟠 **2** — rẻ, chắc chắn gặp |
+| **SD** | 33 | 12% | 40% | 🟠 3 |
+| **EMB** | 36 | 2% | 30% | 🟡 3 — chỉ cụm A + C ⚠️ |
+| **NET** | 12 | 0% | 50% | 🟡 3 |
+| BLD | 19 | 26% | 50% | 🟡 3 — Yocto tư duy |
+| CPP · LNX · OS · DBG | 170 | 29–71% | *giữ* | ⬜ chỉ `weak-review` |
+
+### Lịch 14 ngày còn lại
+
+*Mỗi ngày ~2 phiên ngắn (15′ + 20′) thay vì 1 phiên dài. 🔁 mở đầu mỗi ngày: 5′ `weak-review` (sổ yếu 11 câu).*
+
+| Ngày | Đọc/Hiểu | Phiên 1 (quét rộng) | Phiên 2 (đào T2) |
+|---|---|---|---|
+| **D1** | [driver-basics](../../05-drivers-device-tree/driver-basics.md), [kernel-userspace](../../05-drivers-device-tree/kernel-userspace.md) | `/mock rapid track drivers-dt` | `/mock daily track drivers-dt` |
+| **D2** | 🎯 [device-tree](../../05-drivers-device-tree/device-tree.md) (DTS, `compatible`→match, binding) | `/mock rapid track drivers-dt` | `/mock daily track bsp` |
+| **D3** | 🎯 [bus-protocols](../../05-drivers-device-tree/bus-protocols.md) (I2C/SPI/UART) | `/mock rapid track drivers-dt` | `/mock daily track drivers-dt` |
+| **D4** | 🎯 [pci-usb-drivers](../../05-drivers-device-tree/pci-usb-drivers.md) | `/mock rapid track drivers-dt` | `/mock daily track drivers-dt` |
+| **D5** | 🎯 **[RESUME.tex](../../RESUME.tex)** + [bank/resume.md](../mock-interview/bank/resume.md) | `/mock rapid track resume` | `/mock daily track resume` |
+| **D6** | interrupt/DMA ([BSP-010…013](../mock-interview/bank/bsp.md)) · đệm [interrupts-bare-metal](../../08-embedded-systems/interrupts-bare-metal.md) | `/mock rapid track bsp` | `/mock daily track bsp` |
+| **D7** | 🔁 **Chốt tuần** — không học mới | `/mock weak-review` | `/mock comprehensive track datalogic` |
+| **D8** | 🎯 [yocto](../../06-build-systems/yocto.md) — **tư duy**, không cú pháp recipe | `/mock rapid track build-systems` | `/mock daily track build-systems` |
+| **D9** | [system-design](../../10-thinking/system-design.md) §5–§6 (OTA, **máy quét mã vạch**) + [07-shared-libraries](../../07-shared-libraries/) | `/mock rapid track system-design` | `/mock daily track system-design` |
+| **D10** | [BEH](../mock-interview/bank/behavioral.md) + mục "lead junior / code review" bên dưới | `/mock rapid track behavioral` | `/mock daily track resume` *(lượt 2)* |
+| **D11** | [tcp-ip](../../13-networking/tcp-ip.md), [sockets](../../13-networking/sockets-and-protocols.md) · EMB cụm A + C | `/mock rapid track networking` | `/mock rapid track embedded` |
+| **D12** | 🧪 **Làm [7 bài lab](../mock-interview/bank/debugging.md)** nếu chưa xong | `/mock weak-review` | `/mock daily track debugging` |
+| **D13** | Tổng duyệt | `/mock comprehensive track datalogic` (16 câu) | — |
+| **D14** | Quét toàn diện + nói tiếng Anh 2–3 câu ruột | `/mock full-review` | Đọc lại [sessions/](../mock-interview/sessions/) |
+
+**Nếu chỉ còn 7 ngày:** giữ **D1–D5, D7, D13**. Bỏ được: NET, EMB, SD lượt 2, D14.
+
+> **Phạm vi `embedded-fundamentals` (EMB) cho JD này:** chỉ ôn **A** (C/thanh ghi/`volatile`/bit-manip) + **C** (khái niệm ISR) như *đệm* — vì chúng chuyển thẳng sang MMIO driver + kernel IRQ. **Hoãn** B (startup/linker chi tiết), **D (RTOS)**, F/G/H (CRC/MISRA, low-power, JTAG/SWD): JD là Embedded **Linux** (có MMU, không RTOS/bare-metal firmware) nên các phần này là "nice-to-have" ghi điểm nếu bị hỏi lan, không phải câu loại.
 
 ---
 
@@ -176,9 +216,16 @@ Chuẩn bị STAR ([BEH](../mock-interview/bank/behavioral.md)) cho các câu **
 - **"Vì sao rời công ty cũ"** ([BEH-008](../mock-interview/bank/behavioral.md)) + **câu hỏi ngược** ([BEH-009](../mock-interview/bank/behavioral.md)) — hỏi về SoC/nền tảng, tỉ lệ kernel vs userspace, quy trình Yocto/CI, đội ngũ.
 - Chuẩn bị nói **tiếng Anh** cho 2–3 câu ruột (JD yêu cầu English).
 
-## Lịch nước rút 2 tuần
+## Lịch nước rút
 
-Gộp đôi mỗi ngày theo thứ tự ưu tiên: **Tuần A** = (Tuần 1 buổi 1–2–4) + (Tuần 2 buổi 2–3–4); **Tuần B** = (Tuần 3 buổi 2–3–4) + (Tuần 4 buổi 1–3–4). Bỏ các buổi coding/đọc-thêm nếu thiếu giờ, giữ **mọi buổi 🎯 + `comprehensive` + `full-review`**.
+> ⚠️ *Mục này trước đây ghi **"Tuần A = Tuần 1 buổi 1–2–4 + Tuần 2 buổi 2–3–4; Tuần B = Tuần 3… Tuần 4…"** — trỏ vào các bảng **Tuần 3/Tuần 4 đã bị xoá** khi tái cấu trúc 17/08. Đã thay bằng bản bám lịch mới.*
+
+Phương án rút gọn nằm ngay trong [§🔄 Giai đoạn 2](#lịch-14-ngày-còn-lại): **còn 7 ngày ⇒ giữ D1–D5, D7, D13**; bỏ NET, EMB, SD lượt 2, D14. Nguyên tắc khi cắt: **giữ mọi buổi 🎯 + một `comprehensive` cuối**; bỏ trước các buổi đọc-thêm và 🧪 lab.
 
 ## Vá điểm yếu đã biết
-Từ [weak-register](../mock-interview/weak-register.md): OS-003 (deadlock), CPP-029 (emplace), DP-002 (Singleton) — chèn vào các buổi `weak-review`. GDB (bạn tự nhận yếu) → ưu tiên Tuần 2 buổi 4.
+
+Nguồn duy nhất là [weak-register](../mock-interview/weak-register.md) — **không chép danh sách câu ra đây** (đã từng lệch: mục này còn ghi OS-003/CPP-029/DP-002 là "điểm yếu" trong khi cả ba **đã được gỡ** từ 07–08/08 và nay nằm ở bảng retention).
+
+- **Sổ yếu** → chèn vào phiên `weak-review` (5′ đầu mỗi ngày theo lịch D).
+- **Retention đến hạn** → bảng *🔁 Lịch kiểm tra lại*, rải vào slot khởi động.
+- **Debug** (điểm yếu tự nhận, và resume lại liệt kê là kỹ năng — xem [RES-008](../mock-interview/bank/resume.md)) → **7 bài [🧪 lab](../mock-interview/bank/debugging.md)**, ưu tiên làm sớm.

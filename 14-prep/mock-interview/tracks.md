@@ -30,6 +30,7 @@
 | `networking` | `NET` | [13](../../13-networking/) |
 | `system-design` | `SD` | [10](../../10-thinking/), [07](../../07-shared-libraries/) |
 | `behavioral` | `BEH` | HR/behavioral — mọi vị trí |
+| **`resume`** ⭐ | `RES` | **Bám [RESUME.tex](../../RESUME.tex)** — phần chắc chắn bị hỏi. Chấm theo khung (🏗️), không theo đáp án duy nhất |
 
 ## C. Theo sách đã summary (book)
 

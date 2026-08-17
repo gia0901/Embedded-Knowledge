@@ -26,6 +26,7 @@
 | `SD` | [system-design.md](system-design.md) | Tư duy & system design | [10](../../../10-thinking/), [07](../../../07-shared-libraries/) |
 | `BEH` | [behavioral.md](behavioral.md) | Behavioral / HR (STAR) | — |
 | `COD` | [coding.md](coding.md) | Bài coding tại chỗ | [12](../../../12-dsa/) |
+| **`RES`** ⭐ | [resume.md](resume.md) | **Bám RESUME của ứng viên** — phần **chắc chắn 100% bị hỏi** (phỏng vấn thật dành 30–50% thời gian ở đây) | [RESUME.tex](../../../RESUME.tex) |
 
 ## Quy ước metadata mỗi câu
 
@@ -78,24 +79,28 @@
 
 Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) × **type/level** ([../interview-types.md](../interview-types.md)), ưu tiên chèn câu trong [../weak-register.md](../weak-register.md). "Rapid-fire" = rút câu `concept` 🟢🟡. Xem giao thức đầy đủ trong [../config.md](../config.md).
 
-## Đếm câu
+## Đếm câu — TÍNH BẰNG LỆNH, không chép tay
 
-| Domain | Dải ID đã dùng |
-|---|---|
-| CPP | 001–055 (040–051 = track `emc`, neo theo Item; 052 = shared_ptr 3 tầng thread-safety; 053 = safe-bool / `explicit operator bool`; 054 = move ctor vs move assign; 055 = chuyển ngầm hai chiều + nhập nhằng) |
-| OS | 001–021 (020 = thread-safe vs reentrant, 021 = `fork()` trong chương trình đa luồng) |
-| LNX | 001–029 (027 = `EINTR`/`SA_RESTART`, 028 = `O_APPEND` vs `lseek`+`write`, 029 = chọn clock đo thời gian) |
-| DRV | 001–027 (019–027 = PCI/USB) |
-| BUS | 001–004 |
-| EMB | 001–032 |
-| BSP | 001–027 |
-| BLD | 001–010 (CMake/Yocto/CI) |
-| DBG | 001–019 |
-| DP | 001–016 (014 = Meyers thread-safe/DCLP, 015 = object pool, 016 = decorator) |
-| DSA | 001–014 (013 = chọn sức chứa N của ring buffer, 014 = consumer biết mình mất dữ liệu — cả hai 🎤 2026-08-09) |
-| NET | 001–012 |
-| SD | 001–016 (012 = OTA, 013 = barcode scanner, 014 = UART framing, 015 = driver subsystem, 016 = memory tất định) |
-| BEH | 001–009 |
-| COD | 001–010 |
+> ⚠️ **Ở đây từng có một bảng liệt kê dải ID từng domain. Đã XOÁ ngày 2026-08-17** vì rà soát thấy **12/16 dòng sai** (vd `LNX` ghi 001–029 khi thực tế đã tới **042**; `DBG` ghi 019 khi thực tế **036**; `RES` thiếu hẳn).
+>
+> Đây là *"một sự thật, hai chỗ"* — **lần thứ 4** trong repo này, sau: đáp án chép vào tài liệu topic ([CLAUDE.md §4.7](../../../CLAUDE.md)), `LNX-005` trôi lệch giữa bank và `file-io.md`, và luật `rapid` mâu thuẫn giữa hai file. **Số câu là thứ suy ra được từ chính file — chép tay ra chỗ thứ hai là tự tạo nợ.**
 
-> Khi thêm câu mới, tăng số cuối dải tương ứng và cập nhật bảng này.
+Lấy ID kế tiếp cho một domain:
+```bash
+# ID lon nhat hien co cua mot domain (vd LNX)
+grep -oh "^#### LNX-[0-9]*" linux-sysprog.md | sed 's/.*-//' | sort -n | tail -1
+```
+
+Toàn cảnh mọi domain + tổng số câu:
+```bash
+for f in *.md; do [ "$f" = README.md ] && continue
+  grep -oh "^#### [A-Z]*-[0-9]*" "$f" | sed 's/#### //' | awk -F- '{print $1}' | sort -u | while read d; do
+    printf "%-4s max=%s  (so cau: %s)\n" "$d" \
+      "$(grep -oh "^#### $d-[0-9]*" "$f" | sed 's/.*-//' | sort -n | tail -1)" \
+      "$(grep -c "^#### $d-" "$f")"
+  done
+done | sort -u
+echo "TONG: $(grep -ch '^#### ' *.md | paste -sd+ | bc)"
+```
+
+📊 **Đo độ PHỦ** (bao nhiêu câu đã thật sự được hỏi) — xem [../config.md §7](../config.md).

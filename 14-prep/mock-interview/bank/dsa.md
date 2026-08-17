@@ -119,7 +119,7 @@ Chi tiết đáng nói thêm: nội dung **còn lại** trong buffer luôn liên
 Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
 </details>
 
-#### DSA-013 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
+#### DSA-015 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
 **Ring buffer: làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho `head == tail`?**
 <details><summary>Đáp án</summary>
 
@@ -130,7 +130,7 @@ Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
 | Cách | Làm thế nào | Đánh đổi |
 |---|---|---|
 | **① Bỏ trống một ô** | Coi là đầy khi `(head+1) % N == tail` | Đơn giản nhất, **không cần biến thêm** ⇒ hợp lock-free. Mất **một ô** sức chứa |
-| **② Giữ biến `count`** | Đếm số phần tử đang có | Rõ ràng, dùng hết N ô. Nhưng `count` là **biến chung cả hai bên cùng sửa** ⇒ **phá vỡ SPSC lock-free** ([DSA-014](dsa.md)) |
+| **② Giữ biến `count`** | Đếm số phần tử đang có | Rõ ràng, dùng hết N ô. Nhưng `count` là **biến chung cả hai bên cùng sửa** ⇒ **phá vỡ SPSC lock-free** ([DSA-016](dsa.md)) |
 | **③ Chỉ số chạy tự do** | `head`/`tail` **không** lấy dư, chỉ tăng mãi; số phần tử = `head - tail`; lấy dư **chỉ khi truy cập mảng** | Dùng hết N ô **và** giữ được lock-free. Phải để ý **tràn số** — an toàn nếu N là luỹ thừa của 2 và dùng số nguyên không dấu |
 
 **⭐ Chọn thế nào:**
@@ -145,7 +145,7 @@ Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
 **Chốt:** *"Ba cách: bỏ trống một ô, giữ biến đếm, hoặc chỉ số chạy tự do. Biến đếm dễ đọc nhất nhưng bị cả hai bên ghi nên phá lock-free — vì thế cài đặt SPSC dùng cách bỏ ô hoặc chỉ số tự do."*
 </details>
 
-#### DSA-014 · 🔴 · concept · 🔺T3 · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
+#### DSA-016 · 🔴 · concept · 🔺T3 · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
 **SPSC lock-free ring buffer hoạt động thế nào? Vì sao điều kiện "một producer, một consumer" lại quan trọng đến vậy?**
 
 > 🔺 **Câu T3** — chỉ tính điểm ở phiên `deep-dive` ([config §6](../config.md)). Ở phiên thường, không biết vẫn đạt 4 nếu nắm chắc bản mutex ([COD-006](coding.md)).

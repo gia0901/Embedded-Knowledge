@@ -490,10 +490,10 @@ Trực giao với lựa chọn trên: dữ liệu là **byte stream** → dùng 
 | ID | Câu hỏi |
 |----|---------|
 | [COD-006](../14-prep/mock-interview/bank/coding.md) | Ring buffer là gì và giải quyết vấn đề gì mà queue thường không giải quyết được? |
-| [DSA-013](../14-prep/mock-interview/bank/dsa.md) | Làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho head == tail? |
+| [DSA-015](../14-prep/mock-interview/bank/dsa.md) | Làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho head == tail? |
 | [COD-006](../14-prep/mock-interview/bank/coding.md) | Vì sao ring buffer thường ép kích thước là luỹ thừa của 2? |
-| [DSA-014](../14-prep/mock-interview/bank/dsa.md) | SPSC lock-free hoạt động thế nào, và vì sao "một producer một consumer" lại đủ để bỏ khoá? |
-| [DSA-014](../14-prep/mock-interview/bank/dsa.md) | Khi nào dùng lock-free, khi nào dùng mutex + condition variable? |
+| [DSA-016](../14-prep/mock-interview/bank/dsa.md) | SPSC lock-free hoạt động thế nào, và vì sao "một producer một consumer" lại đủ để bỏ khoá? |
+| [DSA-016](../14-prep/mock-interview/bank/dsa.md) | Khi nào dùng lock-free, khi nào dùng mutex + condition variable? |
 | [LNX-017](../14-prep/mock-interview/bank/linux-sysprog.md) | Buffer đầy thì nên làm gì? |
 
 ---
