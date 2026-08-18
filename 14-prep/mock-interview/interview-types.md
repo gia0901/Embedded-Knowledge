@@ -3,25 +3,7 @@
 > Mỗi loại có **số câu định sẵn** (điều kiện kết thúc phiên → chuyển review) và **cơ cấu level/type**. Interviewer đếm đủ số câu thì chốt; ứng viên có thể gõ **"xong"/"review"** để dừng sớm.
 > Cú pháp: `mock <type> track <track>` — vd `mock daily`, `mock comprehensive track cpp-system`.
 >
-> ⚠️ **Trần độ sâu:** mọi loại dưới đây chạy ở **T2 (mức phỏng vấn thật)**, trừ `deep-dive` = **T3 (nâng cao)**. T3 = tên lệnh/flag/internals/lock-free — **hỏi được nhưng không tính điểm** ở phiên mặc định. Xem [config.md §6 → Trần độ sâu](config.md).
-
-## 🔺 Cách BẬT chế độ chuyên sâu (T3)
-
-Interviewer **không bao giờ tự bật**. Ba cách, chọn cách hợp ngữ cảnh:
-
-| Cách | Lệnh | Được gì |
-|---|---|---|
-| **1. Loại phiên chuyên sâu** | `/mock deep-dive track cpp-system` | 5 câu 🟠🔴 design/tình huống, ~40′, **toàn bộ phiên ở T3** |
-| **2. Cờ `--deep` trên loại bất kỳ** | `/mock comprehensive track cpp-system --deep`<br>`/mock daily --deep` | Giữ nguyên **số câu + cơ cấu** của loại đó, chỉ **nâng trần lên T3** (tính điểm T3, bài coding được phép cỡ lớn) |
-| **3. Nói bằng lời** | *"hỏi khó vào"* · *"cho tôi mức senior"* · *"chấm cả phần chuyên sâu"* | Như cách 2 |
-
-**Khác nhau giữa cách 1 và 2:** `deep-dive` đổi **cả nội dung** (chỉ còn câu design/tình huống, bỏ phần khởi động). `--deep` giữ nguyên hình dạng phiên, chỉ **đổi thang chấm và trần câu hỏi** — hợp khi muốn *"vẫn giả lập vòng thật nhưng chấm khắt khe hơn"*.
-
-**Tắt lại:** bỏ cờ đi. Không có trạng thái dính — mỗi phiên độc lập, mặc định luôn về **T2**.
-
-> 💡 Khi nào nên dùng: còn xa ngày phỏng vấn và muốn **nâng trần**. Sát ngày thì ngược lại — chạy T2 để **phủ rộng**, vì phỏng vấn thật hỏi ở T2.
-
----
+> ⚠️ **Trần độ sâu:** mọi loại chạy ở **T2**, trừ `deep-dive` = **T3**. Luật đầy đủ (gồm cách bật T3) sống ở [config.md §6](config.md) — không chép lại ở đây.
 
 ## `daily` — Ôn hằng ngày (mặc định) · 6 câu · 15–20′
 Đa dạng, nhẹ, giữ nhịp mỗi ngày. Cơ cấu:
@@ -68,30 +50,10 @@ Interviewer ra **3 bài cỡ nhỏ (10–15′/bài)** — một hàm, không ph
 - Dùng khi muốn **nâng trần**, không dùng để giả lập vòng phỏng vấn thật — cái đó là `comprehensive`.
 
 ## `weak-review` — Ôn lại câu yếu · toàn bộ weak-register
-Hỏi lại **mọi câu** trong [weak-register.md](weak-register.md) (lọc theo track nếu nêu) tới khi trả lời vững. Trả lời đạt ≥ 3 điểm hai lần → interviewer gỡ khỏi sổ. Chạy định kỳ (buổi CN theo plan).
-
-## `retention` — Kiểm tra độ nhớ · câu đã trả lời tốt · ~8 câu
-Hỏi lại các câu **đã từng trả lời TỐT** (≥3) — kiểm tra kiến thức có còn vững theo thời gian (spaced review). "Đúng rồi" không loại câu khỏi vùng hỏi.
-- **Nguồn rút: bảng [🔁 Lịch kiểm tra lại](weak-register.md)** (có ngày đến hạn + góc đã dùng + góc mới đề xuất). Ưu tiên câu **quá hạn lâu nhất**.
-- Hỏi theo [config §6 luật ①](config.md): **nén phần nền còn 1 checkpoint**, dồn trọng số vào follow-up, **không lặp lại góc cũ**.
-- Câu nào tụt **< 3** → **kéo về weak-register** (regression). ≥ 3 → dời lịch +2 tuần.
-- Không nhất thiết chạy thành phiên riêng: câu đến hạn có thể rải vào **slot khởi động 🔁 5–10′** đầu mỗi buổi.
-
-## `full-review` — Kiểm tra toàn diện · mọi câu đã hỏi
-Trộn **toàn bộ** câu đã từng hỏi (yếu + tốt, mọi track/level) từ [sessions/](sessions/) — quét rộng để tìm chỗ hổng ẩn. Số câu linh hoạt (mặc định ~12); ứng viên gõ "xong" khi muốn dừng. Hợp giai đoạn nước rút.
+Hỏi lại **mọi câu** trong [weak-register.md](weak-register.md) (lọc theo track nếu nêu) tới khi trả lời vững. Trả lời đạt ≥ 3 điểm hai lần → interviewer gỡ khỏi sổ.
 
 ---
 
-## Bảng tra nhanh
-
-| Type | Số câu | Trần | Nghiêng về | Khi nào dùng |
-|---|---|---|---|---|
-| `daily` | 6 | T2 | mix nhẹ (code = snippet 5–10′) | mỗi ngày |
-| `rapid` | 12 | T2 | 🟢🟡 concept | warm-up / ít thời gian |
-| `comprehensive` | 16 | T2 | đủ 🟢→🔴 + **1 bài vừa / 2 bài nhỏ** | **giả lập vòng thật**, cuối tuần |
-| `by-level` | 10 | T2 | 1 level | vá đúng mức yếu |
-| `coding` | 3 | T2 | 3 bài **cỡ nhỏ** 10–15′ | luyện live-coding |
-| `deep-dive` | 5 | 🔺 **T3** | 🟠🔴 design, bài lớn 40′+ | **nâng trần** (opt-in) |
-| `weak-review` | biến thiên | T2 | câu đã sai | củng cố |
-| `retention` | ~8 | T2 | câu đã trả lời tốt | kiểm tra độ nhớ theo thời gian |
-| `full-review` | ~12 | T2 | mọi câu đã hỏi | quét rộng, nước rút |
+> 🗑️ **Đã bỏ 2026-08-18 — `retention` và `full-review`.** Cả hai **chưa từng chạy một lần nào** trong 17 phiên, và cơ chế của chúng đã sống ở chỗ khác:
+> - *Retention* = **slot khởi động 🔁 5–10′ đầu mỗi buổi**, rút từ bảng [🔁 Lịch kiểm tra lại](weak-register.md). Chính `interview-types` bản cũ cũng ghi *"không nhất thiết chạy thành phiên riêng"* — tức type này tự khai là thừa.
+> - *Full-review* = `comprehensive` (giả lập vòng thật) + `weak-review` (quét câu đã sai). Không có gì nó làm được mà hai type kia không làm.

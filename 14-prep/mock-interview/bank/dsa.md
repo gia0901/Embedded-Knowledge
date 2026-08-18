@@ -1,8 +1,17 @@
 # DSA — Data Structures & Algorithms
 
 > Domain `DSA`. Nên luyện code thực tế trên Leetcode song song ([COD-*](coding.md)). Track dùng: `dsa`, `cpp-mindset`, `cpp-system`.
+> 📑 Thứ tự theo **chủ đề** (mục A, B, C…), không theo số ID — thêm câu mới đặt vào đúng mục ([vì sao](README.md#-id--vị-trí-trong-file)).
+
+| Mục | Nội dung | Câu |
+|---|---|---|
+| **A** | Độ phức tạp & container | 6 |
+| **B** | Mẫu giải thuật | 6 |
+| **C** | Ring buffer | 4 |
 
 ---
+
+## A — Độ phức tạp & container
 
 #### DSA-001 · 🟢 · concept · [→ complexity-and-structures](../../../12-dsa/complexity-and-structures.md)
 **Big-O là gì? Phân biệt time và space complexity.**
@@ -32,6 +41,24 @@ Vector lưu liền mạch: truy cập O(1) theo index, cache tốt, nhưng chèn
 Push_back là O(1) khi còn capacity; khi đầy phải cấp vùng mới (gấp đôi) và copy/move toàn bộ — O(n) lần đó. Nhưng vì capacity tăng cấp số nhân, reallocate ngày càng thưa, nên trung bình qua n lần push_back tổng chi phí O(n), chia đều O(1) mỗi lần — đó là amortized O(1).
 </details>
 
+#### DSA-009 · 🟠 · concept · [→ complexity-and-structures](../../../12-dsa/complexity-and-structures.md)
+**Vì sao vector thường nhanh hơn list dù cùng O(n)?**
+<details><summary>Đáp án</summary>
+
+Big-O bỏ qua chi phí truy cập bộ nhớ thực tế. Vector liền mạch → prefetch hiệu quả, phần lớn cache hit. List node rải rác trên heap → mỗi bước duyệt thường cache miss (đắt hơn hit hàng chục–trăm lần). Nên vector nhanh hơn nhiều lần trong thực tế — lý do thực dụng ưu tiên cấu trúc liền mạch, đặc biệt embedded/hot path.
+</details>
+
+#### DSA-012 · 🔴 · concept · [→ complexity-and-structures](../../../12-dsa/complexity-and-structures.md), [constraints](../../../08-embedded-systems/constraints.md)
+**Khi nào tối ưu space quan trọng hơn time? Liên hệ embedded.**
+<details><summary>Đáp án</summary>
+
+Khi chạy trên hệ RAM hạn chế (embedded, MCU vài KB–MB) hoặc xử lý dữ liệu cực lớn không vừa bộ nhớ. Một thuật toán O(n) time nhưng O(n) space phụ có thể bất khả thi trên thiết bị ít RAM, trong khi bản O(n log n) time nhưng O(1) space lại chạy được. Trên embedded còn tránh cấp phát động (fragmentation, không tất định) — ưu tiên in-place hoặc bộ nhớ tĩnh có giới hạn. Phải hỏi rõ ràng buộc tài nguyên trước khi chọn thuật toán; "tốt nhất" phụ thuộc ngữ cảnh.
+</details>
+
+---
+
+## B — Mẫu giải thuật
+
 #### DSA-005 · 🟡 · concept · [→ algorithm-patterns](../../../12-dsa/algorithm-patterns.md)
 **Two-sum: giải O(n) thế nào?**
 <details><summary>Đáp án</summary>
@@ -60,13 +87,6 @@ BFS duyệt theo tầng (queue) — thăm node gần trước. DFS đi sâu rồ
 Áp dụng cho bài tối ưu/đếm có cấu trúc con tối ưu + bài toán con chồng lấp (tính lại nhiều lần) — dấu hiệu "số cách", "min/max". Lưu kết quả bài con để không tính lại, giảm mũ xuống đa thức. Top-down (memoization): đệ quy + cache. Bottom-up (tabulation): lặp xây từ nhỏ. Khó nhất là định nghĩa state + recurrence; bắt đầu từ brute-force đệ quy rồi thêm cache.
 </details>
 
-#### DSA-009 · 🟠 · concept · [→ complexity-and-structures](../../../12-dsa/complexity-and-structures.md)
-**Vì sao vector thường nhanh hơn list dù cùng O(n)?**
-<details><summary>Đáp án</summary>
-
-Big-O bỏ qua chi phí truy cập bộ nhớ thực tế. Vector liền mạch → prefetch hiệu quả, phần lớn cache hit. List node rải rác trên heap → mỗi bước duyệt thường cache miss (đắt hơn hit hàng chục–trăm lần). Nên vector nhanh hơn nhiều lần trong thực tế — lý do thực dụng ưu tiên cấu trúc liền mạch, đặc biệt embedded/hot path.
-</details>
-
 #### DSA-010 · 🟠 · concept · [→ algorithm-patterns](../../../12-dsa/algorithm-patterns.md)
 **Cho một mảng, làm sao nhận biết nên dùng pattern nào?**
 <details><summary>Đáp án</summary>
@@ -81,11 +101,34 @@ Dựa tín hiệu trong đề: mảng đã sắp xếp + tìm cặp/bộ → two
 Làm rõ trước: ràng buộc (kích thước input, miền giá trị, trùng/âm, yêu cầu time/space), xác nhận I/O bằng ví dụ nhỏ. Nhận diện pattern. Trình bày brute force trước (baseline đúng) rồi tối ưu, nêu đánh đổi. Phân tích complexity (time + space). Test edge case (rỗng, một phần tử, trùng, biên). Quan trọng: **think aloud** — nói ra suy nghĩ và lý do, vì người phỏng vấn chấm cách tiếp cận chứ không chỉ đáp án.
 </details>
 
-#### DSA-012 · 🔴 · concept · [→ complexity-and-structures](../../../12-dsa/complexity-and-structures.md), [constraints](../../../08-embedded-systems/constraints.md)
-**Khi nào tối ưu space quan trọng hơn time? Liên hệ embedded.**
+---
+
+## C — Ring buffer
+
+#### DSA-015 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
+**Ring buffer: làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho `head == tail`?**
 <details><summary>Đáp án</summary>
 
-Khi chạy trên hệ RAM hạn chế (embedded, MCU vài KB–MB) hoặc xử lý dữ liệu cực lớn không vừa bộ nhớ. Một thuật toán O(n) time nhưng O(n) space phụ có thể bất khả thi trên thiết bị ít RAM, trong khi bản O(n log n) time nhưng O(1) space lại chạy được. Trên embedded còn tránh cấp phát động (fragmentation, không tất định) — ưu tiên in-place hoặc bộ nhớ tĩnh có giới hạn. Phải hỏi rõ ràng buộc tài nguyên trước khi chọn thuật toán; "tốt nhất" phụ thuộc ngữ cảnh.
+**Vấn đề:** với hai chỉ số `head`/`tail` chạy vòng, trạng thái **rỗng** và **đầy** đều dẫn tới `head == tail` ⇒ không phân biệt được.
+
+**Ba cách giải — mỗi cách một đánh đổi:**
+
+| Cách | Làm thế nào | Đánh đổi |
+|---|---|---|
+| **① Bỏ trống một ô** | Coi là đầy khi `(head+1) % N == tail` | Đơn giản nhất, **không cần biến thêm** ⇒ hợp lock-free. Mất **một ô** sức chứa |
+| **② Giữ biến `count`** | Đếm số phần tử đang có | Rõ ràng, dùng hết N ô. Nhưng `count` là **biến chung cả hai bên cùng sửa** ⇒ **phá vỡ SPSC lock-free** ([DSA-016](dsa.md)) |
+| **③ Chỉ số chạy tự do** | `head`/`tail` **không** lấy dư, chỉ tăng mãi; số phần tử = `head - tail`; lấy dư **chỉ khi truy cập mảng** | Dùng hết N ô **và** giữ được lock-free. Phải để ý **tràn số** — an toàn nếu N là luỹ thừa của 2 và dùng số nguyên không dấu |
+
+**⭐ Chọn thế nào:**
+- Một luồng, hoặc đã có mutex ⇒ **② `count`** vì dễ đọc nhất.
+- **SPSC lock-free** ⇒ **① hoặc ③**, vì mỗi biến chỉ có **một** bên ghi.
+- ③ là cách các cài đặt nghiêm túc hay dùng (kể cả trong kernel), vì được cả sức chứa lẫn tính lock-free.
+
+⚠️ **Vì sao ② phá lock-free:** `count` bị **cả producer lẫn consumer cùng ghi** ⇒ phải nguyên tử hoá và đồng bộ ⇒ mất đúng tính chất *"mỗi biến một người ghi"* vốn là nền tảng của SPSC.
+
+⚠️ **Bẫy tràn số ở ③:** nếu `head`/`tail` là số nguyên **không dấu** và N là luỹ thừa của 2 thì phép trừ `head - tail` **vẫn đúng** khi tràn (số học modulo) — nhưng dùng số **có dấu** thì tràn là **UB**. Đây là chi tiết dễ sai.
+
+**Chốt:** *"Ba cách: bỏ trống một ô, giữ biến đếm, hoặc chỉ số chạy tự do. Biến đếm dễ đọc nhất nhưng bị cả hai bên ghi nên phá lock-free — vì thế cài đặt SPSC dùng cách bỏ ô hoặc chỉ số tự do."*
 </details>
 
 #### DSA-013 · 🟡 · concept · ⭐ · 🎤 2026-08-09 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
@@ -117,32 +160,6 @@ Tự nó **không biết** — và đó chính là mối nguy: hệ chạy êm t
 Chi tiết đáng nói thêm: nội dung **còn lại** trong buffer luôn liên tục (vì luôn vứt từ đầu cũ) — cái đứt quãng là **lô mà consumer gom vắt qua giai đoạn drop**. Nếu `push` là hàm public, cho nó **trả về được trạng thái drop** để caller biết ngay, đừng luôn trả `true`.
 
 Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
-</details>
-
-#### DSA-015 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
-**Ring buffer: làm sao phân biệt "đầy" với "rỗng" khi cả hai đều cho `head == tail`?**
-<details><summary>Đáp án</summary>
-
-**Vấn đề:** với hai chỉ số `head`/`tail` chạy vòng, trạng thái **rỗng** và **đầy** đều dẫn tới `head == tail` ⇒ không phân biệt được.
-
-**Ba cách giải — mỗi cách một đánh đổi:**
-
-| Cách | Làm thế nào | Đánh đổi |
-|---|---|---|
-| **① Bỏ trống một ô** | Coi là đầy khi `(head+1) % N == tail` | Đơn giản nhất, **không cần biến thêm** ⇒ hợp lock-free. Mất **một ô** sức chứa |
-| **② Giữ biến `count`** | Đếm số phần tử đang có | Rõ ràng, dùng hết N ô. Nhưng `count` là **biến chung cả hai bên cùng sửa** ⇒ **phá vỡ SPSC lock-free** ([DSA-016](dsa.md)) |
-| **③ Chỉ số chạy tự do** | `head`/`tail` **không** lấy dư, chỉ tăng mãi; số phần tử = `head - tail`; lấy dư **chỉ khi truy cập mảng** | Dùng hết N ô **và** giữ được lock-free. Phải để ý **tràn số** — an toàn nếu N là luỹ thừa của 2 và dùng số nguyên không dấu |
-
-**⭐ Chọn thế nào:**
-- Một luồng, hoặc đã có mutex ⇒ **② `count`** vì dễ đọc nhất.
-- **SPSC lock-free** ⇒ **① hoặc ③**, vì mỗi biến chỉ có **một** bên ghi.
-- ③ là cách các cài đặt nghiêm túc hay dùng (kể cả trong kernel), vì được cả sức chứa lẫn tính lock-free.
-
-⚠️ **Vì sao ② phá lock-free:** `count` bị **cả producer lẫn consumer cùng ghi** ⇒ phải nguyên tử hoá và đồng bộ ⇒ mất đúng tính chất *"mỗi biến một người ghi"* vốn là nền tảng của SPSC.
-
-⚠️ **Bẫy tràn số ở ③:** nếu `head`/`tail` là số nguyên **không dấu** và N là luỹ thừa của 2 thì phép trừ `head - tail` **vẫn đúng** khi tràn (số học modulo) — nhưng dùng số **có dấu** thì tràn là **UB**. Đây là chi tiết dễ sai.
-
-**Chốt:** *"Ba cách: bỏ trống một ô, giữ biến đếm, hoặc chỉ số chạy tự do. Biến đếm dễ đọc nhất nhưng bị cả hai bên ghi nên phá lock-free — vì thế cài đặt SPSC dùng cách bỏ ô hoặc chỉ số tự do."*
 </details>
 
 #### DSA-016 · 🔴 · concept · 🔺T3 · 📦 2026-08-13 · [→ ring-buffer](../../../12-dsa/ring-buffer.md)
@@ -177,4 +194,8 @@ Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
 </details>
 
 ---
+⬅️ [Bank index](README.md)
+
+---
+
 ⬅️ [Bank index](README.md)

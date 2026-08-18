@@ -22,24 +22,12 @@ Cả hai đều nạp [config.md](config.md) làm hợp đồng vận hành — 
 
 ## 🧭 Chọn gì cho một phiên?
 
-Một phiên = **1 track** (hỏi về mảng nào) × **1 interview type** (hình thức phỏng vấn).
+Một phiên = **1 track** (hỏi mảng nào) × **1 interview type** (hình thức). Danh sách đầy đủ **chỉ sống ở hai file chủ** — không liệt kê lại ở đây:
 
-### Track — hỏi về mảng nào (chi tiết: [tracks.md](tracks.md))
-- **Theo công việc:** `bsp` (Embedded Linux/BSP) · `cpp-system` (C++ System SW).
-- **Theo phần:** `modern-cpp` · `os` · `linux-sysprog` · `embedded` (bare-metal/MCU/RTOS/firmware) · `drivers-dt` · `debugging` · `dsa` · `design-patterns` · `networking` · `system-design` · `behavioral`.
-- **Theo sách đã summary:** `emc` · `cpp-concurrency` · `melp` · `ostep` · `lkd` · `cpp-mindset`.
-- **⭐ Bám hồ sơ:** **`resume`** — câu hỏi bám từng dòng [RESUME.tex](../../RESUME.tex). Phần **chắc chắn 100% bị hỏi** (phỏng vấn thật dành 30–50% thời gian ở đây); đáp án là **khung** chứ không phải lời giải.
-
-### Interview type — hình thức (chi tiết: [interview-types.md](interview-types.md))
-- `daily` — ôn hằng ngày, 6 câu đa dạng (mặc định).
-- `rapid` — 12 câu phản xạ nhanh.
-- `comprehensive` — giả lập vòng technical thật, 16 câu đủ độ khó + coding + tình huống.
-- `by-level` — luyện đúng 1 mức khó.
-- `coding` — làm bài code (viết vào [coding-arena/](coding-arena/)).
-- `deep-dive` — 5 câu khó/tình huống 1 mảng.
-- `weak-review` — hỏi lại các câu bạn còn yếu.
-- `retention` — hỏi lại các câu **đã trả lời tốt** để kiểm tra độ nhớ theo thời gian.
-- `full-review` — kiểm tra **toàn diện**: trộn mọi câu đã từng hỏi (yếu + tốt).
+| Chọn | File chủ | Hay dùng nhất |
+|---|---|---|
+| **Track** | [tracks.md](tracks.md) | `bsp` ⭐(mặc định) · `cpp-system` · `drivers-dt` · `linux-sysprog` · `debugging` · **`resume`** ⭐ |
+| **Type** | [interview-types.md](interview-types.md) | `rapid` (12 câu, phản xạ) · `daily` (6 câu, mặc định) · `comprehensive` (16 câu, giả lập vòng thật) |
 
 > 🧪 **Không phải phiên mock: câu `lab`.** Bank còn một loại câu **NGỒI MÁY LÀM** — code có bug thật + nhiệm vụ + **output thật đã chạy** để đối chiếu ([DBG-030…036](bank/debugging.md)). Tự làm ngoài phiên, **không chấm điểm**; phiên mock hỏi câu `concept` tương ứng. Sinh ra vì đo được **T1 3.67 / T2 2.1** — *biết* công cụ nhưng *chưa dùng* công cụ.
 
@@ -58,17 +46,16 @@ flowchart TD
     F --> G["Gợi ý ôn tiếp + phiên kế"]
 ```
 
-**Nguyên tắc quan trọng:**
-- **⚖️ Khi hai file mâu thuẫn:** người dùng nói trong phiên > **`config.md`** > `interview-types`/`tracks`/`bank` > `study-plans`. Luật này sinh ra từ hai sự cố thật — xem [§⚖️ đầu config](config.md).
-- **📊 Phủ rộng cũng là hợp đồng** — [config §7](config.md): mỗi 5 phiên phải **đo độ phủ bank theo domain**. Đo tình cờ ngày 17/08 thấy phủ **29%** với **`DRV` 0%** dù đó là trụ lớn nhất của JD; lỗi này chỉ nhìn thấy ở **mức tổng**, không phiên đơn lẻ nào lộ ra.
-- **📈 Câu điểm thấp KHÔNG đi thẳng lên T2** — 0–2 điểm ⇒ đọc lại tài liệu rồi hỏi lại **T1 góc khác**; chỉ câu **3–4** mới đưa vào phiên đào T2. Hỏi sâu trên nền trống không đo được gì, cũng không dạy được gì.
-- **⚠️ Độ sâu là hợp đồng, không phải tuỳ hứng** — [config §6](config.md) chặn **hai lỗi ngược nhau**:
-  - *Không được NÔNG*: **mọi** câu (mới / weak / retention) đều có **phần nền + follow-up mở rộng**; câu weak nén nền còn 1 checkpoint, **điểm gần như hoàn toàn từ follow-up**.
-  - *Không được LỆCH TẦNG*: trần mặc định là **T2 (vận dụng & đánh đổi)**. **T3** (tên lệnh, flag, internals, lock-free) hỏi được nhưng **không tính điểm** — muốn T3 tính điểm thì gõ `deep-dive`.
-- **Review chỉ ở cuối phiên** — trong lúc hỏi, interviewer mở rộng/đào sâu như thật; chỉ khi *hoàn thành* mới nhận xét.
-- **Câu cũ vẫn được hỏi lại** — không có luật "đúng rồi thôi". Câu từng sai → [weak-register](weak-register.md); câu đã gỡ → bảng **🔁 Lịch kiểm tra lại** (hạn = tuần gỡ + 2), **không câu nào biến mất vĩnh viễn**.
-- **Không lặp lại nguyên văn góc hỏi cũ** — hỏi y hệt là đo trí nhớ về hội thoại, không đo kiến thức.
-- **Bank là nguồn duy nhất** — câu interviewer tự phát mà chưa có trong bank sẽ được **thêm vào bank** sau phiên.
+**Luật vận hành sống ở [config.md](config.md), không chép lại ở đây.** Bốn thứ quyết định chất lượng một phiên, đọc trước khi chạy:
+
+| Ở đâu | Luật | Chặn lỗi gì |
+|---|---|---|
+| [§⚖️](config.md) | Thứ tự ưu tiên khi hai file mâu thuẫn | interviewer tự chọn khi config nói ngược nhau |
+| [§6](config.md) | Hợp đồng độ sâu — T1/T2/T3, trần mặc định **T2** | phiên **nông** *và* phiên **lệch tầng** (hai lỗi ngược nhau) |
+| [§7](config.md) | Đo độ phủ bank mỗi 5 phiên | đào sâu một góc, bỏ trắng phần còn lại |
+| [§1 Bước 4](config.md) | Cập nhật bắt buộc sau phiên | phiên chạy xong rồi bay hơi |
+
+Hai nguyên tắc không nằm trong config vì chúng là *tinh thần* chứ không phải thủ tục: **review chỉ ở cuối phiên** (trong lúc hỏi thì đào sâu như thật), và **không câu nào biến mất vĩnh viễn** — không có luật "đúng rồi thôi".
 
 ---
 

@@ -9,6 +9,21 @@
 
 `<DOMAIN>-<NNN>` — số 3 chữ số, tăng dần trong mỗi domain, **không tái sử dụng** (xóa câu thì để trống ID, không gán lại).
 
+### 📑 ID ≠ vị trí trong file
+
+**Thứ tự đọc của file là theo CHỦ ĐỀ (mục `## A`, `## B`…), KHÔNG theo số ID.** ID cấp tăng dần theo *thời gian thêm câu*, nên nó không nói gì về chủ đề. Thêm câu mới ⇒ đặt vào **đúng mục chủ đề**, dù số ID nhảy cóc — đừng nối vào cuối file.
+
+> ⚠️ **Sự cố thật (phát hiện 2026-08-18).** Batch nhập ngày 13/08 nối thẳng vào cuối 3 file, sinh ra câu nằm dưới heading sai:
+> - `drivers-embedded.md`: **DRV-028…035** (device tree + kernel/user space) rơi xuống **sau** heading `## BUS — Bus Protocols` ⇒ 8 câu device tree hiển thị như thể là câu về I2C/SPI.
+> - `bsp.md`: **BSP-028** (RTOS+Linux) và **BSP-029/030** (initramfs, PID 1) nằm trong mục *"Bảo mật boot"*; mục đó lại **không có chữ cái**, phá luôn dãy A–H.
+> - `embedded-fundamentals.md`: **EMB-034/035** (realtime) và **EMB-036** (giảm footprint) nằm dưới *"H — Debug phần cứng"*.
+>
+> Rà soát tiếp toàn bank cùng ngày phát hiện lỗi **nặng hơn ở `cpp.md`**: **CPP-052…064 (13 câu** — OOP, lambda, template, concurrency**)** nằm **sau** heading *"Từ Effective Modern C++ — track `emc`"*, tức 13 câu **không thuộc sách** hiển thị như thể thuộc track `emc`. Và **9/15 file bank không có mục chủ đề nào** — file lớn nhất (`cpp.md`, 64 câu / 108 KB) là một danh sách phẳng, ôn theo chủ đề phải cuộn tay.
+>
+> **Đã xử lý 2026-08-18:** 12 file được chia mục chủ đề + bảng mục lục đầu file. **ID giữ nguyên tuyệt đối, nội dung 408/408 câu byte-identical** (đối chiếu từng khối bằng script trước/sau).
+>
+> Hậu quả: người ôn theo chủ đề bị **bỏ sót** — mở mục "Device Tree" ra thấy 1 câu, trong khi bank có 6. Đã sắp xếp lại 2026-08-18 (ID giữ nguyên, nội dung không đổi một chữ).
+
 | Domain | File | Nội dung | Topic gốc |
 |---|---|---|---|
 | `CPP` | [cpp.md](cpp.md) | C/C++ & Modern C++ | [01](../../../01-cpp-fundamentals/), [02](../../../02-modern-cpp/) |

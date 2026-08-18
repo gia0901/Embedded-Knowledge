@@ -1,8 +1,48 @@
 # SD — Tư duy & System Design
 
 > Domain `SD`. Nhiều câu **mở** — chấm theo *cách tiếp cận*, không đáp án duy nhất. Track dùng: `system-design`, `bsp`, `cpp-system`.
+> 📑 Thứ tự theo **chủ đề** (mục A, B, C…), không theo số ID — thêm câu mới đặt vào đúng mục ([vì sao](README.md#-id--vị-trí-trong-file)).
+
+| Mục | Nội dung | Câu |
+|---|---|---|
+| **A** | Tư duy giải quyết vấn đề | 5 |
+| **B** | Phương pháp system design | 4 |
+| **C** | Bài thiết kế hệ thống | 7 |
+| **D** | Thiết kế API & thư viện | 5 |
+| **E** | ABI & versioning | 5 |
+| **F** | Linking & loading | 7 |
 
 ---
+
+## A — Tư duy giải quyết vấn đề
+
+#### SD-033 · 🟢 · concept · ⭐ · 📦 2026-08-13 · [→ problem-solving](../../../10-thinking/problem-solving.md)
+**Trong phỏng vấn, vì sao nên "think aloud"?**
+<details><summary>Đáp án</summary>
+
+**Vì thứ được chấm là QUÁ TRÌNH SUY NGHĨ, không phải đáp án.** Interviewer đã biết đáp án; cái họ không biết là **bạn suy nghĩ thế nào** — và đó mới là thứ dự đoán được bạn làm việc ra sao.
+
+**Bốn lợi ích cụ thể:**
+1. **Ngồi im 5 phút = 0 thông tin.** Dù bạn đang nghĩ rất hay, interviewer chỉ thấy im lặng và ghi *"không tiếp cận được bài"*.
+2. **Được điểm cho hướng đi đúng** kể cả khi chưa ra đáp án cuối.
+3. **Được sửa hướng sớm.** Nói ra giả định sai ⇒ interviewer thường gợi ý ngay, thay vì để bạn đi lạc 20 phút.
+4. **Cho thấy bạn nêu được đánh đổi** — thứ phân biệt mid với senior mạnh hơn cả việc giải đúng.
+
+**Nói gì cho có ích (không phải kể lể):**
+- *"Tôi đang giả định X — có đúng không?"* ⇒ làm rõ đề bài.
+- *"Có hai hướng: A đơn giản nhưng O(n²), B phức tạp hơn nhưng O(n log n). Với n nhỏ tôi chọn A."* ⇒ **nêu đánh đổi**.
+- *"Tôi chưa chắc chỗ này, để tôi thử một ví dụ nhỏ."* ⇒ trung thực + có phương pháp.
+- *"Ca biên cần xử lý: rỗng, một phần tử, tràn số."* ⇒ tư duy kỹ lưỡng.
+
+⚠️ **Không phải nói liên tục.** Xin **một phút im lặng để nghĩ** là hoàn toàn ổn — miễn là **nói ra rằng bạn đang làm vậy**: *"cho tôi một phút sắp xếp ý nhé"*.
+
+⚠️ **Cạm bẫy ngược:** nói nhiều mà không có cấu trúc cũng trừ điểm. Khung an toàn: **làm rõ đề → nêu hướng và đánh đổi → chọn một → cài đặt → kiểm ca biên**.
+
+**Chốt:** *"Interviewer chấm quá trình chứ không chấm đáp án — im lặng là không có thông tin. Nói giả định, nói đánh đổi, và xin một phút để nghĩ khi cần."*
+</details>
+
+---
+⬅️ [Bank index](README.md)
 
 #### SD-001 · 🟡 · concept · [→ problem-solving](../../../10-thinking/problem-solving.md)
 **Khi gặp vấn đề kỹ thuật chưa từng thấy, bạn tiếp cận thế nào?**
@@ -24,6 +64,37 @@ Mọi quyết định kỹ thuật hy sinh mặt này để được mặt kia; 
 
 Quay về nguyên lý cơ bản nhất và suy luận lên thay vì sao chép khuôn mẫu ("cargo cult"). Hỏi "tại sao" liên tục tới khi chạm nguyên lý không chia nhỏ hơn. Ví dụ: thay vì mặc định "cần mutex", hỏi tại sao → vì có dữ liệu chia sẻ bị ghi đồng thời → nếu thiết kế mỗi thread giữ bản riêng (không chia sẻ mutable) thì loại bỏ được khóa, vừa đúng vừa nhanh hơn.
 </details>
+
+#### SD-032 · 🟡 · concept · 📦 2026-08-13 · [→ problem-solving](../../../10-thinking/problem-solving.md)
+**Khi bế tắc với một bài toán, bạn làm gì?**
+<details><summary>Đáp án</summary>
+
+**Bế tắc gần như luôn có nghĩa: một GIẢ ĐỊNH nào đó của bạn đang sai.** Vì nếu mọi giả định đều đúng thì đường đi đã hiện ra. Nên việc cần làm không phải "cố nghĩ mạnh hơn" mà là **đi tìm giả định sai**.
+
+**Sáu việc, xếp theo thứ tự nên thử:**
+
+| # | Việc | Vì sao hiệu quả |
+|---|---|---|
+| **1** | **Liệt kê những gì đã LOẠI TRỪ, và dựa trên căn cứ nào** | Bug hầu như luôn nấp trong một giả định **chưa từng được kiểm** ([DBG-008](debugging.md)) |
+| **2** | **Giải thích cho người khác** (rubber duck) | Việc phải nói thành lời buộc bạn phát biểu rõ giả định — và bạn thường tự thấy chỗ sai giữa câu |
+| **3** | **Thu nhỏ bài toán** | Bỏ bớt cho tới khi còn ca nhỏ nhất vẫn lỗi; thứ còn lại chính là nguyên nhân |
+| **4** | **Đảo ngược câu hỏi** | Thay vì *"vì sao nó sai?"* hỏi *"vì sao nó lại từng ĐÚNG?"* — thường lộ ra cơ chế thật |
+| **5** | **Đổi mức trừu tượng** | Đang soi từng dòng thì lùi ra nhìn kiến trúc; đang bàn kiến trúc thì soi vào dữ liệu thật |
+| **6** | **Nghỉ / ngủ một đêm** | Không phải lười — nó phá vỡ vết mòn tư duy đang giữ bạn ở một hướng sai |
+
+**Ba câu tự hỏi khi thật sự tắc:**
+- *"Nếu bắt buộc phải sai ở đâu đó, tôi tin chắc chỗ nào nhất?"* → **đi kiểm đúng chỗ đó**.
+- *"Tôi đang giải đúng bài toán không?"* — nhiều khi bế tắc vì bài toán bị phát biểu sai từ đầu.
+- *"Ai đã gặp chuyện này rồi?"* — hỏi sớm không phải là yếu; **tốn hai ngày rồi mới hỏi** mới là lãng phí.
+
+⚠️ **Chống chỉ định:** thử ngẫu nhiên nhiều thứ cùng lúc. Nó phá luôn khả năng suy luận vì bạn không còn biết cái gì gây ra cái gì ([DBG-008](debugging.md) — mỗi lần đổi một biến).
+
+**Chốt:** *"Bế tắc nghĩa là có một giả định sai — nên việc cần làm là liệt kê những gì đã loại trừ và kiểm lại căn cứ, chứ không phải cố nghĩ mạnh hơn. Và đừng thử ngẫu nhiên nhiều thứ cùng lúc."*
+</details>
+
+---
+
+## B — Phương pháp system design
 
 #### SD-004 · 🟠 · design · [→ system-design](../../../10-thinking/system-design.md)
 **Khi được giao bài system design mơ hồ, bước đầu tiên?**
@@ -53,6 +124,10 @@ Tách concern/module hóa (mỗi module một trách nhiệm rõ), interface ổ
 Tách logic khỏi truy cập phần cứng bằng Hardware Abstraction Layer/interface: logic gọi qua interface thay vì đụng thanh ghi/driver trực tiếp, nên test có thể thay phần cứng bằng mock/stub và chạy logic trên host (nhanh, lặp lại được). Module coupling thấp + inject phụ thuộc (thời gian/IO) để kiểm soát trong test. Build cùng code trên host để chạy ASan/TSan.
 </details>
 
+---
+
+## C — Bài thiết kế hệ thống
+
 #### SD-008 · 🔴 · design · 🏗️ · [→ system-design](../../../10-thinking/system-design.md)
 **Thiết kế phần mềm thu thập dữ liệu sensor trên thiết bị nhúng Linux.**
 <details><summary>Đáp án (khung)</summary>
@@ -66,53 +141,11 @@ Tách logic khỏi truy cập phần cứng bằng Hardware Abstraction Layer/in
 - Cách trình bày (làm rõ → chia phần → đào sâu chỗ khó → đánh đổi → lường lỗi) quan trọng hơn "đáp án".
 </details>
 
-#### SD-009 · 🔴 · design · 🏗️ · ⭐ · [→ api-design](../../../07-shared-libraries/api-design.md), [abi-versioning](../../../07-shared-libraries/abi-versioning.md)
-**Thiết kế một C++ shared library/API cho lớp trên dùng. Bạn quan tâm gì?**
-<details><summary>Đáp án</summary>
-
-- **API tốt**: tối thiểu (mọi thứ public là cam kết maintain), che giấu chi tiết, nhất quán, dễ dùng đúng/khó dùng sai (kiểu mạnh, RAII, `[[nodiscard]]`), tài liệu hóa hợp đồng (tiền/hậu điều kiện, ownership, thread-safety).
-- **Ownership rõ ràng** qua kiểu: trả `unique_ptr` (sở hữu), nhận `const&`/`span` (mượn).
-- **Error handling nhất quán**: exception (C++ thuần) hoặc mã lỗi/`expected` (biên giới C/embedded).
-- **Ổn định ABI**: pimpl để giấu data member; biên giới C (`extern "C"`, POD, opaque handle) nếu cần đa compiler/ngôn ngữ; versioning kỷ luật (soname theo major, không đổi chữ ký/layout đã phát hành — chỉ thêm).
-- Cẩn thận virtual function trong interface public (thêm virtual phá vtable).
-</details>
-
-#### SD-010 · 🔴 · design · 🏗️ · ⭐ · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
-**Thư viện cập nhật phiên bản mới khiến app khách hàng (không build lại) crash. Nguyên nhân khả dĩ và cách tránh?**
-<details><summary>Đáp án</summary>
-
-Nguyên nhân khả dĩ: **ABI break** dù API không đổi (app không build lại nên dùng binary cũ với `.so` mới). Vd: thêm data member vào struct/class public (đổi sizeof/offset), thêm/đổi thứ tự virtual function (đổi vtable), đổi chữ ký, đổi kích thước/alignment kiểu. Cách tránh: giữ ABI tương thích — pimpl giấu data member, chỉ thêm hàm mới thay vì sửa cái cũ, không đổi layout đã phát hành, thận trọng virtual; nếu buộc phá ABI thì tăng major + đổi soname (`libfoo.so.2`) để hai bản cùng tồn tại; dùng symbol versioning; kiểm tra bằng `abidiff`/abi-compliance-checker trước khi phát hành.
-</details>
-
 #### SD-011 · 🔴 · design · 🏗️ · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md), [rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
 **Thiết kế cơ chế giao tiếp giữa một process realtime và một process xử lý/giao diện trên cùng SoC.**
 <details><summary>Đáp án</summary>
 
 Tách vai trò (realtime đọc/điều khiển, process kia xử lý/UI/mạng). Giao tiếp cùng máy hiệu năng cao → **shared memory** (zero-copy) tổ chức ring buffer cho luồng dữ liệu lớn, đồng bộ bằng semaphore/mutex process-shared đặt trong vùng shm; dùng **eventfd** hoặc Unix domain socket để báo hiệu/điều khiển có ranh giới. Nếu hệ heterogeneous (Cortex-A Linux + Cortex-M RTOS) thì shared memory + mailbox/RPMsg (AMP). Đánh đổi: shared memory nhanh nhất nhưng tự đồng bộ (dễ sai); message queue/socket an toàn hơn nhưng có copy. Lường lỗi: bên realtime không được block chờ bên kia (buffer + non-blocking), watchdog cho cả hai.
-</details>
-
-#### SD-012 · 🔴 · design · 🏗️ · ⭐ · [→ system-design §6.2](../../../10-thinking/system-design.md), [boot-process](../../../08-embedded-systems/boot-process.md)
-**Thiết kế hệ thống cập nhật firmware (OTA) an toàn — không brick dù mất điện giữa chừng.**
-<details><summary>Đáp án (khung)</summary>
-
-- **Requirements**: nguồn ảnh (OTA/USB/thẻ), kích thước, downtime cho phép, cần ký số không, có cập nhật bootloader/kernel không.
-- **Constraints**: flash đủ 2 slot? RAM verify hash/chữ ký? nguồn ổn định? bootloader chọn được slot?
-- **High-level**: Downloader (resume) → Verifier (**hash + chữ ký** trước khi tin) → Writer (ghi **slot B** khi **A** đang chạy) → Bootloader (cờ "thử B") → Health-check sau boot (OK→**commit**, lỗi→**rollback** A).
-- **Deep dive**: **A/B partition** + cờ `boot_next`/`try_count`; chuyển slot **atomic** (đổi cờ, không ghi đè đang chạy); chỉ mark bootable **sau** verify; **anti-rollback** bằng version counter.
-- **Trade-offs**: A/B (tốn gấp đôi flash, an toàn) vs in-place+recovery (ít flash, rủi ro); ký số (an toàn, cần key mgmt) vs chỉ CRC (chống hỏng, không chống giả).
-- **Failure**: mất điện khi ghi B → A vẫn boot (chưa chuyển cờ); bản mới boot lỗi → watchdog + hết `try_count` → tự rollback A; ảnh giả → chặn ở Verifier.
-</details>
-
-#### SD-013 · 🔴 · design · 🏗️ · ⭐ · [→ system-design §6.3](../../../10-thinking/system-design.md), [architecture](../../../08-embedded-systems/architecture.md)
-**Thiết kế kiến trúc phần mềm cho một máy quét mã vạch (whole product).**
-<details><summary>Đáp án (khung)</summary>
-
-- **Requirements**: nguồn ảnh (camera/CCD), loại mã (1D/2D), **latency** trigger→result (vd <100ms), output (USB-HID/serial/mạng), ánh sáng, offline?
-- **Constraints**: CPU có NEON/DSP? RAM frame buffer? pin hay cắm? độ phân giải×fps → băng thông.
-- **High-level**: Trigger/Illumination → Image capture (V4L2, **DMA**) → Preprocess (binarize, khử nhiễu) → Decode (định vị + symbology) → Output formatter (HID/serial) → Config/Management.
-- **Deep dive**: pipeline đồng thời — capture (ISR/DMA) → **ring buffer** frame → **decode thread** nặng CPU/NEON; **zero-copy** buffer DMA; chia **budget latency** từng tầng.
-- **Trade-offs**: decode 1 frame (nhanh, dễ trượt) vs gộp nhiều frame (chính xác, tăng latency); on-device vs offload; polling vs interrupt+DMA (chọn DMA).
-- **Failure**: decode fail → frame kế, hết timeout → beep lỗi; overrun → drop frame cũ nhất; ánh sáng kém → auto-exposure + illumination.
 </details>
 
 #### SD-014 · 🔴 · design · 🏗️ · [→ system-design §5](../../../10-thinking/system-design.md), [io-multiplexing](../../../04-linux-system-programming/io-multiplexing.md)
@@ -125,18 +158,6 @@ Tách vai trò (realtime đọc/điều khiển, process kia xử lý/UI/mạng)
 - **Deep dive**: **framing** — độ dài (header có length) hoặc **delimiter** + byte-stuffing (escape khi delimiter xuất hiện trong data); **state machine** reassembly (WAIT_SYNC → LEN → PAYLOAD → CRC); không parse nặng trong ISR (chỉ đẩy byte vào ring buffer, thread lo phần còn lại).
 - **Trade-offs**: fixed-length (đơn giản, phí băng thông) vs length-prefixed (gọn, phải chống length giả) vs delimiter (stream-friendly, cần escaping); CRC (mạnh) vs checksum (rẻ).
 - **Failure**: byte lỗi/mất sync → CRC fail → **loại gói, resync** tới delimiter kế; buffer đầy → drop + đếm lỗi; gói dở khi timeout → hủy, về WAIT_SYNC.
-</details>
-
-#### SD-015 · 🔴 · design · 🏗️ · [→ system-design §4](../../../10-thinking/system-design.md), [driver-basics](../../../05-drivers-device-tree/driver-basics.md), [kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)
-**Thiết kế một subsystem driver end-to-end: từ API userspace tới chạm phần cứng.**
-<details><summary>Đáp án (khung)</summary>
-
-- **Requirements**: thao tác userspace cần (đọc/ghi/cấu hình/stream?), đồng bộ hay bất đồng bộ, nhiều tiến trình cùng mở?, tần suất/độ trễ.
-- **Constraints**: bus (I2C/SPI/MMIO?), cần DMA?, interrupt hay polling, ràng buộc realtime.
-- **High-level**: *Userspace lib/API* (che ioctl sau hàm C++ sạch) → *Char device* (`/dev/x`, `file_operations`) → *Kernel driver core* (probe qua device tree, quản state) → *HW access* (MMIO/regmap, IRQ handler top/bottom-half) → phần cứng.
-- **Deep dive**: chọn kênh userspace↔kernel — **ioctl** (lệnh cấu hình), **read/write** (luồng dữ liệu), **sysfs** (thuộc tính đơn giản), **mmap** (zero-copy dữ liệu lớn); `copy_to/from_user` ở biên; đồng bộ trong kernel (mutex vs spinlock nếu đụng IRQ); top-half nhanh + bottom-half (workqueue/threaded IRQ) cho việc nặng.
-- **Trade-offs**: ioctl (linh hoạt, kém khám phá) vs sysfs (dễ script, chỉ hợp giá trị đơn); polling (đơn giản, tốn CPU) vs interrupt+DMA; mmap (nhanh, phức tạp) vs read/write.
-- **Failure**: userspace truyền con trỏ/kích thước xấu → validate + `copy_*` an toàn; thiết bị treo → timeout + reset; probe lỗi → `EPROBE_DEFER`/nhả tài nguyên sạch; tránh sleak khi rmmod.
 </details>
 
 #### SD-016 · 🟠 · design · 🏗️ · [→ system-design §5](../../../10-thinking/system-design.md), [creational §Object Pool](../../../11-design-patterns/creational.md), [constraints](../../../08-embedded-systems/constraints.md)
@@ -201,114 +222,55 @@ res.release();      // "giải phóng" cả pool trong O(1) — reset con trỏ,
 - **Failure**: pool cạn → chính sách rõ (drop/chờ/degrade), không tràn âm thầm; phát hiện leak-logic (mượn không trả) bằng đếm slot; guard chống double-release.
 </details>
 
-#### SD-017 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
-**Phân biệt API và ABI. Cho một thay đổi **giữ nguyên API** nhưng **phá ABI**.**
-<details><summary>Đáp án</summary>
+#### SD-012 · 🔴 · design · 🏗️ · ⭐ · [→ system-design §6.2](../../../10-thinking/system-design.md), [boot-process](../../../08-embedded-systems/boot-process.md)
+**Thiết kế hệ thống cập nhật firmware (OTA) an toàn — không brick dù mất điện giữa chừng.**
+<details><summary>Đáp án (khung)</summary>
 
-| | **API** (Application Programming Interface) | **ABI** (Application Binary Interface) |
-|---|---|---|
-| Hợp đồng ở mức | **Mã nguồn** | **Nhị phân** |
-| Gồm những gì | Tên hàm, kiểu tham số, ngữ nghĩa | **Kích thước & bố cục struct**, offset thành viên, thứ tự vtable, quy ước gọi hàm, tên symbol đã mangle |
-| Phá vỡ thì | **Biên dịch lại là hỏng** — thấy ngay | **Vẫn biên dịch, vẫn chạy** — hỏng lúc chạy, im lặng |
-| Ai quan tâm | Người viết code dùng thư viện | Người **chỉ thay file `.so`** mà không build lại |
-
-**⭐ Ví dụ kinh điển — thêm một thành viên vào struct:**
-```cpp
-// v1.0 (app đã biên dịch với bản này)     // v1.1 — API y hệt, ABI ĐÃ VỠ
-struct Config { int timeout; };            struct Config { int timeout; int retries; };
-```
-`sizeof(Config)` đổi từ 4 → 8. App cũ vẫn cấp phát **4 byte**, còn thư viện mới ghi vào **8 byte** ⇒ **ghi đè ra ngoài** ⇒ hỏng bộ nhớ ngẫu nhiên, crash ở chỗ chẳng liên quan. Không có thông báo lỗi nào, không có cảnh báo lúc liên kết.
-
-**Vì sao ABI đau hơn API:** lỗi API xuất hiện **lúc biên dịch**, có thông báo rõ ràng, sửa xong là hết. Lỗi ABI xuất hiện **ở máy khách**, biểu hiện thành crash ngẫu nhiên hoặc dữ liệu sai, và triệu chứng **cách xa nguyên nhân** ⇒ đúng lớp bug tốn hàng tuần.
-
-**Dấu hiệu nhận biết trong thực tế:** *"khách chép `.so` mới vào rồi app crash, chép lại bản cũ thì hết"* — nghe câu này là nghi ABI break ngay ([SD-010](system-design.md)).
-
-**Chốt:** *"API là hợp đồng mức mã nguồn, ABI là hợp đồng mức nhị phân — bố cục struct, vtable, tên symbol. Thêm một field vào struct giữ nguyên API nhưng phá ABI, và nó hỏng im lặng ở máy khách."*
+- **Requirements**: nguồn ảnh (OTA/USB/thẻ), kích thước, downtime cho phép, cần ký số không, có cập nhật bootloader/kernel không.
+- **Constraints**: flash đủ 2 slot? RAM verify hash/chữ ký? nguồn ổn định? bootloader chọn được slot?
+- **High-level**: Downloader (resume) → Verifier (**hash + chữ ký** trước khi tin) → Writer (ghi **slot B** khi **A** đang chạy) → Bootloader (cờ "thử B") → Health-check sau boot (OK→**commit**, lỗi→**rollback** A).
+- **Deep dive**: **A/B partition** + cờ `boot_next`/`try_count`; chuyển slot **atomic** (đổi cờ, không ghi đè đang chạy); chỉ mark bootable **sau** verify; **anti-rollback** bằng version counter.
+- **Trade-offs**: A/B (tốn gấp đôi flash, an toàn) vs in-place+recovery (ít flash, rủi ro); ký số (an toàn, cần key mgmt) vs chỉ CRC (chống hỏng, không chống giả).
+- **Failure**: mất điện khi ghi B → A vẫn boot (chưa chuyển cờ); bản mới boot lỗi → watchdog + hết `try_count` → tự rollback A; ảnh giả → chặn ở Verifier.
 </details>
 
-#### SD-018 · 🟠 · concept · ⭐ · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
-**Những thay đổi nào trong C++ thường phá ABI? Vì sao C++ dễ vỡ ABI hơn C nhiều?**
-<details><summary>Đáp án</summary>
+#### SD-013 · 🔴 · design · 🏗️ · ⭐ · [→ system-design §6.3](../../../10-thinking/system-design.md), [architecture](../../../08-embedded-systems/architecture.md)
+**Thiết kế kiến trúc phần mềm cho một máy quét mã vạch (whole product).**
+<details><summary>Đáp án (khung)</summary>
 
-**Danh sách phá ABI — nhóm theo cơ chế:**
-
-| Nhóm | Thay đổi | Vì sao vỡ |
-|---|---|---|
-| **Bố cục dữ liệu** | Thêm/bớt/đổi thứ tự **thành viên**; đổi kiểu thành viên; đổi alignment/packing | Offset của mọi thành viên sau đó **dịch đi** |
-| **vtable** | Thêm/bớt/đổi **thứ tự** hàm virtual; thêm base class; đổi một hàm thường thành virtual | Lời gọi virtual là *"nhảy tới ô thứ N của vtable"* — đổi thứ tự là gọi **nhầm hàm** |
-| **Chữ ký hàm** | Đổi kiểu tham số/trả về, thêm tham số (kể cả có giá trị mặc định), đổi `const` | Tên đã **mangle** thay đổi ⇒ symbol cũ biến mất |
-| **Ngữ nghĩa ngầm** | Đổi giá trị enum, đổi kích thước mảng thành viên, đổi quy ước sở hữu (ai `delete`) | Vẫn liên kết được nhưng **hành vi sai** |
-| **Môi trường** | Đổi compiler/phiên bản/cờ ảnh hưởng bố cục, đổi phiên bản libstdc++ | Bố cục kiểu chuẩn có thể khác |
-
-**⭐ Vì sao C++ dễ vỡ hơn C nhiều — ba lý do:**
-1. **C++ phơi bày bố cục lớp ra header.** Client biên dịch theo `sizeof` và offset **tại thời điểm build của họ**; chúng bị "nướng" vào mã máy của họ. C cũng có vấn đề này với struct, nhưng C thường dùng con trỏ mờ (opaque) nhiều hơn.
-2. **vtable là một mảng có thứ tự.** Trong C không có khái niệm tương đương ⇒ C++ có thêm cả một chiều để vỡ.
-3. **Name mangling mã hoá cả chữ ký** ⇒ mọi thay đổi nhỏ đều đổi tên symbol; và **quy tắc mangle khác nhau giữa compiler** ([CPP-023](cpp.md)).
-
-⇒ **Hệ quả thiết kế:** đây chính là lý do các thư viện C++ nghiêm túc hoặc **phơi C API** ([SD-022](system-design.md)), hoặc dùng **Pimpl** để giấu toàn bộ bố cục ([SD-021](system-design.md)), hoặc chỉ phơi **interface thuần ảo** với cam kết không bao giờ đổi thứ tự.
-
-**Bẫy:** (1) tưởng thêm hàm virtual **ở cuối** là an toàn — không, lớp dẫn xuất của client đã có vtable riêng; (2) tưởng thêm tham số **có giá trị mặc định** là an toàn về ABI — không, giá trị mặc định được điền **ở phía client** và tên symbol vẫn đổi; (3) đổi từ `std::string` này sang kiểu khác trong struct công khai.
-
-**Chốt:** *"C++ phơi bố cục lớp và thứ tự vtable ra header, mà cả hai đều bị nướng vào mã của client — nên gần như mọi thay đổi cấu trúc đều phá ABI. Đó là lý do thư viện nghiêm túc giấu bố cục sau Pimpl hoặc phơi C API."*
+- **Requirements**: nguồn ảnh (camera/CCD), loại mã (1D/2D), **latency** trigger→result (vd <100ms), output (USB-HID/serial/mạng), ánh sáng, offline?
+- **Constraints**: CPU có NEON/DSP? RAM frame buffer? pin hay cắm? độ phân giải×fps → băng thông.
+- **High-level**: Trigger/Illumination → Image capture (V4L2, **DMA**) → Preprocess (binarize, khử nhiễu) → Decode (định vị + symbology) → Output formatter (HID/serial) → Config/Management.
+- **Deep dive**: pipeline đồng thời — capture (ISR/DMA) → **ring buffer** frame → **decode thread** nặng CPU/NEON; **zero-copy** buffer DMA; chia **budget latency** từng tầng.
+- **Trade-offs**: decode 1 frame (nhanh, dễ trượt) vs gộp nhiều frame (chính xác, tăng latency); on-device vs offload; polling vs interrupt+DMA (chọn DMA).
+- **Failure**: decode fail → frame kế, hết timeout → beep lỗi; overrun → drop frame cũ nhất; ánh sáng kém → auto-exposure + illumination.
 </details>
 
-#### SD-019 · 🟠 · concept · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
-**`soname` là gì và liên quan thế nào tới tương thích ABI? Symbol versioning khác gì với việc tăng soname?**
-<details><summary>Đáp án</summary>
+#### SD-015 · 🔴 · design · 🏗️ · [→ system-design §4](../../../10-thinking/system-design.md), [driver-basics](../../../05-drivers-device-tree/driver-basics.md), [kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)
+**Thiết kế một subsystem driver end-to-end: từ API userspace tới chạm phần cứng.**
+<details><summary>Đáp án (khung)</summary>
 
-**Ba cái tên của một thư viện — phải phân biệt:**
-
-| Tên | Ví dụ | Ai dùng |
-|---|---|---|
-| **Tên thật** (real name) | `libfoo.so.1.4.2` | File thật trên đĩa |
-| **soname** | `libfoo.so.1` | **Được nướng vào chương trình lúc liên kết**; loader tìm đúng tên này lúc chạy |
-| **Linker name** | `libfoo.so` | Symlink, chỉ dùng lúc **build** |
-
-**Luật:** **soname = lời hứa về ABI.** Cùng soname ⇒ hứa **tương thích ABI ngược** (chương trình build với `1.4.2` chạy được với `1.5.0`). **Phá ABI ⇒ BẮT BUỘC tăng soname** (`.so.1` → `.so.2`).
-
-⇒ Nhờ vậy hai phiên bản **cùng tồn tại** trên một máy: app cũ nạp `libfoo.so.1`, app mới nạp `libfoo.so.2`, không giẫm lên nhau. Đây là cách Linux tránh "DLL hell".
-
-**Symbol versioning — công cụ tinh vi hơn:** gắn **phiên bản cho từng symbol** bên trong *cùng một* thư viện, giữ đồng thời **nhiều bản của một hàm**:
-
-| | **Tăng soname** | **Symbol versioning** |
-|---|---|---|
-| Mức chi tiết | **Cả thư viện** | **Từng hàm** |
-| App cũ | Phải giữ file `.so.1` riêng | Vẫn dùng `.so.1`, gọi vào bản cũ của hàm — **cùng một file** |
-| Chi phí bảo trì | Thấp | **Cao** — phải giữ mã của mọi bản cũ mãi mãi |
-| Dùng khi | **Mặc định** cho hầu hết dự án | Thư viện nền tảng cực rộng (glibc) — nơi bắt cả hệ thống nâng cấp là bất khả thi |
-
-**Thực dụng:** dự án bình thường **cứ tăng soname**. Symbol versioning chỉ đáng khi bạn là glibc — tức là không thể yêu cầu toàn thế giới build lại.
-
-**Bẫy:** (1) **quên tăng soname sau khi phá ABI** — đây là nguyên nhân gốc của phần lớn ca *"chép `.so` mới vào là app crash"*; (2) tăng phiên bản **file** nhưng giữ nguyên soname (đổi `1.4.2`→`1.5.0` mà vẫn `.so.1`) ⇒ **đúng** nếu tương thích, **thảm hoạ** nếu không; (3) đóng gói thiếu symlink ⇒ build được ở máy dev, khách không chạy được.
-
-**Chốt:** *"soname là lời hứa ABI được nướng vào chương trình — phá ABI thì phải tăng soname để hai phiên bản cùng sống. Symbol versioning làm ở mức từng hàm, mạnh hơn nhưng phải nuôi mã cũ mãi, nên chỉ hợp thư viện nền tảng."*
+- **Requirements**: thao tác userspace cần (đọc/ghi/cấu hình/stream?), đồng bộ hay bất đồng bộ, nhiều tiến trình cùng mở?, tần suất/độ trễ.
+- **Constraints**: bus (I2C/SPI/MMIO?), cần DMA?, interrupt hay polling, ràng buộc realtime.
+- **High-level**: *Userspace lib/API* (che ioctl sau hàm C++ sạch) → *Char device* (`/dev/x`, `file_operations`) → *Kernel driver core* (probe qua device tree, quản state) → *HW access* (MMIO/regmap, IRQ handler top/bottom-half) → phần cứng.
+- **Deep dive**: chọn kênh userspace↔kernel — **ioctl** (lệnh cấu hình), **read/write** (luồng dữ liệu), **sysfs** (thuộc tính đơn giản), **mmap** (zero-copy dữ liệu lớn); `copy_to/from_user` ở biên; đồng bộ trong kernel (mutex vs spinlock nếu đụng IRQ); top-half nhanh + bottom-half (workqueue/threaded IRQ) cho việc nặng.
+- **Trade-offs**: ioctl (linh hoạt, kém khám phá) vs sysfs (dễ script, chỉ hợp giá trị đơn); polling (đơn giản, tốn CPU) vs interrupt+DMA; mmap (nhanh, phức tạp) vs read/write.
+- **Failure**: userspace truyền con trỏ/kích thước xấu → validate + `copy_*` an toàn; thiết bị treo → timeout + reset; probe lỗi → `EPROBE_DEFER`/nhả tài nguyên sạch; tránh sleak khi rmmod.
 </details>
 
-#### SD-020 · 🔴 · design · ⭐ · 🏗️ · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
-**Bạn duy trì một shared library C++ cho khách hàng chỉ thay file `.so`, không build lại. Thiết kế thế nào để phát triển tiếp mà không phá ABI?**
+---
+
+## D — Thiết kế API & thư viện
+
+#### SD-009 · 🔴 · design · 🏗️ · ⭐ · [→ api-design](../../../07-shared-libraries/api-design.md), [abi-versioning](../../../07-shared-libraries/abi-versioning.md)
+**Thiết kế một C++ shared library/API cho lớp trên dùng. Bạn quan tâm gì?**
 <details><summary>Đáp án</summary>
 
-**Nguyên tắc gốc: cái gì KHÔNG phơi ra thì không thể phá.** Mọi kỹ thuật dưới đây đều là biến thể của việc **giảm bề mặt nhị phân**.
-
-**Bốn kỹ thuật, theo thứ tự hiệu quả:**
-
-| # | Kỹ thuật | Giải quyết gì |
-|---|---|---|
-| **1** | **Pimpl** — mọi thành viên dữ liệu giấu sau một con trỏ | `sizeof` lớp **không bao giờ đổi** ⇒ thêm/bớt/đổi thành viên thoải mái ([SD-021](system-design.md)) |
-| **2** | **Interface thuần ảo + factory** — client chỉ thấy lớp abstract, đối tượng do thư viện tạo | Client không biết bố cục lớp thật. ⚠️ **Chỉ được THÊM hàm virtual ở CUỐI**, không bao giờ đổi thứ tự |
-| **3** | **Phơi C API** ở biên giới, C++ chỉ ở bên trong | Xoá bỏ cả vtable lẫn name mangling ⇒ ổn định nhất ([SD-022](system-design.md)) |
-| **4** | **Struct có version + trường dự phòng** | Struct công khai đặt `uint32_t size` ở đầu (client điền `sizeof`) ⇒ thư viện biết client dùng bản nào và xử lý được cả hai |
-
-**Kỷ luật vận hành đi kèm — kỹ thuật thôi không đủ:**
-- **Kiểm soát symbol xuất ra.** Mặc định mọi symbol đều công khai ⇒ vô tình biến chi tiết nội bộ thành ABI. Ẩn hết, chỉ xuất tường minh những gì có chủ đích. *(Cách làm cụ thể là T3.)*
-- **Đặt luật rõ về sở hữu:** ai cấp phát thì **người đó giải phóng** — client `new` rồi thư viện `delete` là hỏng khi hai bên dùng runtime khác ([SD-023](system-design.md)).
-- **Không bao giờ để kiểu STL đi qua biên giới** trong ca hỗ trợ nhiều compiler: `std::string`/`std::vector` có bố cục khác nhau giữa các phiên bản libstdc++.
-- **Kiểm ABI tự động trong CI** — so bề mặt nhị phân bản mới với bản phát hành trước; phá thì **fail build**, đừng trông chờ vào việc nhớ.
-- **Tăng soname khi buộc phải phá** ([SD-019](system-design.md)) — phá ABI có kiểm soát vẫn tốt hơn phá âm thầm.
-
-⚠️ **Đánh đổi phải nói ra:** Pimpl thêm **một lần gián tiếp + một lần cấp phát** mỗi đối tượng, và chặn inline ⇒ không dùng cho lớp nhỏ, tạo nhiều, nằm trong đường nóng. Interface thuần ảo thêm lời gọi ảo. **Ổn định ABI không miễn phí** — đổi lấy hiệu năng và sự tiện lợi.
-
-**Chốt:** *"Giảm bề mặt nhị phân: giấu dữ liệu sau Pimpl, phơi interface thuần ảo hoặc C API, kiểm soát symbol xuất ra — rồi bắt CI kiểm ABI mỗi lần phát hành. Và chấp nhận trả bằng một lần gián tiếp."*
+- **API tốt**: tối thiểu (mọi thứ public là cam kết maintain), che giấu chi tiết, nhất quán, dễ dùng đúng/khó dùng sai (kiểu mạnh, RAII, `[[nodiscard]]`), tài liệu hóa hợp đồng (tiền/hậu điều kiện, ownership, thread-safety).
+- **Ownership rõ ràng** qua kiểu: trả `unique_ptr` (sở hữu), nhận `const&`/`span` (mượn).
+- **Error handling nhất quán**: exception (C++ thuần) hoặc mã lỗi/`expected` (biên giới C/embedded).
+- **Ổn định ABI**: pimpl để giấu data member; biên giới C (`extern "C"`, POD, opaque handle) nếu cần đa compiler/ngôn ngữ; versioning kỷ luật (soname theo major, không đổi chữ ký/layout đã phát hành — chỉ thêm).
+- Cẩn thận virtual function trong interface public (thêm virtual phá vtable).
 </details>
 
 #### SD-021 · 🟠 · concept · ⭐ · 📦 2026-08-13 · [→ api-design](../../../07-shared-libraries/api-design.md)
@@ -433,6 +395,131 @@ void     scanner_destroy(Scanner* s);           /* đối xứng với create */
 
 **Chốt:** *"Exception cho lỗi bất thường trong C++ thuần; mã lỗi khi có biên giới C hoặc ràng buộc nhúng; `optional`/`expected` cho lỗi được mong đợi. Quan trọng nhất là nhất quán — trộn hai kiểu là cách chắc chắn để lỗi lọt qua."*
 </details>
+
+---
+
+## E — ABI & versioning
+
+#### SD-017 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
+**Phân biệt API và ABI. Cho một thay đổi **giữ nguyên API** nhưng **phá ABI**.**
+<details><summary>Đáp án</summary>
+
+| | **API** (Application Programming Interface) | **ABI** (Application Binary Interface) |
+|---|---|---|
+| Hợp đồng ở mức | **Mã nguồn** | **Nhị phân** |
+| Gồm những gì | Tên hàm, kiểu tham số, ngữ nghĩa | **Kích thước & bố cục struct**, offset thành viên, thứ tự vtable, quy ước gọi hàm, tên symbol đã mangle |
+| Phá vỡ thì | **Biên dịch lại là hỏng** — thấy ngay | **Vẫn biên dịch, vẫn chạy** — hỏng lúc chạy, im lặng |
+| Ai quan tâm | Người viết code dùng thư viện | Người **chỉ thay file `.so`** mà không build lại |
+
+**⭐ Ví dụ kinh điển — thêm một thành viên vào struct:**
+```cpp
+// v1.0 (app đã biên dịch với bản này)     // v1.1 — API y hệt, ABI ĐÃ VỠ
+struct Config { int timeout; };            struct Config { int timeout; int retries; };
+```
+`sizeof(Config)` đổi từ 4 → 8. App cũ vẫn cấp phát **4 byte**, còn thư viện mới ghi vào **8 byte** ⇒ **ghi đè ra ngoài** ⇒ hỏng bộ nhớ ngẫu nhiên, crash ở chỗ chẳng liên quan. Không có thông báo lỗi nào, không có cảnh báo lúc liên kết.
+
+**Vì sao ABI đau hơn API:** lỗi API xuất hiện **lúc biên dịch**, có thông báo rõ ràng, sửa xong là hết. Lỗi ABI xuất hiện **ở máy khách**, biểu hiện thành crash ngẫu nhiên hoặc dữ liệu sai, và triệu chứng **cách xa nguyên nhân** ⇒ đúng lớp bug tốn hàng tuần.
+
+**Dấu hiệu nhận biết trong thực tế:** *"khách chép `.so` mới vào rồi app crash, chép lại bản cũ thì hết"* — nghe câu này là nghi ABI break ngay ([SD-010](system-design.md)).
+
+**Chốt:** *"API là hợp đồng mức mã nguồn, ABI là hợp đồng mức nhị phân — bố cục struct, vtable, tên symbol. Thêm một field vào struct giữ nguyên API nhưng phá ABI, và nó hỏng im lặng ở máy khách."*
+</details>
+
+#### SD-018 · 🟠 · concept · ⭐ · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
+**Những thay đổi nào trong C++ thường phá ABI? Vì sao C++ dễ vỡ ABI hơn C nhiều?**
+<details><summary>Đáp án</summary>
+
+**Danh sách phá ABI — nhóm theo cơ chế:**
+
+| Nhóm | Thay đổi | Vì sao vỡ |
+|---|---|---|
+| **Bố cục dữ liệu** | Thêm/bớt/đổi thứ tự **thành viên**; đổi kiểu thành viên; đổi alignment/packing | Offset của mọi thành viên sau đó **dịch đi** |
+| **vtable** | Thêm/bớt/đổi **thứ tự** hàm virtual; thêm base class; đổi một hàm thường thành virtual | Lời gọi virtual là *"nhảy tới ô thứ N của vtable"* — đổi thứ tự là gọi **nhầm hàm** |
+| **Chữ ký hàm** | Đổi kiểu tham số/trả về, thêm tham số (kể cả có giá trị mặc định), đổi `const` | Tên đã **mangle** thay đổi ⇒ symbol cũ biến mất |
+| **Ngữ nghĩa ngầm** | Đổi giá trị enum, đổi kích thước mảng thành viên, đổi quy ước sở hữu (ai `delete`) | Vẫn liên kết được nhưng **hành vi sai** |
+| **Môi trường** | Đổi compiler/phiên bản/cờ ảnh hưởng bố cục, đổi phiên bản libstdc++ | Bố cục kiểu chuẩn có thể khác |
+
+**⭐ Vì sao C++ dễ vỡ hơn C nhiều — ba lý do:**
+1. **C++ phơi bày bố cục lớp ra header.** Client biên dịch theo `sizeof` và offset **tại thời điểm build của họ**; chúng bị "nướng" vào mã máy của họ. C cũng có vấn đề này với struct, nhưng C thường dùng con trỏ mờ (opaque) nhiều hơn.
+2. **vtable là một mảng có thứ tự.** Trong C không có khái niệm tương đương ⇒ C++ có thêm cả một chiều để vỡ.
+3. **Name mangling mã hoá cả chữ ký** ⇒ mọi thay đổi nhỏ đều đổi tên symbol; và **quy tắc mangle khác nhau giữa compiler** ([CPP-023](cpp.md)).
+
+⇒ **Hệ quả thiết kế:** đây chính là lý do các thư viện C++ nghiêm túc hoặc **phơi C API** ([SD-022](system-design.md)), hoặc dùng **Pimpl** để giấu toàn bộ bố cục ([SD-021](system-design.md)), hoặc chỉ phơi **interface thuần ảo** với cam kết không bao giờ đổi thứ tự.
+
+**Bẫy:** (1) tưởng thêm hàm virtual **ở cuối** là an toàn — không, lớp dẫn xuất của client đã có vtable riêng; (2) tưởng thêm tham số **có giá trị mặc định** là an toàn về ABI — không, giá trị mặc định được điền **ở phía client** và tên symbol vẫn đổi; (3) đổi từ `std::string` này sang kiểu khác trong struct công khai.
+
+**Chốt:** *"C++ phơi bố cục lớp và thứ tự vtable ra header, mà cả hai đều bị nướng vào mã của client — nên gần như mọi thay đổi cấu trúc đều phá ABI. Đó là lý do thư viện nghiêm túc giấu bố cục sau Pimpl hoặc phơi C API."*
+</details>
+
+#### SD-019 · 🟠 · concept · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
+**`soname` là gì và liên quan thế nào tới tương thích ABI? Symbol versioning khác gì với việc tăng soname?**
+<details><summary>Đáp án</summary>
+
+**Ba cái tên của một thư viện — phải phân biệt:**
+
+| Tên | Ví dụ | Ai dùng |
+|---|---|---|
+| **Tên thật** (real name) | `libfoo.so.1.4.2` | File thật trên đĩa |
+| **soname** | `libfoo.so.1` | **Được nướng vào chương trình lúc liên kết**; loader tìm đúng tên này lúc chạy |
+| **Linker name** | `libfoo.so` | Symlink, chỉ dùng lúc **build** |
+
+**Luật:** **soname = lời hứa về ABI.** Cùng soname ⇒ hứa **tương thích ABI ngược** (chương trình build với `1.4.2` chạy được với `1.5.0`). **Phá ABI ⇒ BẮT BUỘC tăng soname** (`.so.1` → `.so.2`).
+
+⇒ Nhờ vậy hai phiên bản **cùng tồn tại** trên một máy: app cũ nạp `libfoo.so.1`, app mới nạp `libfoo.so.2`, không giẫm lên nhau. Đây là cách Linux tránh "DLL hell".
+
+**Symbol versioning — công cụ tinh vi hơn:** gắn **phiên bản cho từng symbol** bên trong *cùng một* thư viện, giữ đồng thời **nhiều bản của một hàm**:
+
+| | **Tăng soname** | **Symbol versioning** |
+|---|---|---|
+| Mức chi tiết | **Cả thư viện** | **Từng hàm** |
+| App cũ | Phải giữ file `.so.1` riêng | Vẫn dùng `.so.1`, gọi vào bản cũ của hàm — **cùng một file** |
+| Chi phí bảo trì | Thấp | **Cao** — phải giữ mã của mọi bản cũ mãi mãi |
+| Dùng khi | **Mặc định** cho hầu hết dự án | Thư viện nền tảng cực rộng (glibc) — nơi bắt cả hệ thống nâng cấp là bất khả thi |
+
+**Thực dụng:** dự án bình thường **cứ tăng soname**. Symbol versioning chỉ đáng khi bạn là glibc — tức là không thể yêu cầu toàn thế giới build lại.
+
+**Bẫy:** (1) **quên tăng soname sau khi phá ABI** — đây là nguyên nhân gốc của phần lớn ca *"chép `.so` mới vào là app crash"*; (2) tăng phiên bản **file** nhưng giữ nguyên soname (đổi `1.4.2`→`1.5.0` mà vẫn `.so.1`) ⇒ **đúng** nếu tương thích, **thảm hoạ** nếu không; (3) đóng gói thiếu symlink ⇒ build được ở máy dev, khách không chạy được.
+
+**Chốt:** *"soname là lời hứa ABI được nướng vào chương trình — phá ABI thì phải tăng soname để hai phiên bản cùng sống. Symbol versioning làm ở mức từng hàm, mạnh hơn nhưng phải nuôi mã cũ mãi, nên chỉ hợp thư viện nền tảng."*
+</details>
+
+#### SD-010 · 🔴 · design · 🏗️ · ⭐ · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
+**Thư viện cập nhật phiên bản mới khiến app khách hàng (không build lại) crash. Nguyên nhân khả dĩ và cách tránh?**
+<details><summary>Đáp án</summary>
+
+Nguyên nhân khả dĩ: **ABI break** dù API không đổi (app không build lại nên dùng binary cũ với `.so` mới). Vd: thêm data member vào struct/class public (đổi sizeof/offset), thêm/đổi thứ tự virtual function (đổi vtable), đổi chữ ký, đổi kích thước/alignment kiểu. Cách tránh: giữ ABI tương thích — pimpl giấu data member, chỉ thêm hàm mới thay vì sửa cái cũ, không đổi layout đã phát hành, thận trọng virtual; nếu buộc phá ABI thì tăng major + đổi soname (`libfoo.so.2`) để hai bản cùng tồn tại; dùng symbol versioning; kiểm tra bằng `abidiff`/abi-compliance-checker trước khi phát hành.
+</details>
+
+#### SD-020 · 🔴 · design · ⭐ · 🏗️ · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
+**Bạn duy trì một shared library C++ cho khách hàng chỉ thay file `.so`, không build lại. Thiết kế thế nào để phát triển tiếp mà không phá ABI?**
+<details><summary>Đáp án</summary>
+
+**Nguyên tắc gốc: cái gì KHÔNG phơi ra thì không thể phá.** Mọi kỹ thuật dưới đây đều là biến thể của việc **giảm bề mặt nhị phân**.
+
+**Bốn kỹ thuật, theo thứ tự hiệu quả:**
+
+| # | Kỹ thuật | Giải quyết gì |
+|---|---|---|
+| **1** | **Pimpl** — mọi thành viên dữ liệu giấu sau một con trỏ | `sizeof` lớp **không bao giờ đổi** ⇒ thêm/bớt/đổi thành viên thoải mái ([SD-021](system-design.md)) |
+| **2** | **Interface thuần ảo + factory** — client chỉ thấy lớp abstract, đối tượng do thư viện tạo | Client không biết bố cục lớp thật. ⚠️ **Chỉ được THÊM hàm virtual ở CUỐI**, không bao giờ đổi thứ tự |
+| **3** | **Phơi C API** ở biên giới, C++ chỉ ở bên trong | Xoá bỏ cả vtable lẫn name mangling ⇒ ổn định nhất ([SD-022](system-design.md)) |
+| **4** | **Struct có version + trường dự phòng** | Struct công khai đặt `uint32_t size` ở đầu (client điền `sizeof`) ⇒ thư viện biết client dùng bản nào và xử lý được cả hai |
+
+**Kỷ luật vận hành đi kèm — kỹ thuật thôi không đủ:**
+- **Kiểm soát symbol xuất ra.** Mặc định mọi symbol đều công khai ⇒ vô tình biến chi tiết nội bộ thành ABI. Ẩn hết, chỉ xuất tường minh những gì có chủ đích. *(Cách làm cụ thể là T3.)*
+- **Đặt luật rõ về sở hữu:** ai cấp phát thì **người đó giải phóng** — client `new` rồi thư viện `delete` là hỏng khi hai bên dùng runtime khác ([SD-023](system-design.md)).
+- **Không bao giờ để kiểu STL đi qua biên giới** trong ca hỗ trợ nhiều compiler: `std::string`/`std::vector` có bố cục khác nhau giữa các phiên bản libstdc++.
+- **Kiểm ABI tự động trong CI** — so bề mặt nhị phân bản mới với bản phát hành trước; phá thì **fail build**, đừng trông chờ vào việc nhớ.
+- **Tăng soname khi buộc phải phá** ([SD-019](system-design.md)) — phá ABI có kiểm soát vẫn tốt hơn phá âm thầm.
+
+⚠️ **Đánh đổi phải nói ra:** Pimpl thêm **một lần gián tiếp + một lần cấp phát** mỗi đối tượng, và chặn inline ⇒ không dùng cho lớp nhỏ, tạo nhiều, nằm trong đường nóng. Interface thuần ảo thêm lời gọi ảo. **Ổn định ABI không miễn phí** — đổi lấy hiệu năng và sự tiện lợi.
+
+**Chốt:** *"Giảm bề mặt nhị phân: giấu dữ liệu sau Pimpl, phơi interface thuần ảo hoặc C API, kiểm soát symbol xuất ra — rồi bắt CI kiểm ABI mỗi lần phát hành. Và chấp nhận trả bằng một lần gián tiếp."*
+</details>
+
+---
+
+## F — Linking & loading
 
 #### SD-025 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ linking-loading](../../../07-shared-libraries/linking-loading.md)
 **Phân biệt linking và loading. Static và dynamic linking khác nhau ở đâu?**
@@ -634,57 +721,6 @@ Mã chỉ dùng chung được nếu nó **không cần sửa** sau khi nạp. N
 **Chốt:** *"Shared khi nhiều tiến trình dùng chung hoặc cần vá độc lập; static khi một ứng dụng duy nhất, cần một file và tính tất định. Trên nhúng một-ứng-dụng thì static thường đúng — nhưng OTA và giấy phép mới hay là yếu tố quyết định thật."*
 </details>
 
-#### SD-032 · 🟡 · concept · 📦 2026-08-13 · [→ problem-solving](../../../10-thinking/problem-solving.md)
-**Khi bế tắc với một bài toán, bạn làm gì?**
-<details><summary>Đáp án</summary>
-
-**Bế tắc gần như luôn có nghĩa: một GIẢ ĐỊNH nào đó của bạn đang sai.** Vì nếu mọi giả định đều đúng thì đường đi đã hiện ra. Nên việc cần làm không phải "cố nghĩ mạnh hơn" mà là **đi tìm giả định sai**.
-
-**Sáu việc, xếp theo thứ tự nên thử:**
-
-| # | Việc | Vì sao hiệu quả |
-|---|---|---|
-| **1** | **Liệt kê những gì đã LOẠI TRỪ, và dựa trên căn cứ nào** | Bug hầu như luôn nấp trong một giả định **chưa từng được kiểm** ([DBG-008](debugging.md)) |
-| **2** | **Giải thích cho người khác** (rubber duck) | Việc phải nói thành lời buộc bạn phát biểu rõ giả định — và bạn thường tự thấy chỗ sai giữa câu |
-| **3** | **Thu nhỏ bài toán** | Bỏ bớt cho tới khi còn ca nhỏ nhất vẫn lỗi; thứ còn lại chính là nguyên nhân |
-| **4** | **Đảo ngược câu hỏi** | Thay vì *"vì sao nó sai?"* hỏi *"vì sao nó lại từng ĐÚNG?"* — thường lộ ra cơ chế thật |
-| **5** | **Đổi mức trừu tượng** | Đang soi từng dòng thì lùi ra nhìn kiến trúc; đang bàn kiến trúc thì soi vào dữ liệu thật |
-| **6** | **Nghỉ / ngủ một đêm** | Không phải lười — nó phá vỡ vết mòn tư duy đang giữ bạn ở một hướng sai |
-
-**Ba câu tự hỏi khi thật sự tắc:**
-- *"Nếu bắt buộc phải sai ở đâu đó, tôi tin chắc chỗ nào nhất?"* → **đi kiểm đúng chỗ đó**.
-- *"Tôi đang giải đúng bài toán không?"* — nhiều khi bế tắc vì bài toán bị phát biểu sai từ đầu.
-- *"Ai đã gặp chuyện này rồi?"* — hỏi sớm không phải là yếu; **tốn hai ngày rồi mới hỏi** mới là lãng phí.
-
-⚠️ **Chống chỉ định:** thử ngẫu nhiên nhiều thứ cùng lúc. Nó phá luôn khả năng suy luận vì bạn không còn biết cái gì gây ra cái gì ([DBG-008](debugging.md) — mỗi lần đổi một biến).
-
-**Chốt:** *"Bế tắc nghĩa là có một giả định sai — nên việc cần làm là liệt kê những gì đã loại trừ và kiểm lại căn cứ, chứ không phải cố nghĩ mạnh hơn. Và đừng thử ngẫu nhiên nhiều thứ cùng lúc."*
-</details>
-
-#### SD-033 · 🟢 · concept · ⭐ · 📦 2026-08-13 · [→ problem-solving](../../../10-thinking/problem-solving.md)
-**Trong phỏng vấn, vì sao nên "think aloud"?**
-<details><summary>Đáp án</summary>
-
-**Vì thứ được chấm là QUÁ TRÌNH SUY NGHĨ, không phải đáp án.** Interviewer đã biết đáp án; cái họ không biết là **bạn suy nghĩ thế nào** — và đó mới là thứ dự đoán được bạn làm việc ra sao.
-
-**Bốn lợi ích cụ thể:**
-1. **Ngồi im 5 phút = 0 thông tin.** Dù bạn đang nghĩ rất hay, interviewer chỉ thấy im lặng và ghi *"không tiếp cận được bài"*.
-2. **Được điểm cho hướng đi đúng** kể cả khi chưa ra đáp án cuối.
-3. **Được sửa hướng sớm.** Nói ra giả định sai ⇒ interviewer thường gợi ý ngay, thay vì để bạn đi lạc 20 phút.
-4. **Cho thấy bạn nêu được đánh đổi** — thứ phân biệt mid với senior mạnh hơn cả việc giải đúng.
-
-**Nói gì cho có ích (không phải kể lể):**
-- *"Tôi đang giả định X — có đúng không?"* ⇒ làm rõ đề bài.
-- *"Có hai hướng: A đơn giản nhưng O(n²), B phức tạp hơn nhưng O(n log n). Với n nhỏ tôi chọn A."* ⇒ **nêu đánh đổi**.
-- *"Tôi chưa chắc chỗ này, để tôi thử một ví dụ nhỏ."* ⇒ trung thực + có phương pháp.
-- *"Ca biên cần xử lý: rỗng, một phần tử, tràn số."* ⇒ tư duy kỹ lưỡng.
-
-⚠️ **Không phải nói liên tục.** Xin **một phút im lặng để nghĩ** là hoàn toàn ổn — miễn là **nói ra rằng bạn đang làm vậy**: *"cho tôi một phút sắp xếp ý nhé"*.
-
-⚠️ **Cạm bẫy ngược:** nói nhiều mà không có cấu trúc cũng trừ điểm. Khung an toàn: **làm rõ đề → nêu hướng và đánh đổi → chọn một → cài đặt → kiểm ca biên**.
-
-**Chốt:** *"Interviewer chấm quá trình chứ không chấm đáp án — im lặng là không có thông tin. Nói giả định, nói đánh đổi, và xin một phút để nghĩ khi cần."*
-</details>
-
 ---
+
 ⬅️ [Bank index](README.md)

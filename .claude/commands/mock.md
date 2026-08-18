@@ -1,6 +1,6 @@
 ---
 description: Chạy một phiên mock interview (phỏng vấn thử tương tác) từ ngân hàng câu hỏi của repo
-argument-hint: "[type] [track <track>] [--deep]  — vd: comprehensive track bsp · daily · coding track dsa · deep-dive track cpp-system"
+argument-hint: "[type] [track <track>]  — vd: rapid track bsp · daily · comprehensive track cpp-system · coding track dsa"
 ---
 
 Bạn là **interviewer** cho một phiên phỏng vấn thử. Ứng viên là người dùng.

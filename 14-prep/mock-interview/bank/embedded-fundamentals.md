@@ -4,6 +4,7 @@
 > 🏗️ = câu thiết kế/tình huống.
 >
 > **Tài liệu học nền** (đọc sâu ngoài đáp án bank) — [08-embedded-systems](../../../08-embedded-systems/):
+> 📑 Thứ tự theo **chủ đề** (mục A, B, C…), không theo số ID — thêm câu mới đặt vào đúng mục ([vì sao](README.md#-id--vị-trí-trong-file)).
 
 | Mảng (câu) | Tài liệu học |
 |---|---|
@@ -54,8 +55,6 @@ Map bằng con trỏ tới `volatile`: `#define REG (*(volatile uint32_t*)0x4002
 - Kết hợp hay gặp: `volatile` cho biến ISR; `const volatile` cho thanh ghi chỉ-đọc (status) — vừa cấm ghi vừa cấm tối ưu đọc.
 </details>
 
----
-
 ## B — Bộ nhớ bare-metal & khởi động
 
 #### EMB-005 · 🟡 · concept · ⭐ · [→ constraints](../../../08-embedded-systems/constraints.md)
@@ -90,7 +89,36 @@ Linker script mô tả **bản đồ bộ nhớ** của thiết bị (vùng FLAS
 RAM ít + **không MMU** → không có guard page: stack lớn quá tràn **âm thầm** đè lên `.bss`/`.data`/heap → corruption khó lần (biến "tự đổi"). Heap: fragmentation + `malloc` không tất định → nhiều hệ **cấm heap sau init** (tĩnh/pool). Phát hiện stack overflow: (1) **stack painting** — điền pattern (0xAA) lúc init, đo mức cao nhất bị đè; (2) đặt **canary**/word chặn cuối stack, kiểm tra định kỳ; (3) **MPU** đặt vùng cấm ngay dưới stack → fault khi tràn; (4) RTOS có hook `stack overflow check`. Sizing stack: cộng worst-case call depth + local lớn + **stack ISR** (ngắt lồng).
 </details>
 
+#### EMB-036 · 🟡 · design · 📦 2026-08-13 · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Firmware vượt quá dung lượng flash/RAM của chip. Bạn giảm thế nào — theo thứ tự nào?**
+<details><summary>Đáp án</summary>
+
+**Bước 0 — ĐO trước, đừng đoán.** Xem bản đồ kích thước theo **section** và theo **symbol**: `.text` (mã) trong flash, `.rodata` (hằng) trong flash, `.data` (biến có giá trị đầu) chiếm **cả hai**, `.bss` (biến 0) chỉ RAM ([EMB-005](embedded-fundamentals.md)). Thủ phạm gần như luôn nằm ở vài symbol lớn bất ngờ.
+
+**Theo thứ tự hiệu quả trên mỗi đơn vị công sức:**
+
+| # | Việc | Thường thu được |
+|---|---|---|
+| **1** | Bật **tối ưu theo kích thước** (`-Os`) và **loại bỏ mã/dữ liệu không dùng** (mỗi hàm một section + linker gỡ section thừa) | Rất nhiều — làm trước tiên |
+| **2** | ⭐ **Bỏ `printf` họ đầy đủ.** Bản hỗ trợ `%f` và mọi định dạng có thể ăn **hàng chục KB flash** và ngốn stack | Thường là thủ phạm số một |
+| **3** | Bỏ **số thực** nếu chip không có FPU ⇒ kéo theo cả thư viện phần mềm ([EMB-024](embedded-fundamentals.md)) | Lớn |
+| **4** | Chuyển bảng hằng, chuỗi sang **`const`** để nằm ở **flash** thay vì bị copy vào RAM | Cứu RAM |
+| **5** | Xem lại **C++**: exception và RTTI kéo theo bảng thông tin lớn; template khởi tạo nhiều biến thể gây **phình mã** | Trung bình–lớn |
+| **6** | Giảm **kích thước buffer/stack** — nhưng phải **đo mức dùng cao nhất** trước, không cắt mù ([EMB-017](embedded-fundamentals.md)) | Cứu RAM |
+| **7** | Nén dữ liệu tài nguyên, giải nén lúc chạy | Đổi flash lấy RAM + CPU |
+
+**Ba đánh đổi phải nêu:**
+1. **`-Os` có thể chậm hơn `-O2`** — chấp nhận được ở phần lớn nơi, nhưng **không** ở đường tới hạn.
+2. **Cắt stack quá tay = tràn stack im lặng** — nguy hiểm hơn hết flash, vì nó hỏng ngẫu nhiên ở chỗ khác.
+3. **Nén** đổi flash lấy **RAM và thời gian khởi động**.
+
+⚠️ **Việc cần làm sớm nhất trong dự án:** đặt **ngưỡng kích thước trong CI** và cho fail khi vượt. Phát hiện phình dần theo từng commit rẻ hơn nhiều so với việc phải cắt gấp 30% vào tuần cuối trước khi phát hành.
+
+**Chốt:** *"Đo theo section và symbol trước, rồi: bật `-Os` + gỡ mã không dùng, bỏ printf đầy đủ, bỏ float nếu không có FPU, đẩy hằng vào flash. Và đặt ngưỡng kích thước trong CI để không phải cắt gấp lúc cuối."*
+</details>
+
 ---
+⬅️ [Bank index](README.md)
 
 ## C — Ngắt (bare-metal)
 
@@ -128,8 +156,6 @@ Latency = thời gian từ lúc sự kiện ngắt xảy ra tới lúc ISR bắt
 
 Hàm **reentrant** = có thể bị ngắt giữa chừng và gọi lại (từ ISR hoặc thread khác) mà vẫn đúng — không dùng **biến static/global có trạng thái** không được bảo vệ, không trả con trỏ tới buffer tĩnh dùng chung. Quan trọng vì ISR có thể chen vào giữa một hàm main đang chạy: nếu cả hai gọi cùng một hàm **non-reentrant** (vd `strtok`, một số `malloc`, hàm dùng buffer tĩnh) → corruption. Cách viết reentrant: dùng biến local (stack)/tham số thay vì static, tránh trạng thái chia sẻ, hoặc bảo vệ bằng critical section. Liên quan nhưng khác thread-safe (reentrant nghiêm ngặt hơn: an toàn cả khi tự gọi lại chính mình qua ngắt).
 </details>
-
----
 
 ## D — RTOS concepts
 
@@ -177,147 +203,6 @@ RMS: gán **priority tĩnh theo tần suất** — task chu kỳ ngắn (tần s
 <details><summary>Đáp án</summary>
 
 **Tick**: RTOS dùng một timer ngắt định kỳ (vd 1ms) làm nhịp — đếm timeout, đánh thức task ngủ, và **time slicing** (round-robin giữa task cùng priority mỗi tick). Nhược: tick đều đặn **đánh thức CPU liên tục** → tốn điện khi rảnh, và jitter do tick. **Tickless (low-power)**: khi hệ rảnh, RTOS **tắt tick**, đặt timer đúng bằng thời điểm task kế cần dậy → CPU ngủ sâu lâu hơn, tiết kiệm điện (quan trọng cho thiết bị pin). Time slicing chỉ áp cho task cùng priority; task priority cao hơn luôn preempt.
-</details>
-
----
-
-## E — Kiến trúc firmware
-
-#### EMB-020 · 🟡 · design · ⭐ · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
-**Superloop vs RTOS vs event-driven — chọn kiến trúc firmware thế nào?**
-<details><summary>Đáp án</summary>
-
-- **Superloop** (`while(1){ taskA(); taskB(); }` + ngắt): đơn giản nhất, footprint bé, dễ suy luận — hợp firmware nhỏ, ít task, timing lỏng. Nhược: khó đảm bảo timing khi task nhiều/không đều (task chậm làm trễ task khác); thường phải thêm state machine + timer để không block.
-- **Event-driven** (superloop + hàng đợi sự kiện, ISR đẩy event): vẫn một luồng nhưng phản ứng theo sự kiện, không polling bận — tiết kiệm điện, mở rộng tốt hơn.
-- **RTOS**: nhiều task ưu tiên, preemptive → tách concern rõ, đảm bảo task quan trọng chạy đúng hạn; đổi lại tốn RAM (stack mỗi task) + phải bảo vệ dữ liệu chia sẻ + độ phức tạp.
-- Chọn: bắt đầu superloop/event-driven nếu đủ; lên RTOS khi có **nhiều task với ràng buộc timing khác nhau** hoặc cần blocking API sạch. "Đơn giản nhất chạy được" trước.
-</details>
-
-#### EMB-021 · 🟠 · design · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
-**Hiện thực state machine trong firmware — cách nào, đánh đổi?**
-<details><summary>Đáp án</summary>
-
-State machine là xương sống firmware/protocol. Cách: (1) **enum + switch** (switch theo state, xử lý event) — đơn giản, tất định, không cấp phát động, dễ review, footprint biết trước → mặc định embedded; (2) **table-driven** (bảng [state][event] → hành động/state kế) — gọn khi nhiều state/event, dễ mở rộng, tách logic khỏi dữ liệu; (3) **OOP State pattern** (mỗi state một class) — chỉ đáng khi logic mỗi state phức tạp, chấp nhận vtable/gián tiếp. Nguyên tắc: định nghĩa state/event/transition rõ ràng, xử lý event lạ ở mọi state (không "rơi"), tránh cấu trúc động. *(Xem thêm [DP-010](design-patterns.md).)*
-</details>
-
-#### EMB-022 · 🟠 · design · [→ boot-process](../../../08-embedded-systems/boot-process.md)
-**Bootloader bare-metal + firmware update trên MCU hoạt động thế nào?**
-<details><summary>Đáp án</summary>
-
-Bootloader = chương trình nhỏ chạy đầu tiên: kiểm tra có yêu cầu update không, nếu không thì **nhảy vào application** (đặt lại vector table về địa chỉ app: trên Cortex-M set VTOR, nạp SP + reset vector của app rồi jump). Update: (1) bố cục flash **dual-bank A/B** (hoặc bootloader + 1 app + staging) — nhận firmware qua UART/CAN/USB/OTA, ghi vào bank không chạy, **verify CRC/chữ ký trước khi kích hoạt**, đổi con trỏ boot; (2) fallback: nếu app mới không set cờ "healthy" trong N lần boot → bootloader quay về bank cũ; watchdog phủ treo. Nguyên tắc như OTA Linux nhưng thu nhỏ: **không được brick**, verify trước khi commit, có đường lùi. Bootloader phải cực ổn định (ghi dở nó = brick).
-</details>
-
-#### EMB-023 · 🟡 · concept · [→ architecture](../../../08-embedded-systems/architecture.md)
-**HAL / phân tầng driver trong firmware bare-metal — vì sao?**
-<details><summary>Đáp án</summary>
-
-Tách **logic ứng dụng** khỏi **truy cập phần cứng** qua một lớp interface (HAL): app gọi `led_on()` / `sensor_read()` thay vì đụng thanh ghi trực tiếp. Lợi: (1) **port sang chip/board khác** chỉ thay lớp HAL, app không đổi (đúng chất công việc multi-chipset); (2) **test trên host** — thay HAL bằng mock/stub, chạy logic + unit test trên PC (không cần phần cứng thật); (3) đọc code rõ ràng, đóng gói chi tiết register. Đánh đổi: thêm một lớp gián tiếp (chi phí nhỏ; hot path có thể inline/`static inline`). Vendor HAL (STM32 HAL/LL, CMSIS) là ví dụ; nhiều team viết HAL mỏng riêng để kiểm soát. *(Xem [BSP-001](bsp.md), [DP-011](design-patterns.md).)*
-</details>
-
----
-
-## F — Số học & độ tin cậy
-
-#### EMB-024 · 🟠 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
-**Fixed-point vs floating-point khi MCU không có FPU?**
-<details><summary>Đáp án</summary>
-
-MCU không FPU → phép float được **emulate bằng phần mềm** (chậm hàng chục–trăm lần, tốn code) → tránh trong hot path/ISR. **Fixed-point**: biểu diễn số thực bằng số nguyên với "điểm thập phân ảo" (vd Q16.16: 32-bit, 16 bit phần nguyên + 16 bit phân) → dùng số học nguyên nhanh + tất định. Đánh đổi: phải tự quản scale, cẩn thận **overflow khi nhân** (Q16.16 × Q16.16 cần 64-bit trung gian rồi dịch), độ chính xác cố định. Khi nào chọn: có FPU (Cortex-M4F/M7) hoặc tính toán ít → float tiện; không FPU + tính nhiều/real-time → fixed-point. Nêu được: float trên MCU không FPU là **bẫy hiệu năng/tất định** kinh điển.
-</details>
-
-#### EMB-025 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
-**Integer overflow/underflow — bug embedded kinh điển, phòng thế nào?**
-<details><summary>Đáp án</summary>
-
-Số nguyên kích thước cố định (uint8/16/32) tràn khi vượt max → quay vòng (unsigned) hoặc **UB (signed overflow)**. Bug hay gặp: bộ đếm ms tràn (so sánh `time > deadline` sai khi wrap), trừ hai timestamp ra số âm ở unsigned, tích lũy cảm biến tràn, `a+b` tràn trước khi gán vào biến lớn hơn. Phòng: (1) chọn kiểu đủ lớn + fixed-width rõ ràng; (2) so sánh thời gian bằng **hiệu** chịu wrap: `(int32_t)(now - deadline) >= 0` thay vì so trực tiếp; (3) kiểm biên trước phép tính; (4) unsigned cho biến chỉ tăng, cẩn thận integer promotion; (5) `-fsanitize=undefined` khi test trên host, bật cảnh báo. Với signed, tràn là UB → optimizer có thể làm điều bất ngờ.
-</details>
-
-#### EMB-026 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
-**CRC / checksum — vì sao cần, khác nhau thế nào?**
-<details><summary>Đáp án</summary>
-
-Khi truyền qua UART/CAN/RF hay lưu vào flash, dữ liệu có thể **hỏng bit** (nhiễu, mòn flash, mất điện khi ghi) → gắn mã kiểm tra để **phát hiện lỗi**. **Checksum** (cộng byte) rẻ nhưng yếu — không bắt được nhiều lỗi (đảo thứ tự, lỗi bù trừ). **CRC** (Cyclic Redundancy Check) dựa trên chia đa thức → bắt lỗi mạnh hơn nhiều (mọi lỗi 1–2 bit, burst error ≤ độ dài CRC), là chuẩn cho frame giao thức + xác thực firmware image; nhiều MCU có **CRC phần cứng**. Lưu ý: CRC chỉ **phát hiện** lỗi, không sửa (muốn sửa cần ECC/FEC) và **không phải bảo mật** (chống sửa cố ý cần chữ ký/HMAC). Firmware update: CRC/hash để kiểm toàn vẹn + chữ ký để chống giả mạo.
-</details>
-
-#### EMB-027 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
-**MISRA C là gì, vì sao dùng trong embedded? Cho vài ví dụ quy tắc.**
-<details><summary>Đáp án</summary>
-
-MISRA C = bộ **coding guideline** cho C trong hệ nhúng an toàn/quan trọng (ô tô, y tế, công nghiệp) nhằm né vùng **không xác định/dễ lỗi** của C và tăng tính portable/kiểm chứng được. Ví dụ quy tắc: cấm/hạn chế cấp phát động sau init; cấm `goto` bừa; không dựa vào thứ tự đánh giá; ép kiểu tường minh, không trộn signed/unsigned ngầm; mỗi `switch` có `default`, mỗi `case` có `break`; không dùng `//` (bản cũ); một điểm return… Enforce bằng **static analyzer** (Coverity, PC-lint, cppcheck) trong CI. Đánh đổi: code cứng nhắc hơn, đôi khi phải "deviation" có ghi chú. Nêu được: MISRA là về **giảm rủi ro và audit được**, không phải tối ưu.
-</details>
-
----
-
-## G — Low-power (MCU)
-
-#### EMB-028 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
-**Các low-power mode của MCU (sleep/stop/standby) — đánh đổi và wakeup source?**
-<details><summary>Đáp án</summary>
-
-Thang tiết kiệm điện đổi lấy **thời gian/khả năng đánh thức + giữ trạng thái** (tên khác nhau theo hãng, mô hình chung): **Sleep/Idle** — tắt CPU clock, peripheral vẫn chạy, đánh thức nhanh bởi bất kỳ ngắt nào, giữ toàn bộ RAM. **Stop/Deep-sleep** — tắt phần lớn clock/PLL, giữ RAM (self-refresh), dòng thấp hơn nhiều, đánh thức bởi số ít nguồn (RTC alarm, EXTI GPIO), exit latency cao hơn. **Standby/Shutdown** — tắt gần hết, **mất RAM** (chỉ giữ vài thanh ghi backup + RTC), dòng µA, "đánh thức" gần như reset (chạy lại từ đầu), nguồn giới hạn (WKUP pin, RTC). Chọn theo: cần đánh thức nhanh + giữ ngữ cảnh → sleep; ngủ lâu tiết kiệm tối đa + chấp nhận khởi động lại → standby. Wakeup source phải cấu hình trước khi vào mode.
-</details>
-
-#### EMB-029 · 🟠 · design · 🏗️ · [→ constraints](../../../08-embedded-systems/constraints.md)
-**Thiết kế firmware chạy pin lâu — bạn tối ưu điện thế nào?**
-<details><summary>Đáp án (khung)</summary>
-
-- **Kiến trúc event-driven, không polling bận**: CPU ngủ (low-power mode) là mặc định, chỉ dậy khi có ngắt/sự kiện; dùng **tickless** RTOS.
-- **Ngủ sâu nhất có thể** giữa các sự kiện; chọn mode theo yêu cầu đánh thức (RTC cho chu kỳ dài, GPIO cho nút bấm).
-- **Tắt peripheral không dùng** (clock gating, tắt ADC/radio khi rảnh), hạ tần số clock khi tải nhẹ (DVFS nếu có), giảm điện áp.
-- **Gom việc theo lô** (đọc cảm biến rồi ngủ, gửi radio theo batch — radio/TX tốn điện nhất) thay vì làm rải rác.
-- **Đo thật**: dùng power profiler/ampe kế đo dòng từng trạng thái, tìm "kẻ ngốn điện" (thường là radio TX, LED, peripheral quên tắt, MCU không vào được deep sleep vì một ngắt dựng dậy liên tục).
-- Đánh đổi: đánh thức sâu → latency cao; gom batch → độ trễ dữ liệu. Nêu số: duty cycle, dòng trung bình → tính tuổi thọ pin.
-</details>
-
----
-
-## H — Debug phần cứng
-
-#### EMB-030 · 🟡 · concept · [→ debugging](../../../09-debugging/)
-**JTAG và SWD khác nhau? Dùng để làm gì?**
-<details><summary>Đáp án</summary>
-
-Cả hai là giao diện **debug/lập trình phần cứng** cho MCU: nạp firmware, đặt breakpoint, đọc/ghi thanh ghi & bộ nhớ, single-step, xem trạng thái CPU khi nó đang chạy/dừng (in-circuit debug qua probe như ST-Link, J-Link). **JTAG**: chuẩn cũ, nhiều dây (TCK/TMS/TDI/TDO/…), hỗ trợ boundary scan + chuỗi nhiều chip. **SWD** (Serial Wire Debug, ARM): chỉ **2 dây** (SWCLK + SWDIO) làm gần hết việc JTAG cho debug — tiết kiệm chân (quan trọng trên MCU nhỏ), phổ biến trên Cortex-M. Thường kèm **SWO** (trace output, `printf` qua ITM). Không có debugger đầy đủ như GDB trên target nhưng cho phép debug mức thanh ghi thật.
-</details>
-
-#### EMB-031 · 🟡 · concept · ⭐ · [→ tools](../../../09-debugging/tools.md)
-**Không có debugger đầy đủ, bạn debug firmware thế nào?**
-<details><summary>Đáp án</summary>
-
-- **printf qua UART**: kênh log kinh điển — in trạng thái/biến ra serial console. Cẩn thận: printf chậm + không reentrant → không gọi trong ISR/hot path; dùng buffer + gửi ngoài ISR.
-- **Semihosting / SWO(ITM)**: in qua probe debug không cần UART riêng (chậm, chỉ khi có debugger).
-- **GPIO/LED toggle** = "printf bằng chân": bật/tắt chân đánh dấu điểm code, đo bằng **logic analyzer/oscilloscope** → thấy timing thật (đo latency ISR, chu kỳ task) mà không làm chậm như printf.
-- **Logic analyzer/scope**: xem tín hiệu bus (I2C/SPI/UART) thật để tách lỗi phần mềm vs phần cứng (câu "driver chạy nhưng chân không ra tín hiệu").
-- **Trạng thái giữ qua reset**: ghi mã lỗi vào backup register/vùng RAM không bị zero để đọc sau khi crash/reset.
-- Nguyên tắc: chọn công cụ **ít làm nhiễu timing** nhất cho bug timing (GPIO+scope > printf).
-</details>
-
-#### EMB-032 · 🟠 · concept · [→ kernel-debugging](../../../09-debugging/kernel-debugging.md)
-**Hard fault trên Cortex-M — bạn điều tra thế nào?**
-<details><summary>Đáp án</summary>
-
-Hard fault = CPU gặp lỗi nghiêm trọng (truy cập bộ nhớ sai, lệnh không hợp lệ, chia 0 nếu bật, unaligned access, escalate từ fault khác). Điều tra: (1) đọc **fault status registers** (CFSR/HFSR/MMFAR/BFAR trên Cortex-M) — cho biết *loại* lỗi (bus fault? usage fault? địa chỉ nào); (2) lấy **stacked frame** mà CPU đẩy khi vào fault (R0–R3, R12, **LR, PC, xPSR**) — **PC** cho biết lệnh gây lỗi, LR đường về; đọc từ stack trong fault handler; (3) map PC → dòng source bằng map file/`addr2line`/debugger. Nguyên nhân hay gặp: dereference con trỏ null/dangling, **stack overflow** đè vùng khác, gọi qua con trỏ hàm rác, unaligned access, truy cập peripheral chưa bật clock. Viết một **HardFault_Handler** in các thanh ghi này ra UART là công cụ vàng ngoài field.
-</details>
-
-#### EMB-033 · 🟢 · concept · 📦 2026-08-13 · [→ architecture](../../../08-embedded-systems/architecture.md)
-**SoC là gì và khác kiến trúc PC truyền thống ở đâu?**
-<details><summary>Đáp án</summary>
-
-**SoC (System on Chip)** gói **gần như cả hệ thống lên một con chip**: CPU (thường nhiều nhân), GPU, bộ điều khiển bộ nhớ, và **hàng loạt ngoại vi tích hợp** (UART, I2C, SPI, USB, Ethernet, ADC, timer, DMA).
-
-| | **PC truyền thống** | **SoC nhúng** |
-|---|---|---|
-| Thành phần | CPU + chipset + card rời, nối qua **bus chuẩn** (PCIe) | **Tất cả trên một die**, nối qua bus nội bộ |
-| Phát hiện thiết bị | **Tự liệt kê** (PCIe/USB tự khai báo mình) | **Không tự liệt kê** ⇒ phải **mô tả bằng device tree** ([DRV-007](drivers-embedded.md)) |
-| Truy cập ngoại vi | Qua driver + bus chuẩn | **Memory-mapped I/O** — đọc/ghi thẳng thanh ghi ([DRV-008](drivers-embedded.md)) |
-| Nâng cấp | Thay linh kiện | **Không** — cố định khi sản xuất |
-| Tiêu thụ / giá | Cao | **Thấp** — đó là lý do tồn tại |
-
-**⭐ Hệ quả quan trọng nhất cho người viết phần mềm:** SoC **không tự liệt kê được**, nên kernel **không có cách nào tự biết** trên bo có gì. Đó chính là lý do thế giới ARM cần **device tree**, còn PC thì không ([DRV-032](drivers-embedded.md)).
-
-Hệ quả thứ hai: mọi thứ dùng **chung băng thông bộ nhớ và chung nguồn** ⇒ bật thêm một khối ngoại vi có thể ảnh hưởng hiệu năng và điện năng của phần còn lại — thứ không xảy ra khi các card rời có tài nguyên riêng.
-
-**Chốt:** *"SoC gói CPU và toàn bộ ngoại vi lên một die để rẻ và tiết kiệm điện — nhưng vì ngoại vi không tự liệt kê được nên phải mô tả bằng device tree, đó là khác biệt lớn nhất so với PC."*
 </details>
 
 #### EMB-034 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
@@ -373,33 +258,139 @@ Hệ realtime được đánh giá bằng **thời gian xấu nhất**, không p
 **Chốt:** *"Realtime ở mức lập trình là loại mọi thứ không chặn trên được khỏi đường tới hạn — cấp phát động, page fault, khoá, I/O đồng bộ — rồi ĐO worst-case bằng GPIO+scope chứ không đo trung bình."*
 </details>
 
-#### EMB-036 · 🟡 · design · 📦 2026-08-13 · [→ constraints](../../../08-embedded-systems/constraints.md)
-**Firmware vượt quá dung lượng flash/RAM của chip. Bạn giảm thế nào — theo thứ tự nào?**
+## E — Kiến trúc firmware & SoC
+
+#### EMB-020 · 🟡 · design · ⭐ · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
+**Superloop vs RTOS vs event-driven — chọn kiến trúc firmware thế nào?**
 <details><summary>Đáp án</summary>
 
-**Bước 0 — ĐO trước, đừng đoán.** Xem bản đồ kích thước theo **section** và theo **symbol**: `.text` (mã) trong flash, `.rodata` (hằng) trong flash, `.data` (biến có giá trị đầu) chiếm **cả hai**, `.bss` (biến 0) chỉ RAM ([EMB-005](embedded-fundamentals.md)). Thủ phạm gần như luôn nằm ở vài symbol lớn bất ngờ.
+- **Superloop** (`while(1){ taskA(); taskB(); }` + ngắt): đơn giản nhất, footprint bé, dễ suy luận — hợp firmware nhỏ, ít task, timing lỏng. Nhược: khó đảm bảo timing khi task nhiều/không đều (task chậm làm trễ task khác); thường phải thêm state machine + timer để không block.
+- **Event-driven** (superloop + hàng đợi sự kiện, ISR đẩy event): vẫn một luồng nhưng phản ứng theo sự kiện, không polling bận — tiết kiệm điện, mở rộng tốt hơn.
+- **RTOS**: nhiều task ưu tiên, preemptive → tách concern rõ, đảm bảo task quan trọng chạy đúng hạn; đổi lại tốn RAM (stack mỗi task) + phải bảo vệ dữ liệu chia sẻ + độ phức tạp.
+- Chọn: bắt đầu superloop/event-driven nếu đủ; lên RTOS khi có **nhiều task với ràng buộc timing khác nhau** hoặc cần blocking API sạch. "Đơn giản nhất chạy được" trước.
+</details>
 
-**Theo thứ tự hiệu quả trên mỗi đơn vị công sức:**
+#### EMB-021 · 🟠 · design · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
+**Hiện thực state machine trong firmware — cách nào, đánh đổi?**
+<details><summary>Đáp án</summary>
 
-| # | Việc | Thường thu được |
+State machine là xương sống firmware/protocol. Cách: (1) **enum + switch** (switch theo state, xử lý event) — đơn giản, tất định, không cấp phát động, dễ review, footprint biết trước → mặc định embedded; (2) **table-driven** (bảng [state][event] → hành động/state kế) — gọn khi nhiều state/event, dễ mở rộng, tách logic khỏi dữ liệu; (3) **OOP State pattern** (mỗi state một class) — chỉ đáng khi logic mỗi state phức tạp, chấp nhận vtable/gián tiếp. Nguyên tắc: định nghĩa state/event/transition rõ ràng, xử lý event lạ ở mọi state (không "rơi"), tránh cấu trúc động. *(Xem thêm [DP-010](design-patterns.md).)*
+</details>
+
+#### EMB-022 · 🟠 · design · [→ boot-process](../../../08-embedded-systems/boot-process.md)
+**Bootloader bare-metal + firmware update trên MCU hoạt động thế nào?**
+<details><summary>Đáp án</summary>
+
+Bootloader = chương trình nhỏ chạy đầu tiên: kiểm tra có yêu cầu update không, nếu không thì **nhảy vào application** (đặt lại vector table về địa chỉ app: trên Cortex-M set VTOR, nạp SP + reset vector của app rồi jump). Update: (1) bố cục flash **dual-bank A/B** (hoặc bootloader + 1 app + staging) — nhận firmware qua UART/CAN/USB/OTA, ghi vào bank không chạy, **verify CRC/chữ ký trước khi kích hoạt**, đổi con trỏ boot; (2) fallback: nếu app mới không set cờ "healthy" trong N lần boot → bootloader quay về bank cũ; watchdog phủ treo. Nguyên tắc như OTA Linux nhưng thu nhỏ: **không được brick**, verify trước khi commit, có đường lùi. Bootloader phải cực ổn định (ghi dở nó = brick).
+</details>
+
+#### EMB-023 · 🟡 · concept · [→ architecture](../../../08-embedded-systems/architecture.md)
+**HAL / phân tầng driver trong firmware bare-metal — vì sao?**
+<details><summary>Đáp án</summary>
+
+Tách **logic ứng dụng** khỏi **truy cập phần cứng** qua một lớp interface (HAL): app gọi `led_on()` / `sensor_read()` thay vì đụng thanh ghi trực tiếp. Lợi: (1) **port sang chip/board khác** chỉ thay lớp HAL, app không đổi (đúng chất công việc multi-chipset); (2) **test trên host** — thay HAL bằng mock/stub, chạy logic + unit test trên PC (không cần phần cứng thật); (3) đọc code rõ ràng, đóng gói chi tiết register. Đánh đổi: thêm một lớp gián tiếp (chi phí nhỏ; hot path có thể inline/`static inline`). Vendor HAL (STM32 HAL/LL, CMSIS) là ví dụ; nhiều team viết HAL mỏng riêng để kiểm soát. *(Xem [BSP-001](bsp.md), [DP-011](design-patterns.md).)*
+</details>
+
+#### EMB-033 · 🟢 · concept · 📦 2026-08-13 · [→ architecture](../../../08-embedded-systems/architecture.md)
+**SoC là gì và khác kiến trúc PC truyền thống ở đâu?**
+<details><summary>Đáp án</summary>
+
+**SoC (System on Chip)** gói **gần như cả hệ thống lên một con chip**: CPU (thường nhiều nhân), GPU, bộ điều khiển bộ nhớ, và **hàng loạt ngoại vi tích hợp** (UART, I2C, SPI, USB, Ethernet, ADC, timer, DMA).
+
+| | **PC truyền thống** | **SoC nhúng** |
 |---|---|---|
-| **1** | Bật **tối ưu theo kích thước** (`-Os`) và **loại bỏ mã/dữ liệu không dùng** (mỗi hàm một section + linker gỡ section thừa) | Rất nhiều — làm trước tiên |
-| **2** | ⭐ **Bỏ `printf` họ đầy đủ.** Bản hỗ trợ `%f` và mọi định dạng có thể ăn **hàng chục KB flash** và ngốn stack | Thường là thủ phạm số một |
-| **3** | Bỏ **số thực** nếu chip không có FPU ⇒ kéo theo cả thư viện phần mềm ([EMB-024](embedded-fundamentals.md)) | Lớn |
-| **4** | Chuyển bảng hằng, chuỗi sang **`const`** để nằm ở **flash** thay vì bị copy vào RAM | Cứu RAM |
-| **5** | Xem lại **C++**: exception và RTTI kéo theo bảng thông tin lớn; template khởi tạo nhiều biến thể gây **phình mã** | Trung bình–lớn |
-| **6** | Giảm **kích thước buffer/stack** — nhưng phải **đo mức dùng cao nhất** trước, không cắt mù ([EMB-017](embedded-fundamentals.md)) | Cứu RAM |
-| **7** | Nén dữ liệu tài nguyên, giải nén lúc chạy | Đổi flash lấy RAM + CPU |
+| Thành phần | CPU + chipset + card rời, nối qua **bus chuẩn** (PCIe) | **Tất cả trên một die**, nối qua bus nội bộ |
+| Phát hiện thiết bị | **Tự liệt kê** (PCIe/USB tự khai báo mình) | **Không tự liệt kê** ⇒ phải **mô tả bằng device tree** ([DRV-007](drivers-embedded.md)) |
+| Truy cập ngoại vi | Qua driver + bus chuẩn | **Memory-mapped I/O** — đọc/ghi thẳng thanh ghi ([DRV-008](drivers-embedded.md)) |
+| Nâng cấp | Thay linh kiện | **Không** — cố định khi sản xuất |
+| Tiêu thụ / giá | Cao | **Thấp** — đó là lý do tồn tại |
 
-**Ba đánh đổi phải nêu:**
-1. **`-Os` có thể chậm hơn `-O2`** — chấp nhận được ở phần lớn nơi, nhưng **không** ở đường tới hạn.
-2. **Cắt stack quá tay = tràn stack im lặng** — nguy hiểm hơn hết flash, vì nó hỏng ngẫu nhiên ở chỗ khác.
-3. **Nén** đổi flash lấy **RAM và thời gian khởi động**.
+**⭐ Hệ quả quan trọng nhất cho người viết phần mềm:** SoC **không tự liệt kê được**, nên kernel **không có cách nào tự biết** trên bo có gì. Đó chính là lý do thế giới ARM cần **device tree**, còn PC thì không ([DRV-032](drivers-embedded.md)).
 
-⚠️ **Việc cần làm sớm nhất trong dự án:** đặt **ngưỡng kích thước trong CI** và cho fail khi vượt. Phát hiện phình dần theo từng commit rẻ hơn nhiều so với việc phải cắt gấp 30% vào tuần cuối trước khi phát hành.
+Hệ quả thứ hai: mọi thứ dùng **chung băng thông bộ nhớ và chung nguồn** ⇒ bật thêm một khối ngoại vi có thể ảnh hưởng hiệu năng và điện năng của phần còn lại — thứ không xảy ra khi các card rời có tài nguyên riêng.
 
-**Chốt:** *"Đo theo section và symbol trước, rồi: bật `-Os` + gỡ mã không dùng, bỏ printf đầy đủ, bỏ float nếu không có FPU, đẩy hằng vào flash. Và đặt ngưỡng kích thước trong CI để không phải cắt gấp lúc cuối."*
+**Chốt:** *"SoC gói CPU và toàn bộ ngoại vi lên một die để rẻ và tiết kiệm điện — nhưng vì ngoại vi không tự liệt kê được nên phải mô tả bằng device tree, đó là khác biệt lớn nhất so với PC."*
+</details>
+
+## F — Số học & độ tin cậy
+
+#### EMB-024 · 🟠 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Fixed-point vs floating-point khi MCU không có FPU?**
+<details><summary>Đáp án</summary>
+
+MCU không FPU → phép float được **emulate bằng phần mềm** (chậm hàng chục–trăm lần, tốn code) → tránh trong hot path/ISR. **Fixed-point**: biểu diễn số thực bằng số nguyên với "điểm thập phân ảo" (vd Q16.16: 32-bit, 16 bit phần nguyên + 16 bit phân) → dùng số học nguyên nhanh + tất định. Đánh đổi: phải tự quản scale, cẩn thận **overflow khi nhân** (Q16.16 × Q16.16 cần 64-bit trung gian rồi dịch), độ chính xác cố định. Khi nào chọn: có FPU (Cortex-M4F/M7) hoặc tính toán ít → float tiện; không FPU + tính nhiều/real-time → fixed-point. Nêu được: float trên MCU không FPU là **bẫy hiệu năng/tất định** kinh điển.
+</details>
+
+#### EMB-025 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Integer overflow/underflow — bug embedded kinh điển, phòng thế nào?**
+<details><summary>Đáp án</summary>
+
+Số nguyên kích thước cố định (uint8/16/32) tràn khi vượt max → quay vòng (unsigned) hoặc **UB (signed overflow)**. Bug hay gặp: bộ đếm ms tràn (so sánh `time > deadline` sai khi wrap), trừ hai timestamp ra số âm ở unsigned, tích lũy cảm biến tràn, `a+b` tràn trước khi gán vào biến lớn hơn. Phòng: (1) chọn kiểu đủ lớn + fixed-width rõ ràng; (2) so sánh thời gian bằng **hiệu** chịu wrap: `(int32_t)(now - deadline) >= 0` thay vì so trực tiếp; (3) kiểm biên trước phép tính; (4) unsigned cho biến chỉ tăng, cẩn thận integer promotion; (5) `-fsanitize=undefined` khi test trên host, bật cảnh báo. Với signed, tràn là UB → optimizer có thể làm điều bất ngờ.
+</details>
+
+#### EMB-026 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
+**CRC / checksum — vì sao cần, khác nhau thế nào?**
+<details><summary>Đáp án</summary>
+
+Khi truyền qua UART/CAN/RF hay lưu vào flash, dữ liệu có thể **hỏng bit** (nhiễu, mòn flash, mất điện khi ghi) → gắn mã kiểm tra để **phát hiện lỗi**. **Checksum** (cộng byte) rẻ nhưng yếu — không bắt được nhiều lỗi (đảo thứ tự, lỗi bù trừ). **CRC** (Cyclic Redundancy Check) dựa trên chia đa thức → bắt lỗi mạnh hơn nhiều (mọi lỗi 1–2 bit, burst error ≤ độ dài CRC), là chuẩn cho frame giao thức + xác thực firmware image; nhiều MCU có **CRC phần cứng**. Lưu ý: CRC chỉ **phát hiện** lỗi, không sửa (muốn sửa cần ECC/FEC) và **không phải bảo mật** (chống sửa cố ý cần chữ ký/HMAC). Firmware update: CRC/hash để kiểm toàn vẹn + chữ ký để chống giả mạo.
+</details>
+
+#### EMB-027 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
+**MISRA C là gì, vì sao dùng trong embedded? Cho vài ví dụ quy tắc.**
+<details><summary>Đáp án</summary>
+
+MISRA C = bộ **coding guideline** cho C trong hệ nhúng an toàn/quan trọng (ô tô, y tế, công nghiệp) nhằm né vùng **không xác định/dễ lỗi** của C và tăng tính portable/kiểm chứng được. Ví dụ quy tắc: cấm/hạn chế cấp phát động sau init; cấm `goto` bừa; không dựa vào thứ tự đánh giá; ép kiểu tường minh, không trộn signed/unsigned ngầm; mỗi `switch` có `default`, mỗi `case` có `break`; không dùng `//` (bản cũ); một điểm return… Enforce bằng **static analyzer** (Coverity, PC-lint, cppcheck) trong CI. Đánh đổi: code cứng nhắc hơn, đôi khi phải "deviation" có ghi chú. Nêu được: MISRA là về **giảm rủi ro và audit được**, không phải tối ưu.
+</details>
+
+## G — Low-power (MCU)
+
+#### EMB-028 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Các low-power mode của MCU (sleep/stop/standby) — đánh đổi và wakeup source?**
+<details><summary>Đáp án</summary>
+
+Thang tiết kiệm điện đổi lấy **thời gian/khả năng đánh thức + giữ trạng thái** (tên khác nhau theo hãng, mô hình chung): **Sleep/Idle** — tắt CPU clock, peripheral vẫn chạy, đánh thức nhanh bởi bất kỳ ngắt nào, giữ toàn bộ RAM. **Stop/Deep-sleep** — tắt phần lớn clock/PLL, giữ RAM (self-refresh), dòng thấp hơn nhiều, đánh thức bởi số ít nguồn (RTC alarm, EXTI GPIO), exit latency cao hơn. **Standby/Shutdown** — tắt gần hết, **mất RAM** (chỉ giữ vài thanh ghi backup + RTC), dòng µA, "đánh thức" gần như reset (chạy lại từ đầu), nguồn giới hạn (WKUP pin, RTC). Chọn theo: cần đánh thức nhanh + giữ ngữ cảnh → sleep; ngủ lâu tiết kiệm tối đa + chấp nhận khởi động lại → standby. Wakeup source phải cấu hình trước khi vào mode.
+</details>
+
+#### EMB-029 · 🟠 · design · 🏗️ · [→ constraints](../../../08-embedded-systems/constraints.md)
+**Thiết kế firmware chạy pin lâu — bạn tối ưu điện thế nào?**
+<details><summary>Đáp án (khung)</summary>
+
+- **Kiến trúc event-driven, không polling bận**: CPU ngủ (low-power mode) là mặc định, chỉ dậy khi có ngắt/sự kiện; dùng **tickless** RTOS.
+- **Ngủ sâu nhất có thể** giữa các sự kiện; chọn mode theo yêu cầu đánh thức (RTC cho chu kỳ dài, GPIO cho nút bấm).
+- **Tắt peripheral không dùng** (clock gating, tắt ADC/radio khi rảnh), hạ tần số clock khi tải nhẹ (DVFS nếu có), giảm điện áp.
+- **Gom việc theo lô** (đọc cảm biến rồi ngủ, gửi radio theo batch — radio/TX tốn điện nhất) thay vì làm rải rác.
+- **Đo thật**: dùng power profiler/ampe kế đo dòng từng trạng thái, tìm "kẻ ngốn điện" (thường là radio TX, LED, peripheral quên tắt, MCU không vào được deep sleep vì một ngắt dựng dậy liên tục).
+- Đánh đổi: đánh thức sâu → latency cao; gom batch → độ trễ dữ liệu. Nêu số: duty cycle, dòng trung bình → tính tuổi thọ pin.
+</details>
+
+## H — Debug phần cứng
+
+#### EMB-030 · 🟡 · concept · [→ debugging](../../../09-debugging/)
+**JTAG và SWD khác nhau? Dùng để làm gì?**
+<details><summary>Đáp án</summary>
+
+Cả hai là giao diện **debug/lập trình phần cứng** cho MCU: nạp firmware, đặt breakpoint, đọc/ghi thanh ghi & bộ nhớ, single-step, xem trạng thái CPU khi nó đang chạy/dừng (in-circuit debug qua probe như ST-Link, J-Link). **JTAG**: chuẩn cũ, nhiều dây (TCK/TMS/TDI/TDO/…), hỗ trợ boundary scan + chuỗi nhiều chip. **SWD** (Serial Wire Debug, ARM): chỉ **2 dây** (SWCLK + SWDIO) làm gần hết việc JTAG cho debug — tiết kiệm chân (quan trọng trên MCU nhỏ), phổ biến trên Cortex-M. Thường kèm **SWO** (trace output, `printf` qua ITM). Không có debugger đầy đủ như GDB trên target nhưng cho phép debug mức thanh ghi thật.
+</details>
+
+#### EMB-031 · 🟡 · concept · ⭐ · [→ tools](../../../09-debugging/tools.md)
+**Không có debugger đầy đủ, bạn debug firmware thế nào?**
+<details><summary>Đáp án</summary>
+
+- **printf qua UART**: kênh log kinh điển — in trạng thái/biến ra serial console. Cẩn thận: printf chậm + không reentrant → không gọi trong ISR/hot path; dùng buffer + gửi ngoài ISR.
+- **Semihosting / SWO(ITM)**: in qua probe debug không cần UART riêng (chậm, chỉ khi có debugger).
+- **GPIO/LED toggle** = "printf bằng chân": bật/tắt chân đánh dấu điểm code, đo bằng **logic analyzer/oscilloscope** → thấy timing thật (đo latency ISR, chu kỳ task) mà không làm chậm như printf.
+- **Logic analyzer/scope**: xem tín hiệu bus (I2C/SPI/UART) thật để tách lỗi phần mềm vs phần cứng (câu "driver chạy nhưng chân không ra tín hiệu").
+- **Trạng thái giữ qua reset**: ghi mã lỗi vào backup register/vùng RAM không bị zero để đọc sau khi crash/reset.
+- Nguyên tắc: chọn công cụ **ít làm nhiễu timing** nhất cho bug timing (GPIO+scope > printf).
+</details>
+
+#### EMB-032 · 🟠 · concept · [→ kernel-debugging](../../../09-debugging/kernel-debugging.md)
+**Hard fault trên Cortex-M — bạn điều tra thế nào?**
+<details><summary>Đáp án</summary>
+
+Hard fault = CPU gặp lỗi nghiêm trọng (truy cập bộ nhớ sai, lệnh không hợp lệ, chia 0 nếu bật, unaligned access, escalate từ fault khác). Điều tra: (1) đọc **fault status registers** (CFSR/HFSR/MMFAR/BFAR trên Cortex-M) — cho biết *loại* lỗi (bus fault? usage fault? địa chỉ nào); (2) lấy **stacked frame** mà CPU đẩy khi vào fault (R0–R3, R12, **LR, PC, xPSR**) — **PC** cho biết lệnh gây lỗi, LR đường về; đọc từ stack trong fault handler; (3) map PC → dòng source bằng map file/`addr2line`/debugger. Nguyên nhân hay gặp: dereference con trỏ null/dangling, **stack overflow** đè vùng khác, gọi qua con trỏ hàm rác, unaligned access, truy cập peripheral chưa bật clock. Viết một **HardFault_Handler** in các thanh ghi này ra UART là công cụ vàng ngoài field.
 </details>
 
 ---
+
 ⬅️ [Bank index](README.md)

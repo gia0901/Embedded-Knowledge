@@ -47,14 +47,9 @@ Track sách rút câu **2 nguồn**: (1) câu trong bank có **link nguồn tớ
 
 ---
 
-## D. Theo JD cụ thể
-
-| Track | Domain rút câu | JD |
-|---|---|---|
-| `datalogic` | `CPP`(C++17), `LNX`, `DBG`, `DRV`(I2C/SPI + PCI/USB), `BSP`(kernel/Yocto), `BLD`, `SD`, `BEH`(lead/review) | Embedded Linux Engineer @ Datalogic — xem [datalogic-plan](../study-plans/datalogic-plan.md) |
-
 ## Mix / all
 
+> 🗑️ *Bỏ 2026-08-18: track `datalogic` (domain của JD đã sống trong [datalogic-plan](../study-plans/datalogic-plan.md) — hai chỗ cùng một danh sách) và cú pháp trộn `track a+b` (chưa dùng lần nào).*
+
 - `track all` — rút câu toàn bank (cho `comprehensive` giả lập vòng thật đa dạng, hoặc `daily`).
-- `track bsp+cpp-system` — trộn hai job track (khi JD lai).
 - Không nêu track → mặc định `bsp` (theo [config.md](config.md)).

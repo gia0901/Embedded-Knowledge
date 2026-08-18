@@ -25,7 +25,7 @@
 
 ## 🔁 Lịch kiểm tra lại (retention) — hàng đợi, KHÔNG phải nghĩa địa
 
-> **Vấn đề đã có:** câu gỡ khỏi sổ rơi vào bảng "Đã khắc phục" rồi **không cơ chế nào kéo về**. Type `retention` lẽ ra làm việc đó nhưng phải *"ưu tiên câu đã lâu chưa hỏi lại"* mà không nơi nào ghi ngày → thực tế bị bỏ qua. Bảng này là nguồn để `retention` rút, thay cho việc quét `sessions/`.
+> **Vấn đề đã có:** câu gỡ khỏi sổ rơi vào bảng "Đã khắc phục" rồi **không cơ chế nào kéo về**. Trước đây có type `retention` lẽ ra làm việc đó, nhưng nó phải *"ưu tiên câu đã lâu chưa hỏi lại"* mà không nơi nào ghi ngày → thực tế bị bỏ qua (type đó đã bỏ 2026-08-18). Bảng này là nguồn rút cho **slot khởi động 🔁 đầu mỗi buổi**, thay cho việc quét `sessions/`.
 >
 > **Luật:** gỡ ở tuần N → kiểm tra lại **tuần N+2** (~2 tuần, đúng khoảng quên). Rải vào **slot khởi động 🔁 5–10′ đầu mỗi buổi** ([datalogic-plan](../study-plans/datalogic-plan.md) nguyên tắc ②), không dồn hết vào CN.
 > **Hỏi theo config §6 luật ①:** nén phần nền còn 1 checkpoint, trọng số ở follow-up, **không lặp lại góc cũ**. Điểm **< 3 → kéo thẳng về bảng sổ yếu bên trên** (regression). Điểm ≥ 3 → dời lịch thêm 2 tuần hoặc coi như vững nếu hết plan.

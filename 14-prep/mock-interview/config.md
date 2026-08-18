@@ -29,7 +29,7 @@
 | Level ứng viên | Mid-level (kỹ sư ~2–5 năm) | Điều chỉnh độ khó quanh mốc này |
 | Track mặc định | `bsp` (Embedded Linux/BSP) | Ưu tiên 1 theo định hướng ôn tập; xem [tracks.md](tracks.md) |
 | Interview type mặc định | `daily` | Xem [interview-types.md](interview-types.md) |
-| **Trần độ sâu** | **T2** (vận dụng & đánh đổi) | **T3** (tên lệnh/flag/internals/lock-free) hỏi được nhưng **không tính điểm**. Bật T3 bằng `deep-dive` hoặc `--deep` — xem §6 |
+| **Trần độ sâu** | **T2** (vận dụng & đánh đổi) | **T3** (tên lệnh/flag/internals/lock-free) hỏi được nhưng **không tính điểm**. Bật T3 bằng `deep-dive` — xem §6 |
 | Thang chấm | 0–4 (xem §4) | Kịch trần **4 khi T1+T2 đầy đủ** — thiếu T3 không bị giữ điểm |
 | Ngân hàng câu hỏi | [bank/](bank/) — **DUY NHẤT** | Mọi câu hỏi sống ở đây; nơi khác chỉ link tới |
 | Log phiên | [sessions/](sessions/) (git-track) | 1 file / phiên |
@@ -49,7 +49,7 @@
 
 > `Bắt đầu phiên: <type> · <track> · N câu · trần <T2|T3>`
 
-Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở chế độ nào và có cơ hội đổi ý (thêm `--deep` nếu muốn khó hơn).
+Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở chế độ nào và có cơ hội đổi ý.
 
 **Bước 2 — Hỏi (KHÔNG chấm giữa chừng).**
 - Hỏi **từng câu một**, rút từ [bank/](bank/) theo track + type + phân bổ level của interview type.
@@ -58,7 +58,7 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
   2. **Câu yếu** — từ [weak-register.md](weak-register.md), **ưu tiên cao nhất** (câu từng sai/chưa chuẩn).
   3. **Câu ôn nhớ (retention)** — câu **đã từng trả lời TỐT**, hỏi lại để kiểm tra độ nhớ theo thời gian (spaced review). Trả lời tốt **không** loại câu khỏi vùng được hỏi.
      - **Nguồn rút: bảng "🔁 Lịch kiểm tra lại" trong [weak-register.md](weak-register.md)** — có sẵn ngày đến hạn + **góc đã dùng (cấm lặp)** + góc mới đề xuất. Không phải quét `sessions/` thủ công nữa.
-     - Câu đến hạn được rải vào **slot khởi động 🔁 5–10′ đầu mỗi buổi**, không cần đợi phiên `retention` riêng.
+     - Câu đến hạn được rải vào **slot khởi động 🔁 5–10′ đầu mỗi buổi**, — không có loại phiên `retention` riêng.
      - Điểm **< 3 → kéo thẳng về bảng sổ yếu** (regression). Điểm ≥ 3 → dời lịch +2 tuần.
 - Người dùng có thể yêu cầu **kiểm tra toàn diện** (hỏi bất kỳ câu nào đã từng trả lời, bất kể điểm) — khi đó ưu tiên nguồn 2 + 3; `comprehensive` mặc định đã trộn cả 3 nguồn.
 - Sau khi ứng viên trả lời, **BẮT BUỘC hỏi đào sâu / follow-up ≥1 lần** kể cả khi trả lời đúng (§6 luật ④), **nhưng chưa đưa nhận xét đúng/sai**. Chỉ ghi nhận và chuyển câu tiếp (hoặc đào sâu). Giữ giọng interviewer: trung tính, thúc đẩy suy nghĩ.
@@ -92,7 +92,7 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 
 ## 2. Số câu & cấu trúc theo interview type
 
-> ⚠️ **Cơ cấu chi tiết của từng type sống ở [interview-types.md](interview-types.md), KHÔNG chép lại ở đây.** Bảng dưới chỉ giữ **số câu + trần** — hai thứ ngắn, ổn định, cần tra nhanh lúc chốt phiên (Bước 1). *(Trước 2026-08-17 bảng này chép cả cột "Cơ cấu" — tức mô tả cơ cấu tồn tại ở hai file, đúng loại trùng lặp đã gây 4 sự cố trôi lệch. Đã bỏ.)*
+> ⚠️ **Cơ cấu chi tiết của từng type sống ở [interview-types.md](interview-types.md), KHÔNG chép lại ở đây.** Bảng dưới chỉ giữ **số câu + trần** — cần tra nhanh lúc chốt phiên (Bước 1).
 
 | Type | Số câu | Trần |
 |---|---|---|
@@ -103,8 +103,6 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 | `coding` | 3 | T2 |
 | `deep-dive` | 5 | 🔺 **T3** |
 | `weak-review` | toàn bộ weak-register (lọc theo track) | T2 |
-| `retention` | 8 | T2 |
-| `full-review` | 12 | T2 |
 
 ---
 
@@ -157,7 +155,7 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 
 > ⚠️ **"Sâu" ở mức 4 nghĩa là T2, KHÔNG phải T3.** Sâu = *nêu được đánh đổi, biết khi nào dùng / khi nào không, chẩn đoán được tình huống thật*. Sâu **không** phải là nhớ tên lệnh/flag/internals — đó là T3, **không tính điểm** ở phiên mặc định (xem §6 → Trần độ sâu).
 >
-> **Kịch trần = 4 khi T1+T2 đầy đủ.** Không được giữ ứng viên ở 3 chỉ vì họ không biết `abidiff` hay `alignas(64)`. Muốn T3 tính điểm thì phải chạy `deep-dive` / `--deep`.
+> **Kịch trần = 4 khi T1+T2 đầy đủ.** Không được giữ ứng viên ở 3 chỉ vì họ không biết `abidiff` hay `alignas(64)`. Muốn T3 tính điểm thì phải chạy `deep-dive`.
 
 ### 🚫 Thang chấm riêng cho phiên `rapid` — BẮT BUỘC đọc kèm
 
@@ -279,14 +277,7 @@ Trước khi khẳng định *"dòng này compile được"* / *"cái này lỗi
 
 ⚠️ **Không được "bù" bằng cách hỏi sâu vài câu giữa phiên rapid.** Muốn sâu thì đổi type — đó là lý do có `daily`/`comprehensive`. Trộn hai chế độ làm hỏng cả hai: không đo được độ trôi chảy, cũng không đủ thời gian đào sâu.
 
-**Phạm vi áp dụng — chính xác ở đâu:**
-
-| Ngữ cảnh | Có áp ngoại lệ? |
-|---|---|
-| Phiên type **`rapid`** (12 câu) | ✅ **Toàn phiên** |
-| **2 câu "rapid" mở màn** trong phiên `daily` (§2) | ✅ Áp cho **đúng 2 câu đó**; 4 câu còn lại theo luật ①–⑤ như thường |
-| **3 câu 🟢 khởi động** trong `comprehensive` (§2) | ❌ **Không** — §2 ghi rõ *"hỏi nhanh, **vẫn có ≥1 follow-up**"* |
-| Mọi phiên khác | ❌ Không |
+**Phạm vi:** toàn bộ phiên type `rapid`; **đúng 2 câu mở màn** của phiên `daily` (4 câu còn lại theo luật ①–⑤). **Không** áp cho 3 câu 🟢 khởi động của `comprehensive` — chúng vẫn phải có ≥1 follow-up. Không nơi nào khác.
 
 **Chấm điểm:** dùng **§4 → “Thang chấm riêng cho phiên `rapid`”** — **không** áp thang T1/T2 mặc định, vì T2 không được hỏi thì không được chấm.
 
@@ -310,18 +301,12 @@ Trước khi khẳng định *"dòng này compile được"* / *"cái này lỗi
 
 | Loại phiên | Trần | Ghi chú |
 |---|---|---|
-| `daily` · `rapid` · `by-level` · `comprehensive` · `weak-review` · `retention` · `full-review` | **T2** | **Mức phỏng vấn thật.** Mặc định |
+| `daily` · `rapid` · `by-level` · `comprehensive` · `weak-review` | **T2** | **Mức phỏng vấn thật.** Mặc định |
 | `deep-dive` | **T3** | **Nâng cao, opt-in.** Chỉ khi ứng viên chủ động chọn |
 
-**Bật T3 có tính điểm — interviewer KHÔNG BAO GIỜ tự bật.** Ba cách, chi tiết ở [interview-types.md → Cách bật chế độ chuyên sâu](interview-types.md):
+**Bật T3 có tính điểm — interviewer KHÔNG BAO GIỜ tự bật.** Một cách duy nhất: **`/mock deep-dive track <track>`**. (Người dùng nói *"hỏi khó vào"* giữa phiên cũng bật được — đó là luật ưu tiên tầng 1, không phải cơ chế riêng.) Mỗi phiên độc lập, không có trạng thái dính.
 
-| Cách | Lệnh | Tác dụng |
-|---|---|---|
-| Loại phiên chuyên sâu | `/mock deep-dive track <track>` | Đổi **cả nội dung**: 5 câu design/tình huống, toàn phiên T3 |
-| Cờ trên loại bất kỳ | `/mock comprehensive track <track> --deep` | Giữ nguyên cơ cấu, chỉ **nâng trần + thang chấm** lên T3 |
-| Nói bằng lời | *"hỏi khó vào"*, *"cho tôi mức senior"* | Như cờ `--deep` |
-
-Không có trạng thái dính: bỏ cờ đi là về lại **T2**. Mỗi phiên độc lập.
+> 🗑️ *Cờ `--deep` đã bỏ 2026-08-18: ba cơ chế cho cùng một việc, chưa cơ chế nào được dùng lần nào trong 17 phiên.*
 
 **Chuẩn cho bài CODING (chỗ dễ vượt tầng nhất) — BA CỠ BÀI:**
 
@@ -347,10 +332,6 @@ Không có trạng thái dính: bỏ cờ đi là về lại **T2**. Mỗi phiê
 ---
 
 ### ⚠️ Lan can: SÂU ≠ TRIVIA — cách phân biệt T2 với T3
-
-Hai lỗi ngược nhau, §6 chặn cả hai:
-- **Phiên nông** — dừng ở T1, chỉ hỏi định nghĩa → luật ①–⑥ chữa.
-- **Phiên lệch tầng** — nhảy lên T3, chấm điểm thuật ngữ → mục "Trần độ sâu" chữa.
 
 **Ranh giới T2 / T3, phát biểu một câu:** T2 là *"cơ chế nào giải thích một lớp bug sẽ gặp trong công việc"* — nó đổi **quyết định** của bạn. T3 là **nhãn dán** lên cơ chế đó — biết thì nói nhanh hơn, không biết vẫn ra quyết định đúng.
 
@@ -400,4 +381,4 @@ grep -c "^#### " bank/*.md
 
 ⚠️ **Phủ KHÔNG phải mục tiêu tự thân.** Hỏi qua loa 397 câu vô dụng ngang hỏi sâu 100 câu rồi bỏ trắng phần còn lại. Luật này chỉ để **phát hiện lệch**, còn quyết định vẫn theo *xác suất bị hỏi × độ yếu hiện tại*. Domain ngoài JD (vd `EMB` cụm RTOS/bare-metal) **cố ý** để phủ thấp — ghi rõ lý do ở plan thay vì cố kéo lên.
 
-**Ghi kết quả ở đâu:** bảng phủ trong **§📍 của plan đang chạy** — không tạo file thứ hai, không chép số vào `bank/README.md` (đó chính là lỗi *"một sự thật, hai chỗ"* đã xảy ra 4 lần).
+**Ghi kết quả ở đâu:** bảng phủ trong **§📍 của plan đang chạy** — một chỗ duy nhất, không chép số sang file khác.
