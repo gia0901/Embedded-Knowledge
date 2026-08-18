@@ -142,6 +142,102 @@ request_threaded_irq(irq,
 **Chốt:** *"Top half: ack rồi biến, không được ngủ. Bottom half: làm phần nặng. Cần ngủ → workqueue hoặc threaded IRQ; không cần → tasklet/softirq."*
 </details>
 
+#### DRV-036 · 🟠 · concept · ⭐ · 🎤 2026-08-18 · [→ driver-basics §6.3](../../../05-drivers-device-tree/driver-basics.md)
+**Driver của bạn chia chung một đường IRQ với thiết bị khác. Handler phải làm gì khác so với IRQ riêng? Trả sai giá trị thì hậu quả gì?**
+<details><summary>Đáp án</summary>
+
+**Khác biệt cốt lõi: handler PHẢI tự xác định "ngắt này có phải của tôi không".** Với IRQ riêng thì cứ bắn là của mình; với IRQ dùng chung, kernel gọi **lần lượt mọi handler** đã đăng ký trên đường đó, và mỗi handler phải tự lọc.
+
+```c
+static irqreturn_t my_isr(int irq, void *dev_id)
+{
+    struct my_priv *priv = dev_id;
+    u32 status = readl(priv->base + REG_STATUS);
+
+    if (!(status & STATUS_MY_EVENT))
+        return IRQ_NONE;            // ⭐ không phải của tôi
+
+    writel(status, priv->base + REG_STATUS);   // ACK
+    /* ... xử lý ngắn ... */
+    return IRQ_HANDLED;
+}
+```
+
+**Ba yêu cầu bắt buộc khi dùng `IRQF_SHARED`:**
+1. **`dev_id` phải khác NULL và duy nhất** — nó vừa là ngữ cảnh truyền vào handler, vừa là "chữ ký" để `free_irq()` gỡ **đúng** handler của mình khỏi danh sách.
+2. **Phần cứng phải có cách hỏi "có phải tôi vừa bắn không"** — tức có thanh ghi status. Không có thì **không thể** dùng IRQ chung.
+3. **Trả `IRQ_NONE`** khi không phải của mình.
+
+**Hậu quả khi trả SAI:**
+
+| Sai | Hậu quả |
+|---|---|
+| Trả **`IRQ_HANDLED`** cho ngắt không phải của mình | **Nuốt ngắt của driver khác.** Kernel tưởng đã có người xử lý ⇒ thiết bị kia "thỉnh thoảng mất dữ liệu / treo". Bug **cực khó truy** vì lỗi hiện ở driver vô can |
+| Trả **`IRQ_NONE`** cho ngắt của chính mình (vd quên ACK nên status đọc ra rỗng) | Không ai ACK ⇒ với ngắt **mức (level)**, thiết bị giữ chân IRQ ⇒ **bão ngắt**, treo mềm |
+| **Mọi** handler đều trả `IRQ_NONE` liên tục | Kernel kết luận không ai xử lý và **tắt hẳn đường ngắt**: `irq 42: nobody cared (try booting with the "irqpoll" option)` |
+
+**Dấu hiệu nhận biết khi debug:** thấy `nobody cared` trong `dmesg` ⇒ hoặc quên ACK, hoặc handler trả sai. Đối chiếu `/proc/interrupts` để xem đường IRQ đó có ai đăng ký và bộ đếm còn tăng không.
+
+**Bẫy phụ:** vẫn truyền `IRQF_SHARED` khi thiết bị dùng **MSI/MSI-X** — MSI vốn là vector riêng, không chia sẻ; để cờ đó cho thấy chưa nắm cơ chế (xem [DRV-021](drivers-embedded.md)).
+
+**Chốt:** *"IRQ chung thì handler phải tự lọc bằng thanh ghi status và trả IRQ_NONE nếu không phải của mình. Trả IRQ_HANDLED bừa là nuốt ngắt của driver khác — hỏng ở chỗ mình không hề đụng tới."*
+</details>
+
+#### DRV-037 · 🟠 · concept · ⭐ · 🎤 2026-08-18 · [→ driver-basics §6.8](../../../05-drivers-device-tree/driver-basics.md)
+**Một biến dùng chung giữa hàm `read()` của driver và ISR. Dùng loại khoá nào? Vì sao `mutex` sai, và vì sao `spin_lock` thường cũng chưa đủ?**
+<details><summary>Đáp án</summary>
+
+**Đáp án: `spin_lock_irqsave()` / `spin_unlock_irqrestore()` ở phía process context.**
+
+```c
+static ssize_t my_read(struct file *f, char __user *buf, size_t n, loff_t *off)
+{
+    struct my_priv *priv = f->private_data;
+    unsigned long flags;
+    u32 snapshot;
+
+    spin_lock_irqsave(&priv->lock, flags);      // lưu trạng thái + TẮT ngắt trên CPU này
+    snapshot = priv->events;
+    spin_unlock_irqrestore(&priv->lock, flags); // khôi phục ĐÚNG trạng thái cũ
+
+    return copy_to_user(buf, &snapshot, sizeof(snapshot)) ? -EFAULT : sizeof(snapshot);
+}
+```
+
+**Vì sao `mutex` SAI:** mutex là **sleeping lock**. ISR không thể ngủ ⇒ nếu ISR gặp mutex đang bị giữ, nó không có cách nào chờ. Gọi `mutex_lock` trong ngữ cảnh ngắt ⇒ `BUG: scheduling while atomic`.
+
+**Vì sao `spin_lock` thường CHƯA ĐỦ — đây mới là phần đo được hiểu biết thật:**
+`spin_lock` chỉ chặn **CPU khác**. Nó **không tắt ngắt trên CPU hiện tại**. Nên:
+
+```
+CPU0, process context:  spin_lock(&lock)   ← lấy được khoá
+CPU0, ngắt bắn NGAY LÚC NÀY → ISR chạy trên CÙNG CPU0
+CPU0, ISR:              spin_lock(&lock)   ← quay tít chờ khoá
+                                             mà chủ khoá là chính nó, đang bị ngắt
+                                             ⇒ DEADLOCK CỨNG, treo cả CPU
+```
+
+`_irqsave` tắt ngắt cục bộ nên ISR không thể chen vào giữa vùng găng ⇒ không có kịch bản trên.
+
+**Chọn biến thể theo đúng CẶP ngữ cảnh đang tranh nhau:**
+
+| Ai tranh với ai | Dùng |
+|---|---|
+| process ↔ process | `mutex` |
+| process ↔ **hard IRQ** | **`spin_lock_irqsave`** |
+| process ↔ softirq/tasklet | `spin_lock_bh` |
+| **bên trong** hard IRQ handler | `spin_lock` thường — ngắt đã tắt sẵn |
+| process ↔ **threaded IRQ** | ✅ `mutex` được — cả hai đều là process context |
+
+**Vì sao `_irqsave` chứ không phải `spin_lock_irq`:** `spin_lock_irq` **bật lại ngắt vô điều kiện** lúc unlock. Nếu hàm được gọi từ nơi ngắt vốn đã tắt, nó **bật ngắt sai thời điểm**. `_irqsave` lưu trạng thái cũ và khôi phục đúng như vậy ⇒ an toàn khi lồng nhau.
+
+**Hai luật kèm theo:** vùng găng giữ spinlock phải **cực ngắn** (đang tắt ngắt), và **cấm ngủ** bên trong.
+
+🆕 **Trên `PREEMPT_RT`:** `spinlock_t` biến thành **sleeping lock** (rt_mutex). Code "giữ spinlock rồi gọi hàm có thể ngủ" chạy im trên kernel thường sẽ **nổ trên RT** — một lý do nữa để giữ vùng găng sạch.
+
+**Chốt:** *"Process ↔ hard IRQ thì phải spin_lock_irqsave. Mutex sai vì ISR không ngủ được; spin_lock thường sai vì nó chỉ chặn CPU khác, còn ISR bắn trên chính CPU này sẽ tự khoá chính mình."*
+</details>
+
 #### DRV-014 · 🟠 · concept · ⭐ · [→ driver-basics](../../../05-drivers-device-tree/driver-basics.md)
 **Vì sao quản lý tài nguyên trong driver lại đặc biệt quan trọng? `devm_*` giúp gì?**
 <details><summary>Đáp án</summary>

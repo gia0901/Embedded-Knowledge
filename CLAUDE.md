@@ -207,7 +207,7 @@ Embedded-Interview/
 | 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
 | 14 Prep | 🟡 Đang dùng | **study-plans/** (`datalogic-plan` — plan JD đang chạy, §📍 là nguồn tracking duy nhất — + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
-| 15 Book summaries | 🟡 Đang viết | **7 cuốn đã xong**, tất cả đối chiếu PDF (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); TLPI ✅ 10/10 cụm (đủ 64 chương); còn LDD3/Bootlin ⬜. Tiến độ chi tiết từng cuốn xem `15-book-summaries/README.md` |
+| 15 Book summaries | 🟡 Đang viết | **8 cuốn đã xong**, tất cả đối chiếu PDF (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset, **cpp-high-performance** — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); TLPI ✅ 10/10 cụm (đủ 64 chương); **cpp-high-performance là bản CHỌN LỌC 3/14 chương có chủ đích** (bỏ phần trùng EMC/Williams + ~30% là C++20 ngoài JD C++17); còn LDD3/Bootlin ⬜. Tiến độ chi tiết từng cuốn xem `15-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu
 
