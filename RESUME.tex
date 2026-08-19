@@ -33,17 +33,16 @@
 \vspace{4pt}
 
 \section*{SUMMARY}
-Software Engineer with almost 3 years of experience in developing software for Smart TVs and Enterprise products. Experienced in C/C++, Linux System Programming, Device Drivers, Hardware Abstraction Layer (HAL), and cross-layer debugging across user-space and kernel-space. Passionate about system-level programming, Linux internals, and performance-critical, resource-constrained systems.
+Software Engineer with 3 years of experience in developing C/C++ system software for Smart TVs and Enterprise products (ARM-based SoC). Work spans the full system layer: C++ shared-library interfaces and HAL, platform/character drivers, device tree, cross-compilation, and kernel migration (5.10 → 6.12) — including cross-layer debugging from user space down into the driver. Focused on resource-constrained, performance-critical systems.
 
 \section*{TECHNICAL SKILLS}
 \begin{itemize}
-    \item \textbf{Languages:} C, Modern C++
-    \item \textbf{System Programming:} IPC, POSIX APIs, Multi-threading, Shared libraries
-    \item \textbf{Embedded Linux:} HAL, Device Drivers, Device Tree, CMake, Makefile, Cross compilation
+    \item \textbf{Languages:} C, Modern C++ (11,14,17)
+    \item \textbf{System Programming:} IPC (POSIX message queue, shared libraries), Multi-threading, Shared libraries
+    \item \textbf{Embedded Linux:} HAL, Kernel/platform drivers, Device Tree
     \item \textbf{Debugging:} GDB, dmesg, cross-layer (user-space \& kernel-space) debugging
-    \item \textbf{Operating Systems:} Linux
-    \item \textbf{AI-Assisted Development:} Prompt engineering, custom agent skills for code generation, reviewing \& unit testing
-    \item \textbf{Development:} Jira, Confluence, Git, Perforce
+    \item \textbf{Build \& Tooling:} CMake, Makefile, Yocto/BitBake, Git, Perforce, Jira/Confluence
+    \item \textbf{AI-Assisted Development:} Custom agent skills for code generation, review \& unit testing
 \end{itemize}
 
 \section*{WORK EXPERIENCE}
@@ -53,11 +52,11 @@ Software Engineer with almost 3 years of experience in developing software for S
 \begin{itemize}
 \item Developed C/C++ system-software for Display Enhancement components: Dimming, FRC, and TCON
 \item Implemented and extended C++ interfaces and libraries with product-specific logic branching, allowing a unified interface while supporting multiple hardware configurations
-\item Implemented and extended kernel-level drivers (HAL) for SoC interaction, including OOP-based mechanisms for multi-chipset support
-\item Customized internal AI assistant skills (SKILL.md) for Tizen, Samsung's in-house OS, to automate unit-test generation and code implementation, reducing working time by around 70\%
-\item Driver porting for next-generation products (2026--2027), including new hardware support, device tree updates, and kernel migration (Linux 5.10 $\rightarrow$ 6.12)
+\item Implemented and extended kernel-level drivers (HAL) for SoC interaction, using an OOP-style function-pointer to support multiple chipsets behind one interface.
+\item Ported and maintained kernel drivers across chipset generations for (2026--2027) products, covering new hardware bring-up, device tree updates, and a Linux 5.10 $\rightarrow$ 6.12 kernel migration while keeping backward compatibility with the 5.10 branch.
+\item Customized and applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation, cutting time authoring for a code submission from ~1 day to 1$\rightarrow$2 hours.
+\item Diagnosed and resolved cross-layer issues across C++ interfaces, libraries, and kernel drivers
 \item Collaborated with R\&D Headquarters (South Korea) during business trips twice a year to support product bring-up, integration, and issue fixing toward mass-production
-\item Diagnosed and resolved cross-layer issues across interfaces, libraries, and kernel drivers
 \end{itemize}
 
 \vspace{2pt}
@@ -65,8 +64,8 @@ Software Engineer with almost 3 years of experience in developing software for S
 
 \project{S-Box Signage Product (2025)}
 \begin{itemize}
-    \item Implemented adaptive brightness control based on Ambient Light Sensor data, allowing screen brightness to adjust automatically to the surrounding environment
-    \item Designed POSIX message queue-based communication to synchronize brightness across multiple S-Box devices, making combined displays appear as one large uniform screen
+    \item Build adaptive brightness control driven by an ambient light sensor, allowing screen brightness to adjust automatically to the surrounding environment
+    \item Synchronize brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid -- with a single binary serving both standalone and synchronized modes.
 \end{itemize}
 
 \project{Samsung Display Manager (Windows Application)}
@@ -88,7 +87,8 @@ Bachelor of Engineering -- GPA: 7.8 \hfill Nov 2023
 
 \section*{ACHIEVEMENTS}
 \begin{itemize}
-    \item Best Employee of Quarter 1 -- 2026
+    \item Best Employee of the Quarter 1 -- Q1 2026
+    \item Language: English -- TOEIC: 895/990 (2024)
     \item Samsung Software Certificate (Data Structures \& Algorithms) -- Advanced Level
 \end{itemize}
 

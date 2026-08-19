@@ -70,7 +70,7 @@ class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần ph
 <details><summary>Đáp án</summary>
 
 - **FIT (Flattened Image Tree)**: một file `.itb` đóng gói **kernel + nhiều DTB + initramfs + configuration**, mô tả bằng nguồn `.its`, build bằng `mkimage`.
-- Hơn uImage (chỉ bọc một ảnh + header CRC): (1) **nhiều thành phần + nhiều cấu hình** — một ảnh phục vụ nhiều biến thể board; (2) **hash/chữ ký từng thành phần** (SHA + RSA) — nền của **verified boot** trong U-Boot; (3) metadata rõ ràng (load address, entry, compression).
+- Hơn uImage (chỉ bọc **một image** + header CRC): (1) **nhiều thành phần + nhiều cấu hình** — một ảnh phục vụ nhiều biến thể board; (2) **hash/chữ ký từng thành phần** (SHA + RSA) — nền của **verified boot** trong U-Boot; (3) metadata rõ ràng (load address, entry, compression).
 - Thực dụng: sản phẩm cần secure boot hoặc nhiều SKU chung firmware → FIT gần như bắt buộc.
 </details>
 
@@ -87,7 +87,9 @@ class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần ph
 **`initramfs` để làm gì? Thiết bị nhúng có luôn cần nó không?**
 <details><summary>Đáp án</summary>
 
-**`initramfs` là một filesystem tối giản nằm trong RAM**, được bootloader nạp cùng kernel. Kernel mount nó làm root **tạm thời**, chạy một script khởi động, rồi **chuyển sang** rootfs thật.
+**`initramfs` là một filesystem tối giản nằm trong RAM**, được bootloader nạp cùng kernel.
+
+> **Ai nạp nó — chính xác là giai đoạn nào** *(bổ sung 2026-08-19)*: **U-Boot proper**, không phải SPL/MLO. SPL/MLO là giai đoạn 1 cực nhỏ (chạy trong SRAM on-chip, vài chục KB), nhiệm vụ **duy nhất** là init DRAM rồi nạp U-Boot proper vào đó. Nó không biết gì về kernel/initramfs. U-Boot proper mới đọc kernel + DTB + initramfs vào RAM, đặt địa chỉ vào `bootm`/`booti` rồi trao quyền. Kernel mount nó làm root **tạm thời**, chạy một script khởi động, rồi **chuyển sang** rootfs thật.
 
 **Vấn đề nó giải quyết — bài toán con gà quả trứng:** để mount được rootfs, kernel cần **driver** cho thiết bị lưu trữ (và có khi cả LVM, RAID, mã hoá, mạng). Nhưng nếu driver đó nằm dạng **module trong chính rootfs** thì kernel không đọc được nó ⇒ kẹt. initramfs mang sẵn các module đó trong RAM để phá vòng lặp.
 
@@ -259,11 +261,11 @@ Trả lời theo 4 lớp:
 **Buildroot vs Yocto — chọn thế nào? Một BSP layer trong Yocto gồm những gì?**
 <details><summary>Đáp án</summary>
 
-- **Buildroot**: makefile+Kconfig sinh *một ảnh* — học nhanh, minh bạch, hợp sản phẩm đơn/đội nhỏ; không package manager, sstate thô sơ. **Yocto**: framework metadata sinh *một distro* — layer/override cho nhiều SKU, **sstate cache** (build lại chỉ phần đổi), **SDK** cho đội app, license/CVE tooling; giá = đường học dốc. Thực tế: vendor (NXP/TI/ST) phát hành BSP dạng **Yocto layer** → Yocto là mặc định khi sản phẩm nghiêm túc/nhiều biến thể.
+- **Buildroot**: makefile+Kconfig sinh *một image* — học nhanh, minh bạch, hợp sản phẩm đơn/đội nhỏ; không package manager, sstate thô sơ. **Yocto**: framework metadata sinh *một distro* — layer/override cho nhiều SKU, **sstate cache** (build lại chỉ phần đổi), **SDK** cho đội app, license/CVE tooling; giá = đường học dốc. Thực tế: vendor (NXP/TI/ST) phát hành BSP dạng **Yocto layer** → Yocto là mặc định khi sản phẩm nghiêm túc/nhiều biến thể.
 - **BSP layer (`meta-<board>`)** gồm: `conf/machine/<board>.conf` (DTB nào — `KERNEL_DEVICETREE`, u-boot config, console, tune); recipe/append **kernel** (`linux-*.bbappend`: patch DT/driver, config fragment `.cfg`); recipe/append **U-Boot**; firmware blob; image recipe. Nguyên tắc: mọi tùy biến là **bbappend/patch trong layer riêng** — không sửa poky/vendor layer, không sửa `tmp/work`.
 </details>
 
-#### BSP-018 · 🟡 · concept · [→ melp/build-systems](../../../15-book-summaries/melp/build-systems.md)
+#### BSP-018 · 🟡 · concept · [→ yocto §5](../../../06-build-systems/yocto.md) · [→ melp/build-systems](../../../15-book-summaries/melp/build-systems.md)
 **DEPENDS vs RDEPENDS? Vì sao build xong chạy thiếu lib dù compile không lỗi?**
 <details><summary>Đáp án</summary>
 
@@ -291,6 +293,12 @@ Trả lời theo 4 lớp:
 - **Suspend-to-RAM** (`echo mem > /sys/power/state`): freeze userspace → suspend device **theo thứ tự ngược cây thiết bị** (mỗi driver cần `.suspend/.resume`) → tắt CPU phụ, CPU cuối vào ngủ sâu; **RAM ở self-refresh** (giữ nội dung, tốn µA). Resume đi ngược.
 - **Wakeup source**: khai `wakeup-source` trong DT/driver `device_init_wakeup`: GPIO nút nhấn, RTC alarm, WoL. Debug: `/sys/kernel/debug/wakeup_sources`, delta `/proc/interrupts`.
 - Bug PM kinh điển: resume treo vì một driver thiếu resume handler / sai thứ tự clock; công cụ `pm_test` chia đôi tầng.
+
+**⭐ Vì sao suspend đi NGƯỢC cây thiết bị** *(bổ sung 2026-08-19 — trước đây chỉ nêu tên, không nêu lý do)*: device model của Linux là một **cây phụ thuộc** — thiết bị con sống nhờ tài nguyên của cha (bus, clock, regulator, power domain). Ví dụ: cảm biến I2C ← I2C controller ← clock + regulator của SoC.
+- **Suspend đi từ LÁ vào GỐC**: phải cho cảm biến ngủ **trước**, vì tắt I2C controller trước thì cảm biến mất đường giao tiếp, driver của nó không kịp lưu trạng thái/ghi thanh ghi cuối.
+- **Resume đi ngược lại, từ GỐC ra LÁ**: bật clock/regulator/bus **trước**, rồi mới đánh thức thiết bị con — nếu không, driver con ghi vào thanh ghi trong khi bus chưa có clock ⇒ treo hoặc bus error.
+- ⇒ Đây chính là gốc của bug *"resume treo"* nói ở trên: **không phải driver viết sai, mà là sai THỨ TỰ**. Đó cũng là lý do `.suspend/.resume` phải nằm ở **driver**, nơi kernel biết vị trí của nó trên cây.
+- **Đánh đổi khi thiết kế:** càng nhiều thiết bị khai `wakeup-source` thì càng tốn dòng lúc ngủ (phần đó không được tắt hẳn) — chọn wakeup source là chọn giữa **thời gian pin** và **độ nhạy đánh thức**.
 </details>
 
 ## G — Real-time

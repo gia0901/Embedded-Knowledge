@@ -9,7 +9,7 @@
 
 - **Không phải một distro** — mà là **framework build ra distro tùy biến của bạn**.
 - Thành phần: **BitBake** (build engine — đọc metadata, dựng task graph, thực thi) + **OpenEmbedded-Core** (metadata nền) + **Poky** (bản tham chiếu gộp sẵn để bắt đầu).
-- vs **Buildroot**: Buildroot = Makefile+Kconfig sinh *một ảnh*, học nhanh; Yocto = metadata layer sinh *một distro* cho **nhiều SKU**, có **sstate cache**, **SDK**, license/CVE tooling — giá là đường học dốc. Sản phẩm nghiêm túc/nhiều biến thể → Yocto.
+- vs **Buildroot**: Buildroot = Makefile+Kconfig sinh *một image*, học nhanh; Yocto = metadata layer sinh *một distro* cho **nhiều SKU**, có **sstate cache**, **SDK**, license/CVE tooling — giá là đường học dốc. Sản phẩm nghiêm túc/nhiều biến thể → Yocto.
 
 ## 2. Kiến trúc metadata (khái niệm cốt lõi)
 
