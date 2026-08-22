@@ -132,6 +132,56 @@ Khi vấn đề đơn giản và code ổn định, không có nhu cầu thay đ
 <details><summary>Đáp án</summary>
 
 Đảm bảo một class chỉ có một instance + điểm truy cập toàn cục. C++11+ dùng Meyers' Singleton: `static` local trong hàm `instance()` — khởi tạo **lazy** (chỉ dựng lần gọi đầu) và **thread-safe theo chuẩn** (compiler sinh guard variable, xem [DP-014](#dp-014--concept---creational)). Cấm copy (`= delete`), constructor private.
+
+> ⚠️ **"Một instance" chỉ đúng trong MỘT chương trình đã link xong.** Khi singleton nằm ở header mà nhiều `.so` cùng include, số instance do **dynamic linker** quyết định chứ không do C++ — xem [DP-020](#dp-020--concept---creational-linking-loading-symbol-interposition).
+</details>
+
+#### DP-020 · 🟠 · concept · ⭐ · 🎤 2026-08-21 · [→ creational](../../../11-design-patterns/creational.md), [linking-loading §symbol interposition](../../../07-shared-libraries/linking-loading.md#L100)
+**Hai shared library cùng `#include` một header chứa Meyers' Singleton, app link cả hai. Trong tiến trình có bao nhiêu instance? Điều gì lật ngược được câu trả lời?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — bốn bước, hiểu bước 2 là hiểu cả câu:**
+
+1. `static Logger inst;` trong hàm inline ⇒ compiler sinh **một symbol global (weak)** cho biến đó **trong mỗi** `.so` include header, cùng tên mangled.
+2. ⭐ Dynamic linker nạp các `.so` vào **một** tiến trình, gặp symbol trùng tên ⇒ **symbol interposition**: hợp nhất về **một** định nghĩa duy nhất, cái xuất hiện trước trong thứ tự tìm kiếm thắng (cùng cơ chế `LD_PRELOAD` dùng).
+3. Mọi lời gọi `Logger::instance()` đi qua **PLT/GOT** về cùng một địa chỉ.
+4. ⇒ Mặc định trên Linux/ELF: **ĐÚNG MỘT instance.**
+
+```
+[0x7b465ec6c03c] count=1  (display)
+[0x7b465ec6c03c] count=2  (sensor)     ← cùng địa chỉ, count đi tiếp
+```
+
+**"Vì sao" hai tầng:**
+- *Tầng nông* (ai cũng nói được): *"Meyers' singleton đảm bảo một instance"* — **sai chỗ**: chuẩn C++ chỉ nói về **một chương trình**, còn "chương trình" gồm mấy `.so` là chuyện của **linker**, không phải của chuẩn.
+- *Tầng sâu*: tính duy nhất ở đây **không do C++ bảo đảm mà do ELF/dynamic linker bảo đảm** ⇒ hễ đổi cách export symbol là kết quả đổi theo.
+
+**Ba thứ lật ngược kết quả:**
+
+| Thứ | Vì sao | Kết quả |
+|---|---|---|
+| **`-fvisibility=hidden`** khi build `.so` | Symbol không vào bảng động ⇒ không có gì để hợp nhất | **Mỗi `.so` một instance** |
+| **`dlopen(..., RTLD_LOCAL)`** + symbol đã ẩn | Vùng symbol riêng, không nhập vào global scope | Mỗi lần nạp một instance |
+| **Link tĩnh** logger vào từng `.so` | Mỗi `.so` mang sẵn một bản copy | Nhiều instance |
+
+Chạy thật với `-fvisibility=hidden` (giấu `Logger`, chỉ export entry point):
+```
+[0x7498fbfc602c] count=1  (display)
+[0x7498fbfc102c] count=1  (sensor)     ← địa chỉ KHÁC, count riêng
+```
+
+**Muốn CHẮC CHẮN một instance — đừng phó mặc may rủi:**
+```cpp
+// ✅ export có chủ đích, không phụ thuộc cờ build của người khác
+class __attribute__((visibility("default"))) Logger { ... };
+```
+Chắc hơn nữa: **đặt logger vào MỘT `.so` riêng**, các lib khác cùng link vào — khi đó chỉ có đúng một định nghĩa tồn tại, không cần trông vào interposition.
+
+**⚠️ Bẫy — hai cái, cái sau nặng hơn:**
+1. Tưởng `-fvisibility=hidden` chỉ là tối ưu kích thước/tốc độ load. Nó **đổi ngữ nghĩa chương trình** với mọi trạng thái global: singleton, biến `static` trong hàm inline, và cả `typeinfo` (⇒ `dynamic_cast`/`catch` qua ranh giới `.so` có thể trượt).
+2. 🔴 Tưởng "hai `.so`" nghĩa là "hai bên tách biệt" rồi nhảy sang **shared memory**. Sai tầng: hai `.so` nằm **cùng một tiến trình, cùng một không gian địa chỉ** — chúng đã dùng chung mọi địa chỉ. Shared memory giải bài toán **liên tiến trình**; ở đây nó không giải quyết gì mà còn thêm việc tự đồng bộ.
+
+**Chốt:** *"Mặc định là MỘT — nhưng không phải nhờ C++, mà nhờ symbol interposition của dynamic linker. Hễ `-fvisibility=hidden`, `RTLD_LOCAL` hay link tĩnh xen vào là thành nhiều. Muốn chắc thì export có chủ đích, hoặc đẩy singleton vào một `.so` riêng."*
 </details>
 
 #### DP-004 · 🟡 · concept · [→ creational](../../../11-design-patterns/creational.md)

@@ -29,6 +29,8 @@ private:
 // dùng: Logger::instance().log("hi");
 ```
 
+> ⚠️ **"Một instance" chỉ đúng trong phạm vi MỘT chương trình đã link xong.** Nếu singleton nằm ở header mà nhiều `.so` cùng include, số instance thực tế do **dynamic linker** quyết định, không do chuẩn C++: mặc định các symbol trùng tên được hợp nhất (**symbol interposition**) ⇒ **một** instance; nhưng `-fvisibility=hidden`, `dlopen(RTLD_LOCAL)` hoặc link tĩnh sẽ cho **mỗi `.so` một bản riêng**. Cơ chế: [linking-loading.md](../07-shared-libraries/linking-loading.md). Câu hỏi: [DP-020](../14-prep/mock-interview/bank/design-patterns.md).
+
 - **Meyers' Singleton** (static local): C++11 đảm bảo khởi tạo static local là thread-safe → cách hiện đại, gọn nhất.
 - **Cảnh báo (rất hay được hỏi):** Singleton là **global state trá hình** → tạo coupling ẩn, khó test (không thay được bằng mock), khó kiểm soát thứ tự khởi tạo/hủy (static init order fiasco). Lạm dụng là anti-pattern.
 - **Khi nào dùng:** thật sự chỉ được phép có một (vd quản lý một tài nguyên phần cứng duy nhất). Cân nhắc thay bằng **dependency injection** (truyền instance vào) để dễ test.
@@ -192,6 +194,7 @@ public:
 | [DP-004](../14-prep/mock-interview/bank/design-patterns.md) | Factory pattern giải quyết vấn đề gì? Liên hệ với nguyên lý SOLID nào? |
 | [SD-021](../14-prep/mock-interview/bank/system-design.md) | Builder pattern dùng khi nào? C++ hiện đại có cách thay thế không? |
 | [DP-015](../14-prep/mock-interview/bank/design-patterns.md) | Object pool có lợi gì cho embedded? |
+| [DP-020](../14-prep/mock-interview/bank/design-patterns.md) | Hai `.so` cùng include header Singleton — có mấy instance? Điều gì lật ngược kết quả? |
 
 ---
 ⬅️ [solid-principles.md](solid-principles.md) · ➡️ Tiếp theo: [structural.md](structural.md)
