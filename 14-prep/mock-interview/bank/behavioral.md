@@ -83,6 +83,74 @@ Khớp 3 điểm mạnh với JD: (1) nền **system/C++ + HAL/driver** thực c
 - ⚠️ Tránh (vòng kỹ thuật): lương/thưởng/nghỉ phép chi tiết; "công ty làm gì?"; câu chỉ có/không.
 </details>
 
+#### BEH-010 · 🟡 · design · ⭐ · 🎤 2026-08-23
+**"Kể về một lần bạn làm hỏng việc — một quyết định sai, một lỗi bạn gây ra, hoặc một việc không đạt."**
+<details><summary>Gợi ý (khung + chất liệu)</summary>
+
+**Interviewer đang dò gì:** không phải bạn có sai không (ai cũng sai) — mà là **bạn có nhận phần của mình không**, và **có đổi hành vi sau đó không**. Câu này lọc người đổ lỗi.
+
+**Khung 4 bước — thứ tự rất quan trọng:**
+1. **Nhận phần của MÌNH trước, một câu, không rào đón.** *"Em nhận feature mà chưa liệt kê hết edge case."*
+2. **Bối cảnh sau** (document sai, spec chưa update, PO mặc định mình đã hiểu) — nêu để giải thích, **không** để đỡ đòn.
+3. **Đổi hành vi cụ thể** — đây là phần được chấm. *"Thay vì im lặng mò mẫm, em liên hệ thẳng Project Owner làm rõ document."*
+4. **Kết quả đo được**, kể cả kết quả ngoài bản thân: *"PO phát hiện spec sai và sửa lại — lỗi đó không lặp ở model sau."*
+
+**Chất liệu S-Box (đã dùng thật):** loạt edge case của adaptive brightness — chuyển chế độ giữa chừng, độ sáng sai lúc boot; sửa dần từng ca thay vì lường trước.
+
+**⚠️ Ba bẫy:**
+1. **Kể "hai nhóm nguyên nhân" thay vì MỘT câu chuyện.** Đề hỏi *"một lần"*; trả lời *"có nhiều loại nguyên nhân"* là trả lời **chính sách**, không chấm được.
+2. **Nguyên nhân khách quan đứng trước** ⇒ nghe như đỡ đòn trước khi nhận lỗi. Đảo lại.
+3. Chọn "thất bại giả" (*"em quá cầu toàn"*) — mất điểm nặng hơn kể một lỗi thật.
+
+**Chốt:** *"Em nhận phần của mình trước, rồi mới nói bối cảnh — và thứ đáng nói nhất là em đã đổi cách làm việc sau đó, chứ không phải em đã sửa xong bug."*
+</details>
+
+#### BEH-011 · 🟡 · design · ⭐ · 🎤 2026-08-23 · [→ RES-012](resume.md)
+**"Vị trí này có mảng bạn chưa làm qua. Kể một lần bạn học một thứ hoàn toàn mới trong thời gian ngắn — học thế nào, bao lâu thì làm được việc?"**
+<details><summary>Gợi ý (khung + chất liệu)</summary>
+
+**Interviewer đang dò gì:** đây **không** phải câu hỏi về khả năng học. Nó là **phiên bản mềm của [RES-012](resume.md)** — họ đang hỏi *"chỗ trống trong resume bạn lấp được không?"*. ⇒ Chất liệu bạn chọn **quan trọng hơn** câu chuyện bạn kể.
+
+**⭐ Luật chọn chất liệu:** chọn thứ **gần JD nhất** mà bạn thật sự có, **không** chọn thứ dễ kể nhất.
+
+| Chất liệu | Dùng khi | Vì sao |
+|---|---|---|
+| **Yocto trên BeagleBone Black** ⭐ | JD có Yocto/BSP | Trùng đúng trụ JD, có phần cứng thật, có tên đúng (bitbake, OE-core, poky) — **bằng chứng, không phải lời hứa** |
+| Windows App / MVVM | JD có desktop/UI | Xa JD embedded nhất — **chỉ dùng khi không còn gì khác** |
+
+**Khung 4 phần:** ① điểm xuất phát (*"nền em là Linux system software"*) → ② **bắc cầu từ thứ đã có** (*"cross-compilation và CMake/Makefile nhiều nền tảng nên em hiểu vấn đề Yocto giải quyết"*) → ③ cách học + **mốc thời gian cụ thể** → ④ **bằng chứng làm được việc**.
+
+**⚠️ Bẫy lớn nhất — không bắc cầu.** Kể một câu chuyện học tập hay nhưng **không nối về JD** thì interviewer vẫn ghi *"chưa có kinh nghiệm mảng này"*. Phần ② mới là phần được chấm.
+
+**Chốt:** *"Em chọn chất liệu gần với thứ anh cần nhất mà em thật sự đã làm, và nói rõ em bắc cầu từ nền nào sang."*
+</details>
+
+#### BEH-012 · 🟠 · design · ⭐ · 🎤 2026-08-23
+**"Mức lương kỳ vọng của bạn là bao nhiêu?" — và khi bị đẩy: "hơi cao so với ngân sách bọn anh."**
+<details><summary>Gợi ý (khung + cách giữ giá)</summary>
+
+**Interviewer đang dò gì:** hai thứ, và thứ hai quan trọng hơn — ① con số có hợp lý không · ② **bạn có giữ được bình tĩnh khi bị đẩy không**. Người rút lui ngay khi bị chê đắt sẽ bị ép tiếp; người phòng thủ gay gắt thì khó làm việc cùng.
+
+**Khung 3 bước:**
+1. **Ra số dứt khoát, không vòng vo.** Vòng vo (*"em để công ty quyết"*) là mất quyền neo giá.
+2. **Neo vào THỊ TRƯỜNG + NĂNG LỰC, không neo vào nhu cầu bản thân.** ⭐ Đây là chỗ phân biệt.
+3. **Mở đường tổng thu nhập**, rồi **hỏi ngược band của họ**.
+
+| Cách neo | Ví dụ | Người trả lương nghe thấy |
+|---|---|---|
+| ❌ **Nhu cầu bản thân** | *"để em toàn tâm toàn ý làm việc"* | *"Đây là vấn đề của bạn, không phải giá trị của bạn."* |
+| ✅ **Thị trường + năng lực cụ thể** | *"Mức này hợp mặt bằng kỹ sư 3 năm có kernel driver, multi-chipset và kernel migration 5.10→6.12."* | *"Có căn cứ, và đang nhắc tôi nhớ vì sao bạn đáng giá."* |
+
+**Bản mẫu khi bị đẩy:**
+> *"Em hiểu ạ. Con số đó em đưa dựa trên mặt bằng thị trường cho kỹ sư có nền driver và kernel — nhưng em quan tâm tổng thể gói đãi ngộ và lộ trình chứ không riêng lương cứng. **Anh chia sẻ giúp em band của vị trí này thì em dễ trao đổi hơn.**"*
+
+Câu cuối **chuyển quả bóng về phía họ** mà không hạ giá.
+
+**⚠️ Bẫy:** ① tự hạ số ngay khi bị chê đắt ⇒ số ban đầu mất tín nhiệm · ② lấy lương làm **lý do rời công ty cũ** (xem [BEH-008](#beh-008--design--)) · ③ đưa số mà chưa biết gross/net.
+
+**Chốt:** *"Ra số dứt khoát, neo vào thị trường và năng lực chứ không vào nhu cầu của mình, rồi hỏi ngược band của họ."*
+</details>
+
 ---
 
 ## Phụ lục — chuẩn bị
