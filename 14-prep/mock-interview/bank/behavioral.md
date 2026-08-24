@@ -151,6 +151,30 @@ Câu cuối **chuyển quả bóng về phía họ** mà không hạ giá.
 **Chốt:** *"Ra số dứt khoát, neo vào thị trường và năng lực chứ không vào nhu cầu của mình, rồi hỏi ngược band của họ."*
 </details>
 
+#### BEH-013 · 🟠 · design · ⭐ · 🎤 2026-08-24 · [→ BEH-008](#beh-008--design--)
+**"Giả sử bạn nộp đơn nghỉ và công ty cũ giữ lại — tăng lương đúng bằng mức bạn đòi, cho đổi sang mảng bạn muốn. Bạn có ở lại không?"** *(counter-offer)*
+<details><summary>Gợi ý (khung + vì sao câu này nguy hiểm)</summary>
+
+**Interviewer đang dò gì — đây là PHÉP THỬ, không phải câu hỏi thật.** Họ vừa nghe bạn nói lý do rời đi là *"muốn thử thách / vai trò lớn hơn"* ([BEH-008](#beh-008--design--)). Câu này kiểm tra lý do đó **có thật không**, hay chỉ là vỏ bọc lịch sự của *"lương thấp"*.
+
+**⚠️ Vì sao nó nguy hiểm:** nhà tuyển dụng sợ nhất là tốn công phỏng vấn, chốt offer, rồi ứng viên **dùng offer đó để mặc cả với công ty cũ**. Do dự ở câu này là tự khai mình có thể làm thế.
+
+**Khung 3 phần — tổng ~20 giây, không dài hơn:**
+1. **Trả lời NGAY, không do dự.** *"Em không."* Một mệnh đề. Ngập ngừng ở đây đắt hơn mọi câu chữ sau đó.
+2. **Nhắc lại đúng động cơ đã nêu ở BEH-008** — phải **khớp**, vì họ đang đối chiếu hai câu trả lời.
+3. ⭐ **Nêu MỘT thứ cụ thể nơi mới có mà chỗ cũ không có** — đây là phần nâng từ 3 lên 4. Nói chung chung (*"thử thách mới"*) thì đúng nhưng không chứng minh được; nói cụ thể thì họ tin.
+
+| Trả lời | Interviewer nghe thấy |
+|---|---|
+| ❌ *"Cũng còn tuỳ…"* / *"Để em cân nhắc"* | *"Người này sẽ dùng offer của mình đi mặc cả."* |
+| ❌ *"Không, vì lương bên anh tốt hơn"* | Mâu thuẫn với lý do đã nêu ở BEH-008 ⇒ mất tín nhiệm cả hai câu |
+| ✅ *"Không. Vì cái em muốn không phải con số — ở chỗ cũ em làm một mảng hẹp trong một sản phẩm; ở đây em muốn chạm cả chuỗi từ BSP tới ứng dụng."* | Lý do nhất quán, có nội dung, không mặc cả |
+
+**Bẫy:** ① do dự dù chỉ một nhịp · ② lấy tiền làm lý do (phá luôn [BEH-008](#beh-008--design--)) · ③ chê công ty cũ để cho câu trả lời "mạnh hơn" — không cần, và luôn phản tác dụng.
+
+**Chốt:** *"Trả lời ngay, khớp với lý do đã nêu, và nêu một thứ cụ thể nơi mới có mà chỗ cũ không có."*
+</details>
+
 ---
 
 ## Phụ lục — chuẩn bị

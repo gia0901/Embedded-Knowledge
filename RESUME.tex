@@ -27,22 +27,22 @@
     \vspace{2pt}
     Ho Chi Minh City --- 0968.xxx.xxx \\
     \href{https://www.linkedin.com/in/gia-nguyen-6a007b294/}{LinkedIn} \textbar{} \href{mailto:gianguyen.xxx@gmail.com}{gianguyen.hcmut@gmail.com} \\
-    \href{https://github.com/gia0901}{github.com/gia0901}
 \end{minipage}
 
 \vspace{4pt}
 
 \section*{SUMMARY}
-Software Engineer with 3 years of experience in developing C/C++ system software for Smart TVs and Enterprise products (ARM-based SoC). Work spans the full system layer: C++ shared-library interfaces and HAL, platform/character drivers, device tree, cross-compilation, and kernel migration (5.10 → 6.12) — including cross-layer debugging from user space down into the driver. Focused on resource-constrained, performance-critical systems.
+Software Engineer with 3 years of experience in C/C++ system software for Smart TVs and Enterprise Display products (ARM-based SoC). 
+Work spans the full system layer: C++ shared-library interfaces and HAL, kernel drivers, device tree, cross-compilation --- With a focus on 
+resource-constrained, performance-critical systems.
 
 \section*{TECHNICAL SKILLS}
 \begin{itemize}
     \item \textbf{Languages:} C, Modern C++ (11,14,17)
-    \item \textbf{System Programming:} IPC (POSIX message queue, shared libraries), Multi-threading, Shared libraries
+    \item \textbf{System Programming:} IPC (POSIX message queue), Multi-threading, Shared libraries
     \item \textbf{Embedded Linux:} HAL, Kernel/platform drivers, Device Tree
     \item \textbf{Debugging:} GDB, dmesg, cross-layer (user-space \& kernel-space) debugging
     \item \textbf{Build \& Tooling:} CMake, Makefile, Yocto/BitBake, Git, Perforce, Jira/Confluence
-    \item \textbf{AI-Assisted Development:} Custom agent skills for code generation, review \& unit testing
 \end{itemize}
 
 \section*{WORK EXPERIENCE}
@@ -50,11 +50,14 @@ Software Engineer with 3 years of experience in developing C/C++ system software
 \textbf{Samsung Electronics HCMC -- Software Engineer} \hfill Jan 2024 -- Present \\[2pt]
 \textbf{Core Responsibilities}
 \begin{itemize}
-\item Developed C/C++ system-software for Display Enhancement components: Dimming, FRC, and TCON
-\item Implemented and extended C++ interfaces and libraries with product-specific logic branching, allowing a unified interface while supporting multiple hardware configurations
-\item Implemented and extended kernel-level drivers (HAL) for SoC interaction, using an OOP-style function-pointer to support multiple chipsets behind one interface.
-\item Ported and maintained kernel drivers across chipset generations for (2026--2027) products, covering new hardware bring-up, device tree updates, and a Linux 5.10 $\rightarrow$ 6.12 kernel migration while keeping backward compatibility with the 5.10 branch.
-\item Customized and applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation, cutting time authoring for a code submission from ~1 day to 1$\rightarrow$2 hours.
+\item Developed C/C++ system software for display enhancement (dimming, frame-rate control,
+      timing control) across the full stack --- C++ shared-library interfaces down to
+      kernel-level HAL drivers talking to the SoC
+\item Developed and extended one interface across chipsets: the library
+      selects its implementation at boot from board configuration, the kernel driver
+      dispatches through a function-pointer table --- applications above stay unchanged
+\item Ported and maintained kernel drivers across chipset generations for 2026--2027 products, covering new hardware bring-up, device tree updates, and a Linux 5.10 $\rightarrow$ 6.12 kernel migration while keeping backward compatibility with the 5.10 branch.
+\item Customized and applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation, cutting authoring time for a code submission from ~1 day to 1--2 hours
 \item Diagnosed and resolved cross-layer issues across C++ interfaces, libraries, and kernel drivers
 \item Collaborated with R\&D Headquarters (South Korea) during business trips twice a year to support product bring-up, integration, and issue fixing toward mass-production
 \end{itemize}
@@ -64,21 +67,32 @@ Software Engineer with 3 years of experience in developing C/C++ system software
 
 \project{S-Box Signage Product (2025)}
 \begin{itemize}
-    \item Build adaptive brightness control driven by an ambient light sensor, allowing screen brightness to adjust automatically to the surrounding environment
-    \item Synchronize brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid -- with a single binary serving both standalone and synchronized modes.
+    \item Built adaptive brightness control driven by an ambient light sensor, allowing screen
+      brightness to adjust automatically to the surrounding environment without flickering
+      when lighting changes quickly
+    \item Synchronized brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid -- with a single binary serving both standalone and synchronized modes
+\end{itemize}
+
+\project{Kernel Driver Load-Time Optimization (2025--2026)}
+\begin{itemize}
+    \item Cut driver startup time on newer models from 3--4 seconds back to under
+          0.5 second, after tracing the slowdown to drivers being loaded one at a time
+          and interrupted by other startup work
+    \item Chose the fix by measuring two solutions --- loading in parallel and
+          raising scheduling priority --- and verified it over 100 boot cycles
 \end{itemize}
 
 \project{Samsung Display Manager (Windows Application)}
 \begin{itemize}
-    \item Developed a ``Preset'' feature, allowing users to quickly save and switch to their favorite settings on Samsung monitors
-    \item Used JSON to store all application configurations, so they can be saved and restored across restarts
-    \item Applied MVVM architecture using Modern C++ (11,14,17)
+    \item Built the ``Preset'' feature for a Windows monitor-settings app (MVVM, C++17) ---
+          users can save their preferred display settings and restore them across restarts
 \end{itemize}
 
 \project{Chip Porting Internal Tool}
 \begin{itemize}
-    \item Developed Python-based automation tools for driver and library porting workflows, reducing manual effort by more than 50\%
-    \item Automated build system updates (CMake, Makefile) and source adaptation across multiple hardware platforms
+    \item Automated driver/library porting with Python tooling --- build-system updates
+          (CMake, Makefile) and source adaptation across chipset platforms ---
+          reducing manual effort by more than 50\%
 \end{itemize}
 
 \section*{EDUCATION}
