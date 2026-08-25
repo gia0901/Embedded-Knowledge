@@ -1,0 +1,116 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage[left=0.68in,right=0.68in,top=0.42in,bottom=0.38in]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\setlist[itemize]{leftmargin=1.3em, itemsep=0.8pt, topsep=1.5pt, parsep=0pt, partopsep=0pt}
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\vspace{1pt}\titlerule]
+\titlespacing*{\section}{0pt}{6pt}{3pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1.5pt}
+\linespread{1.02}
+
+% project sub-heading inside Selected Contributions
+\newcommand{\project}[1]{\vspace{2pt}\textit{#1}\vspace{1pt}}
+
+\begin{document}
+\pagestyle{empty}
+
+\begin{minipage}[t]{0.55\textwidth}
+    {\LARGE \textbf{NGUYEN HOANG GIA}} \\[5pt]
+    {\large \textbf{C++ System Software Engineer}}
+\end{minipage}%
+\begin{minipage}[t]{0.45\textwidth}
+    \raggedleft
+    \vspace{2pt}
+    Ho Chi Minh City --- 0968.001.529 \\
+    \href{https://www.linkedin.com/in/gia-nguyen-6a007b294/}{LinkedIn} \textbar{} \href{mailto:gianguyen.hcmut@gmail.com}{gianguyen.hcmut@gmail.com}
+\end{minipage}
+
+\vspace{4pt}
+
+\section*{SUMMARY}
+Software Engineer with 3 years of experience building C++ system software and shared libraries for Smart TV and
+enterprise display products. Work spans API design across hardware variants, multi-threaded control logic, and
+IPC between components --- reaching down into kernel drivers when a problem crosses that boundary. Focused on
+resource-constrained, performance-critical systems.
+
+\section*{TECHNICAL SKILLS}
+\begin{itemize}
+    \item \textbf{Languages:} Modern C++ (11/14/17), C, Python
+    \item \textbf{C++ \& API Design:} Shared-library interfaces, RAII, design patterns (factory, dispatch table)
+    \item \textbf{Concurrency \& IPC:} Multi-threading, mutex/condition variable,
+    POSIX message queue, shared memory
+    \item \textbf{Embedded Linux:} HAL, Kernel/platform drivers, Device Tree
+    \item \textbf{Debugging:} cross-layer (user-space $\leftrightarrow$ kernel-space), GDB, dmesg/printk
+    \item \textbf{Build \& Tooling:} CMake, Makefile, Git, Perforce, Yocto/BitBake, Jira/Confluence
+\end{itemize}
+
+\section*{WORK EXPERIENCE}
+
+\textbf{Samsung Electronics HCMC -- Software Engineer} \hfill Jan 2024 -- Present \\[2pt]
+\textbf{Core Responsibilities}
+\begin{itemize}
+\item Designed and maintained C++ shared-library interfaces --- one interface across chipsets
+      and product variants: the library selects its implementation at boot from board
+      configuration, so applications stay unchanged
+\item Developed C/C++ system software for display enhancement (dimming, frame-rate control,
+      timing control), from the C++ API layer down to the kernel HAL drivers behind it
+\item Ported and maintained kernel drivers across chipset generations, including a
+      Linux 5.10 $\rightarrow$ 6.12 migration while staying compatible with the 5.10 branch
+\item Applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation,
+      cutting authoring time for a code submission from about 1 day to 1--2 hours
+\item Supported product bring-up, integration, and issue fixing at R\&D Headquarters
+      (South Korea) on twice-yearly trips, through to mass-production
+\end{itemize}
+
+\vspace{2pt}
+\textbf{Selected Contributions}
+
+\project{S-Box Signage Product (2025)}
+\begin{itemize}
+    \item Built adaptive brightness control on a dedicated worker thread driven by a condition
+          variable, with rate-limited transitions so the screen adapts smoothly instead of
+          flickering when lighting changes quickly
+    \item Synchronized brightness across multiple S-Box units over POSIX message queues, so a
+          multi-panel video wall renders as one uniform screen instead of a visible grid ---
+          with a single binary serving both standalone and synchronized modes
+\end{itemize}
+
+\project{Driver Load-Time Optimization (2025--2026)}
+\begin{itemize}
+    \item Cut driver startup time from 3--4 seconds back to under 0.5 second by loading three
+          drivers in parallel instead of one after another, and raising their scheduling
+          priority so they were no longer interrupted during boot
+    \item Chose the fix by measuring two solutions --- loading in parallel and
+          raising scheduling priority --- and verified it over 100 boot cycles
+\end{itemize}
+
+\project{Samsung Display Manager (Windows Application)}
+\begin{itemize}
+    \item Built the ``Preset'' feature for a Windows monitor-settings app --- MVVM in modern C++,
+          with JSON-backed configuration restored across restarts and a try-then-cancel flow
+          that rolls back to the previous state
+\end{itemize}
+
+\project{Porting Internal Tool (2026)}
+\begin{itemize}
+    \item Automated driver/library porting with Python tooling --- build-system updates
+          (CMake, Makefile) and source adaptation across chipset platforms ---
+          reducing manual effort by more than 50\%
+\end{itemize}
+
+\section*{EDUCATION}
+\textbf{Ho Chi Minh University of Technology -- VNU HCM} \hfill Ho Chi Minh City \\
+Bachelor of Engineering -- GPA: 7.8 \hfill Nov 2023
+
+\section*{ACHIEVEMENTS}
+\begin{itemize}
+    \item Best Employee of the Quarter -- Q1 2026
+    \item Language: English -- TOEIC: 895/990 (2024)
+    \item Samsung Software Certificate (Data Structures \& Algorithms) -- Advanced Level
+\end{itemize}
+
+\end{document}

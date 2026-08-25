@@ -25,23 +25,24 @@
 \begin{minipage}[t]{0.45\textwidth}
     \raggedleft
     \vspace{2pt}
-    Ho Chi Minh City --- 0968.xxx.xxx \\
-    \href{https://www.linkedin.com/in/gia-nguyen-6a007b294/}{LinkedIn} \textbar{} \href{mailto:gianguyen.xxx@gmail.com}{gianguyen.hcmut@gmail.com} \\
+    Ho Chi Minh City --- 0968.001.529 \\
+    \href{https://www.linkedin.com/in/gia-nguyen-6a007b294/}{LinkedIn} \textbar{} \href{mailto:gianguyen.hcmut@gmail.com}{gianguyen.hcmut@gmail.com}
 \end{minipage}
 
 \vspace{4pt}
 
 \section*{SUMMARY}
-Software Engineer with 3 years of experience in C/C++ system software for Smart TVs and Enterprise Display products (ARM-based SoC). 
-Work spans the full system layer: C++ shared-library interfaces and HAL, kernel drivers, device tree, cross-compilation --- With a focus on 
+Software Engineer with 3 years of experience in C/C++ system software for Smart TVs and Enterprise display products (ARM-based SoC). 
+Work spans the full system layer: C++ shared-library interfaces and HAL, kernel drivers, device tree, cross-compilation --- with a focus on 
 resource-constrained, performance-critical systems.
 
 \section*{TECHNICAL SKILLS}
 \begin{itemize}
-    \item \textbf{Languages:} C, Modern C++ (11,14,17)
-    \item \textbf{System Programming:} IPC (POSIX message queue), Multi-threading, Shared libraries
+    \item \textbf{Languages:} C, Modern C++ (11/14/17), Python
+    \item \textbf{System Programming:} IPC (POSIX message queue, shared memory),
+    Multi-threading, Shared libraries
     \item \textbf{Embedded Linux:} HAL, Kernel/platform drivers, Device Tree
-    \item \textbf{Debugging:} GDB, dmesg, cross-layer (user-space \& kernel-space) debugging
+    \item \textbf{Debugging:} cross-layer (user-space $\leftrightarrow$ kernel-space), GDB, dmesg/printk
     \item \textbf{Build \& Tooling:} CMake, Makefile, Yocto/BitBake, Git, Perforce, Jira/Confluence
 \end{itemize}
 
@@ -56,8 +57,8 @@ resource-constrained, performance-critical systems.
 \item Developed and extended one interface across chipsets: the library
       selects its implementation at boot from board configuration, the kernel driver
       dispatches through a function-pointer table --- applications above stay unchanged
-\item Ported and maintained kernel drivers across chipset generations for 2026--2027 products, covering new hardware bring-up, device tree updates, and a Linux 5.10 $\rightarrow$ 6.12 kernel migration while keeping backward compatibility with the 5.10 branch.
-\item Customized and applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation, cutting authoring time for a code submission from ~1 day to 1--2 hours
+\item Ported and maintained kernel drivers across chipset generations for 2026--2027 products, covering new hardware bring-up, device tree updates, and a Linux 5.10 $\rightarrow$ 6.12 kernel migration while keeping backward compatibility with the 5.10 branch
+\item Applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation, cutting authoring time for a code submission from about 1 day to 1--2 hours
 \item Diagnosed and resolved cross-layer issues across C++ interfaces, libraries, and kernel drivers
 \item Collaborated with R\&D Headquarters (South Korea) during business trips twice a year to support product bring-up, integration, and issue fixing toward mass-production
 \end{itemize}
@@ -70,7 +71,7 @@ resource-constrained, performance-critical systems.
     \item Built adaptive brightness control driven by an ambient light sensor, allowing screen
       brightness to adjust automatically to the surrounding environment without flickering
       when lighting changes quickly
-    \item Synchronized brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid -- with a single binary serving both standalone and synchronized modes
+    \item Synchronized brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid --- with a single binary serving both standalone and synchronized modes
 \end{itemize}
 
 \project{Kernel Driver Load-Time Optimization (2025--2026)}
@@ -88,7 +89,7 @@ resource-constrained, performance-critical systems.
           users can save their preferred display settings and restore them across restarts
 \end{itemize}
 
-\project{Chip Porting Internal Tool}
+\project{Porting Internal Tool (2026)}
 \begin{itemize}
     \item Automated driver/library porting with Python tooling --- build-system updates
           (CMake, Makefile) and source adaptation across chipset platforms ---
@@ -101,7 +102,7 @@ Bachelor of Engineering -- GPA: 7.8 \hfill Nov 2023
 
 \section*{ACHIEVEMENTS}
 \begin{itemize}
-    \item Best Employee of the Quarter 1 -- Q1 2026
+    \item Best Employee of the Quarter -- Q1 2026
     \item Language: English -- TOEIC: 895/990 (2024)
     \item Samsung Software Certificate (Data Structures \& Algorithms) -- Advanced Level
 \end{itemize}
