@@ -9,10 +9,36 @@
 
 ### 1.1. Vì sao PCI khác I2C/SPI: tự liệt kê
 
-PCI/PCIe **tự mô tả** qua **configuration space** (256 byte, PCIe mở rộng 4KB) mỗi function: **Vendor ID / Device ID**, Class code, và **BAR** (Base Address Register). Kernel **quét bus** lúc boot (bus/device/function — BDF), đọc VID/DID, và **gán địa chỉ** cho các BAR → không cần device tree khai (khác I2C/SPI vốn *không discoverable* nên phải khai trong DT). Đây là ý so sánh hay bị hỏi.
+PCI/PCIe **tự mô tả** qua **configuration space** (256 byte, PCIe mở rộng 4 KB) mỗi function: **Vendor ID / Device ID**, Class code, và **BAR** (Base Address Register). Kernel **quét bus** lúc boot (bus/device/function — BDF), đọc VID/DID, và **gán địa chỉ** cho các BAR → không cần device tree khai.
 
 - **BAR**: mỗi BAR yêu cầu một vùng địa chỉ (MMIO hoặc I/O port) kích thước bao nhiêu; kernel/firmware map vào không gian địa chỉ → driver `ioremap` BAR để chạm thanh ghi thiết bị.
 - **Config space** truy cập qua `pci_read_config_dword()` v.v.
+
+**⭐ Vì sao I2C/SPI KHÔNG làm được điều đó — cơ chế, không phải quy ước:**
+
+| | PCI / USB | I2C / SPI |
+|---|---|---|
+| Có kênh hỏi danh tính không? | ✅ **Có** — config space (PCI) / descriptor (USB) nằm ở **vị trí chuẩn hoá**, mọi thiết bị đều phải trả lời | ❌ **Không** — protocol chỉ có *"ghi byte tới địa chỉ X"*, **không có khái niệm "anh là ai"** |
+| Dò thử được không? | ✅ Quét BDF là thao tác an toàn | 🔴 **Nguy hiểm** — ghi mù vào một địa chỉ I2C lạ có thể **kích hoạt lệnh thật** của chip đó; SPI thì **không có địa chỉ**, chỉ có chân CS |
+| ⇒ Hệ quả | Kernel tự dựng được cây thiết bị | **Ai đó phải khai** — đó chính là device tree |
+
+⇒ Device tree tồn tại **không phải vì ARM thích XML**, mà vì **I2C/SPI/memory-mapped không có cơ chế tự khai báo ở tầng protocol**. Ai đó phải nói cho kernel biết *"ở địa chỉ 0x48 trên bus i2c-1 có một cảm biến TMP102"*.
+
+### ⚠️ `self-enumeration` **KHÔNG** phải `hotplug` — chỗ nhầm phổ biến nhất
+
+Hai tính chất **độc lập nhau**, và tính chất **quyết định** cho câu hỏi *"vì sao không cần device tree"* là **cái thứ nhất**:
+
+| | **Self-enumeration** | **Hotplug** |
+|---|---|---|
+| Nghĩa là | *"Kernel **hỏi được** thiết bị: anh là ai?"* | *"Cắm/rút **lúc đang chạy** vẫn hoạt động"* |
+| Quyết định điều gì | **Có cần khai trong DT không** | Có cần xử lý sự kiện add/remove runtime không |
+| PCIe trên nhúng | ✅ **có** | ❌ **thường KHÔNG** — chip hàn chết trên board, không ai rút ra |
+| USB | ✅ có | ✅ có |
+| I2C/SPI | ❌ không | ❌ không |
+
+⇒ **PCIe hàn chết trên board vẫn không cần khai vào device tree** — vì nó *self-enumerating*, dù chẳng bao giờ *hotplug*. Trả lời *"vì chúng hotplug"* là **đúng hiện tượng, sai cơ chế**, và interviewer sẽ hỏi ngay *"thế PCIe hàn chết thì sao?"*
+
+📌 **Câu chốt:** *"Không cần device tree vì chúng **tự khai báo được**, không phải vì chúng cắm rút được. Hai chuyện khác nhau."*
 
 ### 1.2. PCI driver — khung
 
@@ -100,6 +126,70 @@ Quan trọng cho embedded: board của bạn đóng vai **USB device** (cắm v�
 ### 2.5. Debug USB
 
 `lsusb` / `lsusb -t` (cây thiết bị + driver bind), `dmesg` (enumerate/disconnect), **usbmon** + Wireshark (bắt gói USB), `/sys/kernel/debug/usb`. Lỗi hay gặp: sai endpoint, quên `usb_submit_urb` re-submit cho interrupt-in, thiếu quyền (udev rule), UDC/gadget không match.
+
+---
+
+## Phần 3 — Khi nào dùng gì (quyết định thiết kế)
+
+### 3.1 Board của bạn là **host** hay **device**?
+
+Câu hỏi đầu tiên, và nó quyết định toàn bộ phần mềm bạn phải viết:
+
+| | Board là **HOST** | Board là **DEVICE** (gadget) |
+|---|---|---|
+| Ai điều phối | Board của bạn | **Máy kia** (PC) |
+| Bạn viết gì | USB **host driver** (URB) hoặc dùng driver class sẵn | **Gadget function** + cấu hình UDC |
+| Ví dụ | Board đọc máy quét USB cắm vào nó | 🎯 **Máy quét cắm vào PC** · thiết bị phát console qua USB |
+| Phần cứng cần | Cổng host + cấp nguồn cho thiết bị | **UDC** (USB Device Controller) trong SoC |
+
+⭐ **Với thiết bị công nghiệp cầm tay (máy quét, máy đọc mã), vai trò thường là DEVICE** — nên **gadget mới là phần đáng đầu tư**, không phải host driver.
+
+### 3.2 Chọn gadget function nào — đừng viết mới nếu có sẵn
+
+| Nhu cầu | Dùng | Trên PC hiện ra là |
+|---|---|---|
+| Cổng COM ảo để debug/điều khiển | **`g_serial`** (CDC-ACM) | `/dev/ttyACM0` — **không cần driver riêng** |
+| Cho PC truy cập file trên thiết bị | `g_mass_storage` | Ổ USB |
+| Mạng qua cáp USB | `g_ether` (CDC-ECM/NCM/RNDIS) | Card mạng |
+| Nút bấm / máy quét giả bàn phím | HID | Bàn phím — **cắm là chạy, mọi OS** |
+| Nhiều chức năng cùng lúc | **composite qua `configfs`** | Nhiều thiết bị |
+
+⚠️ **Chỉ viết gadget function riêng khi không function chuẩn nào vừa.** Dùng class chuẩn nghĩa là **PC không cần cài driver** — đó thường là yêu cầu sản phẩm quan trọng hơn mọi tối ưu kỹ thuật.
+
+### 3.3 INTx hay MSI/MSI-X?
+
+| | INTx (legacy) | MSI-X |
+|---|---|---|
+| Cơ chế | Kéo một trong 4 đường IRQ vật lý | Thiết bị **ghi một message vào bộ nhớ** |
+| Chia sẻ | ✅ **có** ⇒ handler phải kiểm *"có phải của mình không"*, trả `IRQ_NONE` nếu không | ❌ không — mỗi vector một chủ |
+| Số vector | 4, dùng chung cả hệ | tới **2048** |
+| Đua với DMA | 🔴 **Có** — ngắt có thể tới **trước khi** dữ liệu DMA vào RAM xong | ✅ Không — message đi **cùng đường** với dữ liệu, tới sau ⇒ đảm bảo thứ tự |
+
+⭐ **Dòng cuối là lý do kỹ thuật thật để chọn MSI-X**, không phải "vì nó mới hơn": nó **loại bỏ một lớp bug đua** giữa ngắt và DMA. Với INTx bạn phải tự đọc thanh ghi để chắc dữ liệu đã tới.
+
+⇒ **Mặc định dùng `PCI_IRQ_MSIX | PCI_IRQ_MSI | PCI_IRQ_INTX`** — xin cái tốt nhất, tự lùi về INTx nếu phần cứng/firmware không hỗ trợ.
+
+---
+
+## Phần 4 — ⚠️ Bẫy thực chiến
+
+**① Nhầm `self-enumeration` với `hotplug`.** Xem §1.1 — đây là lỗi phổ biến nhất và interviewer hay khoan đúng đó (*"thế PCIe hàn chết trên board thì sao?"*).
+
+**② Handler INTx quên trả `IRQ_NONE`.** IRQ chia sẻ mà handler nào cũng trả `IRQ_HANDLED` ⇒ kernel tưởng đã xử lý; nếu thiết bị thật vẫn giữ đường ngắt thì **bão ngắt**, tới ngưỡng kernel in `nobody cared` rồi **tắt luôn IRQ đó** — mọi thiết bị dùng chung đường ngắt chết theo.
+
+**③ Quên `pci_set_master()`** ⇒ DMA im lặng không chạy. Thiết bị không báo lỗi, chỉ là **không có gì xảy ra** — rất tốn thời gian dò.
+
+**④ `dma_set_mask` sai độ rộng.** Khai 64-bit trong khi thiết bị chỉ địa chỉ hoá được 32-bit ⇒ DMA ghi vào **vùng nhớ sai**, hỏng dữ liệu ngẫu nhiên ở chỗ khác. Khai thiếu (32 khi thiết bị chịu được 64) thì chỉ chậm hơn vì phải đi qua bounce buffer.
+
+**⑤ USB interrupt-in quên `usb_submit_urb()` lại trong callback.** Nhận đúng **một** gói rồi im. Triệu chứng: *"chuột chỉ chạy một lần"*.
+
+**⑥ Bind USB driver ở mức thiết bị thay vì mức interface.** USB bind ở **interface** — một thiết bị composite (vd webcam = video + audio) có nhiều interface do **nhiều driver khác nhau** quản.
+
+**⑦ Tưởng cứ cắm USB là được cấp đủ dòng.** Thiết bị phải **khai `bMaxPower`** trong descriptor và host có quyền từ chối. Bug này chỉ lộ ra khi cắm vào hub không nguồn.
+
+**⑧ Rút thiết bị USB giữa lúc URB đang bay.** `disconnect()` phải `usb_kill_urb()` cho **mọi** URB đang chờ, nếu không thì callback chạy trên bộ nhớ đã giải phóng.
+
+**⑨ Không xử lý được `probe` chạy nhiều lần.** PCI hotplug hoặc USB cắm lại ⇒ `probe` gọi lại. Dùng `devm_*`/`pcim_*` để tài nguyên tự dọn theo device, tránh rò qua mỗi lần cắm rút.
 
 ---
 

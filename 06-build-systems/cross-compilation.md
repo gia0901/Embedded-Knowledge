@@ -88,6 +88,62 @@ cmake --build build
 - **Thư viện phụ thuộc** cũng phải có bản cross-compiled cho target (trong sysroot) — không dùng `apt install` của host được.
 - **Float**: hard-float vs soft-float ABI phải khớp toàn bộ (lẫn lộn → link/runtime lỗi).
 
+### ⭐ 5.1 Ba kiểu lỗi hay gặp — và chúng nói lên điều gì
+
+| Thông báo | Sai ở đâu | Vì sao |
+|---|---|---|
+| `cannot execute binary file: Exec format error` | Chạy binary **target** trên **host** | Kiến trúc khác nhau. Kiểm bằng `file myapp` |
+| 🔴 **`No such file or directory`** khi chạy trên target, **mà file rõ ràng có** | **Thiếu interpreter** | Xem §5.2 — đây là câu hỏi kinh điển |
+| `undefined reference to ...` lúc link | Link nhầm lib của **host** | Toolchain không trỏ đúng sysroot |
+
+### ⭐ 5.2 `not found` khi file rõ ràng tồn tại — cơ chế
+
+```
+# tren target
+$ ls -l /usr/bin/myapp
+-rwxr-xr-x 1 root root 21384 myapp        <- FILE CO THAT
+$ ./myapp
+-sh: ./myapp: No such file or directory   <- ??? 
+```
+
+**Thông báo nói dối.** Thứ *"không tìm thấy"* **không phải `myapp`** — mà là **chương trình thông dịch** ghi trong header ELF của nó.
+
+Binary động link luôn có trường **`PT_INTERP`** trỏ tới **dynamic loader** (vd `/lib/ld-linux-armhf.so.3`). Kernel đọc trường đó **trước khi** chạy binary; loader không tồn tại ⇒ `execve()` trả **`ENOENT`** ⇒ shell in *"No such file or directory"* — **về file loader, không phải về binary của bạn**.
+
+```bash
+readelf -l myapp | grep -A1 INTERP        # target can loader NAO
+#   [Requesting program interpreter: /lib/ld-linux-armhf.so.3]
+ls -l /lib/ld-linux-armhf.so.3            # tren TARGET: co that khong?
+file myapp                                # kien truc + dong/tinh
+ldd myapp                                 # (chay tren target) lib nao thieu
+```
+
+**Ba nguyên nhân, theo thứ tự hay gặp:**
+
+| Nguyên nhân | Dấu hiệu | Cách sửa |
+|---|---|---|
+| **Sai ABI**: build hard-float, rootfs soft-float (hoặc ngược lại) | `readelf -l` trỏ `ld-linux-armhf.so.3` mà target chỉ có `ld-linux.so.3` | Dùng đúng tuple: `arm-linux-gnueabihf-` vs `arm-linux-gnueabi-` |
+| **Sai libc**: build với glibc, rootfs dùng **musl** | Loader tên khác hẳn (`ld-musl-armhf.so.1`) | Dùng toolchain khớp rootfs |
+| **Sai kiến trúc** | `file` báo `x86-64` | Sai toolchain hoàn toàn |
+
+📌 **Cách kiểm nhanh có phải lỗi loader không:** build tĩnh (`-static`). Chạy được ⇒ **chắc chắn** là vấn đề loader/lib động, không phải kiến trúc.
+
+**Chốt:** *"`not found` ở đây gần như luôn là **loader** không tìm thấy, không phải binary. `readelf -l` xem nó đòi loader nào, rồi kiểm trên rootfs xem loader đó có không — thường là lệch hard-float/soft-float hoặc glibc/musl."*
+
+### 5.3 ⚠️ Bẫy khác
+
+**① `pkg-config` trả đường dẫn của HOST.** `pkg-config --cflags` mặc định đọc `/usr/lib/pkgconfig` của máy build ⇒ header sai. → Đặt `PKG_CONFIG_SYSROOT_DIR` + `PKG_CONFIG_LIBDIR`, hoặc dùng `arm-linux-gnueabihf-pkg-config`.
+
+**② `./configure` chạy try-run** để dò tính chất target — nhưng **không chạy được binary target trên host**. → Truyền `--host=` đúng (báo cho autotools biết đang cross) và khai kết quả thủ công qua **cache file** (`ac_cv_*=yes`).
+
+**③ Quên `--host=` mà chỉ đặt `CC=`** ⇒ autotools tưởng đang build native, chọn sai đủ thứ.
+
+**④ Trộn lib từ nhiều sysroot** ⇒ link được nhưng crash lúc chạy vì lệch version symbol.
+
+**⑤ `CMAKE_FIND_ROOT_PATH` chưa đặt** ⇒ CMake tìm thấy lib của host và link vào — xem toolchain file ở §4.
+
+**⑥ Test bằng QEMU rồi tin là xong.** QEMU giả lập CPU, **không** giả lập phần cứng thật, timing, hay cache. Vẫn phải chạy trên board.
+
 ---
 
 ## 6. Yocto vs Buildroot — tạo cả hệ điều hành nhúng

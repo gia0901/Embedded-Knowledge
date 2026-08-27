@@ -748,6 +748,10 @@ PCI/USB **tự liệt kê** (self-enumerating): PCI có **configuration space** 
 <details><summary>Đáp án</summary>
 
 Driver khai `pci_driver` với `id_table` (Vendor/Device ID) + `MODULE_DEVICE_TABLE(pci,…)`; kernel match ID quét được → gọi `probe(pdev)`. Trong probe: `pci_enable_device` → `pci_request_regions` (xin quyền BAR) → `pci_iomap(pdev, bar, 0)` map **BAR** thành MMIO → `pci_set_master` (cho phép DMA) → `dma_set_mask` → xin IRQ → đăng ký subsystem. **BAR** (Base Address Register, trong config space) khai thiết bị cần vùng địa chỉ (MMIO/IO) kích thước bao nhiêu; kernel/firmware gán địa chỉ, driver `ioremap` để chạm thanh ghi. Ưu tiên `pcim_*`/`devm_*` để tự dọn.
+
+**⚠️ Bẫy:** (1) quên **`pci_set_master`** ⇒ DMA im lặng không chạy ([DRV-022](drivers-embedded.md)); (2) `probe` **chạy nhiều lần** (hotplug/cắm lại) mà cấp phát tay ⇒ rò tài nguyên qua mỗi lần — dùng `devm_*`; (3) quên `MODULE_DEVICE_TABLE` ⇒ module không tự nạp, phải `insmod` tay và triệu chứng giống *"driver không nhận thiết bị"*; (4) `probe` trả 0 khi thật ra đã hỏng ⇒ kernel tưởng bind thành công, thiết bị chết câm.
+
+**Chốt:** *"BAR là thiết bị **xin** vùng địa chỉ bao lớn; kernel **gán** địa chỉ thật; driver `ioremap` để chạm. Nên trong probe thứ tự là enable → request_regions → iomap → set_master → set_mask → xin IRQ."*
 </details>
 
 #### DRV-021 · 🟠 · concept · ⭐ · [→ pci-usb-drivers §1.3](../../../05-drivers-device-tree/pci-usb-drivers.md)
@@ -788,7 +792,31 @@ request_irq(irq, my_isr, 0, "mydrv", priv);      // ✅ MSI/MSI-X: KHÔNG cần 
 **DMA trên PCI hoạt động thế nào? Vai trò `pci_set_master`?**
 <details><summary>Đáp án</summary>
 
-PCI device là **bus master** — tự đọc/ghi RAM không cần CPU; `pci_set_master()` bật khả năng đó. Driver dùng cùng DMA API: `dma_alloc_coherent` (descriptor ring, uncached) + `dma_map_single/sg` (payload streaming, kernel flush/invalidate cache); `dma_set_mask_and_coherent` khai độ rộng địa chỉ device chịu được (32/64-bit) để kernel cấp buffer trong tầm. PCIe thường qua **IOMMU** (dịch + bảo vệ địa chỉ). Vẫn phải lo cache maintenance nếu hệ không coherent. *(Nền DMA: [BSP-011](bsp.md).)*
+**Cơ chế:** PCI device là **bus master** — nó **tự phát giao dịch đọc/ghi RAM**, không cần CPU chép. `pci_set_master()` bật bit Bus Master Enable trong config space; **không gọi thì thiết bị bị chặn ở tầng bus**.
+
+```c
+pci_set_master(pdev);                                    // (1) cho phep lam bus master
+dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)); // (2) khai do rong dia chi
+ring = dma_alloc_coherent(&pdev->dev, sz, &ring_dma, GFP_KERNEL);  // descriptor ring
+dma = dma_map_single(&pdev->dev, buf, len, DMA_FROM_DEVICE);       // payload streaming
+//  ... KHONG duoc dung `buf` trong khoang nay ...
+dma_unmap_single(&pdev->dev, dma, len, DMA_FROM_DEVICE);           // moi duoc dung lai
+```
+
+| API | Dùng cho | Vì sao |
+|---|---|---|
+| `dma_alloc_coherent` | **Descriptor ring** — CPU và device **cùng đọc/ghi liên tục** | Bộ nhớ uncached/coherent ⇒ không phải flush tay mỗi lần chạm |
+| `dma_map_single/sg` | **Payload** — trao tay một lần rồi lấy lại | Rẻ hơn; kernel lo flush/invalidate cache đúng chiều |
+
+**⭐ "Vì sao" hai tầng — vì sao có `dma_set_mask`:**
+- *Tầng nông*: *"để khai thiết bị chịu được 32 hay 64 bit."*
+- *Tầng sâu*: nó quyết định kernel **cấp buffer ở đâu**. Khai 64-bit cho một thiết bị chỉ địa chỉ hoá được 32-bit ⇒ kernel cấp buffer trên 4 GB ⇒ device **ghi vào địa chỉ bị cắt cụt** ⇒ **hỏng vùng nhớ của thứ khác**, ngẫu nhiên, xa chỗ gây lỗi. Khai thiếu (32 khi thiết bị chịu 64) thì chỉ **chậm hơn** — kernel phải đi qua **bounce buffer** (chép thêm một lần). ⇒ **Sai theo hai chiều có giá khác hẳn nhau**: một bên là hỏng dữ liệu, một bên là chậm.
+
+**⚠️ Bẫy:** (1) 🔴 **quên `pci_set_master()`** ⇒ DMA **im lặng không chạy**, thiết bị không báo lỗi, chỉ là *"không có gì xảy ra"* — rất tốn thời gian dò; (2) **CPU chạm buffer trong khoảng map–unmap** ⇒ đọc dữ liệu cũ hoặc ghi đè cái device vừa ghi; (3) dùng bộ nhớ **stack** làm buffer DMA ⇒ không đảm bảo alignment/liền vật lý; (4) sai chiều `DMA_TO_DEVICE`/`DMA_FROM_DEVICE` ⇒ kernel flush sai phía, dữ liệu hỏng chỉ trên hệ **không coherent** (chạy đúng trên x86, hỏng trên ARM); (5) quên `dma_unmap_*` ⇒ rò IOMMU mapping, chạy lâu thì cạn.
+
+📌 **IOMMU** (PCIe thường có): dịch địa chỉ **và** giới hạn device chỉ ghi được vào vùng đã map ⇒ một driver lỗi không phá được cả RAM. Nhưng nó **không** thay `dma_set_mask` — vẫn phải khai đúng.
+
+**Chốt:** *"Device tự ghi RAM, nên hai việc phải làm đúng là **cho phép nó** (`pci_set_master`) và **nói cho kernel biết nó với tới đâu** (`dma_set_mask`). Quên cái đầu thì im lặng không chạy; sai cái sau thì hỏng vùng nhớ ở chỗ khác." *(Nền DMA: [BSP-011](bsp.md).)*
 </details>
 
 #### DRV-023 · 🟡 · concept · ⭐ · [→ pci-usb-drivers §2.1](../../../05-drivers-device-tree/pci-usb-drivers.md)
@@ -803,6 +831,12 @@ USB **host-centric** (thiết bị chỉ nói khi host hỏi), host controller =
 <details><summary>Đáp án</summary>
 
 Cắm vào → host phát hiện (pull-up), **reset**, gán **address**, đọc descriptor, chọn configuration, rồi **match driver** theo **VID/PID** (driver riêng) hoặc theo **class** (HID, Mass Storage, CDC → driver class dùng chung, cắm là chạy không cần driver riêng). Sau đó driver dùng endpoint trao đổi. Đây là lý do chuột/USB stick "cắm là nhận" — dùng class driver có sẵn.
+
+**⭐ Vì sao match theo class quan trọng với sản phẩm:** nếu thiết bị **của bạn** khai đúng class chuẩn (HID, CDC-ACM, Mass Storage) thì **PC không phải cài driver** — quyết định chi phí hỗ trợ và việc có phải ký driver cho Windows hay không ([DRV-026](drivers-embedded.md)).
+
+**⚠️ Bẫy:** (1) nhầm **enumeration** (host hỏi *"anh là ai"*) với **hotplug** (cắm rút lúc chạy) — hai chuyện độc lập, và tính chất quyết định *"có cần khai device tree không"* là cái đầu ([DRV-019](drivers-embedded.md)); (2) tưởng driver bind ở mức **thiết bị** — USB bind ở mức **interface**, một webcam có thể do hai driver khác nhau quản.
+
+**Chốt:** *"Host hỏi, device trả lời — reset, gán address, đọc descriptor, rồi match theo VID/PID hoặc theo class. Khai đúng class là thứ làm 'cắm là chạy'."*
 </details>
 
 #### DRV-025 · 🟠 · concept · [→ pci-usb-drivers §2.3](../../../05-drivers-device-tree/pci-usb-drivers.md)
@@ -810,13 +844,44 @@ Cắm vào → host phát hiện (pull-up), **reset**, gán **address**, đọc 
 <details><summary>Đáp án</summary>
 
 Khai `usb_driver` với `id_table`; bind ở mức **interface** (`probe(intf, id)`). Giao tiếp qua **URB** (USB Request Block) = mô tả một lần truyền tới một endpoint: `usb_submit_urb()` **bất đồng bộ** → xong thì callback chạy (hợp streaming, phải re-submit cho interrupt-in). Bản **đồng bộ** tiện hơn cho trao đổi đơn giản: `usb_control_msg()`, `usb_bulk_msg()` (block tới khi xong/timeout). `disconnect()` khi rút.
+
+**⚠️ Bẫy:** (1) 🔴 **quên `usb_submit_urb()` lại trong callback** của interrupt-in ⇒ nhận đúng **một** gói rồi im — triệu chứng *"chuột chỉ chạy một lần"*; (2) `disconnect()` không `usb_kill_urb()` cho mọi URB đang bay ⇒ callback chạy trên bộ nhớ đã giải phóng; (3) dùng `usb_bulk_msg()` (đồng bộ, **block**) trong ngữ cảnh không được ngủ; (4) bind nhầm mức — `probe` nhận **`usb_interface`**, không phải `usb_device`.
+
+**Chốt:** *"URB là một đơn hàng gửi tới một endpoint. Bất đồng bộ thì phải tự re-submit và tự dọn khi rút; đồng bộ (`usb_bulk_msg`) tiện nhưng block."*
 </details>
 
 #### DRV-026 · 🟠 · concept · ⭐ · [→ pci-usb-drivers §2.4](../../../05-drivers-device-tree/pci-usb-drivers.md)
 **USB gadget là gì? Khi nào dùng?**
 <details><summary>Đáp án</summary>
 
-Khi board embedded của bạn đóng vai **USB device** (cắm vào PC), không phải host. Dùng **USB gadget framework** + driver **UDC** (USB Device Controller). Chọn **function**: `g_serial`/CDC-ACM (cổng COM ảo — hay dùng cho console/debug), `g_mass_storage` (ổ USB), `g_ether` (mạng qua USB), HID; ghép nhiều function qua **configfs** (composite gadget). OTG/dual-role: board vừa host vừa device tùy chiều cắm. Phân biệt rõ **host driver** (điều khiển thiết bị cắm vào) vs **gadget** (làm cho mình thành thiết bị) là điểm hay bị hỏi.
+**Cơ chế — câu hỏi đầu tiên là board của bạn đứng ở đầu nào của sợi cáp.**
+
+| | Board là **HOST** | Board là **DEVICE** (gadget) |
+|---|---|---|
+| Ai điều phối bus | **Board của bạn** | **Máy kia** (PC) — USB là host-centric, device chỉ trả lời khi được hỏi |
+| Bạn viết gì | USB **host driver** (URB) hoặc dùng class driver sẵn | **Gadget function** + cấu hình **UDC** |
+| Phần cứng cần | Cổng host + cấp nguồn cho thiết bị cắm vào | **UDC** (USB Device Controller) trong SoC |
+| Ví dụ | Board đọc một máy quét cắm vào nó | 🎯 **Máy quét cắm vào PC** · thiết bị phát console qua USB |
+
+⭐ **Với thiết bị công nghiệp cầm tay (máy quét, máy đọc mã, máy in nhãn), vai trò gần như luôn là DEVICE** ⇒ **gadget mới là phần đáng đầu tư**, không phải host driver. Nói được điều đó cho thấy bạn hiểu sản phẩm, không chỉ hiểu API.
+
+**Chọn function nào — ⭐ đừng viết mới nếu có function chuẩn:**
+
+| Nhu cầu | Function | Trên PC hiện ra là | Cần cài driver ở PC? |
+|---|---|---|---|
+| Cổng COM ảo để debug/điều khiển | **`g_serial`** (CDC-ACM) | `/dev/ttyACM0`, `COMx` | ❌ **không** |
+| Cho PC truy cập file trên thiết bị | `g_mass_storage` | Ổ USB | ❌ không |
+| Mạng qua cáp USB | `g_ether` (CDC-ECM/NCM/RNDIS) | Card mạng | 🟡 tuỳ OS |
+| Nút bấm / quét mã giả bàn phím | **HID** | Bàn phím | ❌ không — **cắm là chạy mọi OS** |
+| Nhiều chức năng cùng lúc | **composite qua `configfs`** | Nhiều thiết bị | tuỳ function |
+
+**⭐ "Vì sao" hai tầng — vì sao ưu tiên class chuẩn:**
+- *Tầng nông*: *"vì có sẵn, đỡ phải viết."*
+- *Tầng sâu*: **class chuẩn nghĩa là PC không phải cài driver.** Với sản phẩm bán ra, *"cắm vào máy khách hàng là chạy"* thường là **yêu cầu sản phẩm quan trọng hơn mọi tối ưu kỹ thuật** — nó quyết định chi phí hỗ trợ, và quyết định việc bạn có phải ký driver cho Windows hay không. Máy quét mã vạch giả HID keyboard là kinh điển: nó chạy trên mọi POS, mọi OS, không cài gì.
+
+**⚠️ Bẫy:** (1) 🔴 **nhầm gadget với host driver** — hai chiều ngược nhau, và câu hỏi *"board anh là host hay device?"* là câu interviewer dùng để kiểm bạn đã làm thật chưa; (2) tưởng chọn function là chuyện phần mềm thuần — **phải có UDC trong SoC**, chip không có thì không làm gadget được; (3) viết function riêng khi HID/CDC đã đủ ⇒ tự chuốc gánh nặng driver phía PC; (4) quên OTG/dual-role: cùng một cổng có thể đổi vai theo chiều cắm (ID pin), và phần mềm phải xử lý được cả hai.
+
+**Chốt:** *"Gadget là khi board của mình **là** thiết bị USB chứ không điều khiển thiết bị USB. Chọn function theo tiêu chí **PC có phải cài driver không** — với sản phẩm bán ra thì đó mới là ràng buộc thật."*
 </details>
 
 #### DRV-027 · 🟡 · concept · [→ pci-usb-drivers §2.5](../../../05-drivers-device-tree/pci-usb-drivers.md)

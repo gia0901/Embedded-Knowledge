@@ -37,6 +37,48 @@
 | **Tối ưu bộ nhớ & cache (C++)** — arena/PMR, alignment & padding, cache locality có SỐ ĐO | 🟠 | ✅ **đã lấp 2026-08-18** | [cpp-high-performance/](../../15-book-summaries/cpp-high-performance/) — ch. 7 (memory) + ch. 4 (cache) + ch. 3 (đo) | **Gap này trước đây KHÔNG có trong sổ** — chỉ lộ ra khi đánh giá sách mới: repo nói *"tránh heap trong đường nóng"* mà chưa nói *dùng gì thay thế*; và cache locality chỉ có **1 đoạn văn** ở [12-dsa §5](../../12-dsa/complexity-and-structures.md). |
 | **Networking chiều sâu** | 🟢 | 🟡 | [13-networking](../../13-networking/) | Topic 14 còn nhẹ. TLS handshake, HTTP/2, MQTT chi tiết nếu JD liên quan mạng. |
 
+### 🔬 Rà soát ĐỘ SÂU tài liệu (2026-08-28) — *"có tài liệu" ≠ "tài liệu đủ dày"*
+
+> **Trục gap MỚI.** Sổ này từ trước tới nay chỉ theo dõi **độ phủ** (*có tài liệu về X chưa?*). Đợt này lộ ra trục thứ hai: **độ sâu**. `yocto.md` và `pci-usb-drivers.md` đều đang ghi **✅ đã lấp** ở bảng trên — mà thực tế là **698 và 954 từ, 0 bảng, 0 bẫy**, chủ yếu là **khẳng định**: không code mẫu, không *"vì sao"*, không *"khi nào dùng / khi nào không"*.
+>
+> ⇒ Đây đúng là bài học *"độ phủ không đo được độ vững"* (plan §📍 17/08) **áp cho tài liệu** thay vì cho bank. Ô ✅ chỉ nói *"đã viết gì đó"*, không nói *"viết đủ để ôn"*.
+
+**Chuẩn tham chiếu:** `ipc-linux.md` sau khi viết lại 13/08 — 4.271 từ · 7 bảng · 14 bẫy · 6× *"vì sao"*.
+
+| File | Trước | Sau | Ghi chú |
+|---|---|---|---|
+| [yocto.md](../../06-build-systems/yocto.md) | 698 từ · 0 bảng · 0 *vì sao* · 1 bẫy | **3.238 · 75 · 10 · 10** | Thêm: bản chất *(tái lập được, không phải "build Linux")* · **khi nào KHÔNG dùng** · cú pháp override `+=` vs `:append` + **cú pháp `_` cũ im lặng không tác dụng** · sstate theo hash · 4 lệnh gỡ rối |
+| [pci-usb-drivers.md](../../05-drivers-device-tree/pci-usb-drivers.md) | 954 · 7 · 2 · 0 | **2.138 · 38 · 4 · 9** | ⭐ **`self-enumeration` ≠ `hotplug`** (bảng riêng) · vì sao I2C/SPI không tự liệt kê được · **host vs device (gadget)** · MSI-X chống đua với DMA |
+| [device-tree.md](../../05-drivers-device-tree/device-tree.md) | 1.128 · 14 · 1 · 0 | **2.190 · 28 · — · 8** | ⭐ **`status="okay"` KHÔNG đủ** (4 nhóm tài nguyên) · **`-EPROBE_DEFER`** · overlay · **quy trình debug DT** + bảng chẩn theo triệu chứng |
+| [cross-compilation.md](../../06-build-systems/cross-compilation.md) | 917 · 19 · 3 · 0 | **1.474 · 29 · — · 6** | ⭐ Cơ chế **`not found` = thiếu interpreter** (`PT_INTERP`) · 3 nguyên nhân · phép thử `-static` một bước |
+| [rtos-vs-linux.md](../../08-embedded-systems/rtos-vs-linux.md) | 1.217 · 21 · 3 · 0 | **1.686 · 26 · — · 5** | ⭐ **Cái GIÁ của PREEMPT_RT**: throughput −5–20% · driver ẩu vỡ · **chỉ là điều kiện cần** (thiếu isolcpus/ghim IRQ/`mlockall` thì đuôi vẫn dài) |
+
+**Bank nâng theo, 12 câu** — hết câu 🟠🔴 dưới 700 ký tự trong `BLD`/`BSP`/`DRV`:
+`BLD-004/006/007/008` · `BSP-017/019/027` · `DRV-020/022/024/025/026`.
+
+#### ⚖️ Hai bài học phương pháp — ghi để không lặp
+
+**① Chuỗi nhân quả *tài liệu mỏng → bank mỏng → trả lời sai* đã đo được.**
+`pci-usb-drivers.md` (954 từ) gánh **9 câu bank**, trong đó **5 câu mỏng** — *tất cả* đều trỏ về nó. Và đó chính là chỗ ứng viên sai ở [RES-012](../mock-interview/bank/resume.md) ngày 18/08 (*"PCI/USB là hotplug tự động"*).
+⚠️ Điểm tinh tế: doc **không sai** — §1.1 có nói self-enumeration. Nó thiếu **sự phân biệt**: không đâu tách `self-enumeration` khỏi `hotplug`. ⇒ **Doc đúng vẫn dạy sai nếu không nêu ranh giới với khái niệm dễ nhầm.**
+
+**② 🔴 ĐẾM TỪ KHOÁ ĐỂ XẾP HẠNG, NHƯNG PHẢI ĐỌC ĐỂ QUYẾT ĐỊNH — lần thứ HAI.**
+`rtos-vs-linux.md` đo ra **0 bẫy** nên bị xếp ưu tiên 3; đọc thật thì nó **tốt**: biểu đồ phân bố latency, output `cyclictest` thật, bảng hard/firm/soft đầy đủ. Chỉ thiếu **cái giá** của PREEMPT_RT ⇒ bổ sung ít hơn hẳn hai file kia.
+*(Lần đầu: `hardware-debug.md` — plan ghi "tôi chấm oan lúc đầu… 886 từ nhưng ĐẶC".)*
+
+⇒ **Hệ quả cho `BSP-021` (2đ, sổ yếu): KHÔNG phải lỗ hổng tài liệu.** Doc có sẵn đáp án, kể cả định nghĩa *firm RT* mà ứng viên hỏi. Đây đúng là **"thuộc bài ≠ hiểu bài"** (19/08) — chữa bằng **đọc lại + tự diễn đạt**, không phải bằng viết thêm doc.
+
+#### ⬜ Còn lại sau đợt này
+
+| File | Số đo | Vì sao chưa làm |
+|---|---|---|
+| [cmake.md](../../06-build-systems/cmake.md) | 795 từ · 1 *vì sao* · 0 bẫy | Mỏng thật, nhưng CMake **đã đo là đạt** (`daily build-systems` 3.17, *"CMake đạt; nợ lệnh Yocto"*) ⇒ ưu tiên thấp |
+| [kernel-userspace.md](../../05-drivers-device-tree/kernel-userspace.md) | 1.146 · 4 · 0 bẫy | Trung bình; chưa có phiên mock nào chỉ ra lỗ hổng |
+| [rtos-programming.md](../../08-embedded-systems/rtos-programming.md) · [memory-and-startup.md](../../08-embedded-systems/memory-and-startup.md) | 1.429 / 1.331 · 0 bẫy | Phần lớn **ngoài JD** (bare-metal/MCU) — `EMB` 3% là **cố ý** ([config §7](../mock-interview/config.md)) |
+| ❌ **KHÔNG flag** [hardware-debug.md](../../08-embedded-systems/hardware-debug.md) | 886 từ · 0 bẫy | **Đã phán định là ĐẶC**, không mỏng. Đừng xếp hạng lại nó bằng số đo |
+
+---
+
 ### 🔎 Phát hiện từ phiên mock 15–17/08 — *lỗ hổng lộ ra khi bị hỏi, không phải khi đọc*
 
 > Đặc điểm chung: **câu bank 🟠 trỏ tới file topic không chứa nội dung đó**. Mẫu này đã lặp **4 lần** ⇒ luật mới ở [config §7](../mock-interview/config.md): kiểm link nguồn có thật sự chứa nội dung **trước khi** đưa câu vào pool ôn.

@@ -177,7 +177,36 @@ class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần ph
 **Kể quá trình kernel migration (vd 5.10 → 6.12).**
 <details><summary>Đáp án</summary>
 
-API kernel thay đổi/deprecate giữa các phiên bản → driver phải sửa khớp (chữ ký hàm đổi, header dời, cơ chế cũ bị gỡ). Quy trình: đọc changelog → build bắt lỗi compile → sửa từng API → test trên target → đảm bảo `dmesg` không còn warning. *(Nên kèm 1 ví dụ API cụ thể nếu nhớ được — vd đổi `gpio_*` sang gpiod, thay đổi chữ ký `.remove` callback, header của `class_create`.)*
+**Bốn nhóm thứ vỡ, xếp theo *mức độ khó phát hiện* — nhóm sau nguy hiểm hơn nhóm trước:**
+
+| Nhóm | Ví dụ | Vì sao dễ/khó |
+|---|---|---|
+| **① Đổi chữ ký hàm** | `probe()`, `class_create()`, `device_create()`, `remove()` trả `void` | ✅ **Dễ nhất** — build lỗi, compiler chỉ thẳng chỗ |
+| **② Hàm bị xoá** | `set_fs()`/`get_fs()` (gỡ ~5.18), `ioremap_nocache()`, `pci_set_dma_mask()` | ✅ Build lỗi, nhưng phải **tìm cơ chế thay thế**, không chỉ đổi tên |
+| **③ Siết cảnh báo** | `-Werror` bắt nhiều thứ trước chỉ warning; cấm biến unused; bắt buộc prototype | 🟡 Build lỗi hàng loạt, phần lớn sửa máy móc |
+| ⭐ **④ Đổi HÀNH VI, giữ nguyên API** | Mặc định scheduler/PM đổi · thứ tự probe đổi · timer resolution đổi · DT binding siết chặt hơn | 🔴 **Nguy hiểm nhất — BUILD SẠCH, chạy mới sai.** Không có công cụ nào bắt được |
+
+**⭐ Nhóm ④ mới là phần đáng nói ở phỏng vấn** — nó là lý do migration mất hàng tuần chứ không phải hàng giờ. Build xanh **không** nghĩa là xong; phải có **bộ test chạy trên phần cứng thật** so sánh hành vi trước/sau.
+
+**Giữ tương thích ngược — thực tế sản phẩm luôn phải chạy song song hai đời kernel:**
+```c
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+    ret = kernel_read(f, buf, len, &pos);        // cach moi
+#else
+    mm_segment_t old = get_fs(); set_fs(KERNEL_DS);   // cach cu
+    ret = vfs_read(f, buf, len, &pos);
+    set_fs(old);
+#endif
+```
+⚠️ Nhưng `#if` rải khắp nơi là **nợ kỹ thuật**: gom vào **một lớp compat riêng**, đừng để lan vào logic nghiệp vụ.
+
+**Quy trình kể ở phỏng vấn — có thứ tự, không phải danh sách:**
+① build ⇒ vá nhóm ①②③ → ② **đọc changelog/`Documentation/` của các subsystem mình chạm** ⇒ tìm nhóm ④ → ③ boot, so `dmesg` **trước/sau** → ④ chạy bộ test chức năng trên **phần cứng thật** → ⑤ đo lại **hiệu năng/latency** *(đổi scheduler/PM có thể làm chậm mà không lỗi)*.
+
+**⚠️ Bẫy:** (1) 🔴 **tưởng build xanh là xong** — nhóm ④ không lộ ra lúc build; (2) sửa hết `#if` rải rác rồi không ai gỡ được khi bỏ kernel cũ; (3) quên rằng **DT binding cũng siết theo** — DTS cũ có thể bị từ chối; (4) nâng kernel **và** đổi thứ khác cùng lúc ⇒ hỏng không biết do cái nào.
+
+**Chốt:** *"Ba nhóm đầu compiler bắt hộ, sửa là xong. Nhóm thứ tư — **API giữ nguyên nhưng hành vi đổi** — mới là phần tốn thời gian, vì build sạch mà chạy sai. Nên nghiệm thu bằng test trên phần cứng thật, không bằng build xanh."*
 </details>
 
 ## C — Interrupt, DMA & MMIO
@@ -261,8 +290,55 @@ Trả lời theo 4 lớp:
 **Buildroot vs Yocto — chọn thế nào? Một BSP layer trong Yocto gồm những gì?**
 <details><summary>Đáp án</summary>
 
-- **Buildroot**: makefile+Kconfig sinh *một image* — học nhanh, minh bạch, hợp sản phẩm đơn/đội nhỏ; không package manager, sstate thô sơ. **Yocto**: framework metadata sinh *một distro* — layer/override cho nhiều SKU, **sstate cache** (build lại chỉ phần đổi), **SDK** cho đội app, license/CVE tooling; giá = đường học dốc. Thực tế: vendor (NXP/TI/ST) phát hành BSP dạng **Yocto layer** → Yocto là mặc định khi sản phẩm nghiêm túc/nhiều biến thể.
-- **BSP layer (`meta-<board>`)** gồm: `conf/machine/<board>.conf` (DTB nào — `KERNEL_DEVICETREE`, u-boot config, console, tune); recipe/append **kernel** (`linux-*.bbappend`: patch DT/driver, config fragment `.cfg`); recipe/append **U-Boot**; firmware blob; image recipe. Nguyên tắc: mọi tùy biến là **bbappend/patch trong layer riêng** — không sửa poky/vendor layer, không sửa `tmp/work`.
+**⭐ Đừng trả lời "Yocto mạnh hơn". Cả hai đều build được Linux — chúng bán hai thứ khác nhau.**
+
+| | **Buildroot** | **Yocto** |
+|---|---|---|
+| Sinh ra cái gì | **Một image** | **Một định nghĩa tái lập được** của image |
+| Cơ chế | Makefile + Kconfig | Metadata (recipe/layer) + BitBake |
+| Đọc hết mất bao lâu | Một buổi | Nhiều tuần |
+| Nhiều biến thể (SKU) | Copy config rồi phân kỳ dần | **Layer + override** — chia sẻ 90% chung |
+| Build lại sau khi đổi 1 dòng | Thường build lại nhiều | **sstate** — chỉ task có hash đổi |
+| Package manager trên thiết bị | ❌ **không** — vá 1 lib phải flash cả image | ✅ có (rpm/ipk/deb) |
+| SDK cho đội app | thô sơ | ✅ **SDK/eSDK** — đội app build mà không cần biết Yocto |
+| License / CVE audit | tay | ✅ `LIC_FILES_CHKSUM` cưỡng chế + `cve-check` |
+
+**"Vì sao" hai tầng:**
+- *Tầng nông*: *"Yocto linh hoạt hơn, Buildroot đơn giản hơn."* Đúng, nhưng không giúp ai quyết định.
+- ⭐ *Tầng sâu*: **tiêu chí không phải mức độ "nghiêm túc" của dự án, mà là SỐ BIẾN THỂ × VÒNG ĐỜI.** Một sản phẩm sống 2 năm → Buildroot thắng vì bạn tiêu ít thời gian hơn để tới đích. Năm SKU sống 8 năm → Yocto thắng vì chi phí học trả một lần, còn chi phí phân kỳ nhánh trả **mãi mãi**.
+
+**Khi nào chọn Buildroot — nửa câu trả lời hay bị bỏ:**
+
+| Tình huống | Chọn |
+|---|---|
+| Một sản phẩm, một biến thể, đội 1–3 người | **Buildroot** |
+| Prototype cần chạy tuần này | **Image dựng sẵn**, không build gì |
+| Cần cập nhật gói lẻ ngoài hiện trường | Yocto (Buildroot không có package manager) |
+| Nhiều SKU · vòng đời dài · cần SDK · cần audit | ⭐ **Yocto** |
+
+📌 **Thực tế quyết định hộ bạn:** vendor SoC (NXP/TI/ST/Qualcomm) phát hành BSP **dạng Yocto layer**. Chọn Buildroot nghĩa là **tự port BSP của vendor sang** — chi phí thường lớn hơn chi phí học Yocto.
+
+**BSP layer (`meta-<board>`) gồm gì:**
+```
+meta-mybsp/
+├── conf/machine/myboard.conf        # KERNEL_DEVICETREE, PREFERRED_PROVIDER_virtual/kernel,
+│                                    # UBOOT_MACHINE, SERIAL_CONSOLES, MACHINE_FEATURES
+├── recipes-kernel/linux/linux-ti_%.bbappend    # patch DT/driver + config fragment .cfg
+├── recipes-bsp/u-boot/u-boot-ti_%.bbappend
+└── recipes-bsp/firmware/...                    # blob wifi/bluetooth
+```
+
+**Ranh giới trách nhiệm** — cũng là câu trả lời cho *"anh đặt thay đổi của mình ở đâu?"*:
+
+| Thứ | Layer nào |
+|---|---|
+| DTB, kernel config cho **board** | **BSP layer** (vendor giữ) |
+| Init system, libc, feature toàn hệ | **Distro layer** |
+| Ứng dụng + **mọi tuỳ biến của bạn** | **Layer sản phẩm của bạn** |
+
+**⚠️ Bẫy:** (1) trả lời *"Yocto tốt hơn"* mà không nêu được ca nào chọn Buildroot ⇒ lộ ra chưa từng phải quyết định thật; (2) sửa thẳng poky/vendor layer ⇒ mất sạch khi vendor phát hành BSP mới; (3) sửa `tmp/work` ⇒ bị nghiền, và sstate không nhận ra; (4) tưởng Buildroot "không dùng được cho sản phẩm thật" — nhiều sản phẩm bán hàng triệu máy chạy Buildroot.
+
+**Chốt:** *"Buildroot cho tôi một image, Yocto cho tôi một định nghĩa tái lập được của image đó. Tiêu chí chọn là **số biến thể × vòng đời sản phẩm**, không phải mức độ nghiêm túc — và trên thực tế vendor phát hành BSP dạng Yocto layer nên với sản phẩm nhiều SKU thì Yocto gần như mặc định."*
 </details>
 
 #### BSP-018 · 🟡 · concept · [→ yocto §5](../../../06-build-systems/yocto.md) · [→ melp/build-systems](../../../15-book-summaries/melp/build-systems.md)
@@ -278,9 +354,38 @@ Trả lời theo 4 lớp:
 **Cross-compile: binary chạy trên board báo `not found` dù file có mặt — chẩn đoán?**
 <details><summary>Đáp án</summary>
 
-- `not found` thật ra là **thiếu interpreter/lib**, không phải thiếu binary: (1) **dynamic loader sai** — binary đòi `/lib/ld-linux-aarch64.so.1` mà rootfs dùng musl/thiếu loader; (2) thiếu **NEEDED lib** trên rootfs; (3) sai kiến trúc/ABI (ARM32 hf vs soft-float).
-- Chẩn đoán tuần tự: `file ./bin` (arch + interpreter) → `ls /lib/ld-*` đối chiếu → `readelf -d | grep NEEDED` đối chiếu rootfs → fix: build đúng libc rootfs / cài đủ lib / static link.
-- Khái niệm gốc: **sysroot** — mọi rắc rối cross-compile quy về "cái này đến từ host hay sysroot?".
+**Thông báo nói dối — thứ "không tìm thấy" KHÔNG phải binary của bạn.**
+
+```
+$ ls -l /usr/bin/myapp
+-rwxr-xr-x 1 root root 21384 myapp        <- FILE CO THAT
+$ ./myapp
+-sh: ./myapp: No such file or directory   <- ???
+```
+
+**Cơ chế:** binary link động có trường **`PT_INTERP`** trong header ELF, trỏ tới **dynamic loader** (vd `/lib/ld-linux-armhf.so.3`). Kernel đọc trường đó **trước khi** chạy binary. Loader không tồn tại trên rootfs ⇒ `execve()` trả **`ENOENT`** ⇒ shell in *"No such file or directory"* — **về file loader, không phải về binary của bạn**.
+
+```bash
+readelf -l myapp | grep -A1 INTERP    # target doi loader NAO
+#   [Requesting program interpreter: /lib/ld-linux-armhf.so.3]
+ls -l /lib/ld-linux-armhf.so.3        # tren TARGET co that khong?
+file myapp                            # kien truc + dong hay tinh
+ldd myapp                             # (chay tren target) lib nao thieu
+```
+
+**Ba nguyên nhân, theo thứ tự hay gặp:**
+
+| Nguyên nhân | Dấu hiệu | Sửa |
+|---|---|---|
+| ⭐ **Lệch ABI float** — build hard-float, rootfs soft-float (hoặc ngược) | Đòi `ld-linux-armhf.so.3` mà target chỉ có `ld-linux.so.3` | Đúng tuple: `arm-linux-gnueabi**hf**-` vs `arm-linux-gnueabi-` |
+| **Lệch libc** — build glibc, rootfs **musl** | Loader tên khác hẳn (`ld-musl-armhf.so.1`) | Toolchain khớp rootfs |
+| **Sai kiến trúc** | `file` báo `x86-64` / `aarch64` khi target là `arm` | Sai toolchain hoàn toàn |
+
+📌 **Cách phân biệt nhanh:** build lại với **`-static`**. Chạy được ⇒ **chắc chắn** là vấn đề loader/lib động, không phải kiến trúc. Đây là phép thử một bước, làm trước mọi thứ khác.
+
+**⚠️ Bẫy:** (1) đi tìm bug trong code ứng dụng — sai hướng hoàn toàn, lỗi nằm ở **ABI/rootfs**; (2) `ldd` chạy trên **host** cho kết quả vô nghĩa, phải chạy trên **target**; (3) copy đại lib từ host sang target để "vá" ⇒ lệch version, crash ở chỗ khác; (4) tưởng cứ `apt install` lib trên host là đủ — cross-compile cần bản **cho target**, trong **sysroot**.
+
+**Chốt:** *"`not found` ở đây gần như luôn là **loader** không tìm thấy chứ không phải binary. `readelf -l` xem nó đòi loader nào, kiểm trên rootfs xem có không — thường là lệch hard-float/soft-float hoặc glibc/musl. Build `-static` để xác nhận trong một bước."*
 </details>
 
 ## F — Power management

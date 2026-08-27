@@ -98,6 +98,47 @@ Cải thiện:
 
 ---
 
+## 4.1 ⭐ `PREEMPT_RT` đổi cái gì — và **giá phải trả**
+
+Câu *"PREEMPT_RT giúp gì"* chỉ là nửa câu trả lời. Nửa còn lại — **cái giá** — mới là chỗ phân biệt.
+
+**Nó đổi ba thứ trong kernel:**
+
+| Đổi gì | Cơ chế | Hệ quả |
+|---|---|---|
+| **`spinlock_t` → mutex có priority inheritance** | Vùng trước đây **không preempt được** giờ **ngủ được** | Giảm mạnh worst-case latency · chặn **priority inversion** ([OS-007](../14-prep/mock-interview/bank/os.md)) |
+| **IRQ handler → kernel thread** | Ngắt không còn chạy trong ngữ cảnh nguyên tử; **xếp hàng theo ưu tiên** như task | Task RT ưu tiên cao **preempt được** cả xử lý ngắt của thiết bị không quan trọng |
+| **Kernel gần như preemptible toàn bộ** | Thu hẹp các vùng cấm preempt | Đuôi phân bố latency bị cắt |
+
+**⚠️ Cái giá — bốn thứ:**
+
+**① Throughput giảm** (điển hình **~5–20%** tuỳ tải). Mọi lock giờ đắt hơn: thay vì spin vài chu kỳ thì có thể **context switch**. Bạn **đổi thông lượng trung bình lấy chặn trên**.
+
+**② Driver có thể vỡ.** Driver viết ẩu — giữ `spinlock_t` rồi gọi hàm có thể ngủ, hoặc dựa vào việc `spin_lock` tắt preempt — sẽ hỏng. Driver vendor cũ là nguồn rủi ro chính.
+
+**③ Chỉ là điều kiện CẦN, không đủ.** Bật `PREEMPT_RT` xong mà không tuning thì worst-case vẫn xấu. Còn phải:
+
+```bash
+isolcpus=2,3 nohz_full=2,3 rcu_nocbs=2,3   # danh rieng CPU cho task RT
+# ghim IRQ khong lien quan sang CPU khac:  /proc/irq/<n>/smp_affinity
+# tat: CPU frequency scaling, C-state sau, SMT/hyperthreading
+chrt -f 80 ./myapp                          # SCHED_FIFO + mlockall() de tranh page fault
+```
+
+**④ Vẫn không phải hard realtime khắt khe.** Worst-case xuống **hàng chục–trăm µs** — đủ cho **soft/firm**, và nhiều ca **hard** ở mức ms. Nhưng nếu deadline là **vài µs** thì vẫn cần MCU/RTOS riêng (§5).
+
+> 📌 **Câu chốt:** *"`PREEMPT_RT` biến spinlock thành mutex có priority inheritance và đẩy IRQ handler vào thread — đổi lấy **chặn trên** cho latency. Giá là **throughput giảm ~5–20%**, driver ẩu có thể vỡ, và nó **chỉ là điều kiện cần** — không isolcpus + ghim IRQ + `mlockall` thì đuôi vẫn dài."*
+
+### ⚠️ Bẫy
+
+**① Đo bằng `Avg` thay vì `Max`.** Xem §1 — trung bình đẹp là vô nghĩa với realtime.
+**② Đo lúc máy rảnh.** Worst-case chỉ lộ ra khi **ép tải song song** (I/O, mạng, cache thrash). `cyclictest` chạy trên máy nhàn rỗi cho số vô dụng.
+**③ Quên `mlockall()`.** Một **page fault** trong đường RT đủ phá mọi tính toán latency.
+**④ Tưởng `SCHED_FIFO` là đủ.** Không có PREEMPT_RT thì task RT vẫn bị chặn bởi vùng không preempt trong kernel.
+**⑤ Nhầm *realtime* với *nhanh*.** Hệ RTOS trung bình **chậm hơn** vẫn realtime hơn (§1).
+
+---
+
 ## 5. Kiến trúc kết hợp (thực tế phổ biến)
 
 Nhiều sản phẩm dùng **cả hai** trên một hệ heterogeneous:

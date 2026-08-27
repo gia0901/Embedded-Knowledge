@@ -322,7 +322,34 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 **Một Yocto recipe (`.bb`) gồm những gì?**
 <details><summary>Đáp án</summary>
 
-Công thức build **một package**: `SRC_URI` (nguồn: git/tarball/file + patch), `LICENSE` + `LIC_FILES_CHKSUM`, `DEPENDS`/`RDEPENDS`, và các **task** `do_fetch → do_unpack → do_patch → do_configure → do_compile → do_install → do_package`. Thường `inherit` một class (`autotools`, `cmake`, `kernel`, `systemd`) để có hành vi build chuẩn thay vì viết tay. `PACKAGES` chia output thành nhiều gói (`-dev`,`-dbg`,`-doc`). BitBake dựng task graph từ dependency giữa các recipe.
+Công thức build **một package**:
+
+```bitbake
+# sensord_1.2.bb
+SUMMARY  = "Ambient light sensor daemon"
+LICENSE  = "MIT"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=0835ade..."   # doi noi dung license -> BUILD FAIL
+SRC_URI  = "git://git.example.com/sensord.git;branch=main;protocol=https \
+            file://0001-fix-i2c-timeout.patch"
+SRCREV   = "a1b2c3d4"        # ⭐ ghim commit; ${AUTOREV} lam MAT tai lap
+S        = "${WORKDIR}/git"
+DEPENDS  = "libgpiod"        # luc BUILD
+RDEPENDS:${PN} = "i2c-tools" # luc CHAY
+inherit cmake systemd        # muon hanh vi build chuan
+```
+
+**Task chạy theo thứ tự** — biết task nào hỏng là biết nghi gì:
+
+| Task | Làm gì | Hỏng vì |
+|---|---|---|
+| `do_fetch` → `do_unpack` → `do_patch` | Tải, giải nén, áp patch | `SRCREV` sai · patch không áp được sau khi vendor nâng version |
+| `do_configure` → `do_compile` | Cấu hình, biên dịch | Thiếu **`DEPENDS`** ⇒ không thấy header |
+| `do_install` | Cài vào **`${D}`** | Quên `${D}` ⇒ ghi ra máy host |
+| `do_package` | Chia `${D}` thành `${PN}`, `-dev`, `-dbg`, `-doc` | File rơi vào gói sai ⇒ image thiếu |
+
+📌 **`${D}` KHÔNG phải rootfs** — nó là thư mục dàn dựng riêng của recipe. Rootfs ghép **sau**, từ các package đã đóng gói. Hiểu nhầm chỗ này sinh ra lỗi *"tôi cài rồi mà image không có"*.
+
+`inherit` cho hành vi build chuẩn (`autotools`, `cmake`, `meson`, `kernel`, `module`, `systemd`) thay vì tự viết `do_configure`/`do_compile`. BitBake dựng **task graph** từ dependency giữa các recipe rồi chạy song song.
 </details>
 
 #### BLD-005 · 🟡 · concept · ⭐ · [→ yocto §2](../../../06-build-systems/yocto.md)
@@ -368,7 +395,26 @@ SRC_URI += "file://0001-add-my-driver.patch \
 **`devtool` dùng để làm gì?**
 <details><summary>Đáp án</summary>
 
-Công cụ phát triển recipe nhanh: `devtool modify <recipe>` kéo source ra workspace để **sửa + build lại lặp nhanh** (không phải sửa recipe thủ công mỗi vòng); `devtool add <url>` tạo recipe mới từ source; `devtool upgrade` nâng version; `devtool finish` gói thay đổi thành **bbappend/patch** trong layer của bạn. Là cách hiện đại thay cho vòng lặp "sửa recipe → cleansstate → bitbake" chậm chạp.
+Nó thay **vòng lặp phát triển**, không chỉ là một lệnh tiện tay.
+
+**Vòng lặp cũ** *(chậm và dễ sai)*: sửa recipe → `cleansstate` → `bitbake` → đợi → flash image → thử → lặp.
+⚠️ Vì chậm nên người ta hay "thử nhanh" bằng cách sửa thẳng trong **`tmp/work/`** — bị nghiền sạch lần build sau, và sstate **không nhận ra** nên build vẫn "thành công" với code cũ ([BLD-006](build-systems.md)).
+
+**Vòng lặp với `devtool`:**
+```bash
+devtool modify sensord                  # keo source ra workspace/, thanh git repo THAT
+#   ... sua code, commit tung buoc nhu binh thuong ...
+devtool build sensord                   # build lai, chi phan doi
+devtool deploy-target sensord root@192.168.1.10   # ⭐ day thang len board dang chay
+devtool finish sensord ../meta-myproduct          # goi thanh patch + bbappend trong layer
+```
+
+⭐ **`deploy-target` là thứ đổi hẳn nhịp làm việc**: sửa code → thấy trên board trong **vài giây**, không dựng lại image, không flash thẻ.
+⭐ **`finish` là thứ giữ kỷ luật**: nó biến các commit của bạn thành **patch + bbappend trong layer riêng** — tức đúng cách tuỳ biến mà [BLD-005](build-systems.md) yêu cầu, tự động.
+
+Còn có `devtool add <url>` (sinh recipe mới từ source) và `devtool upgrade` (nâng version).
+
+**⚠️ Bẫy:** (1) quên `devtool finish` ⇒ thay đổi sống trong `workspace/`, **không vào git của layer**, đồng nghiệp clone về không có; (2) `devtool reset` trước khi finish ⇒ mất công sức; (3) tưởng `deploy-target` đã cập nhật image — **không**, image chỉ đổi sau khi `finish` + build lại.
 </details>
 
 #### BLD-009 · 🟡 · concept · [→ yocto §6](../../../06-build-systems/yocto.md)
@@ -382,14 +428,94 @@ Công cụ phát triển recipe nhanh: `devtool modify <recipe>` kéo source ra 
 **Thêm một package vào image thế nào? `IMAGE_INSTALL` vs `RDEPENDS` khác gì?**
 <details><summary>Đáp án</summary>
 
-Thêm gói vào rootfs: sửa **image recipe** — `IMAGE_INSTALL:append = " mypkg"` (hoặc qua `PACKAGE_GROUP`). Đừng nhét vào recipe của package khác. **`RDEPENDS`** khác mục đích: khai **dependency runtime của một package** (khi cài package A thì cần B đi kèm) — dùng khi B phải theo A ở mọi image (vd `dlopen` lib). Quy tắc: "tôi muốn image có X" → `IMAGE_INSTALL`; "package A không chạy được nếu thiếu B" → `RDEPENDS:${PN}-A += "B"`. *(Chi tiết DEPENDS/RDEPENDS: [BSP-018](bsp.md).)*
+**Cơ chế — hai biến trả lời hai câu hỏi KHÁC nhau:**
+
+| | `IMAGE_INSTALL` | `RDEPENDS` |
+|---|---|---|
+| Trả lời câu | *"**Image này** cần có gì?"* | *"**Package này** không chạy được nếu thiếu gì?"* |
+| Viết ở đâu | **Image recipe** (`core-image-*.bb`) hoặc `local.conf` (chỉ để thử) | **Recipe của package đó** |
+| Phạm vi | Đúng **một image** | **Mọi** image có chứa package đó |
+| Ai đọc | Bước dựng rootfs | Package manager, khi giải dependency |
+
+```bitbake
+# image recipe — "toi muon image nay co sensord va i2c-tools"
+IMAGE_INSTALL:append = " sensord i2c-tools"
+
+# recipe cua sensord — "sensord KHONG CHAY DUOC neu thieu libfoo"
+RDEPENDS:${PN} += "libfoo"
+```
+
+**⭐ "Vì sao" — vì sao không dùng `IMAGE_INSTALL` cho tất cả cho gọn?**
+
+Vì `IMAGE_INSTALL` **không mang theo tri thức**. Khi bạn khai `RDEPENDS:${PN} += "libfoo"`, bạn đang ghi lại một **sự thật về package** — và sự thật đó đi theo package tới **mọi** image, mọi sản phẩm, mọi người dùng lại recipe của bạn. Khai ở `IMAGE_INSTALL` thì sự thật đó chỉ tồn tại trong **một** image; image thứ hai quên khai là hỏng, và **hỏng lúc chạy trên thiết bị**, không phải lúc build.
+
+⇒ Quy tắc quyết định:
+
+| Bạn đang nói gì | Dùng |
+|---|---|
+| *"Sản phẩm này cần công cụ X"* (chủ ý sản phẩm) | `IMAGE_INSTALL` |
+| *"A cần B mới chạy được"* (sự thật kỹ thuật) | `RDEPENDS` |
+
+**Ba cách thêm gói, theo mức độ bền vững:**
+
+```bitbake
+# 1. local.conf  -> CHI DE THU. Khong tai lap duoc tren CI/may dong nghiep
+IMAGE_INSTALL:append = " strace"
+
+# 2. image recipe rieng cua ban  -> ✅ cach dung cho san pham
+require recipes-core/images/core-image-minimal.bb
+IMAGE_INSTALL:append = " sensord i2c-tools"
+
+# 3. packagegroup  -> ✅ khi nhieu image dung chung mot bo goi
+IMAGE_INSTALL:append = " packagegroup-myproduct-tools"
+```
+
+**⚠️ Bẫy:** (1) 🔴 nhét `IMAGE_INSTALL` vào **`local.conf`** rồi để đó — chạy trên máy bạn, CI build ra image thiếu gói, và không ai hiểu vì sao; (2) `IMAGE_INSTALL = "..."` thay vì `:append` ⇒ **xoá sạch** danh sách gốc, image mất cả busybox lẫn init; (3) khai `RDEPENDS` cho thứ chỉ **một** sản phẩm cần ⇒ mọi sản phẩm khác cũng phải mang nó; (4) quên `RDEPENDS` cho lib nạp bằng `dlopen` ⇒ compile sạch, chạy mới chết ([BSP-018](bsp.md)).
+
+**Chốt:** *"`IMAGE_INSTALL` là **chủ ý của sản phẩm** — 'image này cần gì'. `RDEPENDS` là **sự thật về package** — 'A không chạy được nếu thiếu B'. Sự thật thì viết vào recipe để nó đi theo package; chủ ý thì viết vào image."*
 </details>
 
 #### BLD-006 · 🟠 · concept · [→ yocto §3](../../../06-build-systems/yocto.md)
 **sstate-cache là gì? Vì sao build "không nhận thay đổi" và cách xử lý?**
 <details><summary>Đáp án</summary>
 
-**sstate (shared state) cache**: kết quả mỗi task được cache theo **hash đầu vào** (recipe + config + dependency) → lần sau build **chỉ chạy lại task có hash đổi**, phần còn lại lấy từ cache → build từ giờ xuống phút, **chia sẻ được giữa dev/CI**. Mặt trái: nếu bạn sửa nguồn theo cách hash không bắt được (vd sửa thẳng `tmp/work`), BitBake **dùng lại cache cũ** → "không nhận thay đổi". Xử lý: sửa đúng chỗ (recipe/layer) để hash đổi, hoặc `bitbake -c cleansstate <recipe>` rồi build lại.
+**Cơ chế — hai chữ quyết định tất cả: TASK và HASH.**
+
+sstate cache kết quả của **từng task** (`do_compile`, `do_install`, `do_package`…), **không phải từng recipe**. Mỗi mục cache khoá bằng **hash của mọi đầu vào task đó**: nội dung recipe, giá trị các biến nó đọc, hash của những task nó phụ thuộc, phiên bản class được `inherit`.
+
+Build lần sau: BitBake tính lại hash từng task → hash trùng thì **lấy kết quả từ cache, không chạy lại**; hash khác thì chạy lại task đó **và mọi task phụ thuộc nó**.
+
+**"Vì sao" hai tầng:**
+- *Tầng nông* (ai cũng nói): *"nó cache nên build lại nhanh"* — đúng nhưng không dùng được để chẩn đoán.
+- ⭐ *Tầng sâu*: vì khoá là **hash đầu vào**, câu hỏi thực dụng **không phải** *"sstate có nhanh không"* mà là ***"thay đổi của tôi làm hỏng hash của bao nhiêu task?"*** — đó mới là thứ quyết định bạn đợi 30 giây hay 2 tiếng.
+
+| Bạn đổi gì | Hỏng bao nhiêu task | Vì sao |
+|---|---|---|
+| Nội dung một recipe app lá | **Ít** — recipe đó + đóng gói image | Không recipe nào phụ thuộc nó |
+| `DISTRO_FEATURES`, `TUNE_FEATURES` | **Gần như tất cả** | Mọi task compile đều đọc biến này ⇒ hash đổi hàng loạt |
+| Nâng version toolchain | **Tất cả** | Là gốc của cây phụ thuộc |
+| 🔴 Sửa thẳng trong `tmp/work/` | **KHÔNG cái nào** | Hash **không nhìn vào `tmp/work`** ⇒ dùng lại cache cũ ⇒ *"build không nhận thay đổi"* |
+
+**⭐ Đây chính là lời giải cho câu hỏi thứ hai của đề.** Triệu chứng *"tôi sửa rồi mà build không đổi gì"* gần như luôn là **một trong ba ca**:
+
+| Ca | Vì sao hash không đổi | Cách sửa đúng |
+|---|---|---|
+| Sửa trong `tmp/work/` | Không phải đầu vào của hash | `devtool modify` — nó biến source thành git repo mà hash **có** theo dõi |
+| `.bbappend` không khớp version | BitBake **âm thầm bỏ qua**, metadata không đổi | Dùng `%`; kiểm `bitbake-layers show-appends` |
+| Cú pháp `_append` cũ trên Yocto ≥ 3.4 | Biến im lặng không tác dụng | Đổi sang `:append` |
+
+**Ba mức dọn — đừng dùng nhầm:**
+
+```bash
+bitbake -c clean <recipe>        # xoa tmp/work cua recipe, GIU sstate -> thuong khong du
+bitbake -c cleansstate <recipe>  # xoa ca sstate cua recipe   -> dung khi nghi cache cu
+rm -rf tmp/                      # xoa thu muc lam viec, GIU sstate-cache/ -> sach ma van nhanh
+bitbake -S printdiff <target>    # ⭐ CHAN DOAN: hash nao doi so voi lan truoc
+```
+
+**⚠️ Bẫy:** (1) `cleansstate` **toàn bộ** cho chắc — vứt hàng giờ build mà thường chỉ cần một recipe; (2) để `SSTATE_DIR`/`DL_DIR` **bên trong** `build/` ⇒ `rm -rf tmp/` an toàn nhưng lỡ tay xoá `build/` là mất sạch — tách ra ngoài; (3) tưởng sstate làm build **đầu tiên** nhanh — không, nó chỉ giúp từ lần **thứ hai** hoặc khi tải cache dùng chung của CI.
+
+**Chốt:** *"sstate cache theo **task** và khoá theo **hash đầu vào** của task đó. Nên khi build không nhận thay đổi, câu hỏi đúng là 'thay đổi của tôi có nằm trong thứ được băm không?' — sửa trong `tmp/work` thì không, và đó là ca kinh điển."*
 </details>
 
 ---
