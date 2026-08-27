@@ -398,4 +398,382 @@ Trả lời theo 4 lớp:
 
 ---
 
+## 🧪 J — LAB NGỒI MÁY (BeagleBone Black)
+
+> **Bộ 8 bài thực hành trên phần cứng thật**, thêm 2026-08-27. Khác bộ [🧪 DBG-030…036](debugging.md) ở **cấu trúc**, và khác có chủ đích:
+>
+> | | DBG lab | **BSP lab (bộ này)** |
+> |---|---|---|
+> | Lỗ hổng nhắm tới | *"chẩn đoán được, **chọn công cụ** không được"* | *"**thuộc bài ≠ hiểu bài**"* (đo 19/08) |
+> | Cấu trúc | **Triệu chứng trước** | **Khái niệm trước**, triệu chứng thành bước kiểm chứng |
+>
+> Ở DBG, mô hình đã có — chỉ thiếu ánh xạ triệu chứng→công cụ. Ở BSP thì **mô hình chưa có**, nên đưa triệu chứng ra trước là bắt chẩn đoán một hệ thống chưa hình dung được.
+>
+> **Bốn bước, áp cho mọi bài:**
+> **① ĐỌC** (khái niệm, ngắn) → **② QUAN SÁT** nó chạy đúng trên board, bắt log thật → **③ PHÁ có chủ đích** (viết **dự đoán ra giấy TRƯỚC** khi cắm điện) → **④ ĐỐI CHIẾU** bảng mình tự dựng với bảng trong repo.
+>
+> ⭐ **Bước ③ là chỗ khác biệt lớn nhất: bạn KHÔNG chờ triệu chứng — bạn gây ra nó.** Tự tay phá thì biết ground truth, nên mọi suy luận ở ④ kiểm chứng được ngay. Chỗ **dự đoán sai** chính là chỗ mô hình còn hổng — đó là dữ liệu quý nhất của cả buổi.
+
+### ⚠️ Điều kiện cần
+
+> 🔧 **Toàn bộ hướng dẫn setup sống ở [14-prep/lab-setup.md](../../lab-setup.md)** — phần cứng cần mua, đấu nối serial J1, gói host, bố cục thẻ SD, **6 bẫy đã biết**, và **checklist sẵn sàng**.
+>
+> **Không chép lại ở đây.** 8 bài dùng chung một setup; giữ nhiều bản là đúng cái bệnh *"một sự thật, hai chỗ"* mà repo đã dính 4 lần ([CLAUDE.md §4.7](../../../CLAUDE.md)).
+>
+> 🔴 **Ba thứ chặn đường, kiểm trước khi mở bài 031:** ① **cáp USB–TTL 3.3V** (cáp 5V làm hỏng board — không có console thì cả Thẻ A vô nghĩa) · ② **nút S2** (eMMC tranh boot với thẻ SD, triệu chứng giống hệt *"image mình hỏng"*) · ③ **thẻ A luôn boot được** làm thẻ cứu hộ.
+
+> ⚠️ **Về lệnh trong các bài dưới:** chưa chạy trên board của bạn — tên biến U-Boot, địa chỉ nạp, đường dẫn **đổi theo phiên bản**. Coi là *chỉ dẫn cần đối chiếu*. Ô **OUTPUT** để trống là **có chủ đích**: theo [bank/README.md](README.md), output câu `lab` phải là **output chạy thật, dán nguyên văn** — cấm viết tay, cấm phỏng đoán.
+
+---
+
+#### BSP-031 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-27 · [→ boot-process §1–3, §7](../../../08-embedded-systems/boot-process.md)
+**🧪 Bốn giai đoạn boot — nhận ra từng cái trên log THẬT của mình.**
+
+**Bối cảnh thực tế:** bạn nhận một board mới, cắm điện, và phải nói được *"nó đang chết ở giai đoạn nào"*. Không nói được điều đó thì mọi bước bring-up sau chỉ là đoán.
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC (~20 phút, không hơn)
+[boot-process.md §1–§3](../../../08-embedded-systems/boot-process.md). Chỉ cần trả lời **một** câu: *vì sao boot phải nhiều giai đoạn?*
+
+> Đáp án đúng đã có trong doc: **không phải "cho gọn"**, mà vì **SRAM nội quá nhỏ** (vài chục–vài trăm KB). BootROM chỉ nạp nổi **SPL** vào SRAM; SPL có mỗi một việc quan trọng: **khởi tạo DRAM**, để từ đó mới nạp nổi U-Boot đầy đủ rồi tới kernel. **Ràng buộc kích thước SRAM chính là lý do tồn tại của SPL.**
+
+### ② QUAN SÁT — sản phẩm quan trọng nhất của cả bài
+Boot thẻ A (đang chạy được), bắt **toàn bộ** log từ lúc cấp nguồn:
+```bash
+# tren may host
+picocom -b 115200 /dev/ttyUSB0 --logfile boot-ok.log
+#  hoac:  screen /dev/ttyUSB0 115200      (Ctrl-A H de bat log)
+```
+Rồi **tự đánh dấu bốn ranh giới**:
+
+| Dòng trong log | Nghĩa là gì |
+|---|---|
+| `U-Boot SPL 20xx.xx` | SPL đang chạy **trong SRAM** — DRAM **chưa** có |
+| `U-Boot 20xx.xx` | U-Boot proper, giờ **đã ở trong DRAM** |
+| `Starting kernel ...` | **Trao tay** — hết phần bootloader |
+| `Linux version ...` | Kernel banner |
+| `... login:` | Userspace, init đã chạy |
+
+📋 **DÁN LOG CÓ CHÚ THÍCH CỦA BẠN VÀO ĐÂY** *(chưa chạy)*
+```
+(chua chay)
+```
+
+⭐ Đây là thứ mang vào phòng phỏng vấn được. Khi bị hỏi *"kể chuỗi boot"*, bạn kể **từ một cái log mình từng đọc**, không phải từ danh sách học thuộc — và người nghe phân biệt được hai thứ đó.
+
+### ③ PHÁ CÓ CHỦ ĐÍCH
+**Luật: viết dự đoán ra giấy TRƯỚC khi cắm điện.**
+
+| Phá gì | Dự đoán của bạn | Thực tế |
+|---|---|---|
+| Đổi tên `MLO` → `MLO.bak` | *(điền trước)* | *(chưa chạy)* |
+| Khôi phục; đổi tên `u-boot.img` | *(điền trước)* | *(chưa chạy)* |
+| Khôi phục; sửa `bootargs` sai `root=` | *(điền trước)* | *(chưa chạy)* |
+
+### ④ ĐỐI CHIẾU
+[boot-process.md §7](../../../08-embedded-systems/boot-process.md) đã có sẵn bảng **"Chẩn đoán theo CHỖ CHẾT"** (6 dòng). Đối chiếu bảng bạn vừa dựng với nó — ba khả năng, cả ba đều có ích:
+
+- **Khớp** ⇒ khái niệm giờ có bằng chứng của chính bạn đứng sau
+- **Bạn thiếu dòng** ⇒ ca chưa gặp, đọc kỹ dòng đó
+- **Bạn có dòng bảng không có** ⇒ 📌 **bổ sung vào doc**, repo tốt lên
+
+**Vì sao bài này quan trọng nhất bộ:** nó đóng đúng vòng lặp đã hỏng ngày 19/08 — *bảng trên giấy → bảng do tay mình xác nhận*.
+
+**Nối câu hỏi:** [BSP-001](#) *(chuỗi boot nhiều giai đoạn)* · [BSP-002](#) · [BSP-022](#) *(bring-up 🏗️)*
+</details>
+
+#### BSP-032 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-27 · [→ boot-process §3](../../../08-embedded-systems/boot-process.md)
+**🧪 U-Boot trao tay kernel — nó trao CÁI GÌ, cho AI, ở ĐÂU.**
+
+**Bối cảnh thực tế:** đổi sang kernel mới, board dừng ngay sau `Starting kernel ...` và im lặng. Không hiểu bước trao tay thì không biết nghi gì.
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC
+[boot-process.md §3](../../../08-embedded-systems/boot-process.md) — ba thứ U-Boot phải đưa cho kernel: **kernel image**, **device tree blob**, **command line (`bootargs`)**. Thiếu hoặc sai địa chỉ bất kỳ cái nào ⇒ chết ngay sau `Starting kernel`.
+
+### ② QUAN SÁT
+Nhấn phím bất kỳ để dừng autoboot, rồi:
+```
+=> printenv bootcmd
+=> printenv bootargs
+=> printenv loadaddr fdtaddr
+=> bdinfo
+```
+📋 **DÁN OUTPUT THẬT** *(chưa chạy)*
+```
+(chua chay)
+```
+**Câu phải trả lời được sau bước này:** `bootz ${loadaddr} - ${fdtaddr}` — **dấu `-` ở giữa nghĩa là gì?** *(gợi ý: vị trí đó dành cho initramfs)*
+
+### ③ PHÁ
+| Phá gì | Dự đoán | Thực tế |
+|---|---|---|
+| `setenv fdtaddr 0x8FFFFFFF` (địa chỉ vô lý) rồi `boot` | | *(chưa chạy)* |
+| Khôi phục; bỏ hẳn `console=` khỏi `bootargs` | | *(chưa chạy)* |
+| Khôi phục; `bootz ${loadaddr}` (bỏ luôn dtb) | | *(chưa chạy)* |
+
+⭐ Ca thứ hai đáng chú ý nhất: kernel **vẫn boot bình thường**, chỉ là bạn **không thấy gì**. Phân biệt *"chết"* với *"sống nhưng câm"* là một lớp lỗi riêng.
+
+### ④ ĐỐI CHIẾU
+Ba ca trên rơi vào dòng nào của bảng §7? Ca nào **không** có trong bảng?
+
+**Nối câu hỏi:** [BSP-002](#) · [BSP-030](#) *(init PID 1)*
+</details>
+
+#### BSP-033 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-27 · [→ BSP-029](#) · [boot-process §4–5](../../../08-embedded-systems/boot-process.md)
+**🧪 Rootfs & initramfs — tự tay chứng minh khi nào KHÔNG cần initramfs.**
+
+> 🔴 **Bài ưu tiên cao nhất bộ.** [BSP-029](#) là câu bạn đạt **2 điểm** ngày 19/08 vì **đảo ngược luật và ngoại lệ** — trình bày *"khi nhúng vẫn nên dùng"* như luật chung, trong khi bank đánh ⭐ vào *"thiết bị nhúng thường **KHÔNG** cần"*. Cách chắc chắn nhất để sửa: **boot một hệ thống không có initramfs bằng chính tay mình.**
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC
+[BSP-029](#) + [boot-process.md §4–§5](../../../08-embedded-systems/boot-process.md). Câu phải trả lời: **initramfs sinh ra để giải bài toán con-gà-quả-trứng nào?** *(kernel cần driver để đọc rootfs, mà driver lại nằm trong rootfs)*
+Và: **vì sao thiết bị nhúng thường thoát được bài toán đó?** *(driver MMC/eMMC build thẳng `=y` vào kernel ⇒ không cần ai nạp hộ)*
+
+### ② QUAN SÁT
+```bash
+zcat /proc/config.gz | grep -E "CONFIG_MMC_OMAP_HS|CONFIG_EXT4_FS"   # =y hay =m ?
+cat /proc/cmdline
+ls /boot/                                                             # co initramfs khong?
+```
+📋 **DÁN OUTPUT THẬT** *(chưa chạy)*
+```
+(chua chay)
+```
+
+### ③ PHÁ
+| Phá gì | Dự đoán | Thực tế |
+|---|---|---|
+| `setenv bootargs ... root=/dev/mmcblk0p9` (phân vùng không tồn tại) | | *(chưa chạy)* |
+| Khôi phục; đổi `rootfstype=` sang kiểu sai | | *(chưa chạy)* |
+| **Nếu đang có initramfs**: bỏ nó ra, boot thẳng | | *(chưa chạy)* |
+
+### ④ ĐỐI CHIẾU
+Trả lời lại [BSP-029](#) **bằng lời mình**, và lần này **nêu LUẬT trước, NGOẠI LỆ sau**:
+> *"Nhúng thường **không** cần, vì driver lưu trữ build thẳng vào kernel và phần cứng biết trước. **Cần** khi: rootfs mã hoá/nén, cần chọn rootfs lúc chạy (A/B), hoặc cần driver dạng module trước khi mount."*
+
+**Nối câu hỏi:** 🔴 [BSP-029](#) *(sổ yếu)* · [BSP-030](#)
+</details>
+
+#### BSP-034 · 🟠 · lab 🧪 · 🎤 2026-08-27 · [→ boot-process §7](../../../08-embedded-systems/boot-process.md)
+**🧪 Boot chậm — đo xem chậm ở đâu, đừng đoán.**
+
+> ⚠️ **Bài DUY NHẤT trong bộ giữ dạng triệu chứng.** Ở đây bạn **đã có** mô hình — chính bạn làm ca `insmod` 3–4 s → <0.5 s. Đây là tối ưu, không phải học mới, nên hợp dạng DBG lab.
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC
+Ba tầng đo, mỗi tầng một công cụ: **U-Boot** (`bootstage`) · **kernel** (`initcall_debug` + `dmesg` timestamp) · **userspace** (`systemd-analyze blame`).
+
+### ② QUAN SÁT — đo TRƯỚC khi sửa bất cứ gì
+```bash
+# kernel: them vao bootargs
+initcall_debug ignore_loglevel
+# sau khi boot:
+dmesg | sort -k1 -n | tail -30            # initcall lau nhat
+systemd-analyze                            # neu co systemd
+systemd-analyze blame | head -20
+```
+📋 **DÁN OUTPUT THẬT + tổng thời gian boot** *(chưa chạy)*
+```
+(chua chay)
+```
+
+### ③ PHÁ / THỬ
+| Thử gì | Dự đoán | Thực tế |
+|---|---|---|
+| `setenv bootdelay 0` | | *(chưa chạy)* |
+| Tắt một service userspace chậm nhất trong `blame` | | *(chưa chạy)* |
+| Đổi một driver `=y` thành `=m` (hoặc ngược lại) | | *(chưa chạy)* |
+
+### ④ ĐỐI CHIẾU
+Kể lại thành **một câu chuyện có số**, đúng khuôn ca `insmod` của bạn: *trước → nghi gì → đo gì → sửa gì → sau*.
+
+⭐ Bạn sẽ có **câu chuyện tối ưu boot thứ hai** — lần này trên phần cứng **không phải của Samsung**, tức kể được **không vướng NDA**. Đó là tài sản riêng, đáng giá.
+
+**Nối câu hỏi:** [BSP-001](#) · và chính mục *Driver Load-Time Optimization* trên [RESUME](../../../RESUME_embedded_linux.tex)
+</details>
+
+#### BSP-035 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-08-27 · [→ BSP-004](#) · [melp/bootloader-kernel](../../../15-book-summaries/melp/bootloader-kernel.md)
+**🧪 FIT + ký RSA — làm cho U-Boot TỪ CHỐI một image đã bị sửa một byte.**
+
+> ⭐ **Bài đắt nhất bộ.** Khoảnh khắc U-Boot **từ chối** image bạn cố tình sửa là thứ không sách nào thay được. Nó lấp đúng ô 🟠 *"Secure boot / TF-A chiều sâu"* đang treo trong [gap-register](../../study-plans/gap-register.md), và vá đúng chỗ bạn hỏi *"SHA+RSA là gì?"* ngày 19/08.
+
+> 🔴 **ĐỌC TRƯỚC KHI LÀM — giới hạn của phần cứng.** AM335x trên BBB bán lẻ là silicon **GP (General Purpose)**: eFuse chưa blow ⇒ **KHÔNG có chain of trust từ ROM**, tức **không làm được secure boot đúng nghĩa**. Muốn vậy phải có silicon **HS**, và blow eFuse là **không thể hoàn tác**.
+> Thứ làm được — và **đúng là thứ interview hỏi** — là **U-Boot verified boot**: U-Boot tự kiểm chữ ký của FIT trước khi boot. Khi nói ở phỏng vấn, **nêu đúng ranh giới này** — nó **cộng điểm**, vì phân biệt được *verified boot ở bootloader* với *secure boot neo ở ROM/eFuse* là thứ nhiều người nhầm.
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC
+[BSP-004](#). Ba thứ FIT hơn uImage: **nhiều thành phần + nhiều cấu hình** · **hash/chữ ký từng thành phần** · **metadata rõ (load address, entry, compression)**.
+Câu phải trả lời: **SHA và RSA làm hai việc KHÁC nhau — việc gì?**
+> **SHA** = *"nội dung có bị đổi không"* (toàn vẹn). **RSA** = *"ai ký cái hash đó"* (xác thực nguồn). Chỉ SHA thì kẻ tấn công sửa image **và** sửa luôn hash. Ký hash bằng khoá riêng, U-Boot kiểm bằng khoá công khai **nhúng trong `u-boot.dtb`** ⇒ sửa image mà không có khoá riêng thì chữ ký hỏng.
+
+### ② QUAN SÁT — dựng FIT chưa ký trước
+Viết `.its` mô tả kernel + dtb + configuration, rồi:
+```bash
+mkimage -f board.its board.itb
+mkimage -l board.itb            # xem lai cau truc
+```
+📋 **DÁN `.its` + output `mkimage -l`** *(chưa chạy)*
+```
+(chua chay)
+```
+
+### ③ KÝ, RỒI PHÁ
+```bash
+openssl genpkey -algorithm RSA -out keys/dev.key -pkeyopt rsa_keygen_bits:2048
+openssl req -batch -new -x509 -key keys/dev.key -out keys/dev.crt
+mkimage -f board.its -k keys -K u-boot.dtb -r board.itb     # ky + nhung pubkey vao dtb
+# build lai U-Boot voi CONFIG_FIT_SIGNATURE=y va dtb da co khoa
+```
+| Thử gì | Dự đoán | Thực tế |
+|---|---|---|
+| Boot FIT **đã ký, chưa sửa** | | *(chưa chạy)* |
+| **Sửa 1 byte** trong `.itb` rồi boot | | *(chưa chạy)* |
+| Ký bằng **khoá khác** với khoá trong dtb | | *(chưa chạy)* |
+
+📋 **DÁN nguyên văn dòng U-Boot từ chối** *(chưa chạy)* — đây là output đắt nhất cả bộ
+```
+(chua chay)
+```
+
+### ④ ĐỐI CHIẾU
+Trả lời lại [BSP-004](#) và thêm một câu về ranh giới:
+> *"Đây là **verified boot ở tầng U-Boot** — U-Boot tự kiểm FIT. Nó **không** phải secure boot đầy đủ: gốc tin cậy vẫn là U-Boot, mà U-Boot thì chưa được ai kiểm. Muốn khép chuỗi phải neo ở ROM/eFuse, cần silicon HS."*
+
+⭐ Câu *"gốc tin cậy vẫn là U-Boot, mà U-Boot thì chưa được ai kiểm"* là câu đáng nhớ nhất — nó cho thấy bạn hiểu **chuỗi tin cậy chỉ mạnh bằng mắt xích đầu tiên**.
+
+**Nối câu hỏi:** [BSP-004](#) · mục **I — Secure boot & chuỗi tin cậy**
+</details>
+
+#### BSP-036 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-08-27 · [→ BSP-017](#) · [yocto](../../../06-build-systems/yocto.md)
+**🧪 Yocto dựng lại ĐÚNG thứ bạn vừa làm tay — rồi so hai bên.**
+
+> **Thẻ B bắt đầu từ đây.** Thứ tự này có chủ đích: làm tay trước khiến giá trị của Yocto trở nên **hiển nhiên**. Nếu Yocto đi trước, U-Boot chỉ là **hộp đen bitbake nhả ra** — bạn học recipe mà không hiểu nó sinh ra cái gì.
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC
+[BSP-017](#) *(Yocto vs Buildroot)* + [yocto.md §1–2](../../../06-build-systems/yocto.md). Câu phải trả lời **trước khi build**: *Yocto giải quyết vấn đề gì mà làm tay không giải được?* — rồi **sau khi build, đọc lại câu trả lời của mình**.
+
+### ② QUAN SÁT
+```bash
+git clone -b scarthgap git://git.yoctoproject.org/poky
+cd poky && source oe-init-build-env
+# conf/local.conf:  MACHINE = "beaglebone-yocto"
+time bitbake core-image-minimal
+ls tmp/deploy/images/beaglebone-yocto/
+```
+📋 **DÁN: thời gian build lần đầu + danh sách artifacts** *(chưa chạy)*
+```
+(chua chay)
+```
+
+⭐ **Bảng so sánh — đây mới là bài học, không phải phụ phẩm:**
+
+| Artifact | Thẻ A (tay) — lấy ở đâu | Thẻ B (Yocto) — sinh ra sao |
+|---|---|---|
+| `MLO` | *(điền)* | *(điền)* |
+| `u-boot.img` | *(điền)* | *(điền)* |
+| kernel + dtb | *(điền)* | *(điền)* |
+| rootfs | *(điền)* | *(điền)* |
+
+### ③ PHÁ / THỬ
+| Thử gì | Dự đoán | Thực tế |
+|---|---|---|
+| Flash thẻ B, boot — log có **giống** thẻ A không? | | *(chưa chạy)* |
+| `bitbake -e core-image-minimal \| grep ^MACHINE=` | | *(chưa chạy)* |
+| Đổi `MACHINE` sang giá trị sai rồi build | | *(chưa chạy)* |
+
+### ④ ĐỐI CHIẾU
+Trả lời lại [BSP-017](#) — lần này bằng **trải nghiệm**, không phải định nghĩa. Câu chốt nên có: *thứ Yocto cho mà làm tay không cho là **tái lập được** — cùng một commit cho ra cùng một image, trên máy khác, sáu tháng sau.*
+
+**Nối câu hỏi:** [BSP-017](#) · [BLD-*](build-systems.md)
+</details>
+
+#### BSP-037 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-08-27 · [→ BSP-018](#) · [yocto §5](../../../06-build-systems/yocto.md)
+**🧪 bbappend + `DEPENDS` vs `RDEPENDS` — và bắt tận tay chỗ `shlibs` KHÔNG tự đoán được.**
+
+> 🔴 Ngày 19/08 bạn trả lời [BSP-018](#) được **3 điểm** nhưng khi bị hỏi *"khi nào `shlibs` không tự phát hiện được?"* thì **"chưa rõ"**. Bài này thiết kế để **nhìn thấy nó hỏng một lần** — sau đó không quên được.
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC
+[yocto.md §5](../../../06-build-systems/yocto.md) + [BSP-018](#).
+- **`DEPENDS`** = cần lúc **BUILD** (thư viện + header để compile)
+- **`RDEPENDS`** = cần lúc **CHẠY** trên thiết bị
+- Yocto tự sinh phần lớn `RDEPENDS` nhờ quét **`shlibs`** — đọc `NEEDED` trong ELF của binary đã build.
+
+### ② QUAN SÁT — bbappend không fork source
+Viết một `.bbappend` đổi **một** thứ trong U-Boot (ví dụ `bootdelay` hoặc thêm biến env):
+```bash
+bitbake-layers create-layer ../meta-mylab
+bitbake-layers add-layer ../meta-mylab
+# meta-mylab/recipes-bsp/u-boot/u-boot_%.bbappend
+devtool modify u-boot           # cach de sua + xem diff
+```
+📋 **DÁN `.bbappend` + xác nhận thay đổi xuất hiện trên board** *(chưa chạy)*
+```
+(chua chay)
+```
+
+### ③ PHÁ — ⭐ phần đắt nhất bài này
+Đóng gói **một plugin nạp bằng `dlopen()`** (không link trực tiếp), rồi:
+
+| Thử gì | Dự đoán | Thực tế |
+|---|---|---|
+| `readelf -d app \| grep NEEDED` — có thấy thư viện plugin không? | | *(chưa chạy)* |
+| Cài image lên board, chạy app — nó tìm thấy plugin không? | | *(chưa chạy)* |
+| Thêm `RDEPENDS:${PN} += "libplugin"` rồi build lại | | *(chưa chạy)* |
+
+⭐ **Đây chính là câu trả lời bạn thiếu:** `shlibs` quét `NEEDED` trong ELF — mà **`dlopen()` không tạo ra `NEEDED`**. Thư viện được mở **lúc chạy, theo tên chuỗi**, nên build system **không thể** biết. Cùng lớp vấn đề: file cấu hình, script, dữ liệu, binary gọi qua `system()`. Những thứ đó **phải khai `RDEPENDS` bằng tay**.
+
+### ④ ĐỐI CHIẾU
+Trả lời lại [BSP-018](#) kèm **ca cụ thể vừa dựng**. Câu chốt: *"`shlibs` chỉ thấy được thứ linker ghi vào ELF. Cái gì phân giải **lúc chạy theo tên** — `dlopen`, script, file cấu hình — thì nó mù, và mình phải khai tay."*
+
+**Nối câu hỏi:** 🔴 [BSP-018](#) · [SD-030](system-design.md) *(`dlopen`/`dlsym`)*
+</details>
+
+#### BSP-038 · 🟡 · lab 🧪 · 🎤 2026-08-27 · [→ yocto](../../../06-build-systems/yocto.md)
+**🧪 sstate — đo xem nó thật sự tiết kiệm bao nhiêu, đừng tin lời quảng cáo.**
+
+<details><summary>Bốn bước · chỗ dán output · vì sao</summary>
+
+### ① ĐỌC
+[yocto.md](../../../06-build-systems/yocto.md) mục sstate. Ý cốt lõi: sstate cache **kết quả từng task**, không phải từng recipe ⇒ đổi một thứ nhỏ thì chỉ **những task phụ thuộc nó** chạy lại.
+
+### ② QUAN SÁT — ba phép đo
+```bash
+time bitbake core-image-minimal                      # (1) da build roi -> gan nhu tuc thi?
+bitbake -c cleansstate u-boot && time bitbake core-image-minimal   # (2) build lai rieng u-boot
+rm -rf tmp/ && time bitbake core-image-minimal       # (3) xoa tmp, GIU sstate
+```
+📋 **DÁN ba con số thật** *(chưa chạy)*
+
+| Phép đo | Thời gian |
+|---|---|
+| (1) không đổi gì | *(chưa chạy)* |
+| (2) sau `cleansstate u-boot` | *(chưa chạy)* |
+| (3) xoá `tmp/`, giữ `sstate-cache/` | *(chưa chạy)* |
+
+⭐ **Phép đo (3) là phép đo dạy nhiều nhất** — nó cho thấy sstate là thứ tách *"kết quả build"* khỏi *"thư mục làm việc"*. Đây là lý do CI dùng được nó.
+
+### ③ PHÁ
+| Thử gì | Dự đoán | Thực tế |
+|---|---|---|
+| Đổi một dòng trong `.bbappend` rồi build lại — bao nhiêu task chạy lại? | | *(chưa chạy)* |
+| `bitbake -S printdiff core-image-minimal` | | *(chưa chạy)* |
+
+### ④ ĐỐI CHIẾU
+Câu chốt cho phỏng vấn: *"sstate cache theo **task** và khoá theo **hash của đầu vào task đó**. Đổi một biến ảnh hưởng tới nhiều task thì nhiều thứ chạy lại — nên câu hỏi thật không phải 'sstate nhanh không' mà là **'thay đổi của tôi làm hỏng hash của bao nhiêu task'**."*
+
+**Nối câu hỏi:** [BSP-017](#) · [BSP-018](#) · [BLD-*](build-systems.md)
+</details>
+
+---
+
 ⬅️ [Bank index](README.md)

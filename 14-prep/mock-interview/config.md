@@ -120,7 +120,7 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
   | `BSP` | bsp.md | `DSA` | dsa.md |
   | `SD` | system-design.md | `NET` | networking.md |
   | `BEH` | behavioral.md | `COD` | coding.md |
-  | **`RES`** | **resume.md** — bám [RESUME.tex](../../RESUME.tex) | | |
+  | **`RES`** | **resume.md** — bám [RESUME_embedded_linux.tex](../../RESUME_embedded_linux.tex) | | |
 
   > ⚠️ **`RES` có dạng đáp án RIÊNG.** Chỉ ứng viên mới biết họ đã làm gì, nên đáp án **không phải "lời giải"** mà là **khung 4 phần**: *interviewer đang dò gì · câu trả lời tốt gồm · nền kỹ thuật phải nắm · bẫy*. Chấm theo **khung tiếp cận** (🏗️), không theo đáp án duy nhất.
 

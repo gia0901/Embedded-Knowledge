@@ -27,7 +27,7 @@
 
 Trước phiên, `DRV` bị xếp **ưu tiên 🔴 số 1** vì phủ 0%. Kết quả: **3.92** — cao hơn hẳn domain đã ôn kỹ (`CPP` phủ 71% ≈ 3.2 · `LNX` phủ 59% = 2.1–2.67).
 
-**Nguyên nhân rõ khi đối chiếu [RESUME.tex](../../../RESUME.tex):** đây là việc ứng viên **làm hằng ngày** (driver HAL, device tree, kernel migration 5.10→6.12). Độ phủ đo *"đã hỏi chưa"*, **không** đo *"có biết không"* — hai thứ đã bị lẫn khi lập bảng ưu tiên 17/08.
+**Nguyên nhân rõ khi đối chiếu [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex):** đây là việc ứng viên **làm hằng ngày** (driver HAL, device tree, kernel migration 5.10→6.12). Độ phủ đo *"đã hỏi chưa"*, **không** đo *"có biết không"* — hai thứ đã bị lẫn khi lập bảng ưu tiên 17/08.
 
 ⇒ **Sửa plan:** hạ `DRV` khỏi 🔴. D2–D4 rút còn **một `rapid`/ngày**, bỏ `daily` kèm theo. Giờ tiết kiệm dồn sang `BSP` (6%), `SD` (12%), `BEH`/`RES` (0%) — nơi **chưa có bằng chứng nào** về độ vững.
 

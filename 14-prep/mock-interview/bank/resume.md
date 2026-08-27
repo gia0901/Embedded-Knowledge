@@ -1,6 +1,6 @@
 # 📄 RES — Câu hỏi bám RESUME
 
-> **Domain `RES`.** Mọi câu ở đây bám vào **một dòng cụ thể trong [RESUME.tex](../../../RESUME.tex)**. Đây là phần **chắc chắn 100% bị hỏi** — khác với câu kỹ thuật thuần chỉ *có thể* bị hỏi. Phỏng vấn thật dành **30–50%** thời gian ở đây.
+> **Domain `RES`.** Mọi câu ở đây bám vào **một dòng cụ thể trong [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex)**. Đây là phần **chắc chắn 100% bị hỏi** — khác với câu kỹ thuật thuần chỉ *có thể* bị hỏi. Phỏng vấn thật dành **30–50%** thời gian ở đây.
 >
 > ⚠️ **Đáp án ở file này KHÔNG phải "lời giải".** Chỉ bạn mới biết bạn đã làm gì. Đáp án là **KHUNG**, gồm 4 phần:
 > 1. **Interviewer đang dò gì** — câu hỏi thật nằm sau câu hỏi bề mặt.

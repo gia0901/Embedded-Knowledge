@@ -205,7 +205,7 @@ Cùng ý — nhưng vế sau **nói về mình**, vế trước **nói về giá
 
 | Nguồn | Con số |
 |---|---|
-| [RESUME.tex](../../../RESUME.tex) | *"giảm >50%"* |
+| [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex) | *"giảm >50%"* |
 | Phiên 23/08 | *"1 ngày → 10 phút + 1 tiếng review"* |
 | Phiên 24/08 | *"1-2 ngày → 1-2 giờ"* |
 
@@ -213,7 +213,7 @@ Cùng bậc nên không ai bắt bẻ được — nhưng **chốt một phiên 
 
 **Chốt:** *"Tách 'JD nhấn mạnh gì' khỏi 'đội khó tuyển gì' — chúng không giống nhau."*
 **Lần sau sẽ hỏi:** *"nếu đội đã có người mạnh cả ba thứ đó thì em còn mang lại gì?"*
-**Ôn:** [bank BEH-007](../bank/behavioral.md) · [RESUME.tex](../../../RESUME.tex)
+**Ôn:** [bank BEH-007](../bank/behavioral.md) · [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex)
 </details>
 
 ---

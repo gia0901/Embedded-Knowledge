@@ -362,7 +362,7 @@ Câu cuối **chuyển quả bóng về phía họ** mà **không hạ giá**.
 
 **Chốt:** *"Ba trụ, mỗi trụ một bằng chứng cụ thể. Không có bằng chứng thì đó chỉ là lời tự khen."*
 **Lần sau sẽ hỏi:** *"trong ba thứ em vừa nêu, thứ nào em nghĩ đội anh thiếu nhất?"* — ép xếp hạng, dò hiểu biết về JD.
-**Ôn:** [bank BEH-007](../bank/behavioral.md) · [RESUME.tex](../../../RESUME.tex)
+**Ôn:** [bank BEH-007](../bank/behavioral.md) · [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex)
 </details>
 
 ---
@@ -427,7 +427,7 @@ Hỏi câu về **cross-layer debug infrastructure** là phát tín hiệu *"tô
 
 Đây là **thang đo mức độ chuẩn bị**, không phải thang đo năng lực. `BEH` là domain **duy nhất chưa từng đầu tư một giờ nào** — và là domain **100% bị hỏi**, thường **ngay 10 phút đầu**, đúng lúc interviewer hình thành ấn tượng.
 
-**Tin tốt: đây là domain RẺ NHẤT để sửa.** Không cần học gì mới — chất liệu đủ trong [RESUME.tex](../../../RESUME.tex) và trong 4 log phiên trước. Chỉ cần **viết ra và nói to**.
+**Tin tốt: đây là domain RẺ NHẤT để sửa.** Không cần học gì mới — chất liệu đủ trong [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex) và trong 4 log phiên trước. Chỉ cần **viết ra và nói to**.
 
 ---
 
