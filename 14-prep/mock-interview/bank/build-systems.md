@@ -1,6 +1,6 @@
 # BLD — Build systems (CMake, Yocto, cross-compile, CI)
 
-> Domain `BLD`. Hệ build cho embedded Linux: CMake, Yocto, cross-compile, CI. Nguồn: [06-build-systems](../../../06-build-systems/). Track dùng: `bsp`, `cpp-system`, `melp`. Yocto/BSP-layer chuyên sâu còn ở [BSP-017…019](bsp.md).
+> Domain `BLD`. Hệ build cho embedded Linux: CMake, Yocto, cross-compile, **CI/CD & automated test farm**. Nguồn: [06-build-systems](../../../06-build-systems/). Track dùng: `bsp`, `cpp-system`, `melp`. Yocto/BSP-layer chuyên sâu còn ở [BSP-017…019](bsp.md).
 > 📑 Thứ tự theo **chủ đề** (mục A, B, C…), không theo số ID — thêm câu mới đặt vào đúng mục ([vì sao](README.md#-id--vị-trí-trong-file)).
 
 | Mục | Nội dung | Câu |
@@ -9,7 +9,7 @@
 | **B** | CMake | 4 |
 | **C** | Cross-compilation | 4 |
 | **D** | Yocto | 6 |
-| **E** | CI cho embedded | 1 |
+| **E** | CI cho embedded & test farm | 18 |
 
 ---
 
@@ -520,7 +520,108 @@ bitbake -S printdiff <target>    # ⭐ CHAN DOAN: hash nao doi so voi lan truoc
 
 ---
 
-## E — CI cho embedded
+## E — CI cho embedded & test farm
+
+#### BLD-030 · 🟢 · concept · [→ ci-and-test-farm §1.1](../../../06-build-systems/ci-and-test-farm.md)
+**Continuous Integration là gì, và nó sinh ra để giải vấn đề gì?**
+<details><summary>Đáp án</summary>
+
+Gộp code vào nhánh chung **thường xuyên** (≥1 lần/ngày), và mỗi lần gộp có máy **tự build + test**. Giải *integration hell*: để lâu không gộp thì các bản phân kỳ, xung đột dồn thành một đống không gỡ nổi. ⚠️ Chữ *"continuous"* nói về **tần suất gộp**, không phải về việc có Jenkins.
+</details>
+
+---
+
+#### BLD-031 · 🟡 · concept · [→ ci-and-test-farm §1.2](../../../06-build-systems/ci-and-test-farm.md)
+**Phân biệt CI, Continuous Delivery và Continuous Deployment. Ở embedded thường dừng ở đâu, vì sao?**
+<details><summary>Đáp án</summary>
+
+| Thuật ngữ | Tự động tới đâu | Bước cuối do ai |
+|---|---|---|
+| **CI** — Integration | gộp → build → test | dừng ở đây |
+| **CD** — **Delivery** | + đóng gói thành **bản phát hành sẵn sàng** | **người** bấm nút |
+| **CD** — **Deployment** | + **tự đưa ra thật** | không ai bấm |
+
+**⭐ Ở embedded "deploy" = OTA xuống thiết bị của khách**, không phải đổi container trên server:
+
+| | Web | Embedded |
+|---|---|---|
+| Rollback | đổi container, **giây** | phải OTA lần nữa; máy có thể đã **brick** |
+| Nơi chạy | máy chủ mình kiểm soát | **thiết bị của khách**, mất điện giữa chừng được |
+| Xấu nhất | site lỗi vài phút | **cục gạch**, phải thu hồi |
+
+⇒ Embedded gần như luôn dừng ở **Continuous Delivery**: máy lo tới *"đã ký, đã test, sẵn sàng phát hành"*, còn **phát hành là quyết định của người**, thường theo đợt (canary/staged rollout).
+
+**Chốt:** *"Ở web deploy là thao tác đảo được trong vài giây; ở embedded nó là thứ có thể biến máy của khách thành cục gạch — nên bước cuối luôn có người."*
+</details>
+
+---
+
+#### BLD-032 · 🟡 · concept · [→ ci-and-test-farm §1.3](../../../06-build-systems/ci-and-test-farm.md)
+**Giải thích các thuật ngữ pipeline: stage, job, runner, artifact, trigger, gate, DUT, HIL — và chúng là cái gì trong ngữ cảnh embedded?**
+<details><summary>Đáp án</summary>
+
+| Từ | Nghĩa chung | Ở embedded |
+|---|---|---|
+| **Pipeline** | chuỗi bước tự động sau một sự kiện | submit → build 10 platform → test trên board |
+| **Stage** | nhóm bước, xong mới sang nhóm sau | `build` → `smoke` → `robustness` |
+| **Job** | việc chạy độc lập, song song được | "build cho platform A" |
+| **Runner/agent** | máy thực thi job | máy build **x86** — **không** chạy được binary ARM |
+| **Artifact** | sản phẩm giữ lại sau job | **image**, kernel, SDK, gói `-dbg`, manifest |
+| **Trigger** | cái làm pipeline chạy | submit, nightly, gọi tay |
+| **Gate** | điều kiện phải pass mới đi tiếp | *"pass hết mới vào source chính"* |
+| **DUT** | Device Under Test | chính thiết bị trên bàn |
+| **HIL** | Hardware In the Loop | test có **phần cứng thật** trong vòng lặp |
+
+⚠️ **Điểm dễ trả lời hời hợt — artifact ở embedded nặng ký hơn ở web:** thiết bị bán ra sống **5–10 năm**; hai năm sau có lỗi hiện trường thì cần **đúng image đó** và **đúng symbol của bản build đó** để đọc backtrace ([BLD-028](build-systems.md)). Không lưu artifact + manifest version = **không điều tra được**.
+</details>
+
+---
+
+#### BLD-033 · 🟡 · concept · [→ ci-and-test-farm §1.5](../../../06-build-systems/ci-and-test-farm.md)
+**Unit / integration / system test và smoke / regression / soak test — quan hệ giữa hai bộ khái niệm này là gì?**
+<details><summary>Đáp án</summary>
+
+Chúng là **hai trục vuông góc**, không phải hai mức của cùng một thang:
+
+| Trục | Các mức | Trả lời |
+|---|---|---|
+| **Phạm vi** (test *cái gì*) | unit → integration → system → acceptance | *"kiểm một hàm, hay cả cái TV?"* |
+| **Mục đích** (test *để làm gì*) | smoke · functional/robustness · **regression** · soak/stress · performance | *"tôi muốn biết điều gì?"* |
+
+Mỗi bài test có **một toạ độ trên mỗi trục**: *smoke* thường là **system** + mục đích *"còn sống không"*; *regression* có thể là **unit** (chạy lại test cũ sau mỗi sửa) hoặc **system**; *soak* gần như luôn **system**.
+
+**Chốt:** *"'unit/integration/system' nói **phạm vi**, 'smoke/regression/soak' nói **mục đích** — hỏi 'smoke là unit hay system' là hỏi sai trục."*
+</details>
+
+---
+
+#### BLD-034 · 🟢 · concept · [→ ci-and-test-farm §1.4](../../../06-build-systems/ci-and-test-farm.md)
+**Test farm là gì? DUT và HIL nghĩa là gì?**
+<details><summary>Đáp án</summary>
+
+**Test farm**: một nhóm **thiết bị thật** được nối vào hạ tầng điều khiển từ xa (nguồn, serial, cài image, bơm input, thu output) để pipeline **tự chạy test trên phần cứng, không cần người**. **DUT** = Device Under Test, thiết bị đang bị test. **HIL** = Hardware In the Loop: vòng lặp test có phần cứng thật bên trong.
+</details>
+
+---
+
+#### BLD-035 · 🟡 · concept · ⭐ · [→ ci-and-test-farm §1.4](../../../06-build-systems/ci-and-test-farm.md)
+**Vì sao embedded bắt buộc phải test trên board thật? Test trên host và QEMU không đủ ở chỗ nào — và nên chia việc thế nào?**
+<details><summary>Đáp án</summary>
+
+**Bản chất:** phần mềm embedded chỉ **đúng khi đứng cùng phần cứng của nó**. Nhiều lớp lỗi **không thể** lộ trên máy build: timing thật, ngắt thật, tín hiệu thật, panel/cảm biến thật, nhiệt, nguồn.
+
+| Cách chạy | Bắt được | **Không** bắt được |
+|---|---|---|
+| **Host** (unit test, ASan/TSan) | logic thuần, lỗi bộ nhớ | mọi thứ dính phần cứng |
+| **QEMU / mô phỏng** | boot, userspace, phần nhiều kernel | **timing thật**, ngoại vi thật, panel |
+| **Board thật (HIL)** | ✅ hành vi thật, **số đo thật** | (đổi lại: chậm, đắt, **board hỏng được**) |
+
+**⭐ Chia việc — đây mới là phần ăn điểm:** **đẩy càng nhiều test xuống host càng tốt** (rẻ, nhanh, không giòn), **để dành farm cho thứ chỉ phần cứng mới trả lời được**. Farm là tài nguyên **đắt nhất** trong pipeline — dùng nó cho việc host làm được là lãng phí, và còn làm hàng đợi gate dài thêm ([BLD-021](build-systems.md)).
+
+⚠️ **Bẫy:** trả lời *"vì kiến trúc ARM khác x86"* là mới chạm nửa vấn đề — QEMU giải được đúng phần đó mà vẫn không thay được board.
+</details>
+
+---
 
 #### BLD-010 · 🟠 · design · [→ yocto](../../../06-build-systems/yocto.md)
 **Thiết kế CI (vd Jenkins) cho một dự án embedded Linux?**
@@ -531,6 +632,268 @@ bitbake -S printdiff <target>    # ⭐ CHAN DOAN: hash nao doi so voi lan truoc
 - **Test trên target**: sau build, deploy image lên **board thật / QEMU / HIL** (hardware-in-the-loop) chạy smoke test + integration; thu log/artifact.
 - **Artifact**: lưu image + SDK + manifest version cho truy vết; tag theo commit.
 - Đánh đổi: build Yocto nặng → sstate + build node mạnh; test HIL cần hạ tầng phần cứng. Nêu được "sstate cache để CI không build lại từ đầu" là điểm cộng.
+</details>
+
+#### BLD-020 · 🟡 · concept · [→ ci-and-test-farm §2](../../../06-build-systems/ci-and-test-farm.md)
+**CI cho embedded khác CI cho một dịch vụ web ở chỗ nào? Nêu hệ quả hạ tầng của từng khác biệt.**
+<details><summary>Đáp án</summary>
+
+Ba khác biệt, mỗi cái ép ra một yêu cầu hạ tầng:
+
+| Khác biệt | Web | Embedded | Hệ quả bắt buộc |
+|---|---|---|---|
+| Chi phí build | giây–phút | **phút–giờ**, cross-compile, có khi cả rootfs | **sstate/artifact cache** dùng chung, build node mạnh |
+| Nơi chạy test | ngay trên runner | ❌ binary ARM **không chạy trên runner x86** | board thật / QEMU / **HIL** |
+| Trạng thái sau test | container xoá là sạch | 🔴 board **giữ trạng thái**, treo được, **hỏng thật** | flash lại + **cắt nguồn từ xa** + health check |
+
+**Vì sao — tầng nông:** "vì phải chạy trên phần cứng."
+**⭐ Tầng sâu:** CI web coi runner là tài nguyên **vô hạn, dùng một lần**; CI embedded coi board là tài nguyên **hữu hạn, dùng lại, biết hỏng**. Gần như mọi phức tạp của test farm sinh ra từ câu đó — quá nửa công sức không nằm ở *chạy test* mà ở **đưa board về trạng thái sạch, biết nó đang hỏng, và cứu nó không cần người tới bàn**.
+
+**Chốt:** *"Khác biệt lớn nhất không phải kiến trúc CPU, mà là runner vứt đi được còn board thì phải bảo trì."*
+</details>
+
+---
+
+#### BLD-021 · 🟠 · concept · ⭐ · [→ ci-and-test-farm §3](../../../06-build-systems/ci-and-test-farm.md)
+**Dự án bắt buộc mọi thay đổi phải qua pipeline mới vào được source chính, không có đường submit tay. Mô hình này tên gì, được lợi gì, và cái giá là gì?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế** — gọi là **pre-merge gating / gated check-in**: thay đổi vào **hàng đợi** → build toàn bộ matrix + test → **pass mới chạm trunk**. Đối lập là **post-merge**: vào trunk trước, hỏng thì revert.
+
+| | Post-merge | **Pre-merge (gated)** |
+|---|---|---|
+| Trunk có bao giờ hỏng | **có** | ~không |
+| Độ trễ cho người submit | phút | **cả pipeline** |
+| Thông lượng | cao | **giới hạn bởi hàng đợi** |
+| Hợp khi | ít platform, revert rẻ | **nhiều platform, trunk hỏng đắt** |
+
+**Vì sao — tầng nông:** "để trunk không hỏng."
+**⭐ Tầng sâu (định lượng):** trunk hỏng **không phải** "một người build lỗi" mà là **N kỹ sư × số giờ bị chặn**; tệ hơn, người gây hỏng thường **không phải** người phát hiện, nên thời gian truy thủ phạm cũng là chi phí. Càng nhiều platform × nhiều team thì N càng lớn ⇒ gated thắng.
+
+**Cái giá — phải nêu, nếu không là trả lời một chiều:**
+1. **Hàng đợi thành nút cổ chai**: pipeline mất *T* ⇒ thông lượng trần `1/T`.
+2. **Gom lô đổi thông lượng lấy khả năng chẩn đoán**: test 8 thay đổi một lượt, pass thì nhanh gấp 8; hỏng thì **không biết cái nào** ⇒ phải **bisect** lô.
+3. **Bị chặn oan** khi lô chung hỏng vì lỗi người khác.
+4. **Cổng chậm quá sẽ đẻ ra đường tắt** cho "bản gấp" — lúc đó cổng bắt đầu chết.
+
+⚠️ **Bẫy:** khen gated mà không nói được nút cổ chai + bisect ⇒ nghe như chưa từng đứng trong hàng đợi đó.
+</details>
+
+---
+
+#### BLD-022 · 🟡 · concept · [→ ci-and-test-farm §4](../../../06-build-systems/ci-and-test-farm.md)
+**Pipeline build cùng một thay đổi trên ~10 platform khác chip. Vì sao không build một lần cho xong? Cái gì thực sự khác nhau giữa các platform?**
+<details><summary>Đáp án</summary>
+
+| Khác nhau ở | Lỗi chỉ lộ trên một platform |
+|---|---|
+| **Toolchain/compiler version** | warning mới hoá lỗi với `-Werror` |
+| **Kernel version** | API kernel đổi (5.10 → 6.x) ⇒ driver không build; symbol thành `EXPORT_SYMBOL_GPL` |
+| **Kernel config / `#ifdef`** | code nằm trong `#ifdef CONFIG_X` — platform tắt config đó **chưa từng build tới dòng đó** |
+| **Kiến trúc/ABI** | 32 vs 64-bit: `long`, con trỏ, alignment |
+| **Device tree / driver set** | node thiếu ⇒ `-EPROBE_DEFER` mãi mãi, chỉ lộ lúc chạy |
+| **Vendor BSP fork** | mỗi vendor vá kernel khác nhau |
+
+⚠️ **Bẫy phổ biến:** *"code C++ thuần thì build đâu cũng như nhau"* — sai ở dòng `#ifdef`: nhánh bị tắt **chưa từng được compiler đọc**, tức chưa cả được kiểm cú pháp, chứ không phải "chưa test".
+
+**Nối Yocto:** mỗi dòng matrix ≈ một **`MACHINE`**; build 10 lần vẫn chịu nổi nhờ **sstate-cache** dùng chung (phần `allarch`/native tái dùng, chỉ phần machine-specific build lại) — xem [BLD-006](build-systems.md).
+</details>
+
+---
+
+#### BLD-023 · 🟡 · concept · ⭐ · [→ ci-and-test-farm §5](../../../06-build-systems/ci-and-test-farm.md)
+**Smoke test gồm những gì, và khác robustness/functional test ở chỗ nào? Thứ tự chạy nên thế nào?**
+<details><summary>Đáp án</summary>
+
+**Smoke** trả lời đúng **một** câu: *"bản build này có đáng để đổ hàng giờ test lên không?"* (tên gốc từ phần cứng: cắm điện xem có bốc khói không). Trên thiết bị hiển thị:
+
+1. **Boot tới nơi** — bootloader → kernel → init → UI; bắt panic/watchdog/boot time.
+2. ⭐ **Đúng bản** — image báo đúng version. *Thiếu bước này thì flash trượt ⇒ test nguyên image cũ và **xanh hết**.*
+3. **Không crash** — không coredump mới, không `Oops` trong `dmesg`, service không failed.
+4. **Input có phản hồi** — remote ăn phím, đổi volume/nguồn vào.
+5. **Có hình/tiếng** — capture khung hình **không đen**, có audio.
+6. **Mạng lên**; 7. **Reboot 3–5 lần**; 8. **Quét log** (`FATAL`, `segfault`, `Call Trace`).
+
+| | **Smoke** | **Robustness** |
+|---|---|---|
+| Trả lời | *"còn sống không?"* | *"đủ tốt để ship không?"* |
+| Kết quả | **pass/fail** | **số đo + ngưỡng** (ms, fps) |
+| Phủ | rộng–nông | hẹp–sâu |
+| Thời lượng | **phút** | **giờ** |
+| Fail nghĩa là | build hỏng nặng | chất lượng suy giảm |
+
+**⭐ Thứ tự:** sắp cổng theo **chi phí phát hiện một lỗi, rẻ trước** — build/static/unit-test (host) → smoke → robustness → soak (nightly). Robustness chạy trước smoke = đốt hàng giờ để biết thứ 3 phút đã biết.
+
+**Chốt:** *"Smoke là cổng nhị phân rẻ tiền; robustness là phép đo đắt tiền. Đảo thứ tự là tự trả giá tối đa cho một lỗi tối thiểu."*
+</details>
+
+---
+
+#### BLD-024 · 🟠 · design · ⭐ · 🏗️ · [→ ci-and-test-farm §6](../../../06-build-systems/ci-and-test-farm.md)
+**Thiết kế một test farm tự động chạy test trên TV thật sau mỗi lần build. Cần những khối gì và vì sao mỗi khối là bắt buộc?**
+<details><summary>Đáp án</summary>
+
+**Sáu khối, mỗi khối trả lời một câu hỏi "nếu thiếu thì sao":**
+
+| # | Khối | Thiếu thì sao |
+|---|---|---|
+| ① | **Điều khiển nguồn** (relay/PDU) | Test làm treo thiết bị là **chuyện thường**, không phải ngoại lệ ⇒ mỗi lần treo cần người đi cắm lại ⇒ **farm chết sau 6h chiều** |
+| ② | **Serial console** | Là kênh **duy nhất còn sống** khi mạng chưa lên / UI chết / **kernel panic** ⇒ không có = không có bằng chứng cho ca đáng giá nhất |
+| ③ | **Flash tự động** (USB/ethernet) | Không đưa được về **trạng thái sạch đã biết** ⇒ job sau nhiễm trạng thái job trước |
+| ④ | **Bơm input**: phát **IR**, **pattern generator** cấp source | Không có người bấm remote; cần **nguồn tín hiệu tất định** |
+| ⑤ | **Thu output**: capture card + **camera rời** | Cách duy nhất biết "màn hình có hiện đúng không" và **đo được thời gian** |
+| ⑥ | **Orchestrator + device pool + thu log** | Xếp hàng job, cấp phát board, **health check**, gỡ board hỏng khỏi pool, gom bằng chứng |
+
+**⭐ Vì sao pattern generator chứ không mở một video thật:**
+1. **Tất định** — biết chính xác khung hình *phải* ra sao ⇒ so bằng checksum/histogram, kết quả **quyết định được**.
+2. **Không kéo mạng/CDN/DRM vào đường dẫn test** ⇒ tránh flaky không liên quan tới code.
+3. **Ép được ca biên** — đổi độ phân giải, tần số quét, HDR/SDR, tín hiệu ngoài chuẩn.
+
+**Vận hành (chỗ hay bị bỏ):** board hỏng dần phải **tự rút khỏi pool**, và báo cáo phải **phân biệt "hỏng do hạ tầng" với "hỏng do code"** — không thì mọi thống kê thành vô nghĩa.
+</details>
+
+---
+
+#### BLD-036 · 🟡 · concept · ⭐ · [→ ci-and-test-farm §6.1](../../../06-build-systems/ci-and-test-farm.md)
+**Image có thể đưa lên thiết bị bằng USB rời (cắm tay) hoặc qua ethernet. Chọn đường nào cho test farm, và vì sao vẫn phải giữ đường còn lại?**
+<details><summary>Đáp án</summary>
+
+| | **USB rời** | **Ethernet** |
+|---|---|---|
+| Ai thao tác | 🔴 **người cắm tay** | máy — **tự động hoá được** |
+| Thiết bị cần ở trạng thái nào | gần như **chết cũng cài được** (recovery/ROM) | phải **boot đủ xa để có mạng** |
+| Dùng để | **cứu máy**, bring-up | **vòng lặp hằng ngày** |
+
+**⭐ Ba hệ quả:**
+1. **Ethernet là con đường duy nhất cho farm chạy không người.** Còn phải cắm USB nghĩa là còn người trong vòng lặp ⇒ chưa phải test tự động, chỉ là test có script hỗ trợ.
+2. 🔴 **Nhưng ethernet không tự cứu được chính nó** — cài qua mạng đòi thiết bị boot đủ xa để có mạng. Đúng lúc cần nhất (image mới làm máy không boot) thì đường đó **biến mất**. ⇒ phải có **đường thoát không phụ thuộc bản đang chạy**: USB/recovery, bootloader nạp qua **serial/TFTP**, hoặc **A/B partition** tự quay về bản cũ.
+3. **Đó là lý do khối nguồn + serial không thừa** ([BLD-024](build-systems.md)): chuỗi cứu chuẩn là **cắt nguồn → bật lại → bắt bootloader qua serial → nạp lại**.
+
+**Chốt:** *"Ethernet là đường cài hằng ngày vì tự động hoá được; USB/serial là đường cứu hộ vì không phụ thuộc firmware đang nằm trên máy. Farm cần cả hai — nhưng chỉ đường thứ nhất quyết định farm có chạy qua đêm được không."*
+</details>
+
+---
+
+#### BLD-025 · 🟠 · concept · ⭐ · [→ ci-and-test-farm §8](../../../06-build-systems/ci-and-test-farm.md)
+**Yêu cầu: "bấm remote tới lúc hình đổi ≤ 200 ms". Vì sao không đo bằng `clock_gettime()` ngay trong phần mềm trên thiết bị?**
+<details><summary>Đáp án</summary>
+
+Ba lý do, và cả ba đều là lý do **thiết kế phép đo**, không phải chuyện độ chính xác đồng hồ:
+
+| Vấn đề | Vì sao đo từ trong sai |
+|---|---|
+| **Không thấy điểm cuối thật** | Phần mềm chỉ biết lúc nó **gửi khung hình đi**; scaler, TCON, thời gian đáp ứng panel nằm **sau** đó ⇒ mắt người thấy chậm hơn số in ra |
+| **Thiếu điểm đầu thật** | Đồng hồ chạy từ lúc **driver IR nhận mã**, không tính từ lúc **ngón tay bấm** |
+| 🔴 **Hiệu ứng quan sát viên** | Code đo chịu **chính cái tải** đang đo: hệ quá tải thì tiến trình đo cũng bị hoãn ⇒ **báo số đẹp hơn sự thật đúng lúc hệ tệ nhất** |
+
+**Cách đúng — cả hai đầu nằm ngoài thiết bị:** bộ điều khiển đo phát kích thích tại `t0` (IR), camera tốc độ cao / cảm biến quang ghi lúc khung hình đổi thật `t1`; `delay = t1 − t0` **trên cùng một đồng hồ ngoài** ⇒ không cần đồng bộ thời gian với DUT, loại nguồn sai số lớn nhất ngay từ thiết kế. Camera 240 fps ≈ độ phân giải 4 ms; cần hơn thì photodiode dán lên màn.
+
+**Chốt:** *"Không đo được độ trễ của chính mình từ bên trong — cả hai đầu đều nằm ngoài phần mềm, và bản thân phép đo cũng chịu cái tải mà nó đang đo."*
+</details>
+
+---
+
+#### BLD-026 · 🟠 · concept · [→ ci-and-test-farm §10](../../../06-build-systems/ci-and-test-farm.md)
+**Flaky test là gì, và vì sao trên một cổng chặn (gated) nó nguy hiểm hơn hẳn trên CI thường? Xử lý thế nào?**
+<details><summary>Đáp án</summary>
+
+**Định nghĩa:** test cho kết quả khác nhau trên **cùng một code**.
+
+**⭐ Cơ chế nguy hiểm — không phải "chặn nhầm" mà là "ngừng chặn":**
+```
+hỏng ngẫu nhiên 5% → chặn oan người vô tội → người ta học "cứ bấm retry"
+   → retry thành phản xạ với MỌI lỗi → 🔴 lỗi THẬT cũng bị retry cho qua
+   → cổng vẫn tốn thời gian nhưng KHÔNG còn chặn gì
+```
+Cộng dồn rất nhanh: 200 test, mỗi test flaky 0.5% ⇒ `1 − 0.995²⁰⁰ ≈ **63%** số lần chạy có ít nhất một lỗi oan ⇒ gần như lần nào cũng phải retry.
+
+**Nguồn flaky đặc trưng embedded** (khác web): quang/cơ khí (camera lệch, ánh sáng phòng, cáp lỏng) · **`sleep` cố định** thay vì chờ điều kiện · trạng thái tồn dư từ job trước · **một board trong pool hỏng dần**.
+
+**Xử lý:**
+1. **Đo trước** — ghi tỉ lệ pass/fail theo thời gian; không đo thì tranh cãi bằng cảm giác.
+2. **Quarantine** — gỡ khỏi gate, chuyển nightly, có hạn sửa. Giữ trên gate là hy sinh cả cổng cho một test.
+3. **Bỏ `sleep`, chờ theo điều kiện** (log ra dòng X / cổng mở) có timeout.
+4. **Health check board** trước job; board hỏng **tự rút khỏi pool**.
+5. **Tách "hỏng do hạ tầng" khỏi "hỏng do code"** trên báo cáo.
+
+**Chốt:** *"Flaky không làm cổng chặn sai — nó làm cổng ngừng chặn."*
+</details>
+
+---
+
+#### BLD-027 · 🟠 · concept · ⭐ · [→ ci-and-test-farm §7](../../../06-build-systems/ci-and-test-farm.md)
+**Pipeline development đo bằng thiết bị rời (IR, capture, camera), còn verification dưới nhà máy lại dùng test daemon chạy trên máy và app gọi API. Vì sao hai nơi chọn hai kiến trúc khác nhau?**
+<details><summary>Đáp án</summary>
+
+| | **Quan sát ngoài (black-box)** | **Test daemon trên thiết bị** |
+|---|---|---|
+| Thấy được | **đúng cái người dùng thấy** | **giá trị bên trong**: sensor, calib, ID panel |
+| Ảnh hưởng lên hệ | ~0 | **có** — chiếm CPU/RAM, và **là phần mềm không có trong bản ship** |
+| Tốc độ mỗi phép đo | chậm (khung hình, quang học) | **rất nhanh** (một lời gọi API) |
+| Độ giòn | cao (ánh sáng, cáp, đặt camera) | thấp |
+| Dùng ở | **pipeline development** | **verification nhà máy** |
+
+**⭐ Ba lý do:**
+1. **Đối tượng cần chứng minh khác nhau.** Pipeline dev hỏi *"thay đổi code có làm hỏng **hành vi** không?"* ⇒ phải quan sát **như người dùng**, vì lỗi hay nằm đúng ở khoảng cách giữa *"API trả về OK"* và *"màn hình vẫn sai"*. Nhà máy hỏi *"**cái máy cụ thể này** lắp/hiệu chỉnh đúng chưa?"* — phần mềm đã cố định, cần đọc giá trị bên trong.
+2. 🔴 **Daemon làm bạn test một image khác image đem bán.** Thêm phần mềm = đổi bộ nhớ, lịch CPU, thời điểm; với chỉ tiêu **thời gian đáp ứng** thì chính công cụ đo thành nguồn sai số. Nhà máy chấp nhận được vì thứ đang kiểm là **phần cứng**, không phải build.
+3. **Ràng buộc thông lượng ngược nhau.** Nhà máy: **hàng nghìn máy × vài chục giây** ⇒ không soi camera nổi. Dev: **vài build/ngày × hàng giờ** ⇒ đủ chỗ cho phép đo quang học chậm mà trung thực.
+
+**Chốt:** *"Pipeline dev đo **build** nên phải đo từ ngoài để khỏi làm sai lệch thứ đang đo; nhà máy đo **từng đơn vị phần cứng** trên một build đã cố định nên đo từ trong là hợp lý và nhanh hơn nhiều."*
+</details>
+
+---
+
+#### BLD-028 · 🟡 · concept · [→ ci-and-test-farm §9](../../../06-build-systems/ci-and-test-farm.md)
+**Test farm nên thu những bằng chứng gì khi một bài test hỏng, và làm sao chuyển defect tới đúng team một cách tự động?**
+<details><summary>Đáp án</summary>
+
+**Vì sao cần tự động:** trên gate nhiều platform, **người làm hỏng thường không phải người đọc log** ⇒ giá trị lớn nhất không phải "lưu log" mà là **nhận dạng + định tuyến**.
+
+| Loại bằng chứng | Thu ở đâu | Ghi chú |
+|---|---|---|
+| **Message lỗi đặc thù của package** | log ứng dụng / journal | Rẻ nhất, **định tuyến tốt nhất** — chuỗi lỗi đã gắn với chủ sở hữu |
+| **Kernel `Oops` / `Call Trace`** | `dmesg` + serial | Hệ có thể còn sống ⇒ lấy qua mạng được |
+| 🔴 **Kernel panic** | **chỉ serial** | Mạng chết theo — không console = không bằng chứng |
+| **Core dump** | phân vùng riêng / gửi server | **Đắt**: dung lượng, thời gian ghi, có thể chứa dữ liệu nhạy cảm |
+
+**Cơ chế định tuyến:** trích **chữ ký lỗi** (tên tiến trình + hàm trên cùng backtrace + mẫu chuỗi lỗi) → tra bảng ánh xạ sang team sở hữu → mở defect. Kèm hai lợi ích: **gộp trùng** (cùng chữ ký = một defect, không đẻ 40 vé) và **đếm tần suất** ⇒ phân biệt lỗi **luôn xảy ra** với lỗi **flaky** ([BLD-026](build-systems.md)).
+
+⚠️ **Bẫy symbol:** image ship đã **strip** ⇒ backtrace chỉ là địa chỉ trần. Phải **giữ bản có symbol trên server đúng theo từng build** (gói `-dbg` của Yocto) rồi giải mã bằng `addr2line`/`gdb`. Không giữ = có dump mà đọc không ra.
+</details>
+
+---
+
+#### BLD-029 · 🟡 · concept · [→ ci-and-test-farm §11](../../../06-build-systems/ci-and-test-farm.md)
+**Nguồn nội bộ dùng Perforce, còn source SoC vendor trên Git — sửa trên Git rồi đồng bộ về Perforce. Chỗ nào dễ đau, và quản lý thay đổi trên source vendor thế nào cho đúng?**
+<details><summary>Đáp án</summary>
+
+| | **Perforce** | **Git** |
+|---|---|---|
+| Mô hình | **tập trung** — server là chân lý | **phân tán** |
+| Đơn vị | **changelist** (số tăng, nguyên tử) | commit (hash) |
+| Commit cục bộ | ❌ không | ✅ có |
+| Phạm vi | theo **đường dẫn** depot | theo **cả repo** |
+| Sửa lịch sử | gần như không | `rebase`/`amend` **sửa được** |
+
+**Bốn chỗ đau:**
+1. **Ai là chân lý** — mirror **một chiều** thì đơn giản; **hai chiều** mới sinh việc: conflict xảy ra **trong cầu nối**, không thuộc máy của ai.
+2. **Lịch sử không ánh xạ 1–1** — `rebase`/`squash`/force-push viết lại lịch sử, changelist thì **chỉ tiến** ⇒ hoặc cấm rebase nhánh đã sync, hoặc chấp nhận **gộp phẳng** (mất truy vết).
+3. **Cầu nối là điểm hỏng đơn lẻ** — nó chết thì hai bên **âm thầm phân kỳ**.
+4. ⭐ **Vendor ra bản mới va vào bản vá của mình.**
+
+**⭐ Cách đúng cho (4) — chính là mô hình Yocto:** giữ upstream nguyên vẹn, mọi thay đổi là **patch có thứ tự**:
+```bitbake
+SRC_URI = "git://github.com/vendor/driver.git;protocol=https;branch=main \
+           file://0001-fix-probe-defer.patch"
+SRCREV = "a1b2c3d4"   # ghim commit → build tái lập được
+```
+
+| Cách | Khi vendor cập nhật |
+|---|---|
+| 🔴 Fork rồi sửa thẳng | merge cả cây source; **không ai còn biết dòng nào là của mình** |
+| ✅ Patch chồng (`.bbappend`/quilt/`devtool`) | đổi `SRCREV`; patch nào **không áp được nữa thì báo lỗi ngay** — danh sách khác biệt luôn tường minh |
+
+**Chốt:** *"Đừng fork source vendor — giữ upstream nguyên vẹn và diễn đạt mọi thay đổi của mình dưới dạng patch có thứ tự."*
 </details>
 
 ---

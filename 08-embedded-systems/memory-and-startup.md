@@ -1,8 +1,14 @@
 # Bộ nhớ bare-metal & khởi động (startup / linker)
 
-> Bản đồ bộ nhớ của một chương trình bare-metal, chuyện gì xảy ra **trước `main()`**, linker script, và rủi ro stack/heap khi **không có MMU**. Bổ trợ cho [boot-process.md](boot-process.md) (boot *Linux*) — file này là startup **MCU**.
-> Ôn dạng phỏng vấn: bank [EMB-005…008](../14-prep/mock-interview/bank/embedded-fundamentals.md).
-
+> **TL;DR**
+> - Bốn section: **`.text`** (mã) và **`.rodata`** (hằng) nằm ở **flash**; **`.bss`** (biến khởi tạo 0) chỉ ở **RAM**; **`.data`** (biến có giá trị đầu) **tốn cả hai** — giá trị nằm trong flash rồi được **copy sang RAM lúc khởi động**.
+> - ⇒ Mẹo tiết kiệm RAM rẻ nhất: `char msg[] = "hi"` (`.data`) → **`const char msg[] = "hi"`** (`.rodata`, chỉ flash).
+> - **Trước `main()`** có startup/crt0: đặt stack pointer, **copy `.data` từ flash sang RAM**, **zero `.bss`**, khởi tạo runtime, rồi mới gọi `main`. Bỏ qua bước này là lý do biến toàn cục "có giá trị rác".
+> - **Linker script** quyết định cái gì nằm ở đâu — thứ mà trên PC bạn không bao giờ phải đụng tới.
+> - 🔴 **Không có MMU ⇒ stack overflow xảy ra ÂM THẦM**: stack tràn đè lên `.bss`/`.data`/heap và biến "tự đổi giá trị". Ba cách phát hiện thông thường (canary, watermark, so sánh SP) đều **phát hiện muộn** — chỉ **MPU** chặn được **tại chỗ**.
+> - **Heap trên MCU**: phân mảnh + `malloc` không tất định ⇒ nhiều hệ **cấm cấp phát động sau init**, dùng tĩnh/pool.
+>
+> Bổ trợ [bare-metal-c.md](bare-metal-c.md), [constraints.md](constraints.md), [interrupts-bare-metal.md](interrupts-bare-metal.md).
 ---
 
 ## 1. Các section: `.text` / `.rodata` / `.data` / `.bss`
@@ -165,6 +171,14 @@ MPU (có trên nhiều Cortex-M) **không phải MMU** — không dịch địa 
 
 ---
 
-## Ôn tập (bank)
+## Câu hỏi phỏng vấn liên quan
 
-[EMB-005](../14-prep/mock-interview/bank/embedded-fundamentals.md) (sections), [EMB-006](../14-prep/mock-interview/bank/embedded-fundamentals.md) (startup/crt0), [EMB-007](../14-prep/mock-interview/bank/embedded-fundamentals.md) (linker script), [EMB-008](../14-prep/mock-interview/bank/embedded-fundamentals.md) (stack/heap MCU). Liên quan: [constraints.md](constraints.md) (ràng buộc bộ nhớ), [DRV-016 hạn chế heap](../14-prep/mock-interview/bank/drivers-embedded.md).
+| ID | Câu hỏi |
+|----|---------|
+| [EMB-005](../14-prep/mock-interview/bank/embedded-fundamentals.md) | `.text` / `.data` / `.bss` / `.rodata` chứa gì, nằm ở đâu |
+| [EMB-006](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Chuyện gì xảy ra TRƯỚC `main()` trên MCU |
+| [EMB-007](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Linker script để làm gì trong bare-metal |
+| [EMB-008](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Stack/heap trên MCU — phát hiện stack overflow khi không có MMU |
+| [DRV-016](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao hạn chế heap trong embedded, thay bằng gì |
+
+⬅️ [Về 08-embedded-systems](README.md)

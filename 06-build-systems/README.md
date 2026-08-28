@@ -1,22 +1,26 @@
 # 06 — Build Systems
 
-Từ source tới binary: quá trình biên dịch/liên kết, Makefile (build thủ công, tường minh), CMake (meta-build, di động), và cross-compilation (build trên máy host cho target embedded khác kiến trúc). Phỏng vấn hay hỏi: "các bước từ .c tới executable", "header guard để làm gì", "cross-compile là gì", "vì sao dùng CMake".
+Từ source tới binary: quá trình biên dịch/liên kết, Makefile (build thủ công, tường minh), CMake (meta-build, di động), và cross-compilation (build trên máy host cho target embedded khác kiến trúc). Và cuối cùng là **nơi toàn bộ chuỗi đó chạy tự động**: CI/CD + automated test farm. Phỏng vấn hay hỏi: "các bước từ .c tới executable", "header guard để làm gì", "cross-compile là gì", "vì sao dùng CMake", "thiết kế CI cho embedded thế nào".
 
 ## 🗺️ Bức tranh tổng thể
 
-> **Sợi chỉ đỏ:** Cùng một câu chuyện "biến source thành binary" ở **ba mức trừu tượng tăng dần**: hiểu cơ chế → tự động hoá di động → mở rộng cho target khác.
+> **Sợi chỉ đỏ:** Cùng một câu chuyện "biến source thành binary" ở **năm mức trừu tượng tăng dần**: hiểu cơ chế → tự động hoá di động → mở rộng cho target khác → tái lập cả hệ thống → **chạy tự động, có kiểm chứng trên phần cứng thật**.
 
 ```mermaid
 flowchart LR
     M["<b>makefile</b><br/>CƠ CHẾ<br/><i>build 4 bước, rule,<br/>incremental</i>"]
     C["<b>cmake</b><br/>DI ĐỘNG<br/><i>sinh Makefile/Ninja<br/>cho mọi nền tảng</i>"]
     X["<b>cross-compilation</b><br/>TARGET KHÁC<br/><i>toolchain + sysroot<br/>cho ARM/embedded</i>"]
-    M -->|"trừu tượng hoá"| C -->|"đổi target"| X
+    Y["<b>yocto</b><br/>TÁI LẬP ĐƯỢC<br/><i>recipe/layer/sstate<br/>cả một distro</i>"]
+    CI["<b>ci-and-test-farm</b><br/>TỰ ĐỘNG HOÁ<br/><i>gate, build matrix,<br/>board thật</i>"]
+    M -->|"trừu tượng hoá"| C -->|"đổi target"| X -->|"cả hệ thống"| Y -->|"chạy tự động,<br/>trên phần cứng thật"| CI
 ```
 
 - **`makefile` dạy bản chất:** quá trình preprocess→compile→assemble→link, vì sao "undefined reference" là lỗi *linker*. Hiểu cái này thì CMake chỉ là lớp sinh ra nó.
 - **`cmake` giải bài toán di động:** khi dự án lớn/đa nền tảng, viết Makefile tay không scale → CMake mô tả ý định, sinh build system phù hợp.
 - **`cross-compilation` là CMake + đổi target:** dùng toolchain file để build cho kiến trúc khác → dẫn thẳng tới embedded ([08](../08-embedded-systems/)).
+- **`yocto` nâng lên cả hệ thống:** không còn build một binary mà build **cả distro tái lập được** — recipe/layer/sstate.
+- **`ci-and-test-farm` là nơi tất cả chạy không cần người:** build matrix nhiều platform (mỗi platform ≈ một `MACHINE`), cổng chặn trước khi code vào trunk, và **test trên board thật** — vì binary ARM không chạy trên runner x86. Đây cũng là chỗ `sstate` chứng minh giá trị: không có nó thì build 10 platform mỗi lần submit là bất khả thi.
 - **Nối lên trên:** bước link ở đây chính là chủ đề của [07 Shared Libraries](../07-shared-libraries/linking-loading.md); ODR/header liên quan [01/templates](../01-cpp-fundamentals/templates.md).
 - **Câu hỏi tổng hợp:** *"Các bước từ `.cpp` tới executable, và cross-compile thêm gì?"* — nối `makefile` + `cross-compilation`.
 
@@ -28,9 +32,10 @@ flowchart LR
 | 2 | [cmake.md](cmake.md) | meta-build, target-based modern CMake, find_package, generator, vì sao dùng | ✅ |
 | 3 | [cross-compilation.md](cross-compilation.md) | host/build/target, toolchain, sysroot, CMake toolchain file, Yocto/Buildroot | ✅ |
 | 4 | [yocto.md](yocto.md) | Yocto Project: BitBake, recipe/layer/bbappend, machine/BSP layer, sstate, devtool, SDK, CVE/license | ✅ |
+| 5 | [ci-and-test-farm.md](ci-and-test-farm.md) | CI/CD cho embedded: gated check-in, build matrix, tháp test (smoke/robustness/soak), giải phẫu test farm, đo latency từ ngoài, flaky test, Git↔Perforce | ✅ |
 
 ## Thứ tự đọc gợi ý
-`makefile` (hiểu quá trình build) → `cmake` → `cross-compilation`.
+`makefile` (hiểu quá trình build) → `cmake` → `cross-compilation` → `yocto` → `ci-and-test-farm`.
 
 ## Liên kết
 - Sản phẩm build (thư viện): [07-shared-libraries/](../07-shared-libraries/)

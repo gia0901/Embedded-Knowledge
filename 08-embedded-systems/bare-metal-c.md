@@ -1,8 +1,14 @@
 # Bare-metal C — thanh ghi, số học & độ tin cậy
 
-> Nền C cho embedded **không có OS**: thao tác thanh ghi phần cứng, kiểu số xác định, số học fixed-point, và các kỹ thuật độ tin cậy (overflow, CRC, MISRA). Bổ trợ cho [architecture.md](architecture.md) (MMIO) và [constraints.md](constraints.md).
-> Ôn dạng phỏng vấn: bank [EMB-001…004, 024…027](../14-prep/mock-interview/bank/embedded-fundamentals.md).
-
+> **TL;DR**
+> - Nền C khi **không có OS**: không ai dọn hộ, không có MMU chặn hộ — một dòng sai làm treo cả hệ.
+> - **`int` không cố định độ rộng** giữa các trình biên dịch/kiến trúc ⇒ dùng `stdint.h` (`uint8_t`, `uint32_t`). ⚠️ Bẫy **integer promotion**: phép toán trên kiểu nhỏ hơn `int` bị **nâng lên `int`** trước khi tính.
+> - **Thanh ghi phần cứng bắt buộc `volatile`** — giá trị đổi ngoài luồng compiler nhìn thấy, và mỗi lần ghi có **side effect**. Map thanh ghi bằng **bitfield/union là không portable** (chuẩn C không quy định thứ tự bit, padding, endianness).
+> - **`const` đặt ở flash (`.rodata`)** thay vì ăn RAM — mẹo tiết kiệm RAM rẻ nhất trên MCU.
+> - Không có FPU ⇒ **fixed-point**; và mọi so sánh thời gian phải viết theo kiểu **chịu được wrap** của counter.
+> - Độ tin cậy: chống integer overflow, **CRC/checksum**, và **MISRA C** khi dự án cần chứng nhận.
+>
+> Bổ trợ [architecture.md](architecture.md) (MMIO), [constraints.md](constraints.md), [memory-and-startup.md](memory-and-startup.md).
 ---
 
 ## 1. Kiểu số xác định (`stdint.h`) & integer promotion
@@ -108,6 +114,19 @@ Bộ **coding guideline** cho C trong hệ an toàn/quan trọng (ô tô, y tế
 
 ---
 
-## Ôn tập (bank)
+## Câu hỏi phỏng vấn liên quan
 
-Tự trả lời trước khi mở đáp án: [EMB-001…004](../14-prep/mock-interview/bank/embedded-fundamentals.md) (C & thanh ghi), [EMB-024…027](../14-prep/mock-interview/bank/embedded-fundamentals.md) (số học & độ tin cậy). Liên quan: [CPP-022 volatile](../14-prep/mock-interview/bank/cpp.md), [CPP-038 alignment](../14-prep/mock-interview/bank/cpp.md).
+| ID | Câu hỏi |
+|----|---------|
+| [EMB-001](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Set / clear / toggle / test một bit trong thanh ghi |
+| [EMB-002](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Vì sao ưu tiên fixed-width types — `int` có rủi ro gì |
+| [EMB-003](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Truy cập thanh ghi trong C, vì sao `volatile`, `union`/bitfield |
+| [EMB-004](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Vai trò `static` / `const` / `volatile` / `extern` |
+| [EMB-024](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Fixed-point vs floating-point khi không có FPU |
+| [EMB-025](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Integer overflow — bug embedded kinh điển, phòng thế nào |
+| [EMB-026](../14-prep/mock-interview/bank/embedded-fundamentals.md) | CRC / checksum — vì sao cần, khác nhau thế nào |
+| [EMB-027](../14-prep/mock-interview/bank/embedded-fundamentals.md) | MISRA C là gì, vì sao dùng |
+| [CPP-022](../14-prep/mock-interview/bank/cpp.md) | `volatile` có giúp thread-safe không |
+| [CPP-038](../14-prep/mock-interview/bank/cpp.md) | Alignment & padding (góc embedded) |
+
+⬅️ [Về 08-embedded-systems](README.md)

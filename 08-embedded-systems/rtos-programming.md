@@ -1,8 +1,15 @@
 # Lập trình RTOS & kiến trúc firmware
 
-> Từ *chọn* RTOS ([rtos-vs-linux.md](rtos-vs-linux.md)) sang **lập trình** RTOS: scheduler, primitive đồng bộ, ISR→task, sizing stack, schedulability; và **kiến trúc firmware** (superloop / event-driven / RTOS) + bootloader bare-metal.
-> Ôn dạng phỏng vấn: bank [EMB-014…023](../14-prep/mock-interview/bank/embedded-fundamentals.md).
-
+> **TL;DR**
+> - **Cooperative**: task chạy tới khi **tự nhường** ⇒ đơn giản, ít cần bảo vệ dữ liệu. **Preemptive**: scheduler **cướp CPU** theo priority ⇒ tất định hơn, hợp real-time, nhưng mọi dữ liệu dùng chung đều phải bảo vệ.
+> - **ISR → task (deferred processing)**: ISR chỉ làm phần tối thiểu rồi đánh thức task — bản RTOS của "top half / bottom half".
+> - **Mỗi task một stack riêng** ⇒ sizing sai là tràn, và tràn trên MCU thì âm thầm ([memory-and-startup.md](memory-and-startup.md)).
+> - ⭐ **RMS** (Rate Monotonic): gán **priority tĩnh theo tần suất** — chu kỳ ngắn thì ưu tiên cao. Ngưỡng Liu & Layland với n=3 là **0.779**, tức **CPU 78% đã có thể trượt deadline**. ⚠️ Hai khoản hay bị quên và cũng là hai khoản làm hệ trượt trong thực tế: **blocking** (chờ task ưu tiên thấp) và **overhead** (context switch, tick).
+> - **Tickless** tắt nhịp timer khi rảnh để CPU ngủ sâu — đổi lại phức tạp hơn khi tính timeout.
+> - Kiến trúc firmware: **superloop** (nhỏ, timing lỏng) → **event-driven** (một luồng, phản ứng theo sự kiện) → **RTOS** (nhiều task ưu tiên; trả giá bằng RAM cho stack mỗi task).
+> - **Bootloader bare-metal**: bố cục flash **dual-bank**, ghi vào bank không chạy, **verify CRC/chữ ký TRƯỚC khi chuyển sang** — nguyên tắc giống OTA ở Linux.
+>
+> Bổ trợ [rtos-vs-linux.md](rtos-vs-linux.md) (*chọn* RTOS hay Linux), [interrupts-bare-metal.md](interrupts-bare-metal.md), [constraints.md](constraints.md).
 ---
 
 ## 1. Scheduler: preemptive vs cooperative
@@ -128,6 +135,19 @@ void jump_to_app(uint32_t app_base) {
 
 ---
 
-## Ôn tập (bank)
+## Câu hỏi phỏng vấn liên quan
 
-[EMB-014](../14-prep/mock-interview/bank/embedded-fundamentals.md) (preemptive/cooperative), [EMB-015](../14-prep/mock-interview/bank/embedded-fundamentals.md) (primitives), [EMB-016](../14-prep/mock-interview/bank/embedded-fundamentals.md) (ISR→task), [EMB-017](../14-prep/mock-interview/bank/embedded-fundamentals.md) (stack sizing), [EMB-018](../14-prep/mock-interview/bank/embedded-fundamentals.md) (RMS), [EMB-019](../14-prep/mock-interview/bank/embedded-fundamentals.md) (tickless), [EMB-020…023](../14-prep/mock-interview/bank/embedded-fundamentals.md) (kiến trúc firmware, bootloader).
+| ID | Câu hỏi |
+|----|---------|
+| [EMB-014](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Preemptive vs cooperative scheduling |
+| [EMB-015](../14-prep/mock-interview/bank/embedded-fundamentals.md) | RTOS primitives — semaphore/mutex/queue/event flag, dùng khi nào |
+| [EMB-016](../14-prep/mock-interview/bank/embedded-fundamentals.md) | ISR giao tiếp với task thế nào (deferred interrupt processing) |
+| [EMB-017](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Sizing stack mỗi task & phát hiện overflow |
+| [EMB-018](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Rate Monotonic Scheduling — "hệ có kịp deadline không" |
+| [EMB-019](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Tick vs tickless, time slicing |
+| [EMB-020](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Superloop vs RTOS vs event-driven — chọn thế nào |
+| [EMB-021](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Hiện thực state machine trong firmware |
+| [EMB-022](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Bootloader bare-metal + firmware update trên MCU |
+| [EMB-023](../14-prep/mock-interview/bank/embedded-fundamentals.md) | HAL / phân tầng driver trong firmware bare-metal |
+
+⬅️ [Về 08-embedded-systems](README.md)

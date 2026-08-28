@@ -7,7 +7,7 @@
 > - Luật vàng: **mọi tuỳ biến sống trong layer của bạn** bằng `.bbappend`/patch. Không sửa poky, không sửa vendor layer, không sửa `tmp/work`.
 > - Cái giá: đường học dốc, build đầu **hàng chục phút–vài giờ**, đĩa **~50–100 GB**. Đổi lại **sstate** làm build lần sau còn vài phút.
 >
-> Bổ trợ [cross-compilation.md](cross-compilation.md), [cmake.md](cmake.md). 🧪 Thực hành: [BSP-036…038](../14-prep/mock-interview/bank/bsp.md).
+> Bổ trợ [cross-compilation.md](cross-compilation.md), [cmake.md](cmake.md), [ci-and-test-farm.md](ci-and-test-farm.md) (chỗ sstate + `MACHINE` chứng minh giá trị: build 10 platform mỗi lần submit). 🧪 Thực hành: [BSP-036…038](../14-prep/mock-interview/bank/bsp.md).
 
 ---
 

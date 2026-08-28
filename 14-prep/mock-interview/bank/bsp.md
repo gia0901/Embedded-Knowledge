@@ -8,6 +8,15 @@
 
 ## A — Boot chain & bootloader
 
+#### BSP-040 · 🟢 · concept · ⭐ · [→ boot-process](../../../08-embedded-systems/boot-process.md)
+**Kể các giai đoạn boot của một thiết bị embedded Linux, theo thứ tự.**
+<details><summary>Đáp án</summary>
+
+**ROM code** (nằm trong chip, không sửa được) → **SPL/MLO** (nhỏ, chạy trong SRAM, nhiệm vụ chính là khởi tạo DRAM) → **U-Boot** (đầy đủ, nạp kernel + DTB vào RAM) → **kernel** (khởi tạo driver, mount rootfs) → **init/PID 1** (dựng userspace). Mỗi tầng chỉ cần đủ sức nạp tầng kế tiếp. Chi tiết *vì sao* nhiều tầng: [BSP-002](bsp.md).
+</details>
+
+---
+
 #### BSP-001 · 🟡 · concept · ⭐ · [→ melp/bootloader-kernel](../../../15-book-summaries/melp/bootloader-kernel.md)
 **HAL là gì, giải quyết vấn đề gì?**
 <details><summary>Đáp án</summary>
@@ -211,6 +220,24 @@ class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần ph
 
 ## C — Interrupt, DMA & MMIO
 
+#### BSP-041 · 🟢 · concept · ⭐ · [→ architecture](../../../08-embedded-systems/architecture.md)
+**MMIO (memory-mapped I/O) là gì?**
+<details><summary>Đáp án</summary>
+
+Thanh ghi của ngoại vi được **ánh xạ vào không gian địa chỉ**, nên đọc/ghi thanh ghi dùng chính lệnh load/store như bộ nhớ thường — khác *port I/O* (x86 có lệnh `in`/`out` riêng). Hệ quả: phải khai **`volatile`** để compiler không tối ưu mất lần truy cập, và cần **memory barrier** để giữ thứ tự. Trong kernel dùng [`ioremap` + `readl/writel`](bsp.md), không dùng địa chỉ vật lý trần.
+</details>
+
+---
+
+#### BSP-042 · 🟢 · concept · ⭐ · [→ architecture](../../../08-embedded-systems/architecture.md)
+**DMA là gì, giải quyết vấn đề gì?**
+<details><summary>Đáp án</summary>
+
+**Direct Memory Access**: một bộ điều khiển riêng chuyển dữ liệu giữa ngoại vi và RAM **không cần CPU copy từng byte**. CPU chỉ cấu hình (nguồn, đích, độ dài) rồi làm việc khác, và nhận **ngắt báo xong**. Lợi: giải phóng CPU + băng thông cao hơn. Cái giá: **cache có thể lệch với RAM** ⇒ cần cache maintenance ([BSP-011](bsp.md)).
+</details>
+
+---
+
 #### BSP-010 · 🟠 · concept · ⭐ · [→ melp/drivers-init-power](../../../15-book-summaries/melp/drivers-init-power.md), [ostep/concurrency](../../../15-book-summaries/ostep/concurrency.md)
 **Vì sao interrupt handler không được ngủ? Threaded IRQ / top-bottom half giải quyết gì?**
 <details><summary>Đáp án</summary>
@@ -251,6 +278,37 @@ class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần ph
 </details>
 
 ## D — Storage flash & OTA
+
+#### BSP-043 · 🟡 · concept · ⭐ · [→ melp/bootloader-kernel](../../../15-book-summaries/melp/bootloader-kernel.md)
+**Flash (NAND/eMMC) khác RAM và đĩa từ ở chỗ nào? Ba hệ quả cho phần mềm là gì?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — điểm khác gốc rễ:** ghi vào flash chỉ **chuyển bit 1 → 0**. Muốn đưa bit về 1 phải **erase**, mà erase làm theo **cả block** — lớn hơn page rất nhiều.
+
+| | Đơn vị đọc | Đơn vị ghi | Đơn vị **xoá** |
+|---|---|---|---|
+| RAM | byte | byte | — |
+| Đĩa từ | sector | sector (ghi đè tại chỗ) | — |
+| **NAND flash** | page (~2–4 KB) | page | 🔴 **block (~128–256 KB)** |
+
+**Ba hệ quả:**
+1. **Không ghi đè tại chỗ được** ⇒ phải có lớp dịch: **FTL** (trong eMMC/SD, phần cứng lo) hoặc **filesystem hiểu flash** (UBIFS/JFFS2 trên NAND thô).
+2. **Số lần erase mỗi block là hữu hạn** (P/E cycle) ⇒ cần **wear leveling** để không mòn dồn một chỗ ([BSP-016](bsp.md)).
+3. **NAND sinh bit lỗi và có bad block** ⇒ cần **ECC** + quản lý bad block.
+
+⚠️ **Bẫy:** thấy eMMC "dùng như đĩa" rồi tưởng không còn ràng buộc flash — FTL chỉ **giấu** chúng đi, mòn và write amplification vẫn còn nguyên.
+</details>
+
+---
+
+#### BSP-044 · 🟢 · concept · ⭐ · [→ secure-boot](../../../08-embedded-systems/secure-boot.md)
+**OTA update là gì, gồm những bước nào?**
+<details><summary>Đáp án</summary>
+
+**Over-The-Air**: cập nhật firmware/phần mềm từ xa, không cần cầm thiết bị. Các bước: máy chủ phát hành bản **đã ký** → thiết bị tải về → **xác minh chữ ký** → ghi vào nơi lưu trữ → khởi động sang bản mới → xác nhận thành công. Yêu cầu sống còn: **mất điện giữa chừng không được brick** ⇒ A/B partition hoặc recovery ([BSP-015](bsp.md)).
+</details>
+
+---
 
 #### BSP-014 · 🟠 · concept · ⭐ · [→ melp/storage-update](../../../15-book-summaries/melp/storage-update.md), [ostep/persistence](../../../15-book-summaries/ostep/persistence.md)
 **NAND thô + UBIFS vs eMMC + ext4/f2fs — trade-off và stack phần mềm? Vì sao không trộn chéo?**
@@ -492,13 +550,75 @@ ldd myapp                             # (chay tren target) lib nao thieu
 
 ## I — Secure boot & chuỗi tin cậy
 
-#### BSP-026 · 🟠 · concept · ⭐ · [→ melp/storage-update](../../../15-book-summaries/melp/storage-update.md)
+#### BSP-039 · 🟠 · concept · ⭐ · 🎤 2026-08-28 · [→ secure-boot §4.3](../../../08-embedded-systems/secure-boot.md)
+**Trên thiết bị có secure boot, vì sao build một gói RPM rời để cài lúc phát triển cũng phải ký? Ký ở đâu, ai kiểm?**
+<details><summary>Đáp án</summary>
+
+**Vì secure boot KHÔNG dừng ở kernel.** Boot xong rootfs mới bắt đầu chạy — nếu không ai kiểm rootfs thì kẻ tấn công chỉ cần sửa một file trong đó. Nên sản phẩm thật có thêm cơ chế **runtime integrity**, và gói cài thêm phải thoả nó.
+
+**⭐ Có HAI tầng ký, độc lập nhau — đây là phần bị nhầm nhiều nhất:**
+
+| Tầng | Cái gì được ký | **Ai kiểm** | **Lúc nào** | Chặn được gì |
+|---|---|---|---|---|
+| **Chữ ký RPM (GPG)** | **Cả file `.rpm`** | `rpm` / package manager | Lúc **cài** | Gói giả từ kênh phân phối |
+| ⭐ **Chữ ký IMA** | **Từng file bên trong** gói | 🔴 **Kernel** | Mỗi lần **chạy file đó** | Ai đó chép file lạ vào máy **sau khi** đã cài |
+
+⇒ **Hệ quả rất dễ mất thời gian:** gói ký GPG hợp lệ nhưng file bên trong **thiếu chữ ký IMA** ⇒ `rpm` cài **không lỗi gì**, rồi lúc chạy binary thì kernel **từ chối `execve()`** — triệu chứng là **`Permission denied`** trên một file rõ ràng có quyền `x`. Người không biết IMA đang bật sẽ đi sửa `chmod`/`chown` vô ích.
+
+**⇒ Vì sao máy build phải chạm khoá:** chữ ký IMA nằm trong **xattr `security.ima`** của **từng file**, nên phải ký **lúc đóng gói**. Đó chính là lý do khâu build gói lẻ cũng cần khoá.
+
+**Phân biệt với dm-verity — quyết định gói rời có cài được không:**
+
+| | **dm-verity** | **IMA/EVM** |
+|---|---|---|
+| Phạm vi | Cả phân vùng (cây hash, hash gốc được ký) | Từng file |
+| Rootfs | **Chỉ đọc** ⇒ 🔴 **KHÔNG cài gói rời được**, phải build lại cả image | Ghi được, gói rời **cài được** nếu file đã ký |
+
+**Chẩn đoán:**
+```bash
+getfattr -m . -d /usr/bin/myapp        # co security.ima chua?
+dmesg | grep -i "ima\|appraise"        # kernel tu choi vi sao
+cat /sys/kernel/security/ima/policy    # chinh sach dang ap
+rpm -K mypackage.rpm                   # chu ky GPG cua goi
+```
+
+**⚠️ Bẫy:** (1) 🔴 tưởng `Permission denied` là **lỗi quyền file** — thực ra là **IMA từ chối**; (2) nhầm chữ ký RPM với chữ ký IMA — hai tầng, hai người kiểm, hai thời điểm; (3) `scp` binary lên máy rồi `chmod +x` và mong nó chạy — thiếu xattr thì không chạy; (4) test trên máy **dev** (IMA/verity **tắt**) rồi tưởng xong — đúng lớp lỗi này **chỉ lộ ra trên máy production**; (5) dùng **khoá production** trên máy dev để cho tiện — phá đúng lý do secure boot tồn tại.
+
+**Chốt:** *"Secure boot không dừng ở kernel — rootfs có dm-verity, từng file có IMA. Gói RPM phải ký ở **hai tầng**: GPG cho cả gói (package manager kiểm lúc cài) và IMA cho từng file (kernel kiểm lúc chạy). Thiếu tầng hai thì cài xong vẫn `Permission denied`."*
+</details>
+
+#### BSP-026 · 🟠 · concept · ⭐ · [→ secure-boot](../../../08-embedded-systems/secure-boot.md)
 **Secure boot hoạt động thế nào? Vì sao mọi package phải được ký?**
 <details><summary>Đáp án</summary>
 
-- **Chain of trust**: mỗi tầng xác minh **chữ ký** của tầng kế trước khi trao quyền chạy, bắt đầu từ Boot ROM tin cậy tuyệt đối (trong silicon). Nhà sản xuất ký bằng private key; thiết bị xác minh bằng public key nung trong **eFuse/OTP**. Sai chữ ký ở bất kỳ mắt xích nào → dừng boot → chống firmware giả mạo.
-- **Ký package**: để thiết bị chỉ chạy phần mềm do nhà sản xuất phát hành — image không ký/sai chữ ký bị từ chối, ngăn cài firmware trái phép hoặc đã bị sửa đổi. Đây là phần mở rộng của chain of trust xuống tới tầng ứng dụng/OTA.
-- 💡 Nếu bị hỏi sâu hơn mức biết: "Tôi hiểu ở mức khái niệm và vận hành; phần crypto/fuse cụ thể tôi chưa làm trực tiếp nhưng sẵn sàng học." — trung thực ăn điểm hơn chém.
+**Cơ chế — chuỗi tin cậy, mỗi tầng verify tầng kế:**
+
+```
+BootROM (bat bien) ─verify─> SPL/BL2 ─verify─> U-Boot/BL33 ─verify─> kernel
+   hash(pubkey) o eFuse                                                │
+   ← GOC TIN CAY                                              dm-verity│ rootfs
+                                                              IMA/EVM  │ tung file
+```
+
+Ký = **hash nội dung** rồi **ký hash bằng khoá riêng**; thiết bị giữ **khoá công khai** để kiểm. Hash trước vì ký bất đối xứng rất chậm và chỉ làm việc trên khối nhỏ.
+
+**⭐ "Vì sao" hai tầng:**
+- *Tầng nông*: *"để không ai thay được firmware."*
+- *Tầng sâu*: **chuỗi chỉ mạnh bằng mắt xích đầu tiên.** Nếu tầng đi kiểm mà **sửa được** thì kẻ tấn công chỉ cần **tắt việc kiểm**. ⇒ gốc phải nằm ở **mask ROM** (cố định lúc sản xuất chip) + khoá trong **eFuse/OTP** (ghi một lần, đứt cầu chì vật lý). Đó là lý do **verified boot ở U-Boot ≠ secure boot**: U-Boot kiểm kernel, nhưng **không ai kiểm U-Boot**.
+
+**⚠️ Không phải mã hoá.** Secure boot lo **toàn vẹn + xác thực**, KHÔNG lo **bí mật**. Firmware đã ký vẫn dump ra đọc được nguyên vẹn — nó chỉ **không sửa được mà vẫn boot**.
+
+**⇒ Vì sao "mọi package phải được ký" — vì nó KHÔNG dừng ở kernel.** Boot xong rootfs mới chạy; không ai kiểm rootfs thì chỉ cần sửa một file trong đó. Nên có thêm hai cơ chế runtime, **khác nhau**:
+
+| | **dm-verity** | **IMA/EVM** |
+|---|---|---|
+| Bảo vệ | **Cả phân vùng** (cây hash, hash gốc được ký) | **Từng file** (chữ ký trong xattr `security.ima`) |
+| Kiểm khi | Mỗi lần đọc block | Mỗi lần `execve()`/`open()` |
+| Rootfs | **Chỉ đọc** ⇒ **không cài gói rời được** | Ghi được, nhưng file mới phải có chữ ký hợp lệ |
+
+**⚠️ Bẫy:** (1) nhầm ký với **mã hoá**; (2) nhầm **verified boot** (neo ở U-Boot) với **secure boot** (neo ở ROM/eFuse); (3) tưởng nó chống được kẻ **đã có root** — không, đó là mô hình đe doạ khác; (4) **mất khoá riêng còn tệ hơn lộ**: không cập nhật được cho toàn bộ thiết bị đã bán, mà fuse thì không đảo ngược; (5) quên **anti-rollback** — firmware cũ *ký thật, hợp lệ* nhưng có CVE vẫn flash đè được, phải có counter đơn điệu.
+
+**Chốt:** *"Mỗi tầng verify tầng kế, và chuỗi chỉ mạnh bằng mắt xích đầu — nên gốc phải bất biến: ROM + eFuse. Nó không dừng ở kernel: rootfs có dm-verity, từng file có IMA — đó mới là lý do package cũng phải ký."*
 </details>
 
 ---

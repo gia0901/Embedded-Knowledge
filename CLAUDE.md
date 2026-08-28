@@ -114,7 +114,8 @@ Embedded-Interview/
 │   ├── makefile.md
 │   ├── cmake.md
 │   ├── cross-compilation.md      # toolchain, cross-compile cho embedded
-│   └── yocto.md                  # BitBake, layer/recipe/bbappend, sstate, SDK
+│   ├── yocto.md                  # BitBake, layer/recipe/bbappend, sstate, SDK
+│   └── ci-and-test-farm.md       # CI/CD embedded: gated check-in, build matrix, smoke/robustness, test farm
 │
 ├── 07-shared-libraries/          # Thư viện chia sẻ
 │   ├── static-vs-shared.md
@@ -125,6 +126,7 @@ Embedded-Interview/
 ├── 08-embedded-systems/          # Hệ thống nhúng
 │   ├── architecture.md           # SoC, bus, memory-mapped IO
 │   ├── boot-process.md           # bootloader → kernel → init
+│   ├── secure-boot.md            # chuỗi tin cậy, eFuse, dm-verity/IMA, ký gói
 │   ├── rtos-vs-linux.md · rtos-programming.md
 │   ├── bare-metal-c.md · memory-and-startup.md · interrupts-bare-metal.md
 │   ├── hardware-debug.md         # JTAG/SWD, GPIO+scope, crash log qua reset
@@ -198,7 +200,7 @@ Embedded-Interview/
 | 03 Operating System | ✅ Xong | process-thread, scheduling, memory-management, sync-primitives, ipc |
 | 04 Linux system programming | ✅ Xong | file-io, processes-signals, io-multiplexing, ipc-linux |
 | 05 Drivers & Device Tree | ✅ Xong | driver-basics, kernel-userspace, device-tree, **bus-protocols**, pci-usb-drivers |
-| 06 Build systems | ✅ Xong | makefile, cmake, cross-compilation, yocto |
+| 06 Build systems | ✅ Xong | makefile, cmake, cross-compilation, yocto, **ci-and-test-farm** |
 | 07 Shared libraries | ✅ Xong | static-vs-shared, linking-loading, abi-versioning, api-design |
 | 08 Embedded systems | ✅ Xong | architecture, boot-process, rtos-vs-linux, rtos-programming, bare-metal-c, memory-and-startup, interrupts-bare-metal, hardware-debug, constraints |
 | 09 Debugging | ✅ Xong | mindset, gdb, tools, memory-bugs, kernel-debugging |

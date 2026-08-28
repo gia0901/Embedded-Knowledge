@@ -968,7 +968,7 @@ Giữ **hai bản** hệ thống hoàn chỉnh. Đang chạy bản A thì ghi b�
 
 ## G — Ràng buộc embedded & real-time
 
-#### DRV-016 · 🔴 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
+#### DRV-016 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
 **Vì sao nên hạn chế cấp phát động (heap) trong embedded? Thay bằng gì?**
 <details><summary>Đáp án</summary>
 
@@ -1000,7 +1000,7 @@ Giữ **hai bản** hệ thống hoàn chỉnh. Đang chạy bản A thì ghi b�
 **Chốt:** *"Vấn đề của heap trên nhúng không phải hết bộ nhớ mà là bất định — thời gian không chặn trên và phân mảnh không gom lại được. Thay bằng cấp phát tĩnh/pool, và đặt luật: sau khởi tạo thì không cấp phát nữa."*
 </details>
 
-#### DRV-017 · 🔴 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
+#### DRV-017 · 🟡 · concept · [→ constraints](../../../08-embedded-systems/constraints.md)
 **Watchdog là gì? Dùng đúng cách thế nào — và kiểu dùng nào biến nó thành đồ trang trí?**
 <details><summary>Đáp án</summary>
 
@@ -1028,7 +1028,7 @@ Giữ **hai bản** hệ thống hoàn chỉnh. Đang chạy bản A thì ghi b�
 **Chốt:** *"Watchdog chỉ có giá trị khi việc nuôi nó CHỨNG MINH hệ thống đang làm việc — nuôi bằng một thread riêng là biến nó thành đồ trang trí. Và phải giữ bằng chứng trước khi reset, nếu không mỗi lần kích hoạt bạn không học được gì."*
 </details>
 
-#### DRV-015 · 🔴 · design · ⭐ · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
+#### DRV-015 · 🟡 · design · ⭐ · [→ rtos-vs-linux](../../../08-embedded-systems/rtos-vs-linux.md)
 **"Realtime" nghĩa là gì? Khi nào chọn RTOS, khi nào chọn Linux?**
 <details><summary>Đáp án</summary>
 

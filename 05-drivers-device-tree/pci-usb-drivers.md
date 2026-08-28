@@ -1,8 +1,14 @@
 # PCI & USB drivers (Linux)
 
-> Hai bus **tự liệt kê được** (self-enumerating) — khác I2C/SPI phải khai trong device tree. Trọng tâm phỏng vấn Embedded Linux có PCI/USB (vd JD Datalogic): device model, config space/descriptor, cách driver probe, interrupt (MSI), DMA, và USB gadget (khi thiết bị *là* USB device). Bổ trợ [driver-basics.md](driver-basics.md).
-> Ôn dạng phỏng vấn: bank [DRV-019…027](../14-prep/mock-interview/bank/drivers-embedded.md).
-
+> **TL;DR**
+> - PCI và USB là hai bus **tự liệt kê được (self-enumerating)**: thiết bị mang sẵn thông tin nhận dạng, host **hỏi ra được** ⇒ **không cần khai trong device tree** — khác hẳn I2C/SPI.
+> - 🔴 **`self-enumeration` KHÔNG phải `hotplug`** — đây là chỗ nhầm phổ biến nhất, và interviewer hay khoan đúng đó. *"Không cần device tree vì chúng **tự khai báo được**, không phải vì chúng **cắm rút được**."*
+> - **PCI**: **config space** (định danh + cấu hình) · **BAR** khai vùng địa chỉ cần map · ngắt **INTx** (chia sẻ, level) vs **MSI/MSI-X** (thiết bị ghi message ⇒ không chia sẻ, nhiều vector) · DMA phải bật **`pci_set_master()`** — quên là DMA **im lặng không chạy**, không báo lỗi gì.
+> - **USB**: descriptor phân tầng Device → Configuration → **Interface** → Endpoint; ⚠️ **driver bind ở mức *interface***, không phải mức thiết bị (một webcam là composite: video + audio). **URB** là mô tả một lần truyền, **bất đồng bộ** — nhận xong phải **submit lại trong callback**, không thì chỉ nhận đúng một gói.
+> - **USB gadget** là khi board của bạn **đóng vai device** chứ không phải host — ưu tiên function chuẩn sẵn có để **PC không phải cài driver**.
+> - Cuối file: **7 bẫy thực chiến**, phần lớn có triệu chứng *"không có gì xảy ra"* thay vì thông báo lỗi.
+>
+> Bổ trợ [driver-basics.md](driver-basics.md), [bus-protocols.md](bus-protocols.md) (I2C/SPI/UART), [device-tree.md](device-tree.md).
 ---
 
 ## Phần 1 — PCI / PCIe
@@ -205,6 +211,20 @@ Câu hỏi đầu tiên, và nó quyết định toàn bộ phần mềm bạn p
 
 ---
 
-## Ôn tập (bank)
+## Câu hỏi phỏng vấn liên quan
 
-[DRV-019…022](../14-prep/mock-interview/bank/drivers-embedded.md) (PCI), [DRV-023…027](../14-prep/mock-interview/bank/drivers-embedded.md) (USB). Nền chung driver: [driver-basics.md](driver-basics.md); DMA/cache: [BSP-011](../14-prep/mock-interview/bank/bsp.md); vì sao I2C/SPI cần device tree: [DRV-007](../14-prep/mock-interview/bank/drivers-embedded.md).
+| ID | Câu hỏi |
+|----|---------|
+| [DRV-019](../14-prep/mock-interview/bank/drivers-embedded.md) | PCI/USB tự liệt kê — vì sao không cần device tree |
+| [DRV-020](../14-prep/mock-interview/bank/drivers-embedded.md) | Một PCI driver probe làm những gì? BAR là gì |
+| [DRV-021](../14-prep/mock-interview/bank/drivers-embedded.md) | INTx vs MSI/MSI-X khác nhau thế nào |
+| [DRV-022](../14-prep/mock-interview/bank/drivers-embedded.md) | DMA trên PCI, vai trò `pci_set_master` |
+| [DRV-023](../14-prep/mock-interview/bank/drivers-embedded.md) | Kiến trúc USB: descriptor và transfer types |
+| [DRV-024](../14-prep/mock-interview/bank/drivers-embedded.md) | USB enumeration diễn ra thế nào, driver match theo gì |
+| [DRV-025](../14-prep/mock-interview/bank/drivers-embedded.md) | USB host driver viết thế nào? URB là gì |
+| [DRV-026](../14-prep/mock-interview/bank/drivers-embedded.md) | USB gadget là gì, khi nào dùng |
+| [DRV-027](../14-prep/mock-interview/bank/drivers-embedded.md) | Debug một vấn đề USB thế nào |
+| [DRV-007](../14-prep/mock-interview/bank/drivers-embedded.md) | Vì sao I2C/SPI ngược lại **phải** khai device tree |
+| [BSP-042](../14-prep/mock-interview/bank/bsp.md) | DMA là gì (nền) |
+
+⬅️ [Về 05-drivers-device-tree](README.md)

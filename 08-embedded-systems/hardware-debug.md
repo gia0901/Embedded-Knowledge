@@ -1,8 +1,14 @@
 # Debug phần cứng embedded (JTAG/SWD, semihosting, không-debugger)
 
-> Công cụ debug khi làm việc với phần cứng thật: giao diện debug (JTAG/SWD), và cách debug **khi không có debugger đầy đủ** trên target. Bổ trợ cho [09-debugging](../09-debugging/) (debug userspace/kernel) và [interrupts-bare-metal.md](interrupts-bare-metal.md) (hard fault).
-> Ôn dạng phỏng vấn: bank [EMB-030…031](../14-prep/mock-interview/bank/embedded-fundamentals.md).
-
+> **TL;DR**
+> - **JTAG/SWD** là đường vào debug ở mức phần cứng — dừng CPU, đọc thanh ghi, nạp flash. SWD ít chân hơn, là chuẩn thực tế trên Cortex-M.
+> - Câu hỏi thật của phỏng vấn không phải *"biết JTAG không"* mà **"không có debugger thì bạn làm gì"**.
+> - **`printf` qua UART** là kênh kinh điển nhưng **chậm và không reentrant** — nó **đổi timing**, nên vô dụng (và có hại) với bug real-time.
+> - ⭐ **GPIO + oscilloscope = "printf bằng chân"**: bật/tắt một chân để đánh dấu điểm code. Đây là cách **duy nhất đo được worst-case latency thật** mà không làm nhiễu hệ.
+> - **Giữ trạng thái qua reset** (`.noinit` / backup register) là cách lấy bằng chứng cho crash ngoài hiện trường — ⚠️ linker script phải khai vùng đó **ngoài** phần bị zero lúc startup.
+> - Chọn công cụ **theo loại bug**: logic → debugger · timing → GPIO+scope · crash → fault register in ra UART · lỗi giao tiếp → logic analyzer đọc bus thật.
+>
+> Bổ trợ [interrupts-bare-metal.md](interrupts-bare-metal.md) (hard fault), [09-debugging](../09-debugging/).
 ---
 
 ## 1. JTAG vs SWD — giao diện debug phần cứng
@@ -103,6 +109,14 @@ void main(void) {
 
 ---
 
-## Ôn tập (bank)
+## Câu hỏi phỏng vấn liên quan
 
-[EMB-030](../14-prep/mock-interview/bank/embedded-fundamentals.md) (JTAG vs SWD), [EMB-031](../14-prep/mock-interview/bank/embedded-fundamentals.md) (debug không-debugger), [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md) (hard fault). Đối chiếu góc Linux/host: [DBG-014 field crash](../14-prep/mock-interview/bank/debugging.md), [DBG-017 GDB](../14-prep/mock-interview/bank/debugging.md).
+| ID | Câu hỏi |
+|----|---------|
+| [EMB-030](../14-prep/mock-interview/bank/embedded-fundamentals.md) | JTAG và SWD khác nhau, dùng để làm gì |
+| [EMB-031](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Không có debugger đầy đủ thì debug firmware thế nào |
+| [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Hard fault trên Cortex-M — điều tra thế nào |
+| [DBG-014](../14-prep/mock-interview/bank/debugging.md) | Thiết bị ngoài hiện trường tự khởi động lại vài ngày/lần |
+| [DBG-017](../14-prep/mock-interview/bank/debugging.md) | Các lệnh GDB cốt lõi |
+
+⬅️ [Về 08-embedded-systems](README.md)

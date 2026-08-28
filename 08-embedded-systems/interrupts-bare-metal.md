@@ -1,8 +1,15 @@
 # Ngắt bare-metal (ISR, vector table, chia sẻ dữ liệu, hard fault)
 
-> Ngắt trên MCU **không có OS**: quy tắc viết ISR, vector table/NVIC, latency, **chia sẻ dữ liệu ISR ↔ main an toàn**, reentrancy, và điều tra hard fault. Bổ trợ cho [architecture.md §5](architecture.md) (interrupt & DMA tổng quan).
-> Ôn dạng phỏng vấn: bank [EMB-009…013](../14-prep/mock-interview/bank/embedded-fundamentals.md), [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md).
-
+> **TL;DR**
+> - **Quy tắc ISR**: ngắn và nhanh · **không** blocking/ngủ/chờ · **không** `malloc`/`printf`/hàm không reentrant · chỉ ack thiết bị, đẩy dữ liệu vào buffer rồi **báo cho main** · **xoá cờ ngắt đúng chỗ** (không thì bị gọi lại vô hạn).
+> - **Vector table** = mảng **địa chỉ handler** ở đầu flash — CPU không "tìm" ISR mà tra bảng. ⚠️ Viết **sai tên** handler thì **không có lỗi build**: linker lặng lẽ dùng handler mặc định, và ngắt của bạn "không chạy" mà không ai báo gì.
+> - **NVIC**: enable/priority/nesting. ⚠️ **Số priority nhỏ = ưu tiên CAO** — ngược trực giác, hay bị hỏi bẫy. `NMI` không tắt được.
+> - 🔴 **`volatile` KHÔNG thay được critical section** — nó cấm tối ưu, nhưng **không** làm read-modify-write hay nhiều biến trở nên atomic.
+> - ⭐ **SPSC ring buffer** là cách duy nhất truyền **luồng dữ liệu** ISR→main mà **không phải tắt ngắt** mỗi lần đọc: tách quyền sở hữu (ISR chỉ ghi `head`, main chỉ ghi `tail`) thay vì chia sẻ quyền ghi.
+> - **Latency phải đo worst-case, không phải trung bình** — trung bình 2 µs mà worst-case 200 µs thì hệ vẫn trượt deadline.
+> - **Hard fault**: đọc fault register + `sp[6]` (PC) / `sp[5]` (LR) trong stacked frame. ⚠️ Lấy nhầm **MSP vs PSP** ⇒ đi truy một địa chỉ vô nghĩa.
+>
+> Bổ trợ [architecture.md](architecture.md), [hardware-debug.md](hardware-debug.md), [12-dsa/ring-buffer.md](../12-dsa/ring-buffer.md) (bản đầy đủ theo tầng).
 ---
 
 ## 1. ISR là gì & quy tắc viết
@@ -280,6 +287,16 @@ Nguyên nhân hay gặp: dereference null/dangling, **stack overflow** đè vùn
 
 ---
 
-## Ôn tập (bank)
+## Câu hỏi phỏng vấn liên quan
 
-[EMB-009](../14-prep/mock-interview/bank/embedded-fundamentals.md) (ISR rules), [EMB-010](../14-prep/mock-interview/bank/embedded-fundamentals.md) (chia sẻ dữ liệu ISR↔main), [EMB-011](../14-prep/mock-interview/bank/embedded-fundamentals.md) (vector table/NVIC), [EMB-012](../14-prep/mock-interview/bank/embedded-fundamentals.md) (latency), [EMB-013](../14-prep/mock-interview/bank/embedded-fundamentals.md) (reentrancy), [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md) (hard fault). Đối chiếu góc Linux: [DRV-011 top/bottom half](../14-prep/mock-interview/bank/drivers-embedded.md).
+| ID | Câu hỏi |
+|----|---------|
+| [EMB-009](../14-prep/mock-interview/bank/embedded-fundamentals.md) | ISR là gì, quy tắc viết ISR đúng |
+| [EMB-010](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Chia sẻ dữ liệu giữa ISR và main loop an toàn thế nào |
+| [EMB-011](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Vector table và NVIC, priority / nesting |
+| [EMB-012](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Interrupt latency là gì, yếu tố nào ảnh hưởng |
+| [EMB-013](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Hàm reentrant là gì, vì sao quan trọng với ISR |
+| [EMB-032](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Hard fault trên Cortex-M — điều tra thế nào |
+| [DRV-011](../14-prep/mock-interview/bank/drivers-embedded.md) | Top half / bottom half (góc Linux) |
+
+⬅️ [Về 08-embedded-systems](README.md)
