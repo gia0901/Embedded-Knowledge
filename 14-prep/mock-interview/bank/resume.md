@@ -292,6 +292,97 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
 
 ---
 
+#### RES-013 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME: "Cut driver startup time from 3–4 seconds back to under 0.5 second"]
+**"Con số 3–4 giây xuống dưới 0,5 giây — em đo bằng gì? Đo từ mốc nào tới mốc nào?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** con số trong resume là **đo được** hay **nghe nói**. Đây là câu **lọc** — không bảo vệ được một con số mình tự viết ra thì mọi con số còn lại trong resume đều mất giá trị.
+
+**Câu trả lời tốt gồm:**
+1. **Công cụ đo + nó nằm ở đâu** — đo **trong kernel** bằng `jiffies` (hoặc `ktime_get()` cho độ phân giải ns), không phải bấm giờ bằng mắt.
+2. **Hai mốc rõ ràng** — từ lúc vào `probe()` của driver nền → hết vòng nạp các driver con → thoát `probe()`. Nói được **vì sao chọn hai mốc đó**: `probe` bao trọn phần khởi tạo + nạp driver con, nên nó là đơn vị đo có nghĩa.
+3. **Cùng một phép đo cho trước và sau** — nếu baseline đo kiểu khác thì con số cải thiện vô nghĩa.
+4. ⭐ **Biết giới hạn phép đo của mình:** `jiffies` có độ phân giải `1/HZ` (thường 1–10 ms) — thừa cho thang **giây**, nhưng nói ra được điều đó cho thấy bạn hiểu công cụ chứ không chỉ dùng nó.
+
+**Nền kỹ thuật phải nắm:** `jiffies` / `HZ` / `time_before()` · `ktime_get()` vs `jiffies` (độ phân giải) · `probe()` chạy ở đâu trong tiến trình boot ([BSP-006](bsp.md)) · `initcall_debug` + `systemd-analyze` như cách đo **độc lập** để đối chiếu ([BSP-034](bsp.md)).
+
+**Bẫy:** ① nói *"khoảng 3–4 giây"* mà không nêu mốc — interviewer sẽ hỏi *"tính từ đâu?"* và bạn phải nghĩ tại chỗ · ② quên rằng baseline phải đo **cùng cách** · ③ nói con số mà **không có đơn vị đo lặp lại được** (đo một lần vs trung bình N lần boot).
+</details>
+
+---
+
+#### RES-014 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME: "interrupted by other startup work"]
+**"'Driver bị chen ngang bởi việc khởi động khác' — em phát hiện ra điều đó bằng cách nào?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** đây là câu **phân biệt mạnh nhất** trong nhóm resume — nó đo bạn **chẩn đoán bằng bằng chứng** hay **đoán rồi thử**. Ứng viên mid-level thường kể *"em thử cái này không được thì thử cái kia"*; ứng viên tốt kể **chuỗi suy luận có số liệu**.
+
+**Câu trả lời tốt gồm — bốn mắt xích, phải đủ cả bốn:**
+1. **Triệu chứng có số:** `probe` kéo dài 3–5 s.
+2. **Loại trừ nguyên nhân hiển nhiên trước:** đọc `dmesg`, xác nhận đoạn chậm chỉ là **gán biến**, không gọi SoC, không chờ I/O ⇒ **không phải code chậm**.
+3. ⭐ **Bằng chứng về tranh chấp CPU:** CPU **100%**, và **hàng loạt tiến trình `SCHED_FIFO` priority RT xuất hiện từ giây thứ 4** — đúng cửa sổ thời gian bị chậm.
+4. ⭐ **Nối được hai đầu:** driver nền nạp driver con **tuần tự** bằng `call_usermodehelper()`, và tiến trình đó chạy ở **priority thường (120)** ⇒ **bị preempt** bởi các tiến trình RT. Kết luận rút ra từ số liệu, không phải phỏng đoán.
+
+**Nền kỹ thuật phải nắm:** thang priority trong kernel (**số nhỏ = ưu tiên cao**; RT 0–99, `SCHED_OTHER` map vào 100–139, mặc định **120**) · `SCHED_FIFO`/`SCHED_RR` preempt mọi task `SCHED_OTHER` ([OS-026](os.md)) · `call_usermodehelper()` chạy ở **userspace** với priority thường · `ps -eo pid,cls,rtprio,comm` để nhìn class + rtprio.
+
+**Bẫy:** ① dừng ở *"CPU cao nên chậm"* — chưa nói được **ai** chiếm và **vì sao mình thua** · ② nhầm chiều thang priority · ③ kể giải pháp trước khi kể bằng chứng ⇒ nghe như đoán trúng.
+</details>
+
+---
+
+#### RES-015 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME: "measuring two solutions — loading in parallel and raising scheduling priority"]
+**"Em thử hai giải pháp: nạp song song và nâng scheduling priority. Cuối cùng chọn cái nào, vì sao, và rủi ro của phương án bị loại?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** ① có **đo** từng phương án hay chọn theo cảm tính · ② có nhìn ra **tác động lên phần còn lại của hệ thống** không — đây là ranh giới mid → senior · ③ có dám nói *"cả hai đều chưa đủ"* không.
+
+**Câu trả lời tốt gồm:**
+1. **Mỗi phương án chữa một nửa khác nhau:** nạp song song bỏ được phần **tuần tự** nhưng vẫn ở priority 120 ⇒ vẫn bị preempt. Nâng priority thắng được tranh chấp nhưng **vẫn nạp tuần tự** ⇒ vẫn dài.
+2. ⭐ **Có ngưỡng chấp nhận và dám nói phương án đơn lẻ trượt:** riêng lẻ chỉ đạt ~**7/10** lần boot ⇒ **kết hợp cả hai**.
+3. ⭐⭐ **Tự kiểm tác động hệ thống:** *"song song + RT priority có thể trở thành điểm nghẽn cho phần khởi động khác, nên em nhờ team Performance đánh giá trước khi áp"*. Rất ít ứng viên mid-level nghĩ tới bước này.
+4. **Nghiệm thu bằng số lần lặp:** 100 chu kỳ boot, không phải "thử vài lần thấy ổn".
+
+**Rủi ro của mỗi phương án — phải nêu được:**
+
+| Phương án | Rủi ro |
+|---|---|
+| **Nạp song song** | Thứ tự phụ thuộc giữa driver không còn được bảo đảm ⇒ `-EPROBE_DEFER` hoặc race lúc init; tăng đỉnh CPU/RAM cùng lúc |
+| **Nâng priority (RT)** | Task RT **không bị preempt** ⇒ nếu nó bận rộn hoặc kẹt sẽ **bỏ đói** phần còn lại; đẩy jitter sang subsystem khác |
+| **Cả hai** | Cộng dồn cả hai rủi ro ⇒ **bắt buộc** phải đo lại toàn hệ, không chỉ đo thời gian nạp |
+
+**Bẫy:** ① nói *"chọn cái nhanh hơn"* mà không nêu giá phải trả · ② quên rằng RT priority là **đánh đổi toàn cục**, không phải tối ưu cục bộ · ③ viết resume là *"chose"* trong khi thực tế **dùng cả hai** — sai sự thật và **tự mở một câu hỏi khó**.
+</details>
+
+---
+
+#### RES-016 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME: "Applied AI … cutting authoring time from about 1 day to 1–2 hours"]
+**"Dòng về AI trong resume — nếu interviewer đọc nó theo hướng bất lợi cho em thì họ nghĩ gì? Em nói thêm câu nào để chặn?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** bạn có **tự đọc được resume của mình bằng mắt người tuyển** không. Đây là câu đo **nhận thức rủi ro**, không đo kiến thức.
+
+**Suy nghĩ bất lợi họ có — nói thẳng ra được là đã ăn nửa điểm:**
+> *"Vậy phần nào là **em** làm? Bỏ AI đi thì còn lại gì?"*
+
+Với công ty đang tuyển **kỹ sư C++ nhúng**, dòng đó có thể đọc thành: bạn là **người điều phối công cụ**, không phải người **giải được vấn đề**. Rủi ro càng lớn khi con số (1 ngày → 1–2 giờ) **ấn tượng hơn** mọi con số khác trong resume.
+
+**Câu chặn — một câu, không thanh minh dài:**
+> *"AI giúp em đi nhanh ở phần **lặp lại**, nên phần em muốn đầu tư là chỗ **nó không làm thay được**."*
+
+⭐ **Rồi nối ngay vào bằng chứng của chính mình** — đây là phần biến câu phòng thủ thành câu ghi điểm:
+> *"— như bài tối ưu thời gian nạp driver: AI không đọc hộ em `dmesg` để thấy tiến trình RT chen vào giây thứ 4."*
+
+**Nguyên tắc chung áp cho mọi dòng resume:** mỗi dòng nên tự hỏi *"câu này mở ra câu hỏi nào?"*. Dòng nói về **công cụ** luôn mở ra câu hỏi *"còn năng lực của bạn ở đâu?"*; dòng nói về **chẩn đoán** thì không.
+
+**Bẫy:** ① nói *"code/test hoàn toàn có thể do AI làm tốt"* — nói với người đang tuyển kỹ sư viết code là **rủi ro thật** · ② thanh minh dài dòng ⇒ nghe như đang chột dạ · ③ chối bỏ dùng AI ⇒ mâu thuẫn với chính resume.
+</details>
+
+---
+
 ## Cách dùng file này
 
 | Việc | Lệnh / cách làm |
