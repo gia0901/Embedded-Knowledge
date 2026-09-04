@@ -37,11 +37,50 @@ Kernel driver (HAL)
 SoC (Dimming, FRC, TCON)
 ```
 
+---
+
+### 🎙️ BẢN NÓI — 45 giây, PHẢI đọc to bấm giờ
+
+> ⚠️ **Vì sao câu này có bản nói mà các câu khác không:** `RES-001` hỏng **ba lần liên tiếp** cùng một kiểu (18/08 → 23/08 qua `BEH-001` → 29/08), và cả ba lần **nội dung đều có sẵn trong đầu** — hỏng ở khâu **dựng khung và nói ra**. Đó là loại lỗi **chỉ chữa được bằng nói to bấm giờ**, không chữa được bằng đọc thêm. *(Bằng chứng: `BEH` 2.42 → 3.42 sau đúng một ngày viết 5 khung STAR.)*
+>
+> 🔴 **Đây là bản để BẠN sửa lại theo giọng mình rồi thuộc** — không phải để đọc thuộc lòng nguyên văn. Giữ nguyên **thứ tự bốn nhịp**; đổi chữ thoải mái.
+
+**Bản A — "project tâm đắc nhất" (mặc định):**
+
+> *"Em làm system software cho display enhancement trên TV và màn hình doanh nghiệp — từ C++ interface xuống kernel driver nói chuyện với SoC.*
+>
+> *Thứ em tâm đắc nhất là S-Box. **Bài toán là nhiều màn ghép lại thành một màn lớn, mà mỗi máy tự chỉnh sáng theo cảm biến riêng của nó thì chúng lệch nhau — nhìn ra từng ô rõ rệt.***
+>
+> *Em làm phần đồng bộ độ sáng qua POSIX message queue, một máy làm master phân phối giá trị cho các máy còn lại. Chống nhấp nháy bằng cách chỉ tính lại target **4 giây một lần** rồi step dần tới đó.*
+>
+> ***Kết quả là ghép lại nhìn như một màn duy nhất, và cùng một binary chạy được cả chế độ đơn lẻ lẫn đồng bộ.**"*
+
+**Bốn nhịp — và vì sao từng nhịp có mặt:**
+
+| Nhịp | Nội dung | Chữa lỗi nào |
+|---|---|---|
+| 1 | **Định vị** — em đứng ở tầng nào, biên trên/biên dưới là gì | (đã làm tốt cả 3 lần, giữ) |
+| 2 | 🔴 **VẤN ĐỀ trước, bằng hình ảnh** — *"nhìn ra từng ô"* | **Lỗi lặp #1:** ba lần đều nhảy thẳng vào công nghệ |
+| 3 | Giải pháp — **gọi tên cơ chế, không liệt kê công nghệ** | Ba lần đều thành *"vsync 60Hz, message queue…"* |
+| 4 | 🔴 **Kết quả có thể HÌNH DUNG hoặc ĐO** | **Lỗi lặp #2:** ba lần đóng câu **không có gì cụ thể** |
+
+⏱️ **Cách luyện (30 phút, một lần là đủ):** bấm giờ, nói to, ghi âm. Nghe lại và chỉ kiểm **hai** thứ — ① câu thứ hai đã là **vấn đề** chưa ② câu cuối có **thứ đo được / hình dung được** chưa. Đạt cả hai hai lần liên tiếp thì gỡ khỏi sổ yếu.
+
+**Bản B — dùng khi họ hỏi *"kể một vấn đề khó em đã giải quyết"* (KHÔNG phải "tâm đắc"):**
+
+> Chuyển sang **tối ưu thời gian nạp driver** ([RES-013](resume.md)…[RES-015](resume.md)) — vì nó có **chuỗi chẩn đoán bằng bằng chứng** và **con số cứng**: `probe` 3–5 giây → `dmesg` xác nhận đoạn chậm chỉ là gán biến → **CPU 100%, tiến trình RT priority 94 từ giây thứ 4** → driver nền nạp tuần tự bằng `call_usermodehelper` ở **priority 120** ⇒ bị preempt. Kết: **3–4 giây xuống dưới 0,5 giây**, nghiệm thu **100 chu kỳ boot**.
+>
+> 📌 **Phân vai rõ:** S-Box chứng minh **sở hữu một tính năng end-to-end**; insmod chứng minh **chẩn đoán và đo đạc**. JD Datalogic nhấn debugging ⇒ nếu chỉ được kể **một** thứ trong cả buổi, kể cái thứ hai.
+
+---
+
 **Bẫy:** ① kể theo trình tự thời gian *"đầu tiên em được giao…"* — chán và không lộ năng lực · ② nhảy thẳng vào chi tiết kỹ thuật mà không dựng bối cảnh, interviewer không theo kịp · ③ chọn project Windows cho một JD Embedded Linux · ④ nói *"em làm theo yêu cầu team"* — triệt tiêu mọi cơ hội ghi điểm.
 </details>
 
-#### RES-002 · 🟠 · design · ⭐ · 🏗️ · [→ RESUME: "unified interface… multiple hardware configurations"]
-**Resume ghi em làm "C++ interface thống nhất nhưng hỗ trợ nhiều cấu hình phần cứng khác nhau". Cụ thể em làm thế nào để một interface phục vụ được nhiều chipset?**
+#### RES-002 · 🟠 · design · ⭐ · 🏗️ · [→ RESUME: "one interface across chipsets… selects its implementation at boot from board configuration… applications above stay unchanged"]
+**Resume ghi *"một interface dùng chung cho nhiều chipset, thư viện chọn implementation lúc boot theo board configuration"*. Kể cơ chế đó — và điều gì xảy ra khi board configuration đọc ra sai?**
+
+> 📌 *Neo lại 2026-09-04: resume bản mới **đã tự nói ra cơ chế** (chọn lúc boot + bảng con trỏ hàm), nên câu hỏi dịch trọng tâm sang **hệ quả và chế độ hỏng** — đó mới là chỗ interviewer khoan.*
 
 <details><summary>Khung trả lời</summary>
 
@@ -55,11 +94,16 @@ SoC (Dimming, FRC, TCON)
 
 **Nền kỹ thuật phải nắm:** [DP-011](design-patterns.md) DIP/HAL · [solid-principles](../../../11-design-patterns/solid-principles.md) (OCP: *mở để mở rộng, đóng để sửa đổi*) · [api-design](../../../07-shared-libraries/api-design.md) · nếu là `.so` giao cho bên khác thì thêm **ABI** ([SD-017…031](system-design.md)).
 
-**Bẫy:** ① nói *"em dùng OOP"* rồi hết — phải nêu **ai chọn implementation, chọn lúc nào** · ② thổi phồng thành kiến trúc plugin động nếu thực tế chỉ là `#ifdef` — hỏi hai tầng là lộ · ③ quên rằng đây là **shared library**: thêm virtual function vào class đang phát hành là **phá ABI** ⇒ nếu bạn nêu được ý này, đây là chỗ ghi điểm senior.
+**⭐ Chế độ hỏng — phần resume KHÔNG nói, và là chỗ ăn điểm** *(đã hỏi 2026-08-29, đạt 4đ)*:
+- **Dimming:** không có config khớp ⇒ rơi về **default an toàn** là *Global Dimming*, vốn chiếm hầu hết tỉ trọng sản phẩm. Nêu được *"có default an toàn"* quan trọng hơn nêu tên default.
+- **FRC/TCON:** driver thật xác định **lúc chạy** từ **factory data / FMS key**, vì một board ghép được với nhiều loại panel. ⭐ Và data đó **thay đổi được** để bring-up/test bằng data giả — chi tiết này cho thấy bạn hiểu nhu cầu vận hành thật, không chỉ đường happy path.
+- ⚠️ **Câu còn hụt lúc trả lời:** nếu **FMS key sai** (không phải thiếu) thì sao — load nhầm driver, hay từ chối load? Chốt sẵn câu này.
+
+**Bẫy:** ① nói *"em dùng OOP"* rồi hết — phải nêu **ai chọn implementation, chọn lúc nào** · ② thổi phồng thành kiến trúc plugin động nếu thực tế chỉ là `#ifdef` — hỏi hai tầng là lộ · ③ quên rằng đây là **shared library**: thêm virtual function vào class đang phát hành là **phá ABI** ⇒ nêu được ý này là ghi điểm senior.
 </details>
 
-#### RES-003 · 🟠 · concept · ⭐ · [→ RESUME: "OOP-based mechanisms for multi-chipset support" (kernel HAL)]
-**Resume ghi em dùng "cơ chế OOP" trong kernel driver. Kernel viết bằng C — làm sao có OOP ở đó?**
+#### RES-003 · 🟠 · concept · ⭐ · [→ RESUME: "the kernel driver dispatches through a function-pointer table"]
+**Resume ghi kernel driver *"điều phối qua một bảng con trỏ hàm"*. Kernel viết bằng C thuần — cơ chế đó hoạt động thế nào, và nó tương đương cái gì trong C++?**
 
 <details><summary>Khung trả lời</summary>
 
@@ -119,6 +163,13 @@ p->ops->set_brightness(p, 50);          // <-- goi ao
 
 **Nền kỹ thuật phải nắm:** kernel **không có ABI ổn định cho module ngoài cây** (đây là lý do việc này tồn tại — nói được là điểm cộng lớn) · [driver-basics](../../../05-drivers-device-tree/driver-basics.md) · [device-tree](../../../05-drivers-device-tree/device-tree.md) · [kernel-debugging](../../../09-debugging/kernel-debugging.md).
 
+
+**⭐ Bổ sung 2026-09-04 — resume nay ghi thêm *"keeping backward compatibility with the 5.10 branch"*** ⇒ chắc chắn bị hỏi *"tương thích ngược nghĩa là gì — một source hay hai nhánh?"*
+
+**Bản trả lời đã đạt 4đ (29/08):** ***một source duy nhất*** build hợp lệ cho **cả 5.10 lẫn 6.12** — vừa không ảnh hưởng sản phẩm đang bán, vừa sẵn sàng cho đời sau. Cách làm: kiểm **kernel version** rồi tách nhánh cài đặt bằng macro cho từng phiên bản, phần chung giữ đúng convention (khai báo trước, logic sau, luôn có function prototype).
+
+**Nêu thêm được thì lên hẳn một bậc:** ① macro chuẩn là `LINUX_VERSION_CODE` so với `KERNEL_VERSION(a,b,c)` ② **cái giá** của một-source: `#ifdef` càng nhiều thì **nhánh nào cũng phải test riêng**, và code đọc khó dần ⇒ chỉ hợp khi số nhánh **ít và có hạn** ③ khi nào thì **nên tách hai nhánh** thay vì `#ifdef`: khi khác biệt lan ra kiến trúc chứ không còn là vài API.
+
 **Bẫy:** ① trả lời chung chung *"em sửa lỗi build"* — không lộ được gì · ② **không** chuẩn bị được **một ca cụ thể có tên và có cách chẩn đoán** · ③ bị hỏi *"vì sao kernel không giữ ABI như glibc?"* mà tắc — chuẩn bị sẵn: **cố ý**, để kernel tự do refactor nội bộ, và để ép driver vào mainline.
 </details>
 
@@ -138,6 +189,22 @@ p->ops->set_brightness(p, 50);          // <-- goi ao
 4. **Ca hỏng:** một thiết bị chết / hàng đợi đầy thì sao? (mq đầy ⇒ `mq_send` chặn hoặc `EAGAIN` — bạn chọn cái nào và vì sao?)
 
 **Nền kỹ thuật phải nắm:** [LNX-016](linux-sysprog.md) mq · [LNX-035](linux-sysprog.md) POSIX vs SysV · [LNX-017](linux-sysprog.md) chọn IPC · [ipc-linux.md §4 trục quyết định](../../../04-linux-system-programming/ipc-linux.md).
+
+
+**⭐ Bổ sung 2026-09-04 — nửa câu trả lời còn thiếu** *(hỏi 29/08, đạt 3đ)*:
+
+Resume ghi *"a **single binary** serving both standalone and synchronized modes"* ⇒ interviewer sẽ hỏi: **binary đó biết mình đang ở chế độ nào bằng cách nào?**
+
+Phần **đã trả lời được**: cờ **Multi S-Box** do **application** gửi xuống lúc **runtime** (chính là mục bật tính năng trên thiết bị); bật rồi thì máy đó thành **master** phân phối giá trị thanh ghi cho các máy con.
+
+🔴 **Phần còn thiếu — và là nửa quan trọng hơn:** *máy CON biết mình là con bằng cách nào?* Một binary đóng **hai vai** thì phải kể được **cả hai vai**, nếu không thì chưa chứng minh được "một binary hai chế độ" thực sự vận hành ra sao — mà đó lại chính là **điểm hay nhất** của câu chuyện S-Box.
+
+Chốt sẵn ba câu này trước khi đi phỏng vấn:
+1. Máy con nhận vai **thụ động** (cứ nghe hàng đợi, có lệnh thì áp) hay được **cấu hình** thành con?
+2. Ai quyết định **ai là master** — người dùng chọn, hay máy tự thoả thuận?
+3. **Master chết thì sao** — các máy con giữ giá trị cuối, hay quay về tự chỉnh theo cảm biến của mình?
+
+> 📌 Câu 3 là câu interviewer thích nhất, vì nó hỏi về **chế độ hỏng** — và ở hệ nhiều thiết bị thì chế độ hỏng mới là phần thiết kế thật.
 
 **Bẫy:** ① nói *"vì mq dễ dùng"* — không phải lý do kỹ thuật · ② không biết mq **có giới hạn** (`/proc/sys/fs/mqueue/msg_max`, mặc định 10 bản tin) · ③ không nghĩ tới **thiết bị chết giữa chừng** — với sản phẩm ghép nhiều màn thì đây là ca thật · ④ nhầm mq là liên máy được.
 </details>
@@ -170,7 +237,7 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
 **Bẫy:** ① chỉ kể *"đọc sensor rồi set brightness"* — bỏ mất phần khó nhất · ② không nói được **đọc bằng polling hay interrupt** và vì sao · ③ không biết cảm biến của mình nối bằng bus gì (chuẩn bị: I2C) · ④ quên phần **người dùng chỉnh tay** thì hệ tự động phải nhường ra sao.
 </details>
 
-#### RES-007 · 🟢 · concept · ⭐ · [→ RESUME: "Dimming, FRC, and TCON"]
+#### RES-007 · 🟢 · concept · ⭐ · [→ RESUME: "display enhancement (dimming, frame-rate control, timing control)"]
 **Dimming, FRC, TCON — em giải thích ngắn gọn cho người ngoài ngành hiểu được không?**
 
 <details><summary>Khung trả lời</summary>
@@ -210,25 +277,48 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
 
 🧪 **Chuẩn bị bằng tay:** làm [DBG-030…036](debugging.md) — 7 bài lab đúng cho câu này, đặc biệt [DBG-033](debugging.md) (core dump), [DBG-034](debugging.md) (treo).
 
+
+**⭐ Bổ sung 2026-09-04 — câu này hỏi CẮT ĐÔI, không hỏi quy trình** *(hỏi 29/08, đạt 3đ)*:
+
+Tình huống điển hình: *userspace gọi API set độ sáng, **hàm trả về thành công**, nhưng **màn hình không đổi**.*
+
+❌ **Cách trả lời được 3 điểm** — đưa một quy trình **quét tuần tự từ trên xuống**: khoanh vùng thời gian → đọc log userspace → nếu log sạch thì nghi kernel → điều tra kernel. Đúng, nhưng đó là **dò tuần tự**, chi phí O(số tầng).
+
+✅ **Cách trả lời được 4 điểm — MỘT phép đo chia đôi không gian nghi ngờ:**
+
+> *"Việc đầu tiên em làm là **đọc ngược giá trị ngay tại biên** — `printk` đúng chỗ driver ghi thanh ghi, hoặc đọc lại register/sysfs. Một phép đo đó trả lời dứt khoát:*
+> - *giá trị **có** xuống tới kernel ⇒ lỗi nằm ở **kernel/SoC** (ghi sai thanh ghi, sai thời điểm, SoC không nhận)*
+> - *giá trị **chưa** xuống ⇒ lỗi ở **userspace / đường truyền** (sai ioctl, bị nuốt ở tầng thư viện, gọi nhầm instance)"*
+
+**Vì sao khác biệt này quan trọng chứ không phải tiểu tiết:** với stack nhiều tầng (app → C++ interface → shared lib → ioctl → driver → SoC), quét tuần tự tốn **O(n)** lần điều tra, chia đôi tốn **O(log n)**. Và mỗi lần điều tra ở kernel là một lần build + flash + reboot.
+
+📌 **Đây trùng đúng điểm yếu tự nhận ở [CLAUDE.md §2](../../../CLAUDE.md)** (*"debug chủ yếu đọc log + so code + suy luận"*). Phân biệt cần nhớ: **đọc log là THU THẬP bằng chứng; chia đôi là THIẾT KẾ phép đo.** Interviewer hỏi *"bước đầu tiên"* là đang dò vế thứ hai.
+
+**Ôn:** [09-debugging/mindset.md](../../../09-debugging/mindset.md) — chia đôi không gian nghi ngờ.
+
 **Bẫy:** ① *"em đọc log rồi so code"* — đúng là cách bạn đang làm, nhưng nói trần trụi vậy nghe như **không có phương pháp**. Vẫn kể sự thật, nhưng kể **có cấu trúc**: *"em bắt đầu từ log để dựng mốc thời gian, rồi khoanh vùng bằng cách…"* · ② kể một ca mà **gốc rễ hoá ra người khác tìm ra** · ③ không nêu được **cách chặn tái diễn** — interviewer senior rất để ý phần này.
 </details>
 
-#### RES-009 · 🟡 · concept · 🏗️ · [→ RESUME: "reducing working time by around 70%"]
-**Em ghi tự động hoá giảm 70% thời gian làm việc. Con số đó đo bằng cách nào?**
+#### RES-009 · 🟡 · concept · 🏗️ · [→ RESUME: "Automated driver/library porting with Python tooling… reducing manual effort by more than 50%"]
+**Em ghi tool porting giảm hơn 50% công sức thủ công. Con số đó đo bằng cách nào?**
+
+> 📌 *Neo lại 2026-09-04: con số cũ **"giảm 70% thời gian làm việc" đã bị gỡ khỏi resume**. Câu hỏi giữ nguyên giá trị — chỉ đổi sang con số còn sống. **Không xoá ID**: kỹ năng *bảo vệ một con số mình tự viết ra* vẫn là câu lọc.*
 
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ⚠️ **Đây là câu kiểm tra độ tin cậy, không phải câu kỹ thuật.** Mọi con số trong resume đều mời gọi câu hỏi này. Trả lời được ⇒ toàn bộ resume tăng độ tin. Ú ớ ⇒ interviewer bắt đầu nghi ngờ **mọi** con số khác.
 
 **Câu trả lời tốt gồm:**
-1. **Phạm vi hẹp lại cho chính xác:** 70% của **việc gì** — không phải toàn bộ công việc, mà là *"thời gian viết unit test cho một module"* hoặc *"thời gian port một driver sang chipset mới"*.
-2. **Mốc so sánh:** trước đây làm tay mất bao lâu (ví dụ ~2 ngày/module), sau khi có tool còn bao lâu (~4 tiếng).
+1. **Phạm vi hẹp lại cho chính xác:** 50% của **việc gì** — không phải toàn bộ công việc, mà là *"phần thủ công khi port một driver sang chipset mới: sửa CMake/Makefile + chỉnh source cho khớp nền tảng"*. ⚠️ Chữ *"manual effort"* trong resume đã hẹp sẵn — **bám vào nó**, đừng để interviewer hiểu thành *"nhanh gấp đôi cả dự án"*.
+2. **Mốc so sánh:** trước đây làm tay mất bao lâu cho **một lần port**, sau khi có tool còn bao lâu — và **phần nào tool KHÔNG làm được** (vẫn phải review, vẫn phải sửa chỗ đặc thù chipset).
 3. **Đo trên bao nhiêu mẫu:** *"em đo trên N module đã làm cả hai cách"* — hoặc **thừa nhận là ước lượng** nếu đúng là ước lượng.
 4. **Giới hạn:** chỗ nào tool **không** giúp được (logic phức tạp vẫn phải viết tay; phải review lại output).
 
 > **Trung thực là chiến lược tốt nhất ở đây.** *"Đây là ước lượng của em dựa trên N lần làm, không phải số đo chính thức"* — câu này **an toàn hơn** một con số cứng mà không có cơ sở.
 
 **Nếu không bảo vệ được con số:** cân nhắc sửa resume thành phát biểu định tính (*"significantly reduced"*) hoặc thu hẹp phạm vi rõ ràng.
+
+🔗 **Cùng loại câu, khác con số:** [RES-013](resume.md) (*3–4s → 0,5s* — con số **đo được**, dễ bảo vệ nhất) · [RES-016](resume.md) (*1 ngày → 1–2 giờ* — con số **rủi ro nhất**, vì nó nói về AI chứ không về bạn). Chuẩn bị cả ba, vì cả ba đều nằm trong resume.
 
 **Bẫy:** ① bịa thêm chi tiết cho khớp — mâu thuẫn sẽ lộ ở câu sau · ② trả lời *"sếp em bảo vậy"* · ③ để lộ rằng 70% là **phỏng đoán một lần** nhưng lại viết như một phép đo.
 </details>
@@ -266,6 +356,43 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
    - **Modern C++ (11/14/17)** — trùng đúng yêu cầu "C++17" của JD.
 3. **Tự lái:** *"phần này giúp em rõ hơn về tách tầng, nhưng mảng em đầu tư sâu là system software và driver ở phía Linux."*
 
+🔗 **Đào sâu ở đâu:** [RES-017](resume.md) (bản nháp vs sửa trực tiếp) · [RES-018](resume.md) (DDC/CI ≈ I²C) · [RES-019](resume.md) (định danh màn hình) · [RES-020](resume.md) (ghi file & mất điện) · [RES-021](resume.md) (đồng bộ Save/Load).
+
+---
+
+### 🧭 KHUNG KỂ CHUNG cho mọi câu SDM — *"bản đầu tiên + hướng cải tiến"*
+
+> ⚠️ **Đặt ở đây MỘT CHỖ**, các câu `RES-017…021` trỏ về. Đừng chép lại.
+
+SDM là **thế hệ đầu**, làm để **kịp tiến độ dự án**. Nhiều phần **cố ý chưa tối ưu**. Đó là sự thật, và nói ra là **đúng** — nhưng cách nói quyết định bạn nghe như *kỹ sư biết đánh đổi* hay *người bào chữa*.
+
+**Ba mức trả lời, xếp từ mạnh xuống yếu:**
+
+| Mức | Dạng câu | Interviewer nghe thấy |
+|---|---|---|
+| ⭐⭐ **Senior** | *"Em **biết** rủi ro X. Chấp nhận vì ràng buộc Y **cụ thể**, và **bán kính ảnh hưởng** chỉ là Z. Hướng đúng là W."* | đánh đổi **có ý thức** |
+| ⭐ **Mid, trung thực** | *"Lúc đó em **không nghĩ tới**. Sau này nhìn lại thì đúng ra nên W."* | thành thật, học được |
+| 🔴 **Yếu** | *"Phần đó chưa tối ưu vì lúc đó gấp."* | **bào chữa** — và nếu lặp ở mọi câu thì thành mẫu xấu |
+
+🔴 **Chỗ hỏng phải tránh:** nói *"v1 nên chưa tối ưu"* ở **mọi** câu. Một lần là bối cảnh; ba lần là **cái cớ mặc định**. Mỗi câu phải có **ràng buộc riêng** và **bán kính ảnh hưởng riêng**.
+
+✅ **Và luôn có sẵn vế thứ hai:** *"đồng nghiệp cầm dự án sau này đã cải tiến — họ làm bằng W"* (như state machine ở [RES-017](resume.md)). Nó cho thấy bạn **theo dõi tiếp** sản phẩm sau khi rời tay, và bạn **đồng ý** với hướng đúng.
+
+
+### ✅ Bản trả lời đã đạt 4đ (2026-08-29) — chốt lại, đừng dựng lại từ đầu
+
+Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại để một app Windows? Nó chứng minh điều gì mà bốn mục kia không chứng minh được?"*
+
+**Ba lý do, theo đúng thứ tự này:**
+
+1. **Khả năng thích ứng** — không ngại nhận một dự án ngoài chuyên môn trong một giai đoạn để team kịp tiến độ.
+2. **Modern C++ vận dụng thật** — move semantics, smart pointer, OOP design; và nó **quay lại phục vụ** chất lượng code cho C++ interface / shared library ở phía embedded. *(Trùng đúng yêu cầu "C++17" của JD.)*
+3. ⭐⭐ **MVVM → HAL, qua Dependency Inversion** — đây là câu ăn điểm, vì nó biến một mục "lạc đề" thành bằng chứng cho đúng thứ JD cần:
+
+> *"MVVM giúp em hiểu thêm cách HAL hoạt động trên embedded: **lớp trên không biết hardware, hardware không biết lớp trên** — hai bên chỉ gặp nhau ở một interface trừu tượng. Kết quả là coupling thấp, và **mock test được** khi chưa có phần cứng."*
+
+📌 **Vì sao (3) mạnh:** nó không phải phép so sánh cho vui. Trong chính project đó bạn **đã dùng** `MockAppViewModel` để dựng UI khi chưa có màn hình Samsung cắm vào — **đúng cùng một lý do** người ta tách HAL để test driver không cần board. Nêu được ví dụ `Mock` này là biến lý thuyết thành **bằng chứng đã làm**.
+
 **Bẫy:** ① kể dài về UI/Windows trong buổi phỏng vấn Embedded Linux · ② để lộ rằng đây là project bạn thích nhất (interviewer sẽ nghi bạn không hợp vị trí embedded) · ③ ngược lại — **coi thường project của chính mình** (*"cái đó không liên quan đâu ạ"*) — luôn rút ra được điều gì đó.
 </details>
 
@@ -288,6 +415,178 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
 **Nền kỹ thuật nên có trước khi đi phỏng vấn:** [yocto.md](../../../06-build-systems/yocto.md) ở mức **tư duy** (layer/bbappend để làm gì · sstate giải quyết gì · DEPENDS vs RDEPENDS) — [plan nguyên tắc ①](../../study-plans/datalogic-plan.md) ghi rõ **không cần thuộc cú pháp recipe** · [bus-protocols](../../../05-drivers-device-tree/bus-protocols.md) · [pci-usb-drivers](../../../05-drivers-device-tree/pci-usb-drivers.md).
 
 **Bẫy:** ① nói *"em có biết Yocto"* khi chỉ đọc qua — hỏi hai câu là lộ, và **mất niềm tin cho cả buổi** · ② xin lỗi dài dòng, hạ thấp bản thân · ③ chỉ nói *"em học nhanh lắm"* mà không có bằng chứng — trong khi bạn **có** bằng chứng thật: đã port driver qua nhiều chipset và migrate kernel hai đời.
+</details>
+
+---
+
+#### RES-017 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-04 · [→ RESUME: "Preset feature … users can save their preferred display settings"]
+**"Khi người dùng đang sửa một Preset rồi bấm Cancel, em quay lại trạng thái cũ bằng cách nào? Vì sao không cho sửa trên một bản nháp trong bộ nhớ cho an toàn?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** ⭐ Đây là câu **đáng giá nhất** của cả project — vì nó là một quyết định thiết kế mà ứng viên **đã tự đảo ngược**. Họ dò: ① bạn có tự đánh giá lại thiết kế của mình không · ② bạn có nêu được **cái giá** của phương án mình chọn không · ③ bạn có biết **lời giải tốt hơn** mà mình đã không dùng không. Rất ít ứng viên mid-level trả lời được cả ba.
+
+**Câu trả lời tốt gồm — kể theo đúng trình tự đã xảy ra:**
+
+1. **Phương án đầu (bản nháp):** sửa vào một bản sao trong bộ nhớ, bấm **Save** mới ghi xuống. Nghe an toàn.
+2. **Hai lý do bỏ nó** — nêu **cả hai**, vì chúng thuộc hai loại khác nhau:
+   - 🔴 **Sai về trải nghiệm:** người dùng kéo thanh **độ sáng** mà **màn hình không sáng lên** ⇒ đang **chỉnh mù**. Với một app mà toàn bộ mục đích là *nhìn thấy kết quả*, đó là lỗi chí mạng.
+   - 🔴 **Sai về code:** để có bản nháp thì **mọi getter/setter phải rẽ nhánh** *"đang edit hay không"* — rải khắp nơi, **dễ sót một chỗ** và UI hiển thị sai.
+3. **Phương án chốt:** **sửa thẳng lên màn hình thật**; trước khi vào chế độ edit thì **chụp lại trạng thái đang dùng** vào `currentPresetSettings` để **rollback nếu Cancel**.
+4. ⭐ **Nêu cái giá mình đã nhận** — phần phân biệt ứng viên: *"đổi lại, trạng thái cần khôi phục giờ nằm **trên phần cứng**, nên **mọi đường thoát** khỏi chế độ edit đều phải được kiểm soát"* — Cancel, đóng app, rút cáp, chuyển màn hình khác…
+5. ⭐⭐ **Nói thẳng lời giải tốt hơn:** *"em xử lý bằng **cờ trong mode** — không sai, nhưng **dễ quên ở chỗ gọi mới**. Team sau này làm bằng **state machine**, và đó là lời giải đúng hơn."*
+
+**Vì sao (5) là câu ăn điểm chứ không phải câu tự hạ mình:** nó chứng minh bạn phân biệt được *"giải pháp chạy được"* và *"giải pháp không thể dùng sai"*. Đó đúng là khoảng cách **mid → senior** mà [plan §📍](../../study-plans/datalogic-plan.md) đã ghi (*"dừng ở sửa xong, chưa tới ngăn tái diễn"*) — ở câu này bạn **đi tới vế thứ hai**.
+
+**Nền kỹ thuật nên nắm:** state machine vs cờ boolean rải rác ([behavioral.md — State](../../../11-design-patterns/behavioral.md)) · vì sao *"số trạng thái tăng thì số tổ hợp cờ tăng theo cấp số nhân"* · rollback/snapshot là mẫu chung: `currentPresetSettings` ở đây ≡ **bản cũ trong OTA A/B** ([BSP-015](bsp.md)) ≡ **transaction rollback**.
+
+**Bẫy:** ① kể thành *"em làm sai rồi sửa"* với giọng xin lỗi — phải kể là *"em đo lại rồi đổi quyết định"* · ② nêu phương án chốt mà **quên cái giá** ⇒ nghe như chưa hiểu hết hệ quả · ③ khen state machine mà **không nói vì sao cờ không đủ** (câu trả lời: cờ đúng ở *thời điểm viết*, hỏng ở *thời điểm người sau thêm đường thoát mới*).
+</details>
+
+---
+
+#### RES-018 · 🟡 · concept · ⭐ · 🎤 2026-09-04 · [→ RESUME: "Samsung Display Manager"; nối [bus-protocols](../../../05-drivers-device-tree/bus-protocols.md)]
+**"App của em nói chuyện với màn hình bằng gì? Kênh đó có gì đáng lưu ý, và nó liên quan gì tới công việc embedded?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** đây là **cầu nối mạnh nhất** từ một project Windows sang JD Embedded Linux. Nếu chỉ nói *"em gọi API Windows"* thì mục này vô giá trị với họ; nói được tầng bus thì nó **thành bằng chứng kinh nghiệm bus**.
+
+**Câu trả lời tốt gồm:**
+
+1. **Kênh là DDC/CI** — chạy ghép trên chính dây **HDMI/DP**, và **về bản chất là một bus I²C** nằm sẵn trong đầu nối. Mỗi thiết lập (độ sáng, tương phản, response time…) là một **mã VCP** — đọc/ghi giống **thanh ghi**.
+2. ⭐ **Bốn tính chất khiến nó *giống hệt* bài toán driver nhúng:**
+
+| Tính chất DDC/CI | Đối ứng ở embedded |
+|---|---|
+| **Chậm** (I²C ~100 kHz) — một lần đọc/ghi tốn hàng chục ms | Không được làm I/O chậm khi đang **giữ khoá** / trong **ISR** |
+| **Hay lỗi**, không bảo đảm trả lời | Phải **retry**, và retry phải **có giới hạn + backoff** |
+| **Nhiều bên cùng dùng một bus** (driver GPU cũng đọc EDID trên đó) | Tranh chấp bus — phải **nhường**, không độc chiếm |
+| Không có thời gian đáp ứng bảo đảm | Không được **block** luồng giao diện / luồng realtime |
+
+3. **Việc bạn thật sự phải xử lý:** không được block UI, **retry từng bước**, và **nhường bus** cho bên khác.
+4. **Câu chốt để lái về JD:** *"DDC/CI ở đây và I²C/SPI trên thiết bị nhúng là **cùng một lớp bài toán** — bus chậm, không tin cậy, dùng chung. Chỉ khác cái tên và chỗ em ngồi trong stack."*
+
+**Nền kỹ thuật phải nắm trước khi nói câu này:** [bus-protocols.md](../../../05-drivers-device-tree/bus-protocols.md) — I²C: open-drain + pull-up · START/STOP · ACK/NACK · **clock stretching** · arbitration khi nhiều master. Nói *"giống I²C"* mà không giải thích được **clock stretching** hay **vì sao I²C cần pull-up** thì follow-up sẽ lộ.
+
+**Bẫy:** ① nói *"DDC/CI là I²C"* rồi dừng — phải nêu **hệ quả thiết kế**, đó mới là thứ được chấm · ② thổi phồng thành *"em viết driver I²C"* — bạn ở **phía userspace gọi xuống**, nói đúng vị trí của mình · ③ quên mất rằng đây là chỗ **duy nhất** trong project Windows nối thẳng được sang JD, rồi kể toàn UI ([RES-011](resume.md)).
+</details>
+
+---
+
+#### RES-019 · 🟡 · concept · ⭐ · 🎤 2026-09-04 · [→ RESUME: "Samsung Display Manager"; khung kể chung ở [RES-011](resume.md)]
+**"App đang mở, người dùng rút dây một màn hình rồi cắm lại — hoặc đổi sang cổng khác. Preset còn gắn đúng màn đó không?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** bạn có hiểu **định danh thiết bị** là một bài toán riêng không — hay mặc định *"thiết bị thứ hai luôn là thiết bị thứ hai"*. Đây là câu hỏi **rất hay gặp ở embedded**, chỉ đổi vỏ.
+
+**Sự thật của bản v1 — nói thẳng:** hỗ trợ tối đa **4 màn**, mỗi màn có bộ preset riêng, và khoá bằng **chỉ số** (`AtMonitorIndex`) — tức **vị trí trong danh sách liệt kê**, không phải định danh của chính cái màn hình. Mặc định là màn đang hiển thị app.
+
+⇒ **Giới hạn đã biết:** nếu **thứ tự liệt kê đổi** (rút/cắm, đổi cổng, bật màn theo thứ tự khác), bộ preset có thể **gắn sang màn khác**. Người dùng thấy *"preset của tôi nhảy lung tung"*.
+
+**Vì sao chấp nhận được ở v1 — nêu ràng buộc CỤ THỂ, đừng nói chung chung:** kịch bản mục tiêu là **bàn làm việc cố định**, cắm một lần rồi thôi; và **bán kính ảnh hưởng** chỉ là *preset gắn nhầm*, người dùng chọn lại được — **không mất dữ liệu, không hỏng thiết bị**.
+
+**⭐ Hướng đúng — nói được cái này mới ăn điểm:** khoá theo **định danh ổn định lấy từ EDID** (mã nhà sản xuất + mã sản phẩm + **serial**), rớt về *model + cổng* khi màn không có serial. Mỗi lần danh sách thay đổi thì **so khớp lại theo ID**, không theo vị trí. Chỉ số chỉ còn là *cách hiển thị*, không phải *khoá lưu trữ*.
+
+**⭐⭐ Cầu nối sang embedded — đây là lý do câu này đáng có trong bank:** **cùng một bài toán, ba chỗ khác nhau**
+
+| Chỗ | Biểu hiện |
+|---|---|
+| `/dev/sda` vs `/dev/sdb` đảo nhau sau reboot | ⇒ dùng `/dev/disk/**by-id**` thay vì `by-path` |
+| Thiết bị USB cắm lại ra số khác | ⇒ udev rule khớp theo **serial/VID:PID** |
+| Nhiều cảm biến cùng loại trên một bus I²C | ⇒ phân biệt bằng **địa chỉ + node device tree**, không phải thứ tự probe |
+
+**Câu chốt:** *"Bài học em rút ra: **vị trí không phải danh tính**. Cái gì cần sống qua lần cắm lại thì phải khoá bằng thứ thuộc về chính thiết bị."*
+
+**Bẫy:** ① nói *"em xử lý rồi"* trong khi v1 khoá theo chỉ số — [hỏi hai câu là lộ](resume.md) · ② nói giới hạn mà **không nêu hướng đúng** ⇒ nghe như chưa nghĩ tới · ③ quên nêu **bán kính ảnh hưởng** — nó là thứ biến "bug" thành "đánh đổi có ý thức".
+</details>
+
+---
+
+#### RES-020 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-04 · [→ RESUME: "restore them across restarts"; khung kể chung ở [RES-011](resume.md)]
+**"Preset lưu xuống JSON. (a) Mất điện đúng lúc đang ghi file thì sao? (b) Sau này em đổi định dạng file — file cũ của người dùng thế nào?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** ⭐ Đây là câu **chuyển thẳng sang embedded** — cấu hình trên flash, OTA, mất điện giữa chừng. Ở desktop mất điện là hiếm; **ở thiết bị nhúng nó là chuyện thường ngày**. Trả lời tốt câu này chứng minh bạn nghĩ được như người làm firmware.
+
+**Sự thật bản v1 — nói thẳng:** **refresh và ghi đè toàn bộ file**, **không có trường `version`**.
+
+### (a) Mất điện lúc đang ghi
+
+**Cơ chế hỏng:** ghi đè tại chỗ có một **cửa sổ** mà file đã bị cắt cụt nhưng chưa ghi xong ⇒ lần mở sau **parse JSON thất bại** ⇒ **mất toàn bộ preset**. Không phải hỏng một dòng — hỏng **cả file**.
+
+**Ràng buộc biện minh cho v1 (cụ thể, không nói chung chung):** app **desktop**, mất điện đột ngột hiếm; và **bán kính ảnh hưởng** là *thiết lập hiển thị của người dùng*, **không phải chức năng thiết bị** — cùng lắm là chỉnh lại.
+
+**⭐ Hướng đúng — ghi nguyên tử bằng đổi tên:**
+```
+1. ghi toàn bộ nội dung mới vào  presets.json.tmp
+2. fsync()  ← ép dữ liệu xuống đĩa THẬT, không nằm trong page cache
+3. rename("presets.json.tmp", "presets.json")   ← ATOMIC trên cùng filesystem
+```
+⇒ Ở mọi thời điểm, `presets.json` **hoặc là bản cũ nguyên vẹn, hoặc là bản mới nguyên vẹn** — không bao giờ là một nửa. *(Bước 2 hay bị bỏ: `rename` nguyên tử về **metadata**, nhưng nếu nội dung file mới còn trong page cache thì mất điện vẫn ra file rỗng.)*
+
+### (b) Đổi định dạng file
+
+**Không có `version` ⇒ hai kiểu hỏng, kiểu thứ hai tệ hơn:** ① parse thất bại ⇒ mất preset · 🔴 ② parse **thành công** nhưng thiếu trường mới ⇒ nhận giá trị mặc định **im lặng**, người dùng tưởng preset còn nguyên mà thực ra đã đổi.
+
+**⭐ Hướng đúng:** đặt `"version": N` **ngay từ bản đầu** *(rẻ nhất lúc chưa có người dùng nào, đắt nhất khi đã có)*. Lúc load: `version` cũ hơn ⇒ chạy **migration** rồi ghi lại; `version` mới hơn ⇒ **từ chối và giữ nguyên file**, đừng cố đọc.
+
+### ⭐⭐ Cầu nối sang embedded
+
+| SDM | Thiết bị nhúng |
+|---|---|
+| ghi đè `presets.json` | ghi đè partition cấu hình trên flash |
+| tmp + `fsync` + `rename` | **A/B partition** — ghi vào bank không chạy rồi mới chuyển ([BSP-015](bsp.md)) |
+| `version` + migration | schema cấu hình qua nhiều đời firmware |
+| mất điện là **hiếm** | mất điện là **bình thường** — thiết kế phải giả định nó xảy ra |
+
+**Câu chốt:** *"Ở desktop em coi mất điện là ngoại lệ nên ghi đè thẳng. Ở thiết bị nhúng thì nó là **ca mặc định** — và lời giải cùng một hình dạng: **ghi ra chỗ khác, xong xuôi mới chuyển sang**."*
+
+**Bẫy:** ① nói *"em ghi nguyên tử bằng rename"* — **v1 KHÔNG làm thế**, nói vậy là khẳng định sai · ② nêu `rename` mà **quên `fsync`** · ③ chỉ lo (a) mà bỏ (b) — schema evolution mới là thứ cắn về lâu dài · ④ nói *"chưa tối ưu vì gấp"* mà không nêu **ràng buộc + bán kính ảnh hưởng** ([khung kể chung](resume.md)).
+</details>
+
+---
+
+#### RES-021 · 🟡 · concept · ⭐ · 🎤 2026-09-04 · [→ RESUME: "Samsung Display Manager"; khung kể chung ở [RES-011](resume.md)]
+**"Save và Load có chạy khác thread không? Nếu sau này có, em bảo vệ thế nào — đặt một `std::mutex` làm member của class quản lý file là đủ chưa?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** ① bạn có phân biệt *"chưa gặp lỗi"* với *"đã an toàn"* không · ② ⭐ bạn có hiểu **phạm vi của một mutex** không — đây là chỗ phân biệt thật.
+
+**Sự thật bản v1 — nói thẳng và nói cho ĐÚNG cách:** **chưa có mutex**, và **chưa gặp lỗi**. Nhưng lý do phải nói là **cấu trúc**, không phải may mắn:
+
+> *"Truy cập được **tuần tự hoá bởi thiết kế** — mọi thao tác preset đi qua luồng UI, không có đường nào chạy song song. Nên v1 không cần khoá."*
+
+⚠️ **Khác biệt quan trọng:** *"chưa gặp lỗi nên chắc ổn"* = **yếu**. *"tuần tự hoá bởi thiết kế, và đây là giả định em đang dựa vào"* = **mạnh** — vì bạn nêu được **điều kiện** để nó còn đúng.
+
+**Rủi ro khi giả định đó vỡ** (thêm auto-save nền, đồng bộ cloud, mở hai cửa sổ): reader đọc **file đang ghi dở**, hoặc hai writer **xen kẽ** nhau.
+
+### ⭐ Câu chính: mutex làm member — đủ chưa? **Chưa.**
+
+**Cơ chế:** một `std::mutex` member chỉ tuần tự hoá các truy cập **đi qua đúng object đó**. Nhưng thứ cần bảo vệ **không phải object** — mà là **cái file**, một tài nguyên nằm **ngoài** object và có phạm vi **toàn hệ thống**.
+
+| Ai đụng vào file | Mutex member có chặn được? |
+|---|---|
+| 2 thread cùng dùng **một** instance | ✅ có |
+| 2 **instance** khác nhau của cùng class | ❌ **không** — hai mutex khác nhau |
+| 2 **tiến trình** (mở 2 lần app, app + tool cài đặt) | ❌ **không** — mutex nằm trong không gian địa chỉ riêng |
+
+**Ba mức khoá, chọn theo phạm vi của tài nguyên:**
+
+| Phạm vi cần bảo vệ | Công cụ |
+|---|---|
+| Trong một object | `std::mutex` member |
+| Toàn tiến trình (một file, nhiều nơi gọi) | **một chủ sở hữu duy nhất** (singleton) giữ khoá — hoặc khoá tĩnh gắn với *đường dẫn file* |
+| **Liên tiến trình** | khoá của HĐH: `flock`/`fcntl` (Linux) · `LockFileEx` (Windows) |
+
+📌 **Và cách rẻ nhất vẫn là (a) của [RES-020](resume.md):** ghi **tmp + `rename`** làm reader **không bao giờ** nhìn thấy file dở dang — **giảm hẳn nhu cầu khoá** thay vì thêm khoá.
+
+**Cầu nối sang embedded:** đúng bài toán *"nhiều bên cùng ghi một tài nguyên"* trên thiết bị — hai tiến trình cùng ghi file cấu hình, hoặc userspace tool và driver cùng đụng một device node. Và [LNX-042](linux-sysprog.md): đặt `pthread_mutex_t` vào shared memory **không tự động** dùng được liên tiến trình — phải bật `PTHREAD_PROCESS_SHARED`. Cùng một bài học: **khoá phải cùng phạm vi với tài nguyên**.
+
+**Bẫy:** ① nói *"em dùng mutex"* trong khi v1 không có · ② *"chưa gặp lỗi nên ổn"* — không nêu được **giả định** đang dựa vào · ③ trả lời *"đủ rồi"* cho câu mutex member — đây chính là chỗ câu hỏi nhắm vào · ④ thêm khoá mà quên rằng **ghi nguyên tử** giải quyết phần lớn vấn đề rẻ hơn.
 </details>
 
 ---

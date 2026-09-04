@@ -1172,6 +1172,40 @@ double elapsed = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9;
 *(NTP = Network Time Protocol — giao thức đồng bộ đồng hồ máy qua mạng. Nó **chỉnh giờ hệ thống**, đó là toàn bộ lý do câu này tồn tại.)*
 </details>
 
+#### LNX-043 · 🟡 · concept · ⭐ · 🎤 2026-09-04 · [→ file-io](../../../04-linux-system-programming/file-io.md)
+**Đoạn code này đọc `/proc/self/status` như đọc file thường. `stat` báo `size = 0` và `mmap` thất bại, dù `cat` ra hàng chục dòng. Vì sao? Và cái bẫy chết người cho người viết code là gì?**
+```c
+int fd = open("/proc/self/status", O_RDONLY);
+struct stat st;  fstat(fd, &st);
+char *p = mmap(NULL, 4096, PROT_READ, MAP_PRIVATE, fd, 0);   // (1)
+buf = malloc(st.st_size + 1);
+n   = read(fd, buf, st.st_size);                             // (2)
+```
+<details><summary>Đáp án</summary>
+
+**Cơ chế — procfs không phải file, là *giao diện*.** Nội dung được **kernel sinh ra lúc bạn đọc** (qua `seq_file`), không nằm sẵn ở đâu cả.
+
+1. **`st_size = 0`** — kernel **không biết trước** nội dung dài bao nhiêu cho tới khi thật sự sinh ra nó, nên không có con số nào để báo.
+2. **`mmap` thất bại (`ENODEV`)** — `mmap` cần nội dung có **trang nhớ chống lưng** (page cache / `address_space`). Entry `seq_file` không có gì để map.
+
+🔴 **Bẫy (2) — đây mới là chỗ chết người:** `st_size` bằng 0 ⇒ `read(fd, buf, 0)` trả về **0**, mà **`read()` trả 0 nghĩa là EOF**. Đồng nghiệp kết luận *"file rỗng"* và đi tìm bug ở chỗ khác. Không có thông báo lỗi nào cả.
+
+**Output chạy thật** (`gcc -Wall -Wextra`):
+```
+mmap: No such device
+st_size = 0
+read() tra ve = 0
+read() voi buffer 8KB = 1547 byte
+```
+⇒ File có **1547 byte**, `read()` báo **0**.
+
+**Cách đúng:** cấp buffer theo **ước lượng của mình** (hoặc lớn dần) và `read()` **tới khi trả 0**; hoặc `fopen`/`fgets`. **Không bao giờ dùng `st_size` để cấp phát cho file trong `/proc` hay `/sys`.**
+
+**Chốt:** *"`/proc` không phải file trên đĩa — nó là hàm kernel đội lốt file. `st_size` = 0 và `mmap` không dùng được là hệ quả trực tiếp, còn cái bẫy là `read()` trả 0 trông y hệt EOF."*
+</details>
+
+---
+
 #### LNX-023 · 🟡 · concept · ⭐ · [→ tools](../../../09-debugging/tools.md), [kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)
 **Thiết bị nhúng rootfs tối giản: không có `lsof`, không có `strace`. Bạn cần biết một daemon đang mở fd nào và đang kẹt ở đâu trong kernel. Lấy thông tin đó ở đâu, và vì sao "đọc file" lại ra được trạng thái sống của kernel?**
 <details><summary>Đáp án</summary>

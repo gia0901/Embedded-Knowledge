@@ -1029,6 +1029,30 @@ template<class T> struct Pair<T*, T*> { };       // PARTIAL: ràng buộc theo H
 
 ---
 
+#### CPP-065 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-09-04 · [→ templates](../../../01-cpp-fundamentals/templates.md) · [→ api-design](../../../07-shared-libraries/api-design.md)
+**Thư viện của bạn ship `stack.h` + `libstack.so`; `.cpp` dùng `explicit instantiation` cho `Stack<int>` và `Stack<double>`. Khách cần `Stack<float>`, và bạn KHÔNG được build lại `.so` (bản đó đã qua kiểm định, đang chạy hiện trường). Hỏng ở bước nào, và còn đường nào?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — hỏng ở LINK, không phải compile.** Header khai báo đủ member nên compile qua; nhưng `.so` **không chứa** bản instantiate cho `float` ⇒ `undefined reference to Stack<float>::push(float const&)`.
+
+**Các đường ra, kèm cái giá:**
+
+| Phương án | Cách làm | Cái giá |
+|---|---|---|
+| Build lại `.so` | thêm `template class Stack<float>;` | ❌ **Vi phạm ràng buộc đề bài** — phải kiểm định lại |
+| **Chuyển định nghĩa lên header** | gộp `.cpp` vào `stack.h` (hoặc `stack-impl.h`) | Khách compile được **mọi `T`**. Nhưng **lộ source**, compile lâu hơn, và mọi thay đổi cài đặt thành thay đổi header ⇒ khách phải build lại |
+| ⭐ **Type erasure — lõi KHÔNG template** | `.so` chứa lớp cài đặt thao tác trên **byte** (hoặc qua interface ảo); header chỉ còn **vỏ template mỏng** ép kiểu gọi xuống | **Không phải build lại `.so`**, **không lộ source**. Trả giá bằng: mất một phần tối ưu theo kiểu, thêm một tầng gián tiếp, và phải tự lo `sizeof`/alignment/lifetime |
+| Né bài toán | bảo khách dùng `Stack<double>` (float lọt vừa) | Không tốn gì, nhưng tốn bộ nhớ và không phải lúc nào cũng chấp nhận được |
+
+**Vì sao type erasure là câu trả lời "senior":** nó giữ được **cả hai** thứ tưởng như loại trừ nhau — biên giới ABI ổn định của `.so` **và** khả năng dùng kiểu mới. Đây chính là cùng một tư duy với [SD-021 Pimpl](system-design.md) và [SD-022 biên giới C API](system-design.md): **đẩy phần thay đổi ra khỏi thứ đã ship**.
+
+⚠️ **Bẫy:** ① tưởng lỗi hiện lúc compile — không, header đủ để compile ② quên rằng chuyển lên header **đổi luôn hợp đồng bảo trì** (khách phải build lại mỗi lần bạn sửa cài đặt) ③ chọn explicit instantiation từ đầu mà **không liệt kê trước** những `T` khách có thể cần.
+
+**Chốt:** *"`explicit instantiation` là đánh đổi: giấu được cài đặt và giảm thời gian build, nhưng **khoá cứng danh sách kiểu** ngay lúc ship. Muốn giữ cả hai thì phần cài đặt phải **thôi là template** — type erasure."*
+</details>
+
+---
+
 ## F — Lambda & functional
 
 #### CPP-058 · 🟢 · concept · 📦 2026-08-13 · [→ lambdas-functional](../../../02-modern-cpp/lambdas-functional.md)
