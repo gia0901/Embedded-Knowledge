@@ -12,3 +12,5 @@
 # OS / editor cruft
 .DS_Store
 *.swp
+
+project_implementation/

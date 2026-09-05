@@ -33,7 +33,7 @@
 
 \section*{SUMMARY}
 Software Engineer with 3 years of experience in C/C++ system software for Smart TVs and Enterprise display products (ARM-based SoC). 
-Work spans the full system layer: C++ shared-library interfaces and HAL, kernel drivers, device tree, cross-compilation --- with a focus on 
+Work spans the full system layer: C++ shared-library interfaces and HAL, kernel drivers, device tree, cross-compilation -- with a focus on 
 resource-constrained, performance-critical systems.
 
 \section*{TECHNICAL SKILLS}
@@ -52,11 +52,11 @@ resource-constrained, performance-critical systems.
 \textbf{Core Responsibilities}
 \begin{itemize}
 \item Developed C/C++ system software for display enhancement (dimming, frame-rate control,
-      timing control) across the full stack --- C++ shared-library interfaces down to
+      timing control) across the full stack -- C++ shared-library interfaces down to
       kernel-level HAL drivers talking to the SoC
 \item Developed and extended one interface across chipsets: the library
       selects its implementation at boot from board configuration, the kernel driver
-      dispatches through a function-pointer table --- applications above stay unchanged
+      dispatches through a function-pointer table -- applications above stay unchanged
 \item Ported and maintained kernel drivers across chipset generations for 2026--2027 products, covering new hardware bring-up, device tree updates, and a Linux 5.10 $\rightarrow$ 6.12 kernel migration while keeping backward compatibility with the 5.10 branch
 \item Applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation, cutting authoring time for a code submission from about 1 day to 1--2 hours
 \item Diagnosed and resolved cross-layer issues across C++ interfaces, libraries, and kernel drivers
@@ -71,7 +71,7 @@ resource-constrained, performance-critical systems.
     \item Built adaptive brightness control driven by an ambient light sensor, allowing screen
       brightness to adjust automatically to the surrounding environment without flickering
       when lighting changes quickly
-    \item Synchronized brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid --- with a single binary serving both standalone and synchronized modes
+    \item Synchronized brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid -- with a single binary serving both standalone and synchronized modes
 \end{itemize}
 
 \project{Kernel Driver Load-Time Optimization (2025--2026)}
@@ -79,21 +79,21 @@ resource-constrained, performance-critical systems.
     \item Cut driver startup time on newer models from 3--4 seconds back to under
           0.5 second, after tracing the slowdown to drivers being loaded one at a time
           and interrupted by other startup work
-    \item Chose the fix by measuring two solutions --- loading in parallel and
-          raising scheduling priority --- and verified it over 100 boot cycles
+    \item Applied the fix by measuring two solutions -- loading drivers in parallel and
+          raising scheduling priority -- and verified it over 100 boot cycles
 \end{itemize}
 
 \project{Samsung Display Manager (Windows Application)}
 \begin{itemize}
-    \item Built the ``Preset'' feature for a Windows monitor-settings app (MVVM, C++17) ---
+    \item Built the ``Preset'' feature for a Windows monitor-settings app (MVVM, C++17) --
           users can save their preferred display settings and restore them across restarts
 \end{itemize}
 
 \project{Porting Internal Tool (2026)}
 \begin{itemize}
-    \item Automated driver/library porting with Python tooling --- build-system updates
-          (CMake, Makefile) and source adaptation across chipset platforms ---
-          reducing manual effort by more than 50\%
+    \item Automated driver/library porting with Python tooling -- build-system updates
+          (CMake, Makefile) and source adaptation across chipset platforms --
+          reducing manual effort from 1--2 days to 2-3 hours
 \end{itemize}
 
 \section*{EDUCATION}
