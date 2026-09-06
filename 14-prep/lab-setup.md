@@ -57,6 +57,10 @@ picocom -b 115200 /dev/ttyUSB0 --logfile boot.log
 # thoat: Ctrl-A Ctrl-X
 ```
 
+**🪟 Nếu host là Windows** *(cấu hình thực tế của người học 2026-09-06)*: không có `dialout`, không có `/dev/ttyUSB0`. Dùng **MobaXterm** hoặc **PuTTY** → session **Serial**, chọn đúng **COM port** của cáp (Device Manager → *Ports (COM & LPT)* → tìm `Silicon Labs CP210x` hoặc `FTDI`), **115200 8N1**.
+> ⚠️ **Nhưng build Yocto vẫn phải ở một host Linux.** Windows chỉ đóng vai **terminal**. Nếu bạn chạy Linux trong VM thì kiểm dung lượng và toolchain **trong VM đó**, không phải trên Windows và càng không phải trên board.
+
+
 ### 2.2 Công cụ thẻ SD & bootloader
 
 ```bash
@@ -130,9 +134,22 @@ DL_DIR    = "${TOPDIR}/../downloads"      # dung chung giua cac build
 SSTATE_DIR = "${TOPDIR}/../sstate-cache"  # bai 038 do chinh cai nay
 ```
 ```bash
-time bitbake core-image-minimal
+time bitbake core-image-minimal      # 1-2h lan dau
 ls tmp/deploy/images/beaglebone-yocto/
 ```
+
+> ⏱️ **NGUYÊN TẮC ĐƯỜNG GĂNG — đừng ngồi nhìn build chạy.** Build lần đầu tốn **1–2 giờ**; đọc hết phần Yocto cần cho phỏng vấn tốn **~1 giờ**. Chạy nối tiếp là **phí mất một giờ**. ⇒ **Bấm `bitbake` trước, đọc [yocto.md](../06-build-systems/yocto.md) trong lúc nó chạy.**
+> ⚠️ Chậm bất thường thì thủ phạm thường là **mạng** (pha `do_fetch` tải hàng GB), **không phải CPU** — nhiều core không giúp gì cho việc tải.
+
+**✅ Trạng thái host đã kiểm 2026-09-06** *(máy `gia-vm`)* — không cần kiểm lại:
+
+| | |
+|---|---|
+| Distro | **Ubuntu 22.04.5 LTS** — đúng bản danh sách gói §2.4 nhắm tới |
+| Gói Yocto §2.4 | **đã cài đủ hết** |
+| Đĩa trống | **235 GB** *(yêu cầu ≥50)* |
+| CPU / RAM | **24 threads · 23 GB** |
+| Còn thiếu | `gcc-arm-linux-gnueabihf` — **chỉ cần từ bài 035**, không chặn Thẻ B |
 
 📌 `beaglebone-yocto` nằm sẵn trong **poky (`meta-yocto-bsp`)** — **không cần thêm layer** `meta-ti`. Đủ cho toàn bộ Thẻ B.
 
@@ -153,6 +170,12 @@ ls tmp/deploy/images/beaglebone-yocto/
 
 **⑤ Serial ra ký tự rác.** Sai baud. Thử `115200` trước; nếu vẫn rác thì clock/PLL sai — [boot-process.md §7](../08-embedded-systems/boot-process.md) có dòng riêng cho ca này.
 
+**⑦ 🔴 `git://` bị chặn — cổng 9418.** *(gặp thật 2026-09-06)* Clone poky bằng `git://git.yoctoproject.org/poky` ra `Connection refused` / timeout. Giao thức `git` chạy trên **cổng 9418**, bị chặn ở hầu hết mạng công ty và VM; **GitHub đã bỏ hẳn** giao thức này từ 2022.
+```bash
+git clone -b scarthgap https://git.yoctoproject.org/poky      # dung https, KHONG dung git://
+```
+⚠️ **Cùng nguyên nhân sẽ quay lại trong `do_fetch`:** nhiều recipe có `SRC_URI = "git://..."`. Build chết ở `do_fetch` với đúng lỗi này ⇒ không phải recipe hỏng, mà là **cổng bị chặn**. *(Gương GitHub `https://github.com/yoctoproject/poky.git` cho **cùng một SHA** — dùng thay thế được.)*
+
 **⑥ 🔴 Secure boot thật KHÔNG làm được trên BBB.** AM335x bán lẻ là silicon **GP (General Purpose)** — eFuse chưa blow ⇒ **không có chain of trust từ ROM**. Muốn vậy phải có silicon **HS**, và blow eFuse là **không thể hoàn tác**.
 Làm được — và **đúng là thứ interview hỏi** — là **U-Boot verified boot** (bài [BSP-035](mock-interview/bank/bsp.md)). Nói đúng ranh giới này ở phỏng vấn là **điểm cộng**.
 
@@ -160,13 +183,17 @@ Làm được — và **đúng là thứ interview hỏi** — là **U-Boot veri
 
 ## 6. ✅ Checklist sẵn sàng — chạy trước bài BSP-031
 
-- [ ] `groups | grep dialout` ra kết quả
-- [ ] `picocom -b 115200 /dev/ttyUSB0` mở được, không lỗi quyền
-- [ ] Cắm nguồn (giữ **S2**) → **thấy chữ trên serial**
-- [ ] Bắt được log ra file và mở đọc lại được
-- [ ] Thẻ **A boot tới `login:`** ⇒ đây là **thẻ cứu hộ**, giữ nguyên trạng
-- [ ] `mkimage --version` chạy *(cho bài 035)*
-- [ ] `df -h` còn **≥ 50 GB** *(cho Thẻ B)*
+> 🔴 **Cột "Máy" là bắt buộc đọc — chạy nhầm máy là ra kết luận sai, không phải ra lỗi.** Ba ca thật: `dialout` **không tồn tại** trên host Windows · `mkimage` phải ở **host** vì FIT được *tạo* ở đó rồi mới nạp xuống · `df -h` trên **board** đo rootfs target, hoàn toàn không liên quan tới 50 GB cần cho **build Yocto ở host**.
+
+| # | Mục | **Máy** | Ghi chú |
+|---|-----|--------|---------|
+| 1 | Truy cập được cổng serial | **host** | Linux: `groups \| grep dialout` + `picocom -b 115200 /dev/ttyUSB0`. **Windows:** không có `dialout` — chỉ cần MobaXterm/PuTTY mở được COM port của cáp (CP2102/FT232) là đạt |
+| 2 | Cắm nguồn (giữ **S2**) → **thấy chữ trên serial** | — | Không giữ S2 thì eMMC thắng thẻ SD → xem [§5 bẫy ②](#5--bẫy-đã-biết--đọc-trước-khi-đổ-lỗi-cho-phần-mềm) |
+| 3 | **Bắt được log ra file** và mở đọc lại được | **host** | `picocom … \| tee boot.log`, hoặc MobaXterm **Tools → Start logging**. ⭐ **Bài 031 không làm được nếu thiếu mục này** — cả bài là đọc lại log và nhận diện 4 giai đoạn |
+| 4 | Thẻ **A boot tới `login:`** | — | Đây là **thẻ cứu hộ**, giữ nguyên trạng, không nghịch vào |
+| 5 | `mkimage --version` chạy | **host** | Cho bài **035** (tạo FIT + ký). Có trên target **không tính** — FIT được tạo ở host rồi mới nạp xuống |
+| 6 | `arm-linux-gnueabihf-gcc --version` | **host** | Cho bài **035** trở đi (`apt install gcc-arm-linux-gnueabihf`) |
+| 7 | `df -h` còn **≥ 50 GB** | **host** | Cho **Thẻ B (Yocto)**. Đây là chỗ chứa `tmp/` + `sstate-cache` + `downloads`, **không** liên quan gì tới dung lượng thẻ SD hay rootfs của board |
 
 > ⭐ **Chưa tick đủ thì đừng bắt đầu bài 031.** Toàn bộ bộ lab dựa trên việc bạn **đọc được console** và **có một thẻ luôn boot được để so sánh**. Thiếu một trong hai thì mọi lỗi trông giống nhau, và bạn sẽ đi sửa phần mềm trong khi vấn đề nằm ở sợi cáp.
 

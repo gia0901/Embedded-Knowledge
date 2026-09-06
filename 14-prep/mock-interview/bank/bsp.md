@@ -98,7 +98,7 @@ class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần ph
 
 **`initramfs` là một filesystem tối giản nằm trong RAM**, được bootloader nạp cùng kernel.
 
-> **Ai nạp nó — chính xác là giai đoạn nào** *(bổ sung 2026-08-19)*: **U-Boot proper**, không phải SPL/MLO. SPL/MLO là giai đoạn 1 cực nhỏ (chạy trong SRAM on-chip, vài chục KB), nhiệm vụ **duy nhất** là init DRAM rồi nạp U-Boot proper vào đó. Nó không biết gì về kernel/initramfs. U-Boot proper mới đọc kernel + DTB + initramfs vào RAM, đặt địa chỉ vào `bootm`/`booti` rồi trao quyền. Kernel mount nó làm root **tạm thời**, chạy một script khởi động, rồi **chuyển sang** rootfs thật.
+> **Ai nạp nó — chính xác là giai đoạn nào**: **U-Boot proper**, không phải SPL/MLO. SPL/MLO là giai đoạn 1 cực nhỏ (chạy trong SRAM on-chip, vài chục KB), nhiệm vụ **duy nhất** là init DRAM rồi nạp U-Boot proper vào đó. Nó không biết gì về kernel/initramfs. U-Boot proper mới đọc kernel + DTB + initramfs vào RAM, đặt địa chỉ vào `bootm`/`booti` rồi trao quyền. Kernel mount nó làm root **tạm thời**, chạy một script khởi động, rồi **chuyển sang** rootfs thật.
 
 **Vấn đề nó giải quyết — bài toán con gà quả trứng:** để mount được rootfs, kernel cần **driver** cho thiết bị lưu trữ (và có khi cả LVM, RAID, mã hoá, mạng). Nhưng nếu driver đó nằm dạng **module trong chính rootfs** thì kernel không đọc được nó ⇒ kẹt. initramfs mang sẵn các module đó trong RAM để phá vòng lặp.
 
@@ -457,7 +457,7 @@ ldd myapp                             # (chay tren target) lib nao thieu
 - **Wakeup source**: khai `wakeup-source` trong DT/driver `device_init_wakeup`: GPIO nút nhấn, RTC alarm, WoL. Debug: `/sys/kernel/debug/wakeup_sources`, delta `/proc/interrupts`.
 - Bug PM kinh điển: resume treo vì một driver thiếu resume handler / sai thứ tự clock; công cụ `pm_test` chia đôi tầng.
 
-**⭐ Vì sao suspend đi NGƯỢC cây thiết bị** *(bổ sung 2026-08-19 — trước đây chỉ nêu tên, không nêu lý do)*: device model của Linux là một **cây phụ thuộc** — thiết bị con sống nhờ tài nguyên của cha (bus, clock, regulator, power domain). Ví dụ: cảm biến I2C ← I2C controller ← clock + regulator của SoC.
+**⭐ Vì sao suspend đi NGƯỢC cây thiết bị**: device model của Linux là một **cây phụ thuộc** — thiết bị con sống nhờ tài nguyên của cha (bus, clock, regulator, power domain). Ví dụ: cảm biến I2C ← I2C controller ← clock + regulator của SoC.
 - **Suspend đi từ LÁ vào GỐC**: phải cho cảm biến ngủ **trước**, vì tắt I2C controller trước thì cảm biến mất đường giao tiếp, driver của nó không kịp lưu trạng thái/ghi thanh ghi cuối.
 - **Resume đi ngược lại, từ GỐC ra LÁ**: bật clock/regulator/bus **trước**, rồi mới đánh thức thiết bị con — nếu không, driver con ghi vào thanh ghi trong khi bus chưa có clock ⇒ treo hoặc bus error.
 - ⇒ Đây chính là gốc của bug *"resume treo"* nói ở trên: **không phải driver viết sai, mà là sai THỨ TỰ**. Đó cũng là lý do `.suspend/.resume` phải nằm ở **driver**, nơi kernel biết vị trí của nó trên cây.
@@ -680,14 +680,53 @@ Rồi **tự đánh dấu bốn ranh giới**:
 | `Linux version ...` | Kernel banner |
 | `... login:` | Userspace, init đã chạy |
 
-📋 **DÁN LOG CÓ CHÚ THÍCH CỦA BẠN VÀO ĐÂY** *(chưa chạy)*
+📋 **LOG CÓ CHÚ THÍCH — ĐÃ CHẠY 2026-09-06** *(BeagleBoard.org Debian Bookworm Base Image 2026-05-19, cài bằng app của hãng)*
 ```
-(chua chay)
+① ROM -> SPL chay trong SRAM (DRAM chua co), viec duy nhat: init DRAM
+   U-Boot SPL 2019.04-00002-g31a8ae0206 (May 13 2020 - 09:26:17 -0500)
+
+② U-Boot proper (da o trong DRAM), xac dinh cho de boot
+   Trying to boot from MMC2
+   Loading Environment from EXT4...
+   ** Unable to use mmc 0:1 for loading the env **        <-- LOI MA KHONG HONG (xem duoi)
+   U-Boot 2019.04-00002-g31a8ae0206 (May 13 2020 - 09:26:17 -0500)
+
+③ TRAO TAY - het phan bootloader
+   Starting kernel ...
+   [    0.000000] Booting Linux on physical CPU 0x0
+   [    0.000000] Linux version 5.10.168-ti-r84 ... #1bookworm SMP PREEMPT Thu May 7 17:32:50 UTC 2026
+   [    0.000000] CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c5387d
+
+④ Userspace - init da chay
+   [    6.985955] Run /init as init process               <-- /init = INITRAMFS, chua phai rootfs that
+   Loading, please wait...                                <-- thong diep kinh dien cua initramfs-tools
+   [    7.054454] mmc0: new high speed SDHC card at address aaaa
+   [    7.072008] mmcblk0: mmc0:aaaa SE32G 29.7 GiB
+   [    7.084819]  mmcblk0: p1 p2 p3
+   Starting systemd-udevd version 254.16-1~bpo12+1bbbio0~bookworm+20240807
+   [   14.823169] systemd[1]: Hostname set to <BeagleBone>.   <-- rootfs that da mount, ban giao
+
+⑤ Login
+   Debian GNU/Linux 12 BeagleBone ttyS0
+   BeagleBoard.org Debian Bookworm Base Image 2026-05-19
+   BeagleBone login:
 ```
+
+**⭐ Ba thứ đọc ra được mà bảng lý thuyết không nói:**
+
+1. **`Run /init` chứng minh board này CÓ initramfs** — `/init` ở gốc initramfs, không phải `/sbin/init` của rootfs. Nếu không có initramfs, kernel in `Run /sbin/init as init process`. ⇒ đây chính là đầu vào cho [BSP-033](#): *có initramfs* ≠ *cần initramfs*.
+2. 🔴 **`** Unable to use mmc 0:1 for loading the env **` — lỗi mà không phải hỏng.** U-Boot không đọc được env từ EXT4 nên rơi về giá trị biên dịch sẵn; board vẫn boot nên nhìn như vô hại. **Sẽ cắn ở [BSP-032](#)**: env không nạp được từ đĩa thì `saveenv` nhiều khả năng cũng không ghi được ⇒ mọi `setenv` bốc hơi sau khi tắt nguồn.
+3. **Bootloader cũ hơn rootfs 6 năm** (U-Boot 2019.04 build 2020 vs kernel/rootfs 2026). Câu phải trả lời trước khi làm [BSP-035](#): **U-Boot đó đến từ thẻ SD hay từ eMMC?** Kiểm bằng cách boot lại **không giữ S2** rồi `diff` hai log. Nếu nó chạy từ eMMC thì build U-Boot mới xong sẽ thấy *"không có gì thay đổi"* — và mất một buổi tìm nguyên nhân.
+
+⬜ **Bước ③ và ④ chưa làm** — image này cài bằng app của hãng, **không có cấu trúc `MLO`/`u-boot.img` tiêu chuẩn** để đổi tên, và nó đang đóng vai **thẻ cứu hộ** nên không phá. Cần một thẻ tự `dd` để làm bước ③.
 
 ⭐ Đây là thứ mang vào phòng phỏng vấn được. Khi bị hỏi *"kể chuỗi boot"*, bạn kể **từ một cái log mình từng đọc**, không phải từ danh sách học thuộc — và người nghe phân biệt được hai thứ đó.
 
 ### ③ PHÁ CÓ CHỦ ĐÍCH
+
+> 🔴 **PHÁ TRÊN THẺ NÀO —** thẻ cứu hộ **KHÔNG BAO GIỜ đụng vào**. Việc phá làm trên **một thẻ tự chuẩn bị** (`dd` image beagleboard.org — [lab-setup §3 Đường ①](../../lab-setup.md)), chấp nhận flash lại sau mỗi ca.
+> ⚠️ **Và kiểm cấu trúc trước khi định phá:** `ls -la /boot/firmware/`. Image cài bằng **app riêng của hãng** có thể **không có `MLO` + `u-boot.img` rời** — không đổi tên được thứ không tồn tại. Không thấy chúng ⇒ bắt buộc dùng thẻ tự `dd`.
+
 **Luật: viết dự đoán ra giấy TRƯỚC khi cắm điện.**
 
 | Phá gì | Dự đoán của bạn | Thực tế |
@@ -759,11 +798,25 @@ Ba ca trên rơi vào dòng nào của bảng §7? Ca nào **không** có trong 
 Và: **vì sao thiết bị nhúng thường thoát được bài toán đó?** *(driver MMC/eMMC build thẳng `=y` vào kernel ⇒ không cần ai nạp hộ)*
 
 ### ② QUAN SÁT
+> 🔴 **ĐỪNG grep theo tên config đoán trước.** Ví dụ thật: grep `CONFIG_MMC_OMAP_HS` trên kernel **TI 5.10** ra `is not set` — vì AM335x đã chuyển sang driver **`sdhci-omap`**; kết luận rút ra sẽ **ngược hoàn toàn**. Tên config đổi giữa các đời kernel ⇒ **hỏi hệ thống đang chạy** thì không bao giờ sai.
+
 ```bash
-zcat /proc/config.gz | grep -E "CONFIG_MMC_OMAP_HS|CONFIG_EXT4_FS"   # =y hay =m ?
+# ① driver nao dang THAT SU lai mmc0
+basename $(readlink /sys/class/mmc_host/mmc0/device/driver)
+
+# ② MODULE hay BUILT-IN?   (rong = built-in)   <-- CAU QUYET DINH
+lsmod | grep -iE 'mmc|sdhci'
+
 cat /proc/cmdline
-ls /boot/                                                             # co initramfs khong?
+ls -la /boot/ /boot/firmware/ 2>/dev/null      # co initramfs khong? co MLO/u-boot.img khong?
 ```
+
+**Đọc kết quả ②:**
+
+| `lsmod` | Nghĩa | Kết luận |
+|---|---|---|
+| **rỗng** | driver **built-in** (`=y`) | kernel tự đọc được thẻ ⇒ **KHÔNG cần** initramfs. Distro dùng nó vì **thói quen**, không phải nhu cầu |
+| có `sdhci_omap` / `omap_hsmmc` | driver là **module** | 🔴 phải có ai nạp module trước khi mount ⇒ **initramfs bắt buộc** — đúng bài toán con-gà-quả-trứng |
 📋 **DÁN OUTPUT THẬT** *(chưa chạy)*
 ```
 (chua chay)
@@ -977,13 +1030,48 @@ time bitbake core-image-minimal                      # (1) da build roi -> gan n
 bitbake -c cleansstate u-boot && time bitbake core-image-minimal   # (2) build lai rieng u-boot
 rm -rf tmp/ && time bitbake core-image-minimal       # (3) xoa tmp, GIU sstate
 ```
-📋 **DÁN ba con số thật** *(chưa chạy)*
+📋 **ĐÃ CHẠY 2026-09-06** *(Ubuntu 22.04, 24 threads, poky scarthgap, `MACHINE=beaglebone-yocto`)*
 
-| Phép đo | Thời gian |
+| Phép đo | Thời gian | Đọc ra |
+|---|---|---|
+| **(0) build lần đầu** | ⚠️ **~31 phút — ƯỚC LƯỢNG, không phải số đo** *(người học lỡ mất output `time`)* | mẫu số. Không có nó thì (3) vô nghĩa |
+| **(1)** không đổi gì | `real 0m6,007s` | ⭐ **sàn parse metadata** — mọi build đều trả khoản này, dù không có gì để làm |
+| **(2)** sau `cleansstate u-boot` | `real 0m16,809s` | ✅ **HỢP LỆ** — đã xác minh, xem dưới |
+| **(3)** xoá `tmp/`, **giữ** `sstate-cache/` | `real 0m51,362s` | ⭐ **~51 giây thay vì ~31 phút ⇒ nhanh hơn ~36×** |
+
+### ✅ Xác minh phép đo (2) — và interviewer đã đoán SAI
+
+Ban đầu (2) bị nghi *"quá nhanh để là một lần build U-Boot thật"*. Chạy hai lệnh chốt thì **giả thuyết đó sụp**:
+
+```
+$ bitbake -e core-image-minimal | grep ^IMAGE_FSTYPES=
+IMAGE_FSTYPES=" tar.bz2 jffs2 wic wic.bmap"          <-- wic CO ⇒ image THAT SU phu thuoc u-boot
+
+$ bitbake -c cleansstate u-boot && time bitbake u-boot
+Sstate summary: Wanted 163 Local 150 Mirrors 0 Missed 13 Current 200 (92% match, 96% complete)
+NOTE: Tasks Summary: Attempted 1082 tasks of which 1051 didn't need to be rerun
+real    0m20,096s
+```
+
+**⭐ Ba thứ đọc ra từ output này — đây mới là phần dạy nhiều nhất cả bài:**
+
+**① Build U-Boot thật chỉ tốn ~20 giây.** `1082 − 1051 = **31 task** thật sự chạy. Mọi *phụ thuộc* (cross toolchain, native tool, libc) đến từ sstate (`Local 150`); chỉ **13 object `Missed`** — đúng phần vừa `cleansstate`. Nên "build U-Boot" ở đây = **compile riêng U-Boot trên 24 threads**, không phải dựng cả thế giới.
+
+**② 🔴 Vì sao build CẢ IMAGE (16,8s) KHÔNG lâu hơn build riêng u-boot (20,1s)?** Vì **sstate khoá theo hash ĐẦU VÀO, không phải đầu ra**. `cleansstate u-boot` xoá *thành phẩm* của u-boot nhưng **không đổi đầu vào** của task nào phía sau ⇒ sau khi u-boot build lại xong, **task image/wic vẫn khôi phục được từ sstate**. Tổng ≈ đúng thời gian build lại u-boot. Chênh 16,8 vs 20,1 là **nhiễu giữa hai lần chạy**.
+
+**③ Dòng `Sstate summary` là công cụ chẩn đoán tốt nhất** — đọc được nó là biết build tới từ đâu:
+
+| Trường | Nghĩa |
 |---|---|
-| (1) không đổi gì | *(chưa chạy)* |
-| (2) sau `cleansstate u-boot` | *(chưa chạy)* |
-| (3) xoá `tmp/`, giữ `sstate-cache/` | *(chưa chạy)* |
+| `Wanted` | số sstate object build này cần |
+| `Local` | lấy được từ `sstate-cache/` trên máy ⚡ |
+| `Mirrors` | tải từ sstate mirror (nếu có cấu hình) |
+| 🔴 `Missed` | **không tìm thấy ⇒ task phải chạy thật** |
+| `Current` | đã đúng sẵn trong `tmp/`, không cần làm gì |
+
+Và `Tasks Summary: Attempted N of which M didn't need to be rerun` ⇒ **N − M = số task thật sự chạy** — chính là thước đo *"thay đổi của tôi làm hỏng hash của bao nhiêu task"*.
+
+⚠️ **Chi tiết đo lường:** `real 20,096s` nhưng `user 0,358s` / `sys 0,115s` — `time` chỉ đo **tiến trình bitbake cha**; việc thật nằm ở các **worker process** được fork. ⇒ `user`/`sys` **vô nghĩa ở đây**, chỉ `real` mới đúng.
 
 ⭐ **Phép đo (3) là phép đo dạy nhiều nhất** — nó cho thấy sstate là thứ tách *"kết quả build"* khỏi *"thư mục làm việc"*. Đây là lý do CI dùng được nó.
 

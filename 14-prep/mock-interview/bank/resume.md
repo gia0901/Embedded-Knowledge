@@ -164,7 +164,7 @@ p->ops->set_brightness(p, 50);          // <-- goi ao
 **Nền kỹ thuật phải nắm:** kernel **không có ABI ổn định cho module ngoài cây** (đây là lý do việc này tồn tại — nói được là điểm cộng lớn) · [driver-basics](../../../05-drivers-device-tree/driver-basics.md) · [device-tree](../../../05-drivers-device-tree/device-tree.md) · [kernel-debugging](../../../09-debugging/kernel-debugging.md).
 
 
-**⭐ Bổ sung 2026-09-04 — resume nay ghi thêm *"keeping backward compatibility with the 5.10 branch"*** ⇒ chắc chắn bị hỏi *"tương thích ngược nghĩa là gì — một source hay hai nhánh?"*
+**⭐ Tương thích ngược với nhánh 5.10** ⇒ chắc chắn bị hỏi *"tương thích ngược nghĩa là gì — một source hay hai nhánh?"*
 
 **Bản trả lời đã đạt 4đ (29/08):** ***một source duy nhất*** build hợp lệ cho **cả 5.10 lẫn 6.12** — vừa không ảnh hưởng sản phẩm đang bán, vừa sẵn sàng cho đời sau. Cách làm: kiểm **kernel version** rồi tách nhánh cài đặt bằng macro cho từng phiên bản, phần chung giữ đúng convention (khai báo trước, logic sau, luôn có function prototype).
 
@@ -191,7 +191,7 @@ p->ops->set_brightness(p, 50);          // <-- goi ao
 **Nền kỹ thuật phải nắm:** [LNX-016](linux-sysprog.md) mq · [LNX-035](linux-sysprog.md) POSIX vs SysV · [LNX-017](linux-sysprog.md) chọn IPC · [ipc-linux.md §4 trục quyết định](../../../04-linux-system-programming/ipc-linux.md).
 
 
-**⭐ Bổ sung 2026-09-04 — nửa câu trả lời còn thiếu** *(hỏi 29/08, đạt 3đ)*:
+**⭐ Nửa câu trả lời hay bị thiếu:**
 
 Resume ghi *"a **single binary** serving both standalone and synchronized modes"* ⇒ interviewer sẽ hỏi: **binary đó biết mình đang ở chế độ nào bằng cách nào?**
 
@@ -278,7 +278,7 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
 🧪 **Chuẩn bị bằng tay:** làm [DBG-030…036](debugging.md) — 7 bài lab đúng cho câu này, đặc biệt [DBG-033](debugging.md) (core dump), [DBG-034](debugging.md) (treo).
 
 
-**⭐ Bổ sung 2026-09-04 — câu này hỏi CẮT ĐÔI, không hỏi quy trình** *(hỏi 29/08, đạt 3đ)*:
+**⭐ Câu này hỏi CẮT ĐÔI, không hỏi quy trình:**
 
 Tình huống điển hình: *userspace gọi API set độ sáng, **hàm trả về thành công**, nhưng **màn hình không đổi**.*
 

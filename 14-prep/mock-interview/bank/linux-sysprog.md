@@ -245,8 +245,6 @@ static int read_full(int fd, void* buf, size_t len) {
 **Bẫy:** (1) `if (n != count) return -1;` — bug kinh điển, chỉ lộ ở khách; (2) chỉ lặp cho `read` mà quên **`write` cũng short** (LNX-028); (3) test bằng file trên đĩa — file thường **luôn** trả đủ, nên bug không bao giờ lộ khi test; phải test bằng socket/pipe thật.
 
 **Chốt:** *"TCP giao đủ byte, đúng thứ tự — nhưng không giao đúng lô. Mọi `read` phải lặp, mọi protocol phải tự đóng khung."*
-
-> 🎤 Viết lại 2026-08-13 sau khi ứng viên đạt **2 điểm** — liệt kê đúng cả 4 giá trị `n` nhưng **cơ chế TCP luồng byte trắng hoàn toàn**. Bản cũ (277 ký tự) không hề nói tới TCP.
 </details>
 
 #### LNX-026 · 🟠 · concept · [→ file-io](../../../04-linux-system-programming/file-io.md)
@@ -1167,8 +1165,6 @@ double elapsed = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9;
 
 **Chốt:** *"Hỏi 'mấy giờ' thì REALTIME. Hỏi 'bao lâu' thì MONOTONIC. Nhầm chỗ là sinh timeout âm hoặc timeout vô tận."*
 
-> 🎤 Viết lại 2026-08-13 sau khi ứng viên đạt **1 điểm** (trắng, phải thu hẹp mới ra được epoch + 1 triệu chứng). Link nguồn cũ trỏ `→ processes-signals` không có mục clock; nội dung thật ở TLPI cụm 03 §5.
-
 *(NTP = Network Time Protocol — giao thức đồng bộ đồng hồ máy qua mạng. Nó **chỉnh giờ hệ thống**, đó là toàn bộ lý do câu này tồn tại.)*
 </details>
 
@@ -1240,8 +1236,6 @@ read() voi buffer 8KB = 1547 byte
 **Bẫy:** (1) tưởng `/proc` đọc từ đĩa nên "chậm, tránh dùng" — sai, nó là hàm kernel, rẻ; (2) dùng `strace` để soi process đang `D` — vô ích, `ptrace` cần process **nhận được signal**, mà `D` thì không; đúng chỗ phải xem `/proc/<pid>/stack`; (3) coi `/proc/<pid>/fd/` là bản sao — nó là **symlink sống**, đếm được cả socket và pipe (dùng để bắt **rò fd**).
 
 **Chốt:** *"Thiết bị nhúng không có công cụ gì thì vẫn còn `/proc` và `/sys` — kernel tự phơi trạng thái ra dưới dạng file, và `ps`/`top` cũng chỉ đang đọc chỗ đó."*
-
-> 🎤 Viết lại 2026-08-13 sau khi ứng viên được **0 điểm** (trắng cả 2 lần hỏi) — bản cũ là đoạn khẳng định 588 ký tự, không dựng lại được lập luận. Link nguồn cũ trỏ `→ file-io` là **sai**: file đó không có mục nào về hai filesystem này.
 </details>
 
 #### LNX-024 · 🟠 · concept · [→ ipc-linux](../../../04-linux-system-programming/ipc-linux.md)

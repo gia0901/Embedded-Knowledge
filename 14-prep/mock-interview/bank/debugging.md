@@ -106,8 +106,6 @@ Debug là **tìm kiếm nhị phân trên tập nguyên nhân**. Mỗi thí nghi
 4. **Không hỏi khách đủ** trước khi tốn hai tuần đoán. Câu (2) ở trên nhiều khi giải quyết cả ca.
 
 **Chốt:** *"Debug là tìm kiếm nhị phân trên tập nguyên nhân. Việc đầu tiên không phải tìm bug mà là làm cho vòng lặp thử đủ rẻ — sau đó mỗi thí nghiệm phải loại được một nửa, và phải ghi lại cái đã loại."*
-
-> 🎤 Viết lại 2026-08-13 (nợ chất lượng bank). Bản cũ chỉ liệt kê 6 bước không nói **vì sao thứ tự đó** — thuộc được nhưng không dùng được.
 </details>
 
 #### DBG-012 · 🔴 · concept · ⭐ · [→ mindset](../../../09-debugging/mindset.md), [memory-bugs](../../../09-debugging/memory-bugs.md)
@@ -156,8 +154,6 @@ Mục tiêu ngược với trực giác: **tăng tần suất** để mỗi thí
 4. **Chỉ test trên máy dev x86** — x86 có mô hình bộ nhớ mạnh, che rất nhiều lỗi memory-order sẽ nổ trên ARM.
 
 **Chốt:** *"Bug biến mất khi quan sát là một kết luận chẩn đoán: gần như chắc là race hoặc UB bộ nhớ. Đừng quan sát thụ động nữa — đổi sang công cụ phát hiện chủ động, và ép bug xảy ra nhiều hơn thay vì né nó."*
-
-> 🎤 Viết lại 2026-08-13 (nợ chất lượng bank). Bản cũ nêu đúng kết luận nhưng không có **cơ chế vì sao printf che bug**, không có **giá phải trả của từng sanitizer** (thứ quyết định chạy được trên thiết bị hay không), và không có phần **ép bug xảy ra nhiều hơn**.
 </details>
 
 #### DBG-029 · 🟠 · design · ⭐ · 🏗️ · 📦 2026-08-13 · [→ tools](../../../09-debugging/tools.md)
@@ -445,8 +441,6 @@ Toàn bộ thiết kế xoay quanh một câu: *"lần crash tới, thiết bị
 5. **Chỉ sửa cho máy đang lỗi** — 500 máy cùng firmware thì đó là bug của **cả lô**, chỉ khác ở điều kiện kích hoạt.
 
 **Chốt:** *"Không debug được thiết bị ở xa thì phải thiết kế cho nó tự kể lại: hộp đen sống sót qua reboot + symbol lưu theo version + phân biệt được KIỂU chết. Và đo thứ tăng dần trước khi crash, đừng chỉ chờ lúc crash."*
-
-> 🎤 Viết lại 2026-08-13 (nợ chất lượng bank). Bản cũ là **danh sách 4 công cụ** — đúng nhưng nặng tên lệnh (T3) và thiếu toàn bộ phần **quyết định** (lưu symbol, đánh đổi khi log, phân biệt kiểu chết, đo xu hướng).
 </details>
 
 ---

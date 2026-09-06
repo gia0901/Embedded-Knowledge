@@ -8,7 +8,7 @@
 | **A** | Biên dịch & Make | 4 |
 | **B** | CMake | 4 |
 | **C** | Cross-compilation | 4 |
-| **D** | Yocto | 6 |
+| **D** | Yocto | 9 |
 | **E** | CI cho embedded & test farm | 18 |
 
 ---
@@ -517,6 +517,118 @@ bitbake -S printdiff <target>    # ⭐ CHAN DOAN: hash nao doi so voi lan truoc
 
 **Chốt:** *"sstate cache theo **task** và khoá theo **hash đầu vào** của task đó. Nên khi build không nhận thay đổi, câu hỏi đúng là 'thay đổi của tôi có nằm trong thứ được băm không?' — sửa trong `tmp/work` thì không, và đó là ca kinh điển."*
 </details>
+
+#### BLD-037 · 🟡 · concept · ⭐ · 🎤 2026-09-06 · [→ yocto §3](../../../06-build-systems/yocto.md)
+**"Yocto, Poky, BitBake, OpenEmbedded — bốn cái tên này quan hệ với nhau thế nào?"**
+<details><summary>Đáp án</summary>
+
+**Câu mở màn kinh điển.** Trả lời lộn xộn ở đây là mất niềm tin ngay câu đầu.
+
+| Tên | Là gì | Ví von |
+|---|---|---|
+| **BitBake** | **engine** — đọc metadata, dựng đồ thị phụ thuộc, chạy task | trình thông dịch |
+| **OpenEmbedded-Core** (`meta`) | **metadata nền** — recipe cho toolchain, libc, hàng nghìn package cơ bản | thư viện chuẩn |
+| **Poky** | **bản tham chiếu** = BitBake + OE-Core + `meta-poky` + `meta-yocto-bsp` | một distro mẫu để bạn clone rồi sửa |
+| **Yocto Project** | **dự án/tổ chức** bảo trợ tất cả, cộng hạ tầng (autobuilder, LTS, license/CVE tooling) | không phải phần mềm |
+
+**⭐ Hai câu chốt phải bật ra được:**
+1. *"**Yocto không phải một distro** — nó là **framework để mình sinh ra distro của mình**. Poky mới là distro (bản mẫu)."*
+2. *"`git clone poky` là lấy **cả bộ** — engine + metadata nền + BSP mẫu. Từ đó mình **thêm layer riêng**, không sửa vào poky."*
+
+⚠️ **Bẫy:** ① nói *"Yocto là một bản Linux nhúng"* — sai bản chất · ② nhầm **Poky = BitBake** · ③ tưởng phải cài BitBake riêng (nó **nằm trong** poky, dùng qua `source oe-init-build-env`).
+</details>
+
+---
+
+#### BLD-038 · 🟠 · concept · ⭐ · [→ yocto §5](../../../06-build-systems/yocto.md)
+**Trong `.bbappend` bạn viết `EXTRA_OEMAKE += "foo"` nhưng giá trị không có tác dụng, còn `SRC_URI:append = " file://x.patch"` thì chạy. Vì sao? Và vì sao đoạn cũ tra được trên mạng dùng `SRC_URI_append` lại KHÔNG báo lỗi mà cũng KHÔNG chạy?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — hai toán tử khác nhau ở THỜI ĐIỂM áp dụng:**
+
+| | Áp dụng khi nào | Hệ quả trong `.bbappend` |
+|---|---|---|
+| `+=` / `=` | **ngay lúc parse dòng đó** | Recipe gốc parse **sau** có thể **ghi đè mất** ⇒ giá trị của bạn biến mất |
+| **`:append` / `:prepend`** | **hoãn tới cuối**, sau khi mọi thứ đã parse xong | 🟢 **Luôn thắng** — đây là lý do `.bbappend` phải dùng nó |
+
+⇒ **Luật thực hành: trong `.bbappend` gần như luôn dùng `:append`, không dùng `+=`.**
+
+⚠️ **Chi tiết dễ mất cả buổi:** `:append` **không tự thêm dấu cách**. Phải tự viết `" file://x.patch"` — thiếu khoảng trắng đầu là hai giá trị **dính liền** thành một chuỗi vô nghĩa. (`+=` thì có thêm dấu cách — đúng chỗ dễ nhầm lẫn ngược.)
+
+### 🔴 Vế thứ hai — vì sao `SRC_URI_append` "im lặng không làm gì"
+
+Từ **Yocto 3.4 (honister)**, ký tự phân tách override đổi từ **`_`** sang **`:`**. Với BitBake mới:
+- `SRC_URI:append` ⇒ hiểu là **toán tử append** ✅
+- `SRC_URI_append` ⇒ **không còn là toán tử nữa** — nó chỉ là **tên một biến bình thường** tên là `SRC_URI_append`. Biến đó **không ai đọc**, nên **không lỗi, không cảnh báo, không tác dụng**.
+
+⭐ **Đây là lớp lỗi tệ nhất: sai mà không báo.** Mọi tài liệu/StackOverflow trước 2021 đều dùng `_`, nên copy về là dính. **Nói được ý này ở phỏng vấn là dấu hiệu đã dùng thật**, không phải chỉ đọc.
+
+**Chẩn đoán:** `bitbake -e <recipe> | grep ^SRC_URI=` — xem **giá trị cuối cùng** sau khi mọi override đã áp. Không thấy thay đổi của mình ⇒ hoặc sai toán tử, hoặc `.bbappend` **không được nhặt** (`bitbake-layers show-appends`).
+
+**Chốt:** *"`+=` áp ngay lúc parse nên trong bbappend dễ bị recipe gốc ghi đè; `:append` hoãn tới cuối nên luôn thắng. Và cú pháp `_` đời cũ giờ **im lặng không làm gì** — đó là bẫy tôi kiểm bằng `bitbake -e`."*
+</details>
+
+---
+
+#### BLD-039 · 🟡 · concept · ⭐ · 🎤 2026-09-06 · [→ yocto §6](../../../06-build-systems/yocto.md)
+**Bạn xoá sạch `tmp/` của một build Yocto rồi build lại — nó xong sau ~51 giây, trong khi build lần đầu mất ~31 phút. Vì sao? `tmp/` chứa gì, và nó khác `sstate-cache/` chỗ nào?**
+<details><summary>Đáp án</summary>
+
+**Ba thư mục, ba vai trò — phân biệt được là trả lời xong nửa câu:**
+
+| Thư mục | Là gì | Xoá đi thì mất gì |
+|---|---|---|
+| `downloads/` (`DL_DIR`) | **nguyên liệu** — tarball/git source | phải tải lại ⇒ tốn **mạng** |
+| **`sstate-cache/`** | **thành phẩm của từng task**, đóng gói theo **hash đầu vào** | 🔴 phải build lại thật ⇒ tốn **CPU** |
+| `tmp/` | **xưởng** — nơi diễn ra việc | chỉ mất chỗ làm việc, **không mất thành phẩm** |
+
+**`tmp/` chứa:** `work/<arch>/<recipe>/<ver>/` (source đã giải nén `${S}`, cây build `${B}`, thư mục cài tạm `${D}`, log) · `deploy/` (image, gói, SDK) · `sysroots-components/` + `recipe-sysroot*` · `stamps/` (dấu task đã chạy với hash nào) · `cache/` (metadata đã parse). **Toàn bộ là thứ suy ra được** — Yocto coi `tmp/` là **vứt đi được**, đó là thiết kế.
+
+### ⭐ Cơ chế: sstate cache **ĐẦU RA CỦA TASK**, khoá theo **HASH ĐẦU VÀO**
+
+Với mỗi task bật sstate, BitBake ① tính **hash toàn bộ đầu vào** (code của task + biến nó dùng + **hash của mọi task nó phụ thuộc**) ② chạy xong thì **đóng gói đầu ra** thành tarball đặt tên theo chính hash đó:
+```
+sstate:u-boot:...:9f3c2a…_populate_sysroot.tar.zst
+                  ↑ hash đầu vào       ↑ tên task
+```
+Lần build sau, **trước khi chạy** task nó tính hash trước. Có tarball khớp ⇒ **không chạy task**, mà chạy **`do_<task>_setscene`**: **bung tarball vào đúng chỗ**.
+```
+Bình thường:   fetch → unpack → patch → configure → compile → install → populate_sysroot
+Có sstate:     ─────────── BỎ QUA TẤT CẢ ───────────→ [bung tarball]  ⚡
+```
+
+⇒ **Xoá `tmp/` chỉ xoá cái xưởng; thành phẩm vẫn nằm trong `sstate-cache/`.** Bung tarball tốn **giây**, compile tốn **phút–giờ**.
+
+**⭐ Điểm tinh tế hay bị nói sai:** sstate **không cache "việc compile"** — `do_compile`/`do_configure` **không** được cache trực tiếp. Nó cache **sản phẩm giao ra**: nội dung đã staging vào sysroot, gói đã đóng, artifact đã deploy. Vì thế khôi phục từ sstate là **không bao giờ compile**, chứ không phải "compile nhanh hơn".
+
+**📌 Vì sao đây là câu đáng hỏi:** nó là lý do **CI Yocto khả thi**. Mỗi job CI có `tmp/` mới tinh nhưng **mount chung `sstate-cache/` + `downloads/`** ⇒ build vài phút thay vì vài giờ. Không có sstate thì gated check-in trên 10 platform ([BLD-021](build-systems.md)) là bất khả thi.
+
+### ⭐ Đọc `Sstate summary` — công cụ chẩn đoán tốt nhất
+
+Mỗi build in ra dòng này; đọc được nó là biết **build tới từ đâu**:
+```
+Sstate summary: Wanted 163 Local 150 Mirrors 0 Missed 13 Current 200 (92% match, 96% complete)
+Tasks Summary:  Attempted 1082 tasks of which 1051 didn't need to be rerun
+```
+
+| Trường | Nghĩa |
+|---|---|
+| `Wanted` | số sstate object build này cần |
+| `Local` | lấy được từ `sstate-cache/` trên máy ⚡ |
+| `Mirrors` | tải từ sstate mirror (nếu có cấu hình) |
+| 🔴 `Missed` | **không tìm thấy ⇒ task phải chạy THẬT** |
+| `Current` | đã đúng sẵn trong `tmp/`, không phải làm gì |
+
+⇒ **`Attempted N − didn't need rerun M` = số task thật sự chạy.** Đây chính là thước đo *"thay đổi của tôi làm hỏng hash của bao nhiêu task"* — câu hỏi đúng, thay cho *"sstate nhanh không"*.
+
+**Số đo thật** ([BSP-038](bsp.md), 24 threads, scarthgap, `beaglebone-yocto`): lần đầu **~31 phút** → xoá `tmp/` giữ sstate: **51 giây** (**~36×**). Sàn parse metadata: **6 giây**. `cleansstate u-boot` rồi build lại: **~17–20 giây** (chỉ **31/1082 task** chạy thật).
+
+⭐ **Một ca đáng nhớ từ chính số đo trên:** `cleansstate u-boot` rồi build **cả image** (16,8s) **không lâu hơn** build **riêng u-boot** (20,1s). Vì sstate khoá theo **hash đầu vào**: xoá thành phẩm của u-boot **không đổi đầu vào** của task image phía sau ⇒ chúng vẫn khôi phục được từ sstate. **Đây là bằng chứng trực tiếp rằng sstate khoá theo input, không phải output.**
+
+⚠️ **Bẫy:** ① tưởng sstate cache theo **recipe** — không, theo **task** ② tưởng xoá `tmp/` là mất hết ③ quên `downloads/` là **cache thứ ba, riêng biệt** (mạng, không phải CPU) ④ nói *"sstate làm compile nhanh hơn"* — sai, nó **bỏ qua compile hoàn toàn**.
+</details>
+
+---
 
 ---
 

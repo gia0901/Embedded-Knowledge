@@ -332,7 +332,7 @@ static ssize_t my_write(struct file *f, const char __user *ubuf, size_t len, lof
         return -EFAULT;                            // ✅ khác 0 = lỗi
 ```
 
-`copy_from_user`/`copy_to_user` (và `get_user`/`put_user` cho biến đơn) làm **ba việc** — và mỗi việc chặn một hậu quả cụ thể *(bảng bổ sung 2026-08-17: bản cũ chỉ liệt kê tên ba việc, không nói vì sao)*:
+`copy_from_user`/`copy_to_user` (và `get_user`/`put_user` cho biến đơn) làm **ba việc** — và mỗi việc chặn một hậu quả cụ thể:
 
 | Việc | Thiếu nó thì chuyện gì xảy ra |
 |---|---|
@@ -573,8 +573,6 @@ Trong `probe()`, driver nhận con trỏ tới **device node** của chính nó 
 
 ### ⭐ Vì sao DT **luôn** tách rời, còn driver thì **tuỳ** (build-in hoặc `.ko`)?
 
-*(Bổ sung 2026-08-17 — ứng viên tự đặt câu hỏi này, đúng chỗ đáng hỏi.)*
-
 | | Driver | Device tree |
 |---|---|---|
 | Bản chất | **Code cho một dòng chip** | **Sự thật về một tấm board cụ thể** |
@@ -661,8 +659,6 @@ while (*STATUS & BUSY) { }                  // compiler: "không ai đổi *STAT
 
 ### 🐧 Trong KERNEL thì viết thế nào — khác MCU ở chỗ có **MMU**
 
-*(Bổ sung 2026-08-17: ứng viên phản ánh đúng rằng đáp án cũ chỉ dạy MMIO kiểu MCU, trong khi JD là kernel driver.)*
-
 ```c
 // MCU (KHONG MMU): dia chi vat ly dung thang duoc
 volatile uint32_t *reg = (uint32_t *)0x40021000;
@@ -731,7 +727,7 @@ CPU không đọc thẳng RAM mà qua **cache**. DMA thì ghi/đọc **thẳng R
 
 PCI/USB **tự liệt kê** (self-enumerating): PCI có **configuration space** (Vendor/Device ID, class, BAR) kernel quét lúc boot rồi gán địa chỉ; USB có **descriptor** host đọc khi cắm. Kernel biết thiết bị *là gì* và *ở đâu* mà không cần khai. I2C/SPI **không discoverable** — bus không có cơ chế hỏi "ai đang cắm ở địa chỉ này" → phải khai trong **device tree** (compatible + reg).
 
-**"Descriptor" là gì — nói đơn giản** *(bổ sung 2026-08-17)*: là **tấm căn cước thiết bị tự mang trong ROM của nó**. Cắm vào ⇒ host hỏi *"anh là ai?"* qua kênh mặc định ⇒ thiết bị trả về: nhà sản xuất (**VID**), mã sản phẩm (**PID**), thuộc **lớp** nào (chuột / bàn phím / ổ đĩa), có mấy kênh truyền. Host đọc xong, cấp địa chỉ, rồi chọn driver theo VID/PID hoặc theo lớp. **Thiết bị tự mang datasheet, host chỉ việc đọc.**
+**"Descriptor" là gì — nói đơn giản**: là **tấm căn cước thiết bị tự mang trong ROM của nó**. Cắm vào ⇒ host hỏi *"anh là ai?"* qua kênh mặc định ⇒ thiết bị trả về: nhà sản xuất (**VID**), mã sản phẩm (**PID**), thuộc **lớp** nào (chuột / bàn phím / ổ đĩa), có mấy kênh truyền. Host đọc xong, cấp địa chỉ, rồi chọn driver theo VID/PID hoặc theo lớp. **Thiết bị tự mang datasheet, host chỉ việc đọc.**
 
 **Toàn cảnh — vì sao DT chỉ cần cho một nửa số bus:**
 
@@ -1113,7 +1109,7 @@ Thống nhất **baud rate** (và data bits/parity/stop bit) vì không có dây
 
 I2C khi cần nối nhiều thiết bị tốc độ thấp với ít dây (tiết kiệm chân). SPI khi cần băng thông cao, full-duplex và chấp nhận tốn dây (mỗi slave thêm 1 CS).
 
-**"Full-duplex" nghĩa là gì và lợi ở đâu** *(bổ sung 2026-08-17 — bản cũ chỉ ghi từ khoá)*:
+**"Full-duplex" nghĩa là gì và lợi ở đâu**:
 
 | | Số dây dữ liệu | Song công |
 |---|---|---|
@@ -1172,7 +1168,7 @@ CS còn đánh dấu **ranh giới một giao dịch**: nhiều chip yêu cầu 
    Mot ai do keo -> noi dat    -> muc 0      (wired-AND)
 ```
 
-**⚡ "Kéo xuống 0 thì dòng có lớn không?" — không, và đây chính là lý do tồn tại của open-drain** *(bổ sung 2026-08-17)*:
+**⚡ "Kéo xuống 0 thì dòng có lớn không?" — không, và đây chính là lý do tồn tại của open-drain**:
 
 ```
 I = Vdd / R = 3,3 V / 4,7 kΩ ≈ 0,7 mA      <-- khong dang ke; chip I2C thuong sink duoc 3 mA

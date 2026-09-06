@@ -112,8 +112,6 @@ class FakeBarcodePort : public IBarcodePort {
 4. **Nhầm DIP với DI.** *Dependency **Injection*** chỉ là cách truyền phụ thuộc vào (qua ctor/setter) — một kỹ thuật. *Dependency **Inversion*** là nguyên tắc về **chiều phụ thuộc và quyền sở hữu interface**. Dùng DI mà interface vẫn thuộc tầng dưới ⇒ vẫn chưa đảo.
 
 **Chốt:** *"DIP không phải 'thêm interface' — mà là tầng cao **sở hữu** interface theo nhu cầu của nó, để tầng thấp phải chĩa lên. Bằng chứng đã làm đúng: logic compile và test được khi driver chưa tồn tại."*
-
-> 🎤 Viết lại 2026-08-13 (nợ từ Tuần 1). Bản cũ (465 ký tự) chỉ nêu kết luận *"thay implementation bằng mock"* — không nói được **đảo cái gì**, không có seam nào ngoài virtual, không có đánh đổi.
 </details>
 
 #### DP-012 · 🔴 · concept · [→ behavioral](../../../11-design-patterns/behavioral.md)
