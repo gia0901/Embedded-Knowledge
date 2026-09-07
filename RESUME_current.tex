@@ -20,7 +20,7 @@
 
 \begin{minipage}[t]{0.55\textwidth}
     {\LARGE \textbf{NGUYEN HOANG GIA}} \\[5pt]
-    {\large \textbf{Software Engineer}}
+    {\large \textbf{Embedded Software Engineer}}
 \end{minipage}%
 \begin{minipage}[t]{0.45\textwidth}
     \raggedleft
@@ -43,6 +43,8 @@ resource-constrained, performance-critical systems.
     Multi-threading, Shared libraries
     \item \textbf{Embedded Linux:} HAL, Kernel/platform drivers, Device Tree
     \item \textbf{Debugging:} cross-layer (user-space $\leftrightarrow$ kernel-space), GDB, dmesg/printk
+    \item \textbf{AI-assisted Development:} Claude Code, internal AI -- unit-test generation,
+    code implementation
     \item \textbf{Build \& Tooling:} CMake, Makefile, Git, Perforce, Jira/Confluence
 \end{itemize}
 
@@ -51,14 +53,13 @@ resource-constrained, performance-critical systems.
 \textbf{Samsung Electronics HCMC -- Software Engineer} \hfill Jan 2024 -- Present \\[2pt]
 \textbf{Core Responsibilities}
 \begin{itemize}
-\item Developed C/C++ system software for display enhancement (dimming, frame-rate control,
-      timing control) across the full stack -- C++ shared-library interfaces down to
-      kernel-level HAL drivers talking to the SoC
-\item Developed and extended one interface across chipsets: the library
+\item Developed C/C++ software for display enhancement (dimming, frame-rate control,
+      timing control) -- from the C++ interfaces exposed by the shared library, down to
+      the kernel-level HAL drivers talking to the SoC
+\item Developed and extended a single C++ interface across chipsets: the library
       selects its implementation at boot from board configuration, the kernel driver
       dispatches through a function-pointer table -- applications above stay unchanged
 \item Ported and maintained kernel drivers across chipset generations for 2026--2027 products, covering new hardware bring-up, device tree updates, and a Linux 5.10 $\rightarrow$ 6.12 kernel migration while keeping backward compatibility with the 5.10 branch
-\item Applied AI (Claude Code, Internal AI) to automate unit-test generation and code implementation, cutting authoring time for a code submission from about 1 day to 1--2 hours
 \item Diagnosed and resolved cross-layer issues across C++ interfaces, libraries, and kernel drivers
 \item Collaborated with R\&D Headquarters (South Korea) during business trips twice a year to support product bring-up, integration, and issue fixing toward mass-production
 \end{itemize}
@@ -71,7 +72,9 @@ resource-constrained, performance-critical systems.
     \item Built adaptive brightness control driven by an ambient light sensor, allowing screen
       brightness to adjust automatically to the surrounding environment without flickering
       when lighting changes quickly
-    \item Synchronized brightness across multiple S-Box units over POSIX message queues, so a multi-panel video wall renders as one uniform screen instead of a visible grid --- with a single binary serving both standalone and synchronized modes
+    \item Synchronized brightness across multiple S-Box units over POSIX message queues, 
+      so a multi-panel video wall renders as one uniform screen instead of a visible grid -- 
+      with a single binary serving both standalone and synchronized modes
 \end{itemize}
 
 \project{Kernel Driver Load-Time Optimization (2025--2026)}
@@ -85,25 +88,26 @@ resource-constrained, performance-critical systems.
 
 \project{Samsung Display Manager (Windows Application)}
 \begin{itemize}
-    \item Built the ``Preset'' feature for a Windows monitor-settings app (MVVM, C++17) --
-          users can save their preferred display settings and restore them across restarts
+    \item Built the ``Preset'' feature for a Windows monitor-settings app (MVVM, Modern C++) -- users
+        can save a display configuration, restore it across restarts, and export it to apply on another
+        monitor -- delivered in one month, in time for release 1.0
 \end{itemize}
 
 \project{Porting Internal Tool (2026)}
 \begin{itemize}
     \item Automated driver/library porting with Python tooling -- build-system updates
           (CMake, Makefile) and source adaptation across chipset platforms --
-          reducing manual effort from 1--2 days to 2-3 hours
+          reducing manual effort from 1--2 days to 2--3 hours
 \end{itemize}
 
 \section*{EDUCATION}
 \textbf{Ho Chi Minh University of Technology -- VNU HCM} \hfill Ho Chi Minh City \\
-Bachelor of Engineering -- GPA: 7.8 \hfill Nov 2023
+Bachelor of Engineering \hfill Nov 2023
 
 \section*{ACHIEVEMENTS}
 \begin{itemize}
     \item Best Employee of the Quarter -- Q1 2026
-    \item Language: English -- TOEIC: 895/990 (2024)
+    \item English -- TOEIC: 895/990 (2024)
     \item Samsung Software Certificate (Data Structures \& Algorithms) -- Advanced Level
 \end{itemize}
 

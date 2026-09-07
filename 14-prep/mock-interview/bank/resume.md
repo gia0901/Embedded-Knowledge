@@ -349,12 +349,16 @@ Tình huống điển hình: *userspace gọi API set độ sáng, **hàm trả 
 **Interviewer đang dò gì:** thường chỉ là **hỏi cho đủ resume**. Nhưng với JD Embedded Linux, đây là mục **ít liên quan nhất** — mục tiêu của bạn là trả lời tử tế rồi **lái về** mảng mạnh, không sa đà.
 
 **Câu trả lời tốt gồm:**
-1. **Ngắn** — 30–45 giây. Tính năng Preset, lưu cấu hình bằng JSON, kiến trúc MVVM.
-2. **Rút ra thứ CHUYỂN ĐƯỢC sang embedded**, đây mới là phần đáng nói:
+1. **Mở bằng BỐI CẢNH + KẾT QUẢ, không mở bằng tính năng** — *"Lúc em vào, app điều khiển được màn hình và đã lưu được setting của chính app bằng JSON, nhưng chưa có khái niệm preset. Em làm Preset và import/export preset giữa các màn hình, xong trong một tháng, kịp release 1.0 của team."* Một câu này trả lời luôn ba thứ interviewer định hỏi sau: **phạm vi**, **thời gian**, **kết quả**. Chi tiết & bẫy: [RES-022](resume.md).
+2. **Ngắn** — 30–45 giây tổng. Preset, import/export preset sang màn hình khác, kiến trúc MVVM.
+3. **Rút ra thứ CHUYỂN ĐƯỢC sang embedded**, đây mới là phần đáng nói:
    - **MVVM = tách trạng thái khỏi hiển thị** — cùng tư duy với tách *business logic* khỏi *tầng phần cứng* trong HAL.
    - **Cấu hình bền vững qua khởi động lại** — bài toán y hệt trên thiết bị (lưu setting vào flash, lo mất điện giữa chừng).
-   - **Modern C++ (11/14/17)** — trùng đúng yêu cầu "C++17" của JD.
-3. **Tự lái:** *"phần này giúp em rõ hơn về tách tầng, nhưng mảng em đầu tư sâu là system software và driver ở phía Linux."*
+   - **Modern C++** — RAII, smart pointer, `std::optional`. Nói **tên thứ mình dùng được**, đừng nói tên chuẩn: xem cảnh báo ⚠️ ngay dưới.
+4. **Tự lái:** *"phần này giúp em rõ hơn về tách tầng, nhưng mảng em đầu tư sâu là system software và driver ở phía Linux."*
+
+> ⚠️ **Đừng gắn nhãn "C++17" cho riêng SDM.** App build được tới C++20, và thứ duy nhất thuộc C++17 dùng trong đó là `std::optional` — nói "C++17" là tự mời một câu hỏi mình không có gì để trả lời. Resume **đã bỏ nhãn này** khỏi mục SDM (07/09), chỉ còn "Modern C++".
+> Nhãn **17** vẫn còn ở dòng **TECHNICAL SKILLS** (`Modern C++ (11/14/17)`) và nó **phải bảo vệ được bằng cả 3 năm**, không phải bằng SDM. Chuẩn bị sẵn ít nhất **hai** thứ C++17 dùng thật ngoài `optional` (structured binding, `if constexpr`, `string_view`, `[[nodiscard]]`…) — nếu không có, hạ dòng Skills xuống "(11/14)" còn an toàn hơn.
 
 🔗 **Đào sâu ở đâu:** [RES-017](resume.md) (bản nháp vs sửa trực tiếp) · [RES-018](resume.md) (DDC/CI ≈ I²C) · [RES-019](resume.md) (định danh màn hình) · [RES-020](resume.md) (ghi file & mất điện) · [RES-021](resume.md) (đồng bộ Save/Load).
 
@@ -385,8 +389,8 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 
 **Ba lý do, theo đúng thứ tự này:**
 
-1. **Khả năng thích ứng** — không ngại nhận một dự án ngoài chuyên môn trong một giai đoạn để team kịp tiến độ.
-2. **Modern C++ vận dụng thật** — move semantics, smart pointer, OOP design; và nó **quay lại phục vụ** chất lượng code cho C++ interface / shared library ở phía embedded. *(Trùng đúng yêu cầu "C++17" của JD.)*
+1. **Khả năng thích ứng — có con số** — nhận một dự án ngoài chuyên môn, đang thiếu người, và **một tháng sau team có release 1.0**. Đừng nói suông "em thích ứng nhanh"; nói mốc thời gian ([RES-022](resume.md)).
+2. **Modern C++ vận dụng thật** — move semantics, smart pointer, RAII, OOP design; và nó **quay lại phục vụ** chất lượng code cho C++ interface / shared library ở phía embedded.
 3. ⭐⭐ **MVVM → HAL, qua Dependency Inversion** — đây là câu ăn điểm, vì nó biến một mục "lạc đề" thành bằng chứng cho đúng thứ JD cần:
 
 > *"MVVM giúp em hiểu thêm cách HAL hoạt động trên embedded: **lớp trên không biết hardware, hardware không biết lớp trên** — hai bên chỉ gặp nhau ở một interface trừu tượng. Kết quả là coupling thấp, và **mock test được** khi chưa có phần cứng."*
@@ -587,6 +591,34 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 **Cầu nối sang embedded:** đúng bài toán *"nhiều bên cùng ghi một tài nguyên"* trên thiết bị — hai tiến trình cùng ghi file cấu hình, hoặc userspace tool và driver cùng đụng một device node. Và [LNX-042](linux-sysprog.md): đặt `pthread_mutex_t` vào shared memory **không tự động** dùng được liên tiến trình — phải bật `PTHREAD_PROCESS_SHARED`. Cùng một bài học: **khoá phải cùng phạm vi với tài nguyên**.
 
 **Bẫy:** ① nói *"em dùng mutex"* trong khi v1 không có · ② *"chưa gặp lỗi nên ổn"* — không nêu được **giả định** đang dựa vào · ③ trả lời *"đủ rồi"* cho câu mutex member — đây chính là chỗ câu hỏi nhắm vào · ④ thêm khoá mà quên rằng **ghi nguyên tử** giải quyết phần lớn vấn đề rẻ hơn.
+</details>
+
+---
+
+#### RES-022 · 🟡 · concept · ⭐ · 🏗️ · [→ RESUME: "Joined a short-staffed team … delivered the ``Preset'' feature with settings persistence in one month, in time for the team's 1.0 release"]
+**"Em nói một tháng ra được tính năng Preset, và team kịp release 1.0. Lúc em vào thì app đã có gì, em làm chính xác phần nào, và 'kịp 1.0' là nhờ em hay nhờ cả team?"**
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** ba thứ cùng lúc — ① mốc thời gian có **thật và nhớ được** không · ② bạn **nhận công đúng phần mình** hay vơ cả release · ③ dưới sức ép một tháng thì bạn **cắt cái gì**, và có **biết mình đang cắt** không. Câu ③ mới là câu ăn điểm; hai câu đầu chỉ để loại.
+
+**Câu trả lời tốt gồm bốn phần, theo thứ tự này:**
+
+1. **Trạng thái lúc vào — mô tả bằng NĂNG LỰC CÒN THIẾU, không bằng lời chê.**
+   *"App đã chạy được, điều khiển được màn hình qua DDC/CI, và đã lưu được setting của chính app bằng JSON. Thứ chưa có là **preset** — người dùng chưa lưu lại được một bộ cấu hình để gọi lại, và chưa mang được cấu hình từ màn hình này sang màn hình khác."* — một câu, khách quan, không nhắc "team yếu".
+   ⚠️ **Đừng nhận phần lưu JSON là của mình.** Nó **có trước** khi bạn vào. Bạn **dùng lại** nó làm chỗ lưu cho preset — và nói đúng như vậy còn mạnh hơn: *tái sử dụng cơ chế sẵn có thay vì dựng cơ chế thứ hai* là một quyết định thiết kế, không phải thiếu sót.
+2. **Phạm vi bạn làm — cụ thể tới mức đếm được**, vì "một tháng" nghe *nhỏ* nếu không có phạm vi kèm theo: Preset cho **tối đa 4 màn hình** (index chọn màn) · **import/export preset** — setup một màn rồi bê nguyên cấu hình sang màn khác · **đồng bộ luồng Save/Load** với UI.
+   ⭐ **Import/export là chi tiết đáng nêu nhất**, vì nó là chỗ duy nhất trong project chạm vào một câu hỏi kỹ thuật thật: *cấu hình rời khỏi máy nó sinh ra thì phải mang theo gì để dùng lại được ở nơi khác* — xem follow-up ngay dưới.
+3. **Kết quả + RANH GIỚI CÔNG LAO.**
+   ✅ *"Phần em nhận xong đúng hạn nên 1.0 không phải cắt tính năng."*
+   🔴 *"Nhờ em mà team release được 1.0."* — cùng một sự thật, nhưng vế sau interviewer nghe thấy **người vơ công**.
+4. ⭐ **Đánh đổi đã chấp nhận CÓ Ý THỨC** — đây là chỗ biến "làm nhanh" thành "làm nhanh mà biết mình đang đánh đổi gì": ghi đè toàn bộ file, **không có trường version** ([RES-020](resume.md)) · **chưa có khoá** cho luồng Save/Load ([RES-021](resume.md)) · sửa trực tiếp thay vì bản nháp ([RES-017](resume.md)). Mỗi cái nêu **ràng buộc riêng** và **bán kính ảnh hưởng riêng** — xem [KHUNG KỂ CHUNG](resume.md) ở [RES-011](resume.md).
+
+🎯 **Follow-up gần như chắc chắn:** *"Export ở màn hình này, import sang màn hình khác **model khác** thì sao?"* — đây là câu hỏi hay nhất mà mục SDM tạo ra được, vì nó đúng bài toán **portability của cấu hình**: file preset phải **tự mô tả** (nó thuộc model nào, gồm những thuộc tính nào), và bên nhận phải **bỏ qua thuộc tính không hỗ trợ** thay vì áp bừa. Nối thẳng sang [RES-019](resume.md) (định danh màn hình) và [RES-020](resume.md) (chưa có trường version ⇒ file cũ gặp app mới thì xử lý ra sao). Trả lời trung thực theo [KHUNG KỂ CHUNG](resume.md): bản đầu làm tới đâu, và hướng đúng là gì.
+
+📌 **Vì sao mục này đáng để trong resume dù là app Windows:** nó là bằng chứng **duy nhất** trong resume cho *"nhận việc ngoài chuyên môn, trong ràng buộc thời gian, và giao đúng hạn"*. Ba mục kia chứng minh chiều sâu kỹ thuật; mục này chứng minh **độ tin cậy khi giao việc**. Lái tiếp: [RES-011](resume.md).
+
+**Bẫy:** ① biến *"team đang thiếu người"* thành lời chê đồng nghiệp — nêu **một câu như ràng buộc** rồi đi tiếp · ② nhận công cả release (phần 3) · ③ nói "một tháng" mà **không nói phạm vi** ⇒ nghe như một tháng làm được rất ít · ④ để "gấp" thành **cái cớ mặc định** ở mọi câu SDM sau đó · ⑤ **không nhớ mình vào tháng nào, 1.0 ra khi nào** — con số mơ hồ tự huỷ đúng như [RES-012](resume.md) đã dạy: một chi tiết không đứng vững kéo theo nghi ngờ mọi con số còn lại.
 </details>
 
 ---

@@ -213,6 +213,8 @@
   | **5** | `/mock rapid track build-systems` | `BLD` **13%** — vừa thêm **17 câu** CI/test-farm chưa hỏi câu nào, mà đó là trụ JD *"Yocto + CMake/CI"* |
   | **6** | `/mock daily track bsp` ở **T2** | chỉ sau khi đã đọc lại; [config §6](../mock-interview/config.md) cấm đưa câu 0–2đ thẳng lên T2 |
 
+  📌 **Resume đổi 07/09 — mục SDM:** bỏ nhãn *"C++17"* (app build tới C++20, thứ C++17 duy nhất dùng là `std::optional` ⇒ nhãn đó tự mời câu hỏi không trả lời được) và **thêm thành tựu**: **Preset + import/export preset giữa các màn hình, xong trong 1 tháng, kịp release 1.0** *(phần lưu JSON đã có sẵn trước khi vào — không nhận)*. Dòng mới ⇒ câu hỏi mới **[RES-022](../mock-interview/bank/resume.md)** *(phạm vi · ranh giới công lao · đánh đổi đã chấp nhận)* — **chưa nói lần nào**, ghép vào việc **4** vì cùng là bài nói to bấm giờ. Sửa song song ở `RESUME_bosch.tex`; `RESUME_cpp_linux.tex` **chưa có** thành tựu này.
+
   **📊 Độ phủ đo lại 2026-09-06: `178/457 = 38%`** — `BEH` 100% · `RES` 76% · `CPP` 72% · `LNX` 60% · `OS` 42% · `DBG` 41% · `COD` 30% · **`BSP` 29%** · `DRV` 29% · `BUS` 28% · `DP` 25% · `SD` 21% · **`BLD` 13%** · `DSA` 12% · `EMB` 2% · **`NET` 0%** 🔴.
   > ⚠️ **`BLD` tụt từ 26% xuống 13% không phải vì quên ôn** — mà vì **mẫu số tăng** (19 → 36 câu sau khi thêm CI/test-farm). Phủ thấp ở đây nghĩa là *"có tài liệu mới chưa kiểm"*, khác hẳn `NET` 0% nghĩa là *"chưa bao giờ chạm"*.
 
