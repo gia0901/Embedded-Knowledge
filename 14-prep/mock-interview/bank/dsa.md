@@ -195,7 +195,3 @@ Liên hệ: DSA-013 (chọn N), [COD-006](coding.md) (cài đặt).
 
 ---
 ⬅️ [Bank index](README.md)
-
----
-
-⬅️ [Bank index](README.md)

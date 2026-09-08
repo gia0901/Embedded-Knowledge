@@ -1324,9 +1324,383 @@ Chúng **đo hai thứ khác nhau**. ASan canh **biên và vòng đời** của 
 **Chốt:** *"ASan và valgrind không phải hai bản của cùng một thứ. ASan không biết 'byte này đã được ghi chưa' — đúng lớp lỗi đó là chỗ valgrind không thay thế được, và là lý do duy nhất đáng để chịu cái chậm 10–50×."*
 </details>
 
----
-⬅️ [Bank index](README.md)
+#### DBG-037 · 🟡 · lab 🧪 · 🎤 2026-09-08 · [→ gdb](../../../09-debugging/gdb.md)
+**🧪 NGỒI MÁY LÀM. Lỗi chỉ xảy ra ở lần lặp thứ 4096 trong tổng 5000. Dừng đúng lần đó — không bấm `continue` 4096 lần.**
+
+```c
+// loop.c  —  gcc -Wall -Wextra -g -O0 -o loop loop.c
+#include <stdio.h>
+static int table[64];
+static void put(int i, int v) { table[i % 64] = v; }
+
+int main(void) {
+    for (int i = 0; i < 5000; i++) put(i, i * 2);
+    printf("%d\n", table[7]);
+    return 0;
+}
+```
+
+**Nhiệm vụ:** ① dừng đúng lần lặp `i == 4096` bằng **điều kiện** · ② dừng đúng lần đó bằng **số lần**, không dùng điều kiện · ③ `info breakpoints` sau khi dừng — con số "hit" là bao nhiêu, vì sao · ④ trả lời: nếu `put()` được gọi **10 triệu lần** thì cách nào hỏng, và vì sao?
+
+<details><summary>Đáp án — output thật đã chạy</summary>
+
+📋 **ĐÃ CHẠY 2026-09-08** *(Ubuntu 22.04, gcc 11, gdb 12.1)*
+
+**① Điều kiện:**
+```
+(gdb) break put if i == 4096
+(gdb) run
+Breakpoint 1, put (i=4096, v=8192) at loop.c:3
+(gdb) p i
+$1 = 4096
+```
+
+**② Số lần — bỏ qua 4096 lần chạm đầu:**
+```
+(gdb) break put
+(gdb) ignore 1 4096
+(gdb) run
+Breakpoint 1, put (i=4096, v=8192) at loop.c:3
+```
+
+**③ `info breakpoints` — con số hé lộ cơ chế:**
+```
+Num  Type        Disp Enb Address   What
+1    breakpoint  keep y   0x...     in put at loop.c:3
+	breakpoint already hit 4097 times
+```
+**4097, không phải 1.** Vì `ignore` **không** ngăn breakpoint chạm — nó vẫn dừng tiến trình đủ 4096 lần rồi cho chạy tiếp. Nó chỉ ngăn *báo cho bạn*.
+
+**④ Với 10 triệu lần gọi thì CẢ HAI đều đau, nhưng khác mức:**
+
+| | `break … if cond` | `ignore N` |
+|---|---|---|
+| Cần biết trước | **điều kiện** | **số lần** |
+| Mỗi lần chạm | dừng tiến trình → **gdb đánh giá biểu thức** → chạy tiếp | dừng → trừ một biến đếm → chạy tiếp |
+| Tái lập khi đổi input | ✅ điều kiện vẫn đúng | ❌ số lần đổi theo |
+
+⭐ **Điều kiện do GDB đánh giá, không phải CPU.** Mỗi lần chạm là một lượt `ptrace` dừng/khôi phục — đắt hơn nhiều so với một lần trừ biến đếm. Trên hàm cực nóng, chương trình có thể chậm hàng trăm lần và bài debug trở nên bất khả thi.
+
+**Ba lối ra khi cả hai đều quá chậm:**
+```gdb
+(gdb) tbreak f                # dung MOT lan roi tu xoa
+(gdb) condition 1 i > 100     # them dieu kien cho breakpoint da co
+```
+```c
+if (i == 4096) raise(SIGTRAP);   // nhung dieu kien vao CODE: CPU kiem tra, khong phai gdb
+```
+Cách thứ ba là cách duy nhất giữ được tốc độ gần như nguyên vẹn — đổi lại phải build lại.
+
+**Bẫy:** ① điều kiện tham chiếu biến **chưa vào scope** tại địa chỉ breakpoint ⇒ không bao giờ đúng · ② `ignore` đếm **mọi** lần chạm, kể cả từ thread khác · ③ sau khi dừng lần đầu, `ignore` đã hết hiệu lực — vòng sau lại dừng.
+
+**Chốt:** *"Biết điều kiện thì `break … if`; biết số lần thì `ignore`. Cả hai đều dừng tiến trình mỗi lần chạm — muốn nhanh thật thì nhúng điều kiện vào code."*
+</details>
+
+#### DBG-038 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-09-08 · [→ gdb](../../../09-debugging/gdb.md)
+**🧪 NGỒI MÁY LÀM. Cùng một file, build `-O0` thì debug bình thường; build `-O2` thì gdb gần như mù. Tự dựng lại cả hai triệu chứng.**
+
+```c
+// opt.c  —  build HAI lan: -O0 va -O2
+#include <stdio.h>
+static int scale(int v, int k) { int tmp = v * k; int adj = tmp + 7; return adj; }
+
+int main(void) {
+    int total = 0;
+    for (int i = 0; i < 5; i++) total += scale(i, 3);
+    printf("%d\n", total);
+    return 0;
+}
+```
+
+**Nhiệm vụ:** ① build `-O0`, `break scale`, `info locals` — ghi lại · ② build `-O2`, **cùng lệnh đó** — chuyện gì xảy ra · ③ thêm `__attribute__((noinline))` vào `scale`, build lại `-O2` — triệu chứng đổi thành gì · ④ trả lời: một bug **biến mất** khi hạ xuống `-O0` thì bạn nghi cái gì, và **không** nên kết luận cái gì?
+
+<details><summary>Đáp án — output thật đã chạy</summary>
+
+📋 **ĐÃ CHẠY 2026-09-08** *(Ubuntu 22.04, gcc 11, gdb 12.1)*
+
+**① `-O0` — mọi thứ nhìn được:**
+```
+Breakpoint 1, scale (v=0, k=3) at opt.c:2
+tmp = 0
+adj = 0
+$1 = 3
+```
+
+**② `-O2` — breakpoint KHÔNG đặt được:**
+```
+(gdb) break scale
+Function "scale" not defined.
+Make breakpoint pending on future shared library load? (y or [n]) [answered N]
+65
+[Inferior 1 (process 8321) exited normally]
+(gdb) p k
+No symbol "k" in current context.
+```
+Hàm bị **inline mất hẳn** — không còn symbol nào tên `scale`. Đây là triệu chứng nặng hơn `<optimized out>` vì nó phá **bước đầu tiên** của quy trình debug.
+
+**③ `-O2` + `noinline` — hàm còn, biến thì không:**
+```
+Breakpoint 1, scale (v=v@entry=0, k=k@entry=3) at opt.c:2
+(gdb) info locals
+tmp = <optimized out>
+adj = <optimized out>
+```
+Biến cục bộ sống trong **thanh ghi** rồi bị ghi đè; DWARF không mô tả nổi vị trí của nó tại điểm dừng đó. `<optimized out>` **không phải gdb hỏng**. Chú ý `v@entry=` — gdb còn giữ được **giá trị lúc vào hàm**, đôi khi đủ dùng.
+
+**④ Bug biến mất ở `-O0` là MANH MỐI, không phải bất tiện:**
+
+| Nghi ngờ | Vì sao `-O0` che được | Xác nhận bằng |
+|---|---|---|
+| **UB** (overflow có dấu, aliasing, biến chưa khởi tạo) | `-O0` không khai thác giả định UB nên "tình cờ" đúng | `-fsanitize=undefined` |
+| **Race / thiếu `volatile`** | `-O0` đọc lại biến từ bộ nhớ mỗi lần; `-O2` giữ trong thanh ghi | `-fsanitize=thread` |
+| **Phụ thuộc layout stack** | `-O0` đệm rộng hơn, ghi lố rơi vào chỗ vô hại | `-fsanitize=address` |
+
+🔴 **Không** kết luận *"compiler có bug"*. Xác suất đó thấp hơn nhiều bậc so với UB trong code của mình.
+
+**Bộ cờ để debug bản tối ưu — nguyên tắc: đổi càng ÍT càng tốt:**
+```
+-Og                        # toi uu nhung GIU debuggability - nac giua -O0 va -O2
+-O2 -fno-inline            # tat rieng inline, giu cac toi uu khac
+-g3                        # giu ca macro
+-fno-omit-frame-pointer    # de bt khong gay
+```
+Nhảy thẳng `-O2` → `-O0` là đổi hàng chục biến đổi cùng lúc; bug biến mất thì **không học được gì**.
+
+**Bẫy:** ① thêm `printf` để dò rồi bug biến mất (**Heisenbug**) — chính `printf` đã đổi layout/thời điểm · ② tin `<optimized out>` nghĩa là biến không tồn tại · ③ hạ mức tối ưu cho **bản release** để "hết bug" — đó là **giấu bug**.
+
+**Chốt:** *"Bug chỉ có ở `-O2` là dấu hiệu UB hoặc race. Chạy UBSan/TSan trước khi đụng gdb, và nếu phải debug bản tối ưu thì dùng `-Og`/`-fno-inline` chứ đừng về `-O0`."*
+</details>
+
+#### DBG-039 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-09-08 · [→ gdb](../../../09-debugging/gdb.md), [ci-and-test-farm](../../../06-build-systems/ci-and-test-farm.md)
+**🧪 NGỒI MÁY LÀM. Tự tay strip một binary, rồi tự lấy lại backtrace có tên hàm. Dùng chính `loop.c` của [DBG-037](debugging.md).**
+
+**Nhiệm vụ:** ① build có `-g`, giữ một bản `app.full` · ② tách symbol ra file riêng rồi strip bản gửi đi · ③ chép **một mình** binary đã strip sang thư mục khác, `bt` — ghi lại · ④ chép thêm file symbol vào cạnh nó, `bt` lại · ⑤ trả lời: nếu thiết bị ngoài hiện trường chạy build **A** mà bạn chỉ còn symbol của build **B** thì sao?
+
+<details><summary>Đáp án — output thật đã chạy</summary>
+
+📋 **ĐÃ CHẠY 2026-09-08** *(Ubuntu 22.04, binutils 2.38, gdb 12.1)*
+
+**①②  Quy trình chuẩn — ba lệnh `objcopy`:**
+```
+objcopy --only-keep-debug   app.full  app.debug     # rut symbol ra file rieng
+objcopy --strip-debug       app                     # binary gui ra thiet bi
+objcopy --add-gnu-debuglink=app.debug  app          # gan "ten file symbol" vao binary
+```
+
+Kích thước đo thật:
+```
+15968  app.full      <-- ban co symbol
+ 6304  app           <-- ban gui ra thiet bi (nho hon ~60%)
+17672  app.debug     <-- giu o build server
+```
+
+**③ Chỉ có binary đã strip:**
+```
+(gdb) bt
+#0  0x0000555555555151 in put ()
+#1  0x00005555555551a6 in main ()
+```
+Có tên hàm (từ symbol table động) nhưng **không có tham số, không có số dòng**.
+
+**④ Đặt `app.debug` cạnh bên — cùng binary đó:**
+```
+(gdb) bt
+#0  put (i=0, v=0) at loop.c:3
+#1  0x00005555555551a6 in main () at loop.c:4
+```
+File chạy trên thiết bị **không đổi một byte**. Khác nhau chỉ ở chỗ **host có giữ symbol hay không**.
+
+**⑤ Symbol của build KHÁC là cái bẫy nguy hiểm nhất trong bài này.** Địa chỉ trong core dump được diễn giải bằng bảng symbol bạn đưa vào — đưa nhầm build thì gdb in ra tên hàm và số dòng **sai một cách rất thuyết phục**, và bạn sẽ đi điều tra một hàm chưa bao giờ chạy. `--add-gnu-debuglink` có checksum và ELF có **build-id** để chống chuyện này, nhưng nếu bạn ép bằng `add-symbol-file` thì không còn ai chặn.
+
+⇒ **Hệ quả cho CI ([ci-and-test-farm](../../../06-build-systems/ci-and-test-farm.md)):** file symbol phải được **archive theo từng build**, đánh dấu bằng build-id. Mất symbol của **đúng** build đang chạy ngoài hiện trường thì core dump gửi về chỉ là một đống địa chỉ.
+
+**Đọc core dump của THIẾT BỊ trên máy host — hai lệnh không được quên:**
+```gdb
+(gdb) set sysroot /path/to/target/rootfs      # de gdb lay .so CUA THIET BI
+(gdb) set solib-search-path /path/to/libs
+(gdb) file app.full
+(gdb) core-file core.1234
+```
+Thiếu `set sysroot`, gdb dùng `libc.so` **của host** để giải các frame trong thư viện — host và target gần như không bao giờ cùng phiên bản libc, và **gdb không báo lỗi**, chỉ in sai.
+
+**Bẫy:** ① strip trước rồi mới nghĩ tới symbol — **không lấy lại được** · ② nhầm `--strip-all` với `--strip-debug`: cái đầu bỏ cả symbol table động, backtrace qua `.so` có thể gãy hẳn · ③ quên `set sysroot`.
+
+**Chốt:** *"Strip là chuyện của binary GỬI ĐI, không phải chuyện của symbol. Tách bằng `--only-keep-debug`, archive theo build-id ở CI, và `set sysroot` khi đọc core của thiết bị."*
+</details>
+
+#### DBG-040 · 🟠 · lab 🧪 · ⭐ · 🎤 2026-09-08 · [→ gdb](../../../09-debugging/gdb.md), [sync-primitives](../../../03-operating-system/sync-primitives.md)
+**🧪 NGỒI MÁY LÀM. Chương trình treo cứng, CPU 0%. Chỉ ra ĐÚNG vòng chờ bằng bằng chứng, không phải bằng đọc code.**
+
+```c
+// dead.c  —  gcc -Wall -Wextra -g -O0 -o dead dead.c -lpthread
+#include <pthread.h>
+#include <unistd.h>
+static pthread_mutex_t A = PTHREAD_MUTEX_INITIALIZER, B = PTHREAD_MUTEX_INITIALIZER;
+
+static void* t1(void* x) { (void)x; pthread_mutex_lock(&A); sleep(1); pthread_mutex_lock(&B); return 0; }
+static void* t2(void* x) { (void)x; pthread_mutex_lock(&B); sleep(1); pthread_mutex_lock(&A); return 0; }
+
+int main(void) {
+    pthread_t a, b;
+    pthread_create(&a, 0, t1, 0);
+    pthread_create(&b, 0, t2, 0);
+    pthread_join(a, 0); pthread_join(b, 0);
+    return 0;
+}
+```
+
+**Nhiệm vụ:** ① chạy trong gdb, đợi nó treo, **Ctrl-C** · ② gõ `bt` — nhận xét bạn thấy gì · ③ gõ `thread apply all bt` — chỉ ra **thread nào chờ mutex nào** · ④ chụp backtrace **lần thứ hai** cách vài giây · ⑤ trả lời: bước ④ chứng minh thêm điều gì mà bước ③ chưa chứng minh được?
+
+<details><summary>Đáp án — output thật đã chạy</summary>
+
+📋 **ĐÃ CHẠY 2026-09-08** *(Ubuntu 22.04, glibc 2.35, gdb 12.1)*
+
+**② `bt` trần là cái bẫy đầu tiên:** nó chỉ in **thread đang được chọn**, thường là thread 1 — và thread 1 đang nằm ở `pthread_join`. Kết luận *"treo ở join"* là sai hoàn toàn: `join` chờ là **hệ quả**, không phải nguyên nhân.
+
+**③ `thread apply all bt` — nguyên nhân hiện ra:**
+```
+Thread 3 ... "dead":
+#3  ___pthread_mutex_lock (mutex=0x555555558040 <A>) at pthread_mutex_lock.c:93
+#4  0x0000555555555240 in t2 (x=0x0) at dead.c:5
+
+Thread 2 ... "dead":
+#3  ___pthread_mutex_lock (mutex=0x555555558080 <B>) at pthread_mutex_lock.c:93
+#4  0x0000555555555201 in t1 (x=0x0) at dead.c:4
+
+Thread 1 ... "dead":
+#3  __pthread_clockjoin_ex (...)
+#4  0x00005555555552ad in main () at dead.c:7
+```
+
+⭐ **Thông tin quyết định nằm ở tham số `mutex=` của frame `pthread_mutex_lock`** — và gdb in cả **tên biến** (`<A>`, `<B>`) vì chúng là biến toàn cục. Đọc ra ngay: thread chạy `t2` chờ **`A`**, thread chạy `t1` chờ **`B`**. Ghép với code (`t1` giữ `A`, `t2` giữ `B`) ⇒ **circular wait**.
+
+**⑤ Chụp lần hai mới phân biệt được ba kiểu treo giống hệt nhau từ bên ngoài:**
+
+| Hai lần chụp | CPU | Kết luận |
+|---|---|---|
+| **Giống hệt**, frame ở `pthread_mutex_lock` | ~0% | **deadlock** — sửa bằng thứ tự khoá hoặc `std::scoped_lock` |
+| **Khác nhau** liên tục, không tiến triển | cao | **livelock** — mọi thread đều chạy, chỉ là nhường nhau |
+| Frame ở `read`/`recv`/`accept` | ~0% | **chờ I/O**, không phải deadlock |
+
+Một lần chụp chỉ cho biết *"đang chờ"*; hai lần mới cho biết *"không tiến"*.
+
+**Lệnh đi tiếp sau khi biết thread nào:**
+```gdb
+(gdb) thread 3                  # chuyen sang thread do
+(gdb) frame 4                   # nhay toi frame CODE CUA MINH
+(gdb) p A                       # __owner cua struct mutex = TID dang giu
+(gdb) set scheduler-locking on  # chi thread hien tai chay khi step
+```
+
+**Không attach được** (`ptrace_scope`, thiết bị không có gdb) thì đọc `/proc/<pid>/task/*/wchan` và `/proc/<pid>/task/*/stack` — xem [DBG-034](debugging.md).
+
+**Bẫy:** ① dùng `bt` thay vì `thread apply all bt` · ② `set scheduler-locking on` rồi quên tắt — tự tạo deadlock giả · ③ kết luận deadlock từ **một** lần chụp · ④ nhầm thread chờ I/O với thread chờ khoá.
+
+**Chốt:** *"`thread apply all bt`, đọc tham số `mutex=` của từng frame lock, rồi chụp lần hai để chứng minh nó không tiến. Vòng chờ hiện ra bằng bằng chứng, không bằng đọc code."*
+</details>
+
+#### DBG-041 · 🟡 · lab 🧪 · ⭐ · 🎤 2026-09-08 · [→ gdb](../../../09-debugging/gdb.md), [linking-loading](../../../07-shared-libraries/linking-loading.md)
+**🧪 NGỒI MÁY LÀM. Đặt breakpoint vào một hàm nằm trong `.so` mà chương trình chưa nạp. gdb nói "không có hàm đó". Chứng minh nó vẫn dừng được — và chỉ ra constructor của `.so` chạy vào lúc nào.**
+
+> 📦 **Codebase: dùng luôn `project_implementation/HAL_layer`** — HAL C++ của chính bạn (`interface/` ở app, `impl/` thành `libdisplay.so` nạp bằng `dlopen`). Không cần viết file mới; đây là bài lab duy nhất chạy trên **nhiều file + shared library**, thứ mà một file `.c` đơn không dựng lại được.
+
+**Chuẩn bị:** `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
+
+**Nhiệm vụ:** ① dừng ở `main`, xem `libdisplay.so` **đã nạp chưa** · ② đặt breakpoint vào một hàm trong `.so` — gdb trả lời gì · ③ làm cho nó dừng được, rồi đọc `bt` xem **ai gọi** constructor của `.so` · ④ trả lời: main đã chạy tới đâu khi constructor đó chạy?
+
+<details><summary>Đáp án — output thật đã chạy</summary>
+
+📋 **ĐÃ CHẠY 2026-09-08** *(Ubuntu 22.04, gdb 12.1, CMake Debug, `hal_demo` + `libdisplay.so` cùng thư mục `bin/`)*
+
+**① Ở `main`, `.so` CHƯA có mặt:**
+
+```
+Breakpoint 1, main () at main.cpp:4
+4	    IDisplay* displayObj = IDisplay::getInstance();
+
+(gdb) info sharedlibrary
+From                To                  Syms Read   Shared Object Library
+0x00007ffff7fc5090  0x00007ffff7fee315  Yes         /lib64/ld-linux-x86-64.so.2
+0x00007ffff7ca2420  0x00007ffff7daafc2  Yes (*)     /lib/x86_64-linux-gnu/libstdc++.so.6
+0x00007ffff7828700  0x00007ffff79ba9bd  Yes         /lib/x86_64-linux-gnu/libc.so.6
+...
+```
+
+**Không có `libdisplay.so`.** Đúng như thiết kế: nó không nằm trong `DT_NEEDED` của binary — không ai link nó cả — nên loader không nạp lúc khởi động. Nó chỉ xuất hiện khi `loadlib()` gọi `dlopen`.
+
+**② Breakpoint vào hàm chưa tồn tại:**
+
+```
+(gdb) break DisplayBuilderImpl::buildNewDisplayHandle
+Function "DisplayBuilderImpl::buildNewDisplayHandle" not defined.
+Make breakpoint pending on future shared library load? (y or [n])
+```
+
+gdb **không sai** — tại thời điểm đó symbol đó thật sự không tồn tại trong bất kỳ object nào đã nạp. Câu hỏi nó đưa ra chính là lời giải.
+
+**③ Trả lời `y` (hoặc đặt trước `set breakpoint pending on`), chạy lại — gdb dừng ở constructor của `.so`:**
+
+```
+(gdb) set breakpoint pending on
+(gdb) break DisplayBuilderImpl::buildNewDisplayHandle
+(gdb) break DisplayImpl_Inject
+(gdb) run
+```
+
+`bt` tại điểm dừng đầu tiên — **đọc từ dưới lên**:
+
+```
+#0  DisplayImpl_Inject () at impl/DisplayBuilderImpl.cpp:10
+#1  call_init (...)                      at ./elf/dl-init.c:70
+#3  _dl_init (...)                       at ./elf/dl-init.c:117
+#5  dl_open_worker (...)                 at ./elf/dl-open.c:808
+#8  _dl_open (... caller_dlopen=0x... <loadlib(char const*)+29> ...)
+#14 ___dlopen (...)                      at ./dlfcn/dlopen.c:81
+#15 loadlib (path=0x... "libdisplay.so") at interface/IDisplay.cpp:17
+#16 IDisplay::getInstance ()             at interface/IDisplay.cpp:39
+#17 main ()                              at main.cpp:4
+```
+
+⭐ **Đây là toàn bộ bài học, in ra thành bằng chứng:** `__attribute__((constructor))` của `.so` **không** chạy ở một thời điểm bí ẩn nào đó — nó chạy **bên trong lời gọi `dlopen`**, trên **cùng thread**, và `dlopen` **chưa trả về** khi nó chạy. Frame `#15` vẫn đang đứng ở dòng 17 của `IDisplay.cpp`.
+
+Sau khi `.so` đã nạp, breakpoint pending **tự giải**:
+
+```
+(gdb) info breakpoints
+Num  Type       Disp Enb Address            What
+1    breakpoint keep y   0x00007ffff7fb750f in DisplayBuilderImpl::buildNewDisplayHandle()
+                                            at impl/DisplayBuilderImpl.cpp:18
+	breakpoint already hit 1 time
+
+(gdb) info sharedlibrary libdisplay
+0x00007ffff7fb7280  0x00007ffff7fb7659  Yes  .../bin/libdisplay.so
+```
+
+Địa chỉ `0x00007ffff7fb...` nằm trong vùng ánh xạ của `.so`, khác hẳn `0x0000555555555...` của executable — nhìn địa chỉ là biết code đang ở đâu.
+
+**④ Main đã chạy tới đâu?** Tới **đúng dòng 4** và đang **kẹt giữa chừng** trong `getInstance()`. Đây là điểm nhiều người trả lời sai theo hai hướng ngược nhau: *"constructor chạy trước main"* (đúng với `.so` link sẵn, **sai** với `dlopen`) hoặc *"chạy sau khi dlopen xong"* (sai — nó chạy **trong lòng** `dlopen`).
+
+| Cách nạp `.so` | Constructor chạy khi nào |
+|---|---|
+| Link lúc build (`DT_NEEDED`) | **trước `main`**, do `_dl_init` lúc khởi động tiến trình |
+| `dlopen` lúc chạy | **trong lời gọi `dlopen`**, sau khi `main` đã chạy được một đoạn |
+
+**Chuyển sang việc thật:** đây đúng mô hình HAL nhiều chipset — plugin chọn lúc chạy. Ba hệ quả:
+
+- Debug plugin trên thiết bị: breakpoint **luôn** phải là pending, vì lúc gdb khởi động thì `.so` chưa tồn tại trong tiến trình.
+- Lỗi trong constructor của plugin nổ **giữa lòng `dlopen`**, nên backtrace đi xuyên qua `dl-init.c`/`dl-open.c` — nhìn thấy các frame đó **đừng nghi loader hỏng**, hãy đọc tiếp xuống frame của mình.
+- Constructor chạy trước khi `dlopen` trả về ⇒ mọi thứ nó đụng tới (ở đây là `IDisplay::builder`) phải **sẵn sàng từ trước**, không được phụ thuộc thứ mà code sau `dlopen` mới khởi tạo.
+
+**Ba lệnh đáng thuộc cho ca này:**
+
+```gdb
+set breakpoint pending on           # dat break vao .so chua nap
+info sharedlibrary [ten]            # .so nao da nap, symbol doc duoc chua
+set stop-on-solib-events 1          # dung MOI lan nap/go .so
+```
+
+**Chốt:** *"Symbol của plugin chưa tồn tại lúc gdb khởi động — đó là lý do breakpoint phải pending. Và constructor của `.so` chạy BÊN TRONG `dlopen`, không phải trước main, không phải sau khi dlopen trả về."*
+</details>
 
 ---
-
 ⬅️ [Bank index](README.md)

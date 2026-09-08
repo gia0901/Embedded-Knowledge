@@ -102,7 +102,3 @@ MQTT phổ biến nhất: pub/sub nhẹ trên TCP, thiết bị publish lên bro
 
 ---
 ⬅️ [Bank index](README.md)
-
----
-
-⬅️ [Bank index](README.md)
