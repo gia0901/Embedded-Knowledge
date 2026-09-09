@@ -39,7 +39,7 @@
 
 📌 **Resume đổi 07/09 — mục SDM:** bỏ nhãn *"C++17"* (app build tới C++20, thứ C++17 duy nhất dùng là `std::optional` ⇒ nhãn đó tự mời câu hỏi không trả lời được) và **thêm thành tựu**: **Preset + import/export preset giữa các màn hình, xong trong 1 tháng, kịp release 1.0** *(phần lưu JSON đã có sẵn trước khi vào — không nhận)*. Dòng mới ⇒ câu hỏi mới **[RES-022](../mock-interview/bank/resume.md)** *(phạm vi · ranh giới công lao · đánh đổi đã chấp nhận)* — **chưa nói lần nào**, ghép vào việc **4** vì cùng là bài nói to bấm giờ. Sửa song song ở `RESUME_bosch.tex`; `RESUME_cpp_linux.tex` **chưa có** thành tựu này.
 
-### 🧪 Hai bộ lab — trạng thái
+### 🧪 Ba bộ lab — trạng thái
 
 **Bộ lab DBG — 12 bài** *(7 bài gốc 17/08 + 5 bài gdb 08/09)*: bank có type thứ tư, **câu `lab` 🧪 "NGỒI MÁY LÀM"** (code có bug thật + nhiệm vụ + **output thật đã chạy** để đối chiếu; quy ước ở [bank/README.md](../mock-interview/bank/README.md) và [CLAUDE.md §6](../../CLAUDE.md)). Xếp theo **TRIỆU CHỨNG, không theo công cụ** — vì ngoài đời luôn bắt đầu từ triệu chứng, và đó đúng là lỗ hổng đã đo (*chẩn đoán được, chọn công cụ không được*):
 
@@ -91,7 +91,19 @@
 
     **⚠️ Ba cảnh báo phần cứng (chi tiết ở lab-setup):** ① **không có cáp USB–TTL 3.3V thì toàn bộ Thẻ A vô nghĩa** (cáp 5V làm hỏng board) · ② **eMMC của BBB tranh boot với thẻ SD** — không giữ nút **S2** lúc cấp nguồn thì triệu chứng giống hệt "image mình hỏng", đây là bẫy số 1 của người mới · ③ 🔴 **secure boot thật KHÔNG làm được trên BBB** — AM335x bán lẻ là **GP silicon**, eFuse chưa blow, không có chain of trust từ ROM. Làm được (và đúng thứ interview hỏi) là **U-Boot verified boot**. Nói đúng ranh giới này ở phỏng vấn là **điểm cộng**.
 
-    **⬜ Hoãn có chủ đích: bộ lab DBG** — 12/12 chưa làm bài nào. Căn cứ: `DBG` **3.67** vs `BSP` **3.33** (thấp nhất), và BSP là trụ số 1 JD. Đã ghi vào [gap-register](gap-register.md) để lần sau không ai đảo ngược trong im lặng.
+**Bộ lab DP (design patterns) trên code C++ của chính mình — 5 bài** *(thêm 09/09)*: sống ở [11-design-patterns/in-practice/02 §7](../../11-design-patterns/in-practice/02-interface-impl-plugin.md), chạy trên **pack code hoàn chỉnh ở §6 cùng file** (9 file, 301 dòng — `HAL_layer` bị `.gitignore` nên pack là bản mang đi được). ⭐ **Khác hai bộ kia:** không cần phần cứng, không cần root, **userspace thuần**, và đối tượng phá là **code do chính mình viết** — nên sai ở đâu là lộ ngay mô hình của mình hổng ở đó.
+
+    | # | Bài | Phá cái gì | Vá lỗ hổng | Xong? |
+    |---|---|---|---|---|
+    | 0 | Null Object | giấu `.so` đi | `DP-028` | ⬜ |
+    | 1 | Data race trong Singleton | đưa `getInstance()` về dạng gốc | `DP-026` · 🔴 **`DP-002`** (sổ yếu, regression 4→1) | ⬜ |
+    | 2 | Self-registration & `-rdynamic` | tắt `ENABLE_EXPORTS` | `DP-029` | ⬜ |
+    | 3a | vtable ABI — chèn slot vào giữa | API mới đặt **trước** destructor | `DP-027` · **`DP-033`** | ⬜ |
+    | 3b | vtable ABI — `.so` cũ thiếu slot | build `.so` ở v1, app ở v2 | `DP-028` | ⬜ |
+
+    **📌 Hai phát hiện đo được khi dựng bộ lab này (09/09), đáng nhớ hơn cả bài lab:** ① race trong `getInstance()` **không hiếm** — **178/200** lần chạy 8 luồng dựng object hai lần, thấy được **không cần sanitizer**; ② **version check khớp nhau vẫn gọi nhầm hàm** — version bảo vệ API *thiếu*, không bảo vệ slot *bị đảo*. Điều ② bác bỏ một khẳng định sai trong chính tài liệu (đã sửa cả doc lẫn bank `DP-028`).
+
+        **⬜ Hoãn có chủ đích: bộ lab DBG** — 12/12 chưa làm bài nào. Căn cứ: `DBG` **3.67** vs `BSP` **3.33** (thấp nhất), và BSP là trụ số 1 JD. Đã ghi vào [gap-register](gap-register.md) để lần sau không ai đảo ngược trong im lặng.
 
     **Bộ công cụ lõi đã chốt:** `gdb` · `strace` · ASan · `/proc`+`/sys` · valgrind (đúng một việc: biến chưa khởi tạo) · TSan (đa luồng). **Cắt hẳn:** `perf`, `ltrace`, `gdbserver`/`addr2line` bài riêng — giữ ở mức câu `concept` là đủ. Lý do cắt: phỏng vấn embedded hỏi *"nó crash/treo"* nhiều hơn hẳn *"nó chậm"*.
     **⚠️ Ba bẫy môi trường đã đo thật và viết thẳng vào bài** (đây là thứ làm người ta bỏ cuộc, không phải kiến thức debug): `core_pattern` pipe vào apport ⇒ `ulimit -c` một mình **không đủ**, apport còn **vứt luôn** core của binary tự build · `ptrace_scope=1` chặn `gdb -p` · **TSan chết ngay khi khởi động trên kernel 6.x** vì xung đột ASLR, phải `setarch -R`.

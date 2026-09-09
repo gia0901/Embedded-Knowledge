@@ -143,11 +143,16 @@ Embedded-Interview/
 │   ├── problem-solving.md        # phương pháp giải quyết vấn đề
 │   └── system-design.md          # thiết kế hệ thống hướng Embedded Linux
 │
-├── 11-design-patterns/           # Mẫu thiết kế (bổ sung)
-│   ├── solid-principles.md       # SOLID — nền tảng
-│   ├── creational.md             # Singleton, Factory, Builder
-│   ├── structural.md             # Adapter, Bridge/Pimpl, Facade, Proxy
-│   └── behavioral.md             # Strategy, Observer, State, Command
+├── 11-design-patterns/           # Mẫu thiết kế — CÓ CHỦ ĐÍCH không dàn đều 23 pattern GoF
+│   ├── solid-principles.md       # 5 nguyên lý = 5 cách nói của MỘT mục tiêu + bảng ánh xạ nguyên lý→pattern
+│   ├── creational.md             # Factory Method · Abstract Factory · Singleton · Object Pool (Builder: nhận diện)
+│   ├── structural.md             # Bridge(+Pimpl) · Adapter · Facade (Proxy/Decorator: nhận diện)
+│   ├── behavioral.md             # Strategy · Template Method · Observer · State · Command · Memento · Null Object
+│   └── in-practice/              # 🎯 Pattern ÁP VÀO VIỆC THẬT — chọn lọc, không dàn đều
+│       ├── README.md             #   bản đồ 3 tầng: 5 SỞ HỮU · 4 BIẾT · còn lại CẮT (kèm lý do)
+│       ├── 01-display-stack.md   #   lib_display: Strategy · Abstract Factory · Bridge · chỗ KHÔNG dùng pattern
+│       ├── 02-interface-impl-plugin.md  # mổ HAL_layer bạn viết: 5 pattern + 3 bug thật đã đo bằng máy
+│       └── 03-events-and-preset.md      # Observer/Command/Memento từ S-Box + Preset
 │
 ├── 12-dsa/                       # Data Structures & Algorithms (bổ sung)
 │   ├── complexity-and-structures.md  # Big-O, container, trade-off
@@ -205,7 +210,7 @@ Embedded-Interview/
 | 08 Embedded systems | ✅ Xong | architecture, boot-process, rtos-vs-linux, rtos-programming, bare-metal-c, memory-and-startup, interrupts-bare-metal, hardware-debug, constraints |
 | 09 Debugging | ✅ Xong | mindset, gdb, tools, memory-bugs, kernel-debugging |
 | 10 Thinking | ✅ Xong | problem-solving, system-design |
-| 11 Design patterns | ✅ Xong | solid-principles, creational, structural, behavioral (bổ sung) |
+| 11 Design patterns | ✅ Xong | **Viết lại toàn diện 09/09 theo hướng CHỌN LỌC** — 12 pattern bám việc thật (5 sở hữu · 7 biết), phần còn lại hạ xuống mức *nhận diện*; mỗi pattern có thẻ *bản chất · cái biến thiên · cái giá · đừng dùng khi*. Kèm 🎯 **`in-practice/`** (case study `lib_display` · mổ `HAL_layer` · pack code + 5 lab 🧪). Bank `DP` 20 → **39 câu** |
 | 12 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
 | 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
