@@ -1,7 +1,9 @@
-# 03 — Sự kiện & trạng thái: Observer · Command · Memento
+# B2 — Sự kiện & trạng thái, thiết kế lại: Observer · Command · Memento
+
+> 🅱️ **PHẦN B — CẢI TIẾN.** Cùng bối cảnh sản phẩm, nhưng đây là **thiết kế nên có**, không phải mô tả hệ đang chạy. Kiến trúc thật ở [🅰️ A1](A1-baseline-libdisplay.md); phần vá 5 điểm yếu ở [🅱️ B1](B1-redesign-architecture.md).
 
 > **TL;DR**
-> - Ba pattern **tầng 2** ([bản đồ](README.md)) — mỗi cái neo vào một dòng resume: **Observer** ↔ adaptive brightness (S-Box) · **Command** ↔ đồng bộ brightness qua POSIX mq · **Memento** ↔ feature Preset (SDM).
+> - Ba pattern **tầng 2** ([bản đồ](README.md)), mỗi cái neo vào một dòng resume: **Observer** ↔ adaptive brightness · **Command** ↔ đồng bộ brightness qua POSIX mq · **Memento** ↔ feature Preset.
 > - ⭐ **Bài học xuyên suốt cả ba: pattern giải quyết vấn đề *cấu trúc*, không giải quyết vấn đề *miền*.** Observer đưa sự kiện tới đúng chỗ — nhưng **không** chống nhấp nháy; Command đóng gói yêu cầu — nhưng **không** làm nó tới nơi; Memento chụp trạng thái — nhưng **không** làm nó đọc được ở máy khác.
 > - Chỗ khác biệt giữa mid và senior nằm đúng ở nửa sau của mỗi câu trên.
 > - Mục tiêu tầng 2: **nói được một đoạn 3–4 câu nêu đúng vấn đề pattern giải**, không cần thuộc code.
@@ -80,7 +82,7 @@ struct BrightnessCmd {
 
 ⭐ **`apply_at_ms` là chi tiết đắt giá nhất ở đây.** Với video wall, mỗi unit nhận message ở thời điểm khác nhau; nếu ai nhận được thì áp dụng ngay, người xem thấy **các panel đổi lệch nhau** — đúng cái "visible grid" mà resume nói đã loại bỏ. Ra lệnh *"đổi tại mốc thời gian T"* thay vì *"đổi ngay"* mới cho ra một mặt phẳng đồng nhất. Đây là **Command hoãn thực thi** — một trong những lý do gốc pattern tồn tại.
 
-### 2.2 ⚠️ Trường `version` — cùng bài học ABI của [02 §3.3](02-interface-impl-plugin.md), lặp lại ở tầng khác
+### 2.2 ⚠️ Trường `version` — cùng bài học ABI của [A2 §3.3](A2-cpp-interface-hal.md), lặp lại ở tầng khác
 
 `struct` đi qua ranh giới process là **một hợp đồng nhị phân**, hệt như vtable:
 
@@ -102,7 +104,7 @@ Dòng resume nói *một binary phục vụ cả standalone lẫn synchronized*.
 // Chế độ synced:    gửi lên mq, mọi unit (kể cả mình) áp dụng tại apply_at_ms.
 ```
 
-Đúng tinh thần [01 §4](01-display-stack.md): **hai biến thể của một hành vi ⟹ đủ điều kiện cho một abstraction mỏng** (một `ICommandSink` với hai impl), **không** đủ điều kiện cho một tầng framework.
+Đúng tinh thần [B1 §7.1](B1-redesign-architecture.md): **hai biến thể của một hành vi ⟹ đủ điều kiện cho một abstraction mỏng** (một `ICommandSink` với hai impl), **không** đủ điều kiện cho một tầng framework.
 
 ---
 
@@ -134,8 +136,8 @@ Memento kinh điển là **trong một process, trong một phiên chạy** (und
 
 **Export sang màn hình khác đẻ ra ba câu hỏi mà pattern không trả lời** — trả lời được là nội dung phỏng vấn tốt:
 
-1. **Versioning.** Preset lưu bởi app 1.0, mở bằng app 1.2 — field mới thiếu thì sao? *(Trả lời: đánh version, thiếu thì lấy mặc định — **cùng luật "thêm vào cuối"** của §2.2 và [02 §3.3](02-interface-impl-plugin.md).)*
-2. **Khả năng của thiết bị.** Màn hình đích **không hỗ trợ** một setting, hoặc có dải giá trị khác. *(Trả lời: áp dụng từng phần + báo cáo cái bỏ qua — chính là ý **`-ENOTSUP`** của [Null Object](02-interface-impl-plugin.md) ở tầng khác.)*
+1. **Versioning.** Preset lưu bởi app 1.0, mở bằng app 1.2 — field mới thiếu thì sao? *(Trả lời: đánh version, thiếu thì lấy mặc định — **cùng luật "thêm vào cuối"** của §2.2 và [A2 §3.3](A2-cpp-interface-hal.md).)*
+2. **Khả năng của thiết bị.** Màn hình đích **không hỗ trợ** một setting, hoặc có dải giá trị khác. *(Trả lời: áp dụng từng phần + báo cáo cái bỏ qua — chính là ý **`-ENOTSUP`** của [Null Object](A2-cpp-interface-hal.md) ở tầng khác.)*
 3. **Tính nguyên tử.** Áp 10 setting, cái thứ 7 hỏng — dừng hay đi tiếp? *(Không có đáp án đúng duy nhất; có **quyết định rõ ràng và nhất quán** mới là câu trả lời.)*
 
 > 💡 **Bài nói bấm giờ:** ba ý trên chính là khung trả lời cho [RES-022](../../14-prep/mock-interview/bank/resume.md) — *phạm vi · ranh giới công lao · đánh đổi đã chấp nhận* — đang nằm ở việc **#4** trong [hàng đợi của plan](../../14-prep/study-plans/datalogic-plan.md). Đọc to, bấm giờ, đừng chỉ đọc thầm.
@@ -168,4 +170,4 @@ Memento kinh điển là **trong một process, trong một phiên chạy** (und
 | [RES-022](../../14-prep/mock-interview/bank/resume.md) | Feature Preset — phạm vi, ranh giới công lao, đánh đổi đã chấp nhận |
 
 ---
-⬅️ [02-interface-impl-plugin.md](02-interface-impl-plugin.md) · ➡️ [Về bản đồ](README.md)
+⬅️ 🅱️ [B1-redesign-architecture.md](B1-redesign-architecture.md) · [Về bản đồ](README.md)

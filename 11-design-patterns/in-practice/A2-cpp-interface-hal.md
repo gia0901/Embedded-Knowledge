@@ -1,7 +1,19 @@
-# 02 — Mổ khung `interface` / `impl` bạn đã viết
+# A2 — Ranh giới C++ interface/impl: bộ khung TIÊU CHUẨN
+
+> 🅰️ **PHẦN A — TIÊU CHUẨN.** Tài liệu này mổ **Tầng 0** của trục kiến trúc ở [A1](A1-baseline-libdisplay.md): lớp **C++ interface mà app nhìn thấy**, nằm **trên** mặt tiền C `lib_api_*`.
+>
+> ```
+> App
+>  └─ IDisplay / DisplayImpl      ← 🅰️ A2 (tài liệu này) · ranh giới KHÉP · C++
+>       └─ lib_api_*              ← chỗ hẹp · ranh giới MỞ · extern "C"
+>            └─ libdisplay nội bộ ← 🅰️ A1 · C++ không phải ABI
+> ```
+>
+> Đường nối giữa hai tài liệu nằm ngay trong code: `DisplayImpl::setPower()` gọi xuống `lib_api_set_power()`.
+> Muốn xem bản **làm lại** → [🅱️ B1](B1-redesign-architecture.md).
 
 > **TL;DR**
-> - Khung HAL bạn viết ([`project_implementation/HAL_layer`](../../14-prep/mock-interview/project_implementation/HAL_layer)) chứa **năm** pattern chồng lên nhau: Bridge (qua ranh giới `.so`) · **Factory Method** · **Self-registration / DI** · Singleton · **Null Object**. Bốn trong năm cái đó bạn viết ra mà chưa gọi tên — gọi đúng tên là phần lớn giá trị của tài liệu này.
+> - Bộ khung HAL ([`project_implementation/HAL_layer`](../../14-prep/mock-interview/project_implementation/HAL_layer) — **bị `.gitignore`, pack code đầy đủ ở §6**) chứa **năm** pattern chồng lên nhau: Bridge (qua ranh giới `.so`) · **Factory Method** · **Self-registration / DI** · Singleton · **Null Object**. Bốn trong năm cái đó bạn viết ra mà chưa gọi tên — gọi đúng tên là phần lớn giá trị của tài liệu này.
 > - ⚠️ **`IDisplayBuilder` KHÔNG phải Builder pattern.** Nó là **Factory Method**. Nói sai tên ở phỏng vấn tệ hơn không nói.
 > - 🔴 **Ba vấn đề thật, đã đo bằng máy, không phỏng đoán:** (1) `getInstance()` có **data race** — TSan bắt được; (2) chèn một `virtual` vào giữa `IDisplay` ⟹ app gọi `setPower()` mà **destructor chạy**, exit 0, **không crash, không log**; (3) cái tên sai ở trên.
 > - Bài học lớn nhất: **qua ranh giới `.so`, vtable là ABI.** Thêm virtual **luôn** là ABI break — virtual-không-pure chỉ cho tương thích **mã nguồn**, không cho tương thích **nhị phân** (§2.1). Và version check bảo vệ được API **thiếu**, không bảo vệ được slot **bị đảo** (§3.3).
@@ -615,7 +627,7 @@ DisplayImpl::~DisplayImpl() {
 }
 
 int DisplayImpl::setPower(bool onoff) {
-    // Thực tế: ret = lib_api_set_power(onoff);  /* xuống shared_lib -> ioctl */
+    // Thực tế: ret = lib_api_set_power(onoff);  /* xuống libdisplay -> ioctl */
     printf("  [impl] setPower -> %s\n", onoff ? "ON" : "OFF");
     return 0;
 }
@@ -1007,4 +1019,4 @@ Rất nhiều người (kể cả bản đầu của tài liệu này) tin rằn
 | [DP-020](../../14-prep/mock-interview/bank/design-patterns.md) | Hai `.so` cùng include header Singleton — có mấy instance? Điều gì lật ngược kết quả? |
 
 ---
-⬅️ [01-display-stack.md](01-display-stack.md) · ➡️ Tiếp theo: [03-events-and-preset.md](03-events-and-preset.md)
+⬅️ [A1-baseline-libdisplay.md](A1-baseline-libdisplay.md) · ➡️ 🅱️ [B1-redesign-architecture.md](B1-redesign-architecture.md) *(cùng bối cảnh, làm lại)*

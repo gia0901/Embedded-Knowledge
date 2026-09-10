@@ -5,7 +5,7 @@
 > - **Factory Method**: tạo **một** loại sản phẩm; client chỉ thấy interface. **Abstract Factory**: tạo **cả một họ** phải khớp nhau — điểm bán hàng của nó là **nhất quán họ được bảo đảm bằng KIỂU, không bằng kỷ luật**.
 > - **Singleton**: bảo đảm một instance. Tiện, và là pattern **bị lạm dụng nhiều nhất** — nó là global state trá hình. Phần đáng học không phải "viết thế nào" mà là *vì sao Meyers thread-safe* và *vì sao "một instance" sai qua ranh giới `.so`*.
 > - **Object Pool**: tái sử dụng object cấp phát sẵn — cấp phát **tất định**, không chạm heap. Đây là creational pattern hợp embedded nhất.
-> - Áp dụng thật: [in-practice/01 §2.2](in-practice/01-display-stack.md) (Abstract Factory theo SoC) · [in-practice/02](in-practice/02-interface-impl-plugin.md) (Factory Method + Singleton trong HAL của bạn).
+> - Áp dụng thật: [in-practice/B1 §4](in-practice/B1-redesign-architecture.md) (Abstract Factory theo SoC) · [in-practice/02](in-practice/A2-cpp-interface-hal.md) (Factory Method + Singleton trong HAL của bạn).
 
 ---
 
@@ -60,7 +60,7 @@ std::unique_ptr<Sensor> createSensor(SensorType t) {
 |---|---|---|
 | *Simple factory* | Một hàm free + `switch` | Không phải pattern GoF, nhưng **thường là đủ** |
 | **Factory Method** (GoF) | Một **hàm ảo** trong lớp cha, lớp con quyết định | Dùng khi factory tự nó cũng đa hình |
-| Factory qua plugin | Hàm ảo nằm trong `.so`, đăng ký ngược lên app | [in-practice/02](in-practice/02-interface-impl-plugin.md) |
+| Factory qua plugin | Hàm ảo nằm trong `.so`, đăng ký ngược lên app | [in-practice/02](in-practice/A2-cpp-interface-hal.md) |
 
 > ⚠️ **Đừng gọi nhầm tên với Builder.** Builder dựng object **nhiều bước** (setter nối chuỗi rồi `build()`); Factory tạo xong trong **một** lời gọi. Chính codebase của bạn có `IDisplayBuilder` mà thực chất là Factory Method — nói sai tên là mời interviewer hỏi vào đúng chỗ đó ([DP-025](../14-prep/mock-interview/bank/design-patterns.md)).
 
@@ -101,7 +101,7 @@ std::unique_ptr<ISocFactory> pickFactory(const BoardConfig& cfg);
 | Thêm nền tảng mới | Sửa N hàm | Thêm 1 class + 1 `case` |
 | Thay bằng test double | Hook từng hàm | Thay **một** factory |
 
-Đầy đủ với ví dụ hệ display: [in-practice/01 §2.2](in-practice/01-display-stack.md) · câu [DP-022](../14-prep/mock-interview/bank/design-patterns.md).
+Đầy đủ với ví dụ hệ display: [in-practice/B1 §4](in-practice/B1-redesign-architecture.md) · câu [DP-022](../14-prep/mock-interview/bank/design-patterns.md).
 
 ---
 
@@ -146,7 +146,7 @@ return inst;
 ```
 
 - **Sau lần đầu**, mỗi lời gọi chỉ là **một atomic load** rồi return — gọi triệu lần vẫn rẻ. Thuật ngữ: **"magic statics"**.
-- 🔴 **Chỉ khởi tạo hằng thì KHÔNG có guard.** `static Logger* p = nullptr;` là *constant initialization* — compiler không sinh guard nào, và mọi `if (p == nullptr) { p = ... }` bên dưới là **check-then-act có data race**. Đã đo thật: **178/200** lần chạy 8 luồng dựng object **hai lần** ([in-practice/02 §3.2](in-practice/02-interface-impl-plugin.md)).
+- 🔴 **Chỉ khởi tạo hằng thì KHÔNG có guard.** `static Logger* p = nullptr;` là *constant initialization* — compiler không sinh guard nào, và mọi `if (p == nullptr) { p = ... }` bên dưới là **check-then-act có data race**. Đã đo thật: **178/200** lần chạy 8 luồng dựng object **hai lần** ([in-practice/A2 §3.2](in-practice/A2-cpp-interface-hal.md)).
 - ⚠️ **Chỉ thread-safe phần *khởi tạo*, không phải phần *dùng*.** Method sửa state chung thì vẫn phải tự đồng bộ.
 
 **Vì sao double-checked locking tự viết trước C++11 SAI:**

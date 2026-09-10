@@ -5,7 +5,7 @@
 > - **Bridge** là cái quan trọng nhất cho việc của bạn: khi có **hai chiều biến thiên độc lập**, kế thừa cả hai cho **N×M** lớp; Bridge kéo về **N+M**. **Pimpl** là một ứng dụng khác của cùng ý tưởng, phục vụ mục tiêu khác: **giấu triển khai & giữ ABI**.
 > - **Adapter** đổi interface cho khớp; **Facade** giữ nguyên các interface bên dưới nhưng che một trình tự phức tạp. HAL thường là **cả hai cộng lại**.
 > - **Proxy** và **Decorator** ở mức **nhận diện tên** — cùng hình dạng "bọc một object", khác mục đích.
-> - Ranh giới `.so` làm mọi thứ ở đây đắt hơn: mỗi interface là một **hợp đồng nhị phân** ([in-practice/02 §3.3](in-practice/02-interface-impl-plugin.md)).
+> - Ranh giới `.so` làm mọi thứ ở đây đắt hơn: mỗi interface là một **hợp đồng nhị phân** ([in-practice/A2 §3.3](in-practice/A2-cpp-interface-hal.md)).
 
 ---
 
@@ -105,7 +105,7 @@ private:
 | Số implementation | Nhiều, thay được | Thường **đúng một** |
 | Implementor có đa hình không | Có | Thường không |
 
-**Vì sao Pimpl giữ được ABI:** thêm field vào `Impl` **không đổi `sizeof(Widget)`** (vẫn là một con trỏ) ⟹ code đã biên dịch trước đó vẫn dựng object đúng kích thước. Đối chiếu: thêm data member thẳng vào class **là ABI break**, và thêm virtual cũng vậy ([in-practice/02 §3.3](in-practice/02-interface-impl-plugin.md) · [07/abi-versioning](../07-shared-libraries/abi-versioning.md)).
+**Vì sao Pimpl giữ được ABI:** thêm field vào `Impl` **không đổi `sizeof(Widget)`** (vẫn là một con trỏ) ⟹ code đã biên dịch trước đó vẫn dựng object đúng kích thước. Đối chiếu: thêm data member thẳng vào class **là ABI break**, và thêm virtual cũng vậy ([in-practice/A2 §3.3](in-practice/A2-cpp-interface-hal.md) · [07/abi-versioning](../07-shared-libraries/abi-versioning.md)).
 
 **Cái giá của Pimpl, phải nói ra:** một lần cấp phát heap cho mỗi object + một lần gián tiếp mỗi lời gọi + không inline được. Trên đường nóng của embedded thì cân nhắc; trên API cấu hình thì gần như miễn phí. Chi tiết: [07/api-design §2](../07-shared-libraries/api-design.md).
 

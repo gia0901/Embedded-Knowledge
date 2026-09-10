@@ -444,61 +444,62 @@ Memento cổ điển sống **trong một process, một phiên** (undo/redo). M
 
 ---
 
-## E — 🎯 Case study hệ display (`lib_display` + HAL bạn viết)
+## E — 🎯 Case study hệ display (`libdisplay` + HAL bạn viết)
 
-> Nguồn: [11-design-patterns/in-practice/](../../../11-design-patterns/in-practice/) — pattern rút từ **code bạn đã viết** (`project_implementation/HAL_layer`) và **bối cảnh việc thật** (dimming / video-enhancer / frc / tcon).
+> Nguồn: [11-design-patterns/in-practice/](../../../11-design-patterns/in-practice/) — chia **🅰️ TIÊU CHUẨN** (`A1` hệ thật · `A2` ranh giới C++ interface) và **🅱️ CẢI TIẾN** (`B1` kiến trúc · `B2` sự kiện).
+> ⚠️ **Định danh trong mục này là tên tài liệu, không phải tên thật** — bộ từ vựng chuẩn ở [in-practice/README](../../../11-design-patterns/in-practice/README.md).
 > ⭐ Cả mục này bám resume, nên **xác suất bị hỏi rất cao**: interviewer đọc resume xong sẽ đi thẳng vào đây.
-> 🧪 **5 bài lab NGỒI MÁY** cho domain này (Null Object · data race · `-rdynamic` · hai bài vtable ABI) sống ở [in-practice/02 §7](../../../11-design-patterns/in-practice/02-interface-impl-plugin.md) cùng pack code hoàn chỉnh — **không chép lại ở đây**, vì chúng dính liền với mã nguồn.
+> 🧪 **5 bài lab NGỒI MÁY** cho domain này (Null Object · data race · `-rdynamic` · hai bài vtable ABI) sống ở [A2 §7](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md) cùng pack code hoàn chỉnh — **không chép lại ở đây**, vì chúng dính liền với mã nguồn.
 
-#### DP-021 · 🟠 · concept · ⭐ · 🎤 2026-09-09 · [→ in-practice/01 §2](../../../11-design-patterns/in-practice/01-display-stack.md)
-**Trong library display của bạn: dimming chia thành global / local / oled (cùng xuất phát từ một class gốc), còn video-enhancer chia theo loại SoC (cũng kế thừa từ một class gốc). Nhìn qua thì cả hai đều là "kế thừa + đa hình". Vì sao đây lại là HAI pattern khác nhau — và là hai cái nào?**
+#### DP-021 · 🟠 · concept · ⭐ · 🎤 2026-09-09 · [→ A1 §5](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [B1 §1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Trong library display của bạn: dimming chia thành global / local / oled (cùng xuất phát từ một class gốc), còn video enhancement chia theo loại chip (cũng kế thừa từ một class gốc). Nhìn qua thì cả hai đều là "kế thừa + đa hình". Vì sao đây lại là HAI pattern khác nhau — và là hai cái nào?**
 <details><summary>Đáp án</summary>
 
 **Cơ chế — hỏi "trục biến thiên" trước khi gọi tên pattern.** Cùng là kế thừa, nhưng *cái gì thay đổi* khác nhau:
 
-| | dimming | video-enhancer |
+| | dimming | video enhancement |
 |---|---|---|
-| Cái thay đổi | **Thuật toán** trên cùng một nền (global: 1 giá trị · local: N zone theo histogram · oled: ABL + chống burn-in) | **Toàn bộ cách điều khiển** vì đổi SoC: register map, command set, ràng buộc thời điểm |
-| Số thứ đổi cùng lúc | **Một** — chỉ dimming | **Cả họ** — enhancer + dimming backend + frc của SoC đó phải khớp nhau |
+| Cái thay đổi | **Thuật toán** trên cùng một nền (global: 1 giá trị · local: N zone theo histogram · oled: ABL + chống burn-in) | **Toàn bộ cách điều khiển** vì đổi chip: register map, command set, ràng buộc thời điểm |
+| Số thứ đổi cùng lúc | **Một** — chỉ dimming | **Cả họ** — enhancer + dimming backend + frc của chip đó phải khớp nhau |
 | Điểm quyết định | Có thể đổi **lúc runtime** (picture mode, nội dung) | **Một lần lúc boot**, theo board config |
 | ⇒ Pattern | **Strategy** (behavioral) | **Abstract Factory** (creational) |
 
 **"Vì sao" — tầng nông và tầng sâu:**
 - *Nông (ai cũng nói được):* "một cái là hành vi, một cái là tạo object".
-- *Sâu (phân biệt ứng viên):* **Abstract Factory tồn tại để bảo đảm tính NHẤT QUÁN CỦA HỌ.** Nếu chỉ cần "tạo object theo SoC" thì vài hàm `makeX(SocType)` rời là đủ. Cái mà factory rời **không** cho được: ngăn việc trộn enhancer của SoC-A với dimming backend của SoC-B — lỗi đó **compile sạch, chạy được**, chỉ sai trên đúng một board (xem DP-022). Abstract Factory biến ràng buộc đó thành ràng buộc **kiểu**, không còn phụ thuộc kỷ luật lập trình viên.
+- *Sâu (phân biệt ứng viên):* **Abstract Factory tồn tại để bảo đảm tính NHẤT QUÁN CỦA HỌ.** Nếu chỉ cần "tạo object theo chip" thì vài hàm `makeX(ChipType)` rời là đủ. Cái mà factory rời **không** cho được: ngăn việc trộn enhancer của chip-A với dimming backend của chip-B — lỗi đó **compile sạch, chạy được**, chỉ sai trên đúng một board (xem DP-022). Abstract Factory biến ràng buộc đó thành ràng buộc **kiểu**, không còn phụ thuộc kỷ luật lập trình viên.
 
 **Chúng KHÔNG loại trừ nhau — thường đi cùng nhau:**
 ```cpp
 // Factory (tạo) đẻ ra Strategy (hành vi) rồi cắm vào context
-std::unique_ptr<IDimming> SocAFactory::createDimming() {
-    return std::make_unique<LocalDimming>(std::make_unique<SocABackend>());
+std::unique_ptr<IDimming> ChipAFactory::createDimming() {
+    return std::make_unique<LocalDimming>(std::make_unique<DimmingBackendChipA>());
 }
 ```
 
 **Bẫy:** trả lời "cả hai đều là Factory" hoặc "cả hai đều là Strategy". **Chốt:** *Factory trả lời **ai được tạo ra**, Strategy trả lời **nó cư xử thế nào** — hai câu hỏi khác nhau nên hai pattern khác nhau, và chúng xuất hiện cùng nhau chứ không thay nhau.*
 </details>
 
-#### DP-022 · 🔴 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ in-practice/01 §2.2](../../../11-design-patterns/in-practice/01-display-stack.md)
-**Đồng nghiệp đề xuất: thay vì một `ISocFactory`, chỉ cần vài hàm rời — `makeEnhancer(SocType)`, `makeDimming(SocType)`, `makeFrc(SocType)`. Ngắn hơn, không thêm class nào. Code compile sạch và chạy được trên bàn. Bạn phản đối bằng lý do gì? Nêu CỤ THỂ lỗi mà thiết kế đó cho phép xảy ra.**
+#### DP-022 · 🔴 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ B1 §4](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Đồng nghiệp đề xuất: thay vì một `IPlatformFactory`, chỉ cần vài hàm rời — `makeEnhancer(ChipType)`, `makeDimming(ChipType)`, `makeFrc(ChipType)`. Ngắn hơn, không thêm class nào. Code compile sạch và chạy được trên bàn. Bạn phản đối bằng lý do gì? Nêu CỤ THỂ lỗi mà thiết kế đó cho phép xảy ra.**
 <details><summary>Đáp án</summary>
 
 **Cơ chế của lỗi — theo từng bước:**
-1. Mỗi hàm nhận `SocType` **độc lập** ⟹ không gì buộc ba lời gọi phải dùng **cùng một** giá trị.
+1. Mỗi hàm nhận `ChipType` **độc lập** ⟹ không gì buộc ba lời gọi phải dùng **cùng một** giá trị.
 2. Một chỗ khởi tạo (đường init khác, code nhánh product, một bản merge) truyền thiếu/sai `soc` cho **một** trong ba.
-3. Kết quả: enhancer của SoC-A chạy cùng dimming backend của SoC-B.
+3. Kết quả: enhancer của chip-A chạy cùng dimming backend của chip-B.
 4. Trình biên dịch **không thấy gì sai** — kiểu đều đúng. Linker cũng vậy. Test trên board đang dùng có thể vẫn đúng.
 
 **Triệu chứng ngoài hiện trường:** sai màu / nhấp nháy / một feature im lặng không hoạt động, **trên đúng một model board**, không crash, không log. Đây là lớp bug đắt nhất: không phát hiện được ở CI, chỉ lộ ở giai đoạn tích hợp hoặc tệ hơn là ở khách.
 
 **"Vì sao" tách tầng:**
 - *Nông:* "Abstract Factory gom lại cho gọn / đỡ lặp `switch`".
-- *Sâu:* nó **chuyển một ràng buộc từ kỷ luật sang hệ thống kiểu**. Với `ISocFactory`, "cả họ phải cùng một SoC" **không thể vi phạm** — vì chỉ có một object factory, và nó *là* SoC đó. Không còn tham số nào để truyền sai.
+- *Sâu:* nó **chuyển một ràng buộc từ kỷ luật sang hệ thống kiểu**. Với `IPlatformFactory`, "cả họ phải cùng một chip" **không thể vi phạm** — vì chỉ có một object factory, và nó *là* chip đó. Không còn tham số nào để truyền sai.
 
-| | Vài hàm `makeX(SocType)` | **`ISocFactory`** |
+| | Vài hàm `makeX(ChipType)` | **`IPlatformFactory`** |
 |---|---|---|
 | Nhất quán họ | Do lập trình viên nhớ | **Do kiểu bảo đảm** |
 | `switch (soc)` nằm ở đâu | Lặp trong **mỗi** hàm | **Một chỗ duy nhất** (`pickFactory`) |
-| Thêm SoC mới | Sửa **N** hàm | Thêm 1 class + 1 `case` |
+| Thêm chip mới | Sửa **N** hàm | Thêm 1 class + 1 `case` |
 | Truyền test double | Phải hook từng hàm | Thay **một** factory |
 
 **Nhượng bộ công bằng (nói ra sẽ được cộng điểm, đừng bảo vệ cực đoan):** nếu chỉ có **một** loại sản phẩm cần tạo, Abstract Factory là thừa — Factory Method đủ. Nó chỉ trả công khi có **≥ 2 thứ phải khớp nhau**.
@@ -506,8 +507,8 @@ std::unique_ptr<IDimming> SocAFactory::createDimming() {
 **Chốt:** *Vấn đề không phải dài dòng, mà là thiết kế đó **cho phép trộn nhầm họ** và lỗi ấy compile sạch. Abstract Factory làm cho lỗi đó không viết ra được.*
 </details>
 
-#### DP-023 · 🔴 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ in-practice/01 §3](../../../11-design-patterns/in-practice/01-display-stack.md)
-**Bạn có 3 thuật toán dimming (global/local/oled) và 3 SoC, mỗi SoC ghi duty xuống phần cứng một kiểu khác nhau. Cách làm ngây thơ cho ra 9 class (`LocalDimmingSocA`, `OledDimmingSocB`…). Thiết kế lại thế nào? Và: pattern bạn dùng khác Strategy chỗ nào, khi code của chúng trông giống hệt nhau?**
+#### DP-023 · 🔴 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ A1 §5.3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [structural §1](../../../11-design-patterns/structural.md)
+**Bạn có 3 thuật toán dimming (global/local/oled) và 3 chip, mỗi chip ghi duty xuống phần cứng một kiểu khác nhau. Cách làm ngây thơ cho ra 9 class (`LocalDimmingChipA`, `OledDimmingChipB`…). Thiết kế lại thế nào? Và: pattern bạn dùng khác Strategy chỗ nào, khi code của chúng trông giống hệt nhau?**
 <details><summary>Đáp án</summary>
 
 **Cơ chế — Bridge: tách hai trục, nối bằng con trỏ.**
@@ -516,7 +517,7 @@ std::unique_ptr<IDimming> SocAFactory::createDimming() {
 3. Giữ trục *thuật toán* ở cây kế thừa (**abstraction**), đẩy trục *phần cứng* ra một interface riêng (**implementor**), abstraction **giữ** một implementor.
 
 ```cpp
-class IDimmingBackend {                       // IMPLEMENTOR — biến thiên theo SoC
+class IDimmingBackend {                       // IMPLEMENTOR — biến thiên theo chip
 public:
     virtual ~IDimmingBackend() = default;
     virtual void writeDuty(int zone, int duty) = 0;
@@ -529,13 +530,13 @@ public:
     explicit DimmingBase(std::unique_ptr<IDimmingBackend> hw) : hw_(std::move(hw)) {}
 };
 // ghép lúc chạy: 3 + 3 = 6 lớp, phủ được 9 tổ hợp
-auto d = std::make_unique<LocalDimming>(std::make_unique<SocABackend>());
+auto d = std::make_unique<LocalDimming>(std::make_unique<DimmingBackendChipA>());
 ```
 
 | | Kế thừa hai trục | **Bridge** |
 |---|---|---|
 | Số lớp | N × M = 9 | **N + M = 6** |
-| Thêm 1 SoC | +N lớp | **+1** |
+| Thêm 1 chip | +N lớp | **+1** |
 | Thêm 1 thuật toán | +M lớp | **+1** |
 | Tổ hợp mới | Viết lớp mới | **Ghép lúc runtime** |
 
@@ -551,8 +552,8 @@ auto d = std::make_unique<LocalDimming>(std::make_unique<SocABackend>());
 **Bẫy:** trả lời "Bridge với Strategy giống nhau" rồi dừng ⟹ 2 điểm. **Chốt:** *Cả hai đều là giữ con trỏ tới interface rồi ủy nhiệm; khác nhau ở chỗ Strategy tách **hành vi khỏi context**, Bridge tách **hai chiều biến thiên khỏi nhau**.*
 </details>
 
-#### DP-024 · 🟡 · concept · ⭐ · 🎤 2026-09-09 · [→ in-practice/01 §4](../../../11-design-patterns/in-practice/01-display-stack.md)
-**Trong library có 4 feature. Dimming và video-enhancer đi qua interface + factory. Còn `frc` và `tcon` chỉ là một command cố định xuống SoC, và bạn để nguyên hàm gọi thẳng. Vì sao không bọc chúng cho đồng bộ? Nêu cái giá cụ thể.**
+#### DP-024 · 🟡 · concept · ⭐ · 🎤 2026-09-09 · [→ B1 §7.1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Trong library có 4 feature. Dimming và video enhancement đi qua interface + factory. Còn `frc` và `tcon` chỉ là một command cố định xuống chip, và bạn để nguyên hàm gọi thẳng. Vì sao không bọc chúng cho đồng bộ? Nêu cái giá cụ thể.**
 <details><summary>Đáp án</summary>
 
 Vì trừu tượng hoá phải **trả giá cho một biến thể đã tồn tại**, không phải cho một biến thể tưởng tượng. `frc`/`tcon` không có thuật toán, không state, không biến thể — bọc lại thì mua được **số không**.
@@ -571,7 +572,7 @@ Cái giá cụ thể, không nói chung chung:
 **Chốt:** *Nói được chỗ mình **cố tình không** dùng pattern là tín hiệu senior mạnh hơn kể tên năm pattern — vì nó cho thấy bạn tính được cả cái giá, không chỉ cái lợi.*
 </details>
 
-#### DP-025 · 🟡 · concept · 🎤 2026-09-09 · [→ in-practice/02 §3.1](../../../11-design-patterns/in-practice/02-interface-impl-plugin.md)
+#### DP-025 · 🟡 · concept · 🎤 2026-09-09 · [→ A2 §3.1](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md)
 **Trong HAL của bạn, `IDisplayBuilder` chỉ có đúng một hàm `buildNewDisplayHandle()` trả về `IDisplay*`. Nó tên là "Builder" — nhưng theo GoF thì đó là pattern nào?**
 <details><summary>Đáp án</summary>
 
@@ -580,7 +581,7 @@ Là **Factory Method**, không phải Builder. GoF Builder giải bài toán *ob
 Rủi ro thật: nói *"em dùng Builder"* ⟹ interviewer hỏi ngay *"Builder khác Factory thế nào?"* ⟹ mô tả không khớp code vừa kể. Cách nói an toàn: *"trong codebase nó tên `IDisplayBuilder`, nhưng đúng tên GoF là Factory Method — nó tạo trong một lời gọi chứ không dựng từng bước; `Builder` là quy ước nội bộ có sẵn."*
 </details>
 
-#### DP-026 · 🟠 · concept · ⭐ · 🎤 2026-09-09 · [→ in-practice/02 §3.2](../../../11-design-patterns/in-practice/02-interface-impl-plugin.md)
+#### DP-026 · 🟠 · concept · ⭐ · 🎤 2026-09-09 · [→ A2 §3.2](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md)
 **Đọc đoạn này (trích từ HAL bạn viết). Nó có vấn đề gì khi hai thread cùng gọi lần đầu? Và vì sao chữ `static` ở dòng đầu không cứu được?**
 ```cpp
 IDisplay* IDisplay::getInstance() {
@@ -622,7 +623,7 @@ Kiểm chứng: TSan im lặng, và `g++ -S | grep cxa_guard` cho thấy `__cxa_
 **Bẫy:** nghĩ "có `static` là an toàn". **Chốt:** *magic statics bảo vệ **khởi tạo**, không bảo vệ **logic bạn viết quanh nó** — và cũng không bảo vệ các method của object sau đó.*
 </details>
 
-#### DP-027 · 🔴 · concept · ⭐ · 🎤 2026-09-09 · [→ in-practice/02 §3.3](../../../11-design-patterns/in-practice/02-interface-impl-plugin.md), [abi-versioning](../../../07-shared-libraries/abi-versioning.md)
+#### DP-027 · 🔴 · concept · ⭐ · 🎤 2026-09-09 · [→ A2 §3.3](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md), [abi-versioning](../../../07-shared-libraries/abi-versioning.md)
 **Bạn thêm API mới `virtual int setBrightness(int)` vào `IDisplay`, đặt TRƯỚC `setPower` cho gọn nhóm. Rebuild app, giữ nguyên `libdisplay.so` cũ. Chạy: dòng log của `setPower` biến mất, thay vào đó destructor chạy, exit code 0, không crash. Giải thích chuyện gì đã xảy ra và rút ra luật.**
 <details><summary>Đáp án</summary>
 
@@ -662,7 +663,7 @@ App gọi `setPower` ⟹ nhảy slot 1 ⟹ ở object đến từ `.so` cũ, slo
 **Chốt:** *Qua ranh giới `.so`, **vtable là ABI**. API mới chỉ được **thêm vào cuối**. Đây cũng là lý do tồn tại của Pimpl và của biên giới `extern "C"`.*
 </details>
 
-#### DP-028 · 🟠 · concept · 🎤 2026-09-09 · [→ in-practice/02 §2.1](../../../11-design-patterns/in-practice/02-interface-impl-plugin.md)
+#### DP-028 · 🟠 · concept · 🎤 2026-09-09 · [→ A2 §2.1](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md)
 **Trong HAL của bạn, các API của `IDisplay` là `virtual` thường chứ không phải pure virtual, và bản base trả `-ENOTSUP`; khi không nạp được `.so` thì `getInstance()` trả về một object `IDisplay` dummy thay vì `nullptr`. Đó là pattern gì, và nó mua được HAI thứ nào?**
 <details><summary>Đáp án</summary>
 
@@ -693,7 +694,7 @@ App gọi `setPower` ⟹ nhảy slot 1 ⟹ ở object đến từ `.so` cũ, slo
 **Chốt:** *Null Object đổi lỗi `nullptr` lấy lỗi có-mã-trả-về, và cho tương thích **nguồn**. Muốn gọi API mới an toàn trên `.so` cũ thì phải có **cơ chế hỏi khả năng** (version/capability) tồn tại **từ v1** — thêm virtual luôn là ABI break.*
 </details>
 
-#### DP-029 · 🟠 · design · 🏗️ · 🎤 2026-09-09 · [→ in-practice/02 §4](../../../11-design-patterns/in-practice/02-interface-impl-plugin.md), [linking-loading](../../../07-shared-libraries/linking-loading.md)
+#### DP-029 · 🟠 · design · 🏗️ · 🎤 2026-09-09 · [→ A2 §4](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md), [linking-loading](../../../07-shared-libraries/linking-loading.md)
 **HAL của bạn: `.so` có một hàm `__attribute__((constructor))`, khi được `dlopen` thì tự gọi ngược lên app để đăng ký factory của mình. Vì sao làm vòng vèo vậy thay vì link thẳng `.so` vào app? Đánh đổi là gì — và điều kiện kỹ thuật nào khiến `.so` gọi được symbol nằm trong app?**
 <details><summary>Đáp án</summary>
 
@@ -715,7 +716,7 @@ App gọi `setPower` ⟹ nhảy slot 1 ⟹ ở object đến từ `.so` cũ, slo
 **Chốt:** *Đổi **an toàn lúc link** lấy **linh hoạt lúc boot**. Đáng đổi khi một binary phải phục vụ nhiều board; không đáng khi chỉ có một cấu hình phần cứng.*
 </details>
 
-#### DP-030 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ in-practice/03 §1](../../../11-design-patterns/in-practice/03-events-and-preset.md)
+#### DP-030 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ B2 §1](../../../11-design-patterns/in-practice/B2-redesign-events.md)
 **Bạn làm adaptive brightness: cảm biến ánh sáng phát sự kiện theo Observer, module brightness đăng ký nhận `onLux(lux)` rồi gọi `setBrightness`. Pattern dùng đúng sách. Nhưng khi ánh sáng thay đổi nhanh, màn hình nhấp nháy thấy rõ. Pattern sai chỗ nào — và bạn thêm gì?**
 <details><summary>Đáp án</summary>
 
@@ -739,7 +740,7 @@ Hysteresis là một **máy trạng thái nhỏ**, và ở đây **enum + ngư�
 **Chốt:** *Observer mua **cấu trúc**, không mua **tính đúng đắn của miền**. Câu hỏi T2 luôn nằm ở nửa sau: "pattern **không** giải quyết được gì, và bạn xử lý phần đó thế nào".*
 </details>
 
-#### DP-031 · 🟠 · design · 🏗️ · 🎤 2026-09-09 · [→ in-practice/03 §2](../../../11-design-patterns/in-practice/03-events-and-preset.md)
+#### DP-031 · 🟠 · design · 🏗️ · 🎤 2026-09-09 · [→ B2 §2](../../../11-design-patterns/in-practice/B2-redesign-events.md)
 **Bạn đồng bộ độ sáng giữa nhiều S-Box qua POSIX message queue — mỗi message là một Command đã tuần tự hoá. Nhưng người xem vẫn thấy các panel đổi lệch nhau thành lưới. Thiếu gì trong message? Và vì sao struct đó bắt buộc phải có trường `version`?**
 <details><summary>Đáp án</summary>
 
@@ -769,7 +770,7 @@ struct BrightnessCmd {
 **Chốt:** *Cứ chỗ nào hai binary build riêng phải hiểu nhau — vtable qua `.so`, struct qua message queue, bảng con trỏ hàm giữa HAL và driver — thì layout là ABI, và luật luôn giống nhau: **chỉ được thêm vào cuối**.*
 </details>
 
-#### DP-032 · 🟡 · concept · 🎤 2026-09-09 · [→ in-practice/03 §3](../../../11-design-patterns/in-practice/03-events-and-preset.md)
+#### DP-032 · 🟡 · concept · 🎤 2026-09-09 · [→ B2 §3](../../../11-design-patterns/in-practice/B2-redesign-events.md)
 **Feature "Preset" (lưu cấu hình màn hình, khôi phục sau restart, export sang màn hình khác) về bản chất là Memento. Memento sách vở thiếu ba thứ gì cho yêu cầu "export sang màn hình khác"?**
 <details><summary>Đáp án</summary>
 
@@ -782,20 +783,20 @@ Memento cổ điển sống **trong một process, một phiên chạy** (undo/r
 **Chốt:** *Memento mua được **encapsulation** (caretaker không cần biết bên trong); nó không mua được **tính khả chuyển** — phần đó là versioning + capability + chính sách lỗi.*
 </details>
 
-#### DP-033 · 🔴 · concept · ⭐ · 🎤 2026-09-09 · [→ in-practice/02 §3.3 + §7 Lab 3a](../../../11-design-patterns/in-practice/02-interface-impl-plugin.md)
+#### DP-033 · 🔴 · concept · ⭐ · 🎤 2026-09-09 · [→ A2 §3.3 + §7 Lab 3a](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md)
 **Bạn đã thêm `IDisplayBuilder::abiVersion()` để app hỏi `.so` xem nó build với header phiên bản nào, và app chỉ gọi API mới khi version đủ. Một hôm app in ra `impl ABI version = 2 (interface = 2)` — khớp hoàn toàn — nhưng gọi `setBrightness()` thì destructor chạy và hàm trả về số rác. Vì sao cơ chế version không cứu được?**
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** version chỉ nói *"tôi biết bao nhiêu API"*, nó **không mô tả BỐ CỤC** của những API đó. Ở đây `.so` được build từ header có `setBrightness` khai báo **sau** destructor, còn app build từ header có nó **trước** destructor. Cùng gọi là "v2", cùng số lượng API — nhưng **thứ tự slot vtable khác nhau**.
 
 ```
-slot ham   |  .so (v2, dung thu tu)  |  app (v2, chen truoc dtor)
-   0       |  setPower               |  setPower
-   1       |  ~DisplayImpl           |  setBrightness   <-- app nhay vao day
-   2       |  ~DisplayImpl           |  ~IDisplay
-   3       |  setBrightness          |  —
+slot ham   |  .so (v2, dung thu tu)   |  app (v2, chen TRUOC dtor)
+   0       |  setPower                |  setPower
+   1       |  ~DisplayImpl  (complete)|  setBrightness   <-- app nhay vao day
+   2       |  ~DisplayImpl  (deleting)|  ~IDisplay (complete)
+   3       |  setBrightness           |  ~IDisplay (deleting)
 ```
-App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **destructor** ⟹ destructor chạy, giá trị trả về là rác.
+App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **destructor (bản complete)** ⟹ destructor chạy, giá trị trả về là rác. *(Destructor chiếm **hai** slot liền nhau — complete và deleting — tại đúng vị trí nó được khai báo; đó là lý do chèn virtual trước nó làm lệch cả hai.)*
 
 **"Vì sao" tách tầng:**
 - *Nông:* "phải build lại `.so`".

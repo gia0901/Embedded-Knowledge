@@ -128,7 +128,7 @@ public:
 
 ### 3.1 ⭐ Chỗ Observer KHÔNG giúp được
 
-Nối thẳng `onLux → setBrightness` là **đúng pattern nhưng sai sản phẩm**: ánh sáng dao động liên tục ⟹ độ sáng đuổi theo từng mẫu ⟹ **nhấp nháy**. Đó là **vấn đề miền**, phải giải bằng đường ống sau Observer: **lọc** (EMA) → **hysteresis hai ngưỡng** → **giới hạn tốc độ** (ramp) → **chống lặp**. Chi tiết + cách kể ở phỏng vấn: [in-practice/03 §1.2](in-practice/03-events-and-preset.md).
+Nối thẳng `onLux → setBrightness` là **đúng pattern nhưng sai sản phẩm**: ánh sáng dao động liên tục ⟹ độ sáng đuổi theo từng mẫu ⟹ **nhấp nháy**. Đó là **vấn đề miền**, phải giải bằng đường ống sau Observer: **lọc** (EMA) → **hysteresis hai ngưỡng** → **giới hạn tốc độ** (ramp) → **chống lặp**. Chi tiết + cách kể ở phỏng vấn: [in-practice/B2 §1.2](in-practice/B2-redesign-events.md).
 
 ---
 
@@ -199,7 +199,7 @@ struct BrightnessCmd {
 
 ⭐ **`apply_at_ms` là chi tiết đắt giá nhất.** Với video wall nhiều panel, mỗi unit nhận message ở thời điểm khác nhau; "đổi ngay khi nhận" ⟹ các panel đổi lệch nhau thành lưới. Ra lệnh *"đổi tại mốc T"* mới cho mặt phẳng đồng nhất — đây đúng là lý do gốc Command tồn tại: **tách thời điểm phát khỏi thời điểm chạy**.
 
-⚠️ **Command qua ranh giới process là ABI.** Struct đó phải có `version`, và **chỉ được thêm field vào cuối** — cùng luật với vtable qua `.so`. Chi tiết: [in-practice/03 §2](in-practice/03-events-and-preset.md).
+⚠️ **Command qua ranh giới process là ABI.** Struct đó phải có `version`, và **chỉ được thêm field vào cuối** — cùng luật với vtable qua `.so`. Chi tiết: [in-practice/B2 §2](in-practice/B2-redesign-events.md).
 
 ---
 
@@ -214,7 +214,7 @@ struct BrightnessCmd {
 
 **Điểm hay bị bỏ sót:** giá trị nằm ở chữ *"không phơi bên trong"*. Nếu UI tự đọc từng field rồi tự set lại thì mỗi setting mới phải sửa UI — encapsulation vỡ. Với Memento, thêm state mới chỉ sửa **originator**.
 
-⚠️ **Memento cổ điển sống trong MỘT process, MỘT phiên chạy** (undo/redo). Muốn nó qua restart hoặc sang máy khác (feature Preset) thì phải thêm ba thứ pattern không nói tới: **versioning** · **capability của thiết bị đích** · **chính sách lỗi khi áp dụng dở dang**. Xem [in-practice/03 §3](in-practice/03-events-and-preset.md).
+⚠️ **Memento cổ điển sống trong MỘT process, MỘT phiên chạy** (undo/redo). Muốn nó qua restart hoặc sang máy khác (feature Preset) thì phải thêm ba thứ pattern không nói tới: **versioning** · **capability của thiết bị đích** · **chính sách lỗi khi áp dụng dở dang**. Xem [in-practice/B2 §3](in-practice/B2-redesign-events.md).
 
 ---
 
@@ -241,7 +241,7 @@ int IDisplay::setBrightness(int) { return -ENOTSUP; }
 
 ⚠️ **Nó đổi an toàn lấy độ hiện.** Lỗi không nổ ngay tại chỗ mà **im lặng trôi đi** — nên điều kiện dùng được là **mã trả về phải được kiểm và log**; không thì Null Object chỉ đang giấu bug. Và với lệnh phải chắc chắn tới nơi (ghi cấu hình an toàn, điều khiển phần cứng quan trọng), *fail loud* đúng hơn.
 
-> 🔴 **Một hiểu lầm phải sửa cho đúng:** virtual-không-pure + Null Object cho **tương thích MÃ NGUỒN** (impl không phải sửa code khi interface thêm API), **không** cho tương thích **NHỊ PHÂN** — `.so` đã biên dịch từ trước có vtable **ngắn hơn**, gọi API mới vào đó là **segfault**, không phải `-ENOTSUP`. Đã đo thật: [in-practice/02 §2.1 + Lab 3b](in-practice/02-interface-impl-plugin.md).
+> 🔴 **Một hiểu lầm phải sửa cho đúng:** virtual-không-pure + Null Object cho **tương thích MÃ NGUỒN** (impl không phải sửa code khi interface thêm API), **không** cho tương thích **NHỊ PHÂN** — `.so` đã biên dịch từ trước có vtable **ngắn hơn**, gọi API mới vào đó là **segfault**, không phải `-ENOTSUP`. Đã đo thật: [in-practice/A2 §2.1 + Lab 3b](in-practice/A2-cpp-interface-hal.md).
 
 ---
 

@@ -91,7 +91,7 @@
 
     **⚠️ Ba cảnh báo phần cứng (chi tiết ở lab-setup):** ① **không có cáp USB–TTL 3.3V thì toàn bộ Thẻ A vô nghĩa** (cáp 5V làm hỏng board) · ② **eMMC của BBB tranh boot với thẻ SD** — không giữ nút **S2** lúc cấp nguồn thì triệu chứng giống hệt "image mình hỏng", đây là bẫy số 1 của người mới · ③ 🔴 **secure boot thật KHÔNG làm được trên BBB** — AM335x bán lẻ là **GP silicon**, eFuse chưa blow, không có chain of trust từ ROM. Làm được (và đúng thứ interview hỏi) là **U-Boot verified boot**. Nói đúng ranh giới này ở phỏng vấn là **điểm cộng**.
 
-**Bộ lab DP (design patterns) trên code C++ của chính mình — 5 bài** *(thêm 09/09)*: sống ở [11-design-patterns/in-practice/02 §7](../../11-design-patterns/in-practice/02-interface-impl-plugin.md), chạy trên **pack code hoàn chỉnh ở §6 cùng file** (9 file, 301 dòng — `HAL_layer` bị `.gitignore` nên pack là bản mang đi được). ⭐ **Khác hai bộ kia:** không cần phần cứng, không cần root, **userspace thuần**, và đối tượng phá là **code do chính mình viết** — nên sai ở đâu là lộ ngay mô hình của mình hổng ở đó.
+**Bộ lab DP (design patterns) trên code C++ của chính mình — 5 bài** *(thêm 09/09)*: sống ở [11-design-patterns/in-practice/A2 §7](../../11-design-patterns/in-practice/A2-cpp-interface-hal.md), chạy trên **pack code hoàn chỉnh ở §6 cùng file** (9 file, 301 dòng — `HAL_layer` bị `.gitignore` nên pack là bản mang đi được). ⭐ **Khác hai bộ kia:** không cần phần cứng, không cần root, **userspace thuần**, và đối tượng phá là **code do chính mình viết** — nên sai ở đâu là lộ ngay mô hình của mình hổng ở đó.
 
     | # | Bài | Phá cái gì | Vá lỗ hổng | Xong? |
     |---|---|---|---|---|

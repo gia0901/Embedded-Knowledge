@@ -14,3 +14,7 @@
 *.swp
 
 project_implementation/
+
+# Tư liệu NỘI BỘ về hệ thật (tên symbol/API của công việc) — KHÔNG commit.
+# Bản đã khử nhạy cảm sống ở in-practice/A1-baseline-libdisplay.md và PHẢI tự chứa.
+11-design-patterns/in-practice/shared_lib.md

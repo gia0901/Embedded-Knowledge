@@ -14,7 +14,7 @@ flowchart TD
     S -->|"hiện thực hoá"| C["<b>creational</b><br/>AI TẠO object, loại nào<br/><i>Factory Method · Abstract Factory<br/>Singleton · Object Pool</i>"]
     S -->|"hiện thực hoá"| ST["<b>structural</b><br/>GHÉP object không dính chặt<br/><i>Bridge (+Pimpl) · Adapter · Facade</i>"]
     S -->|"hiện thực hoá"| B["<b>behavioral</b><br/>AI LÀM GÌ, KHI NÀO, báo cho ai<br/><i>Strategy · Template Method · Observer<br/>State · Command · Memento · Null Object</i>"]
-    C --> P["🎯 <b>in-practice/</b> — ÁP VÀO VIỆC THẬT<br/><i>lib_display · HAL bạn viết</i><br/>chọn lọc: 5 SỞ HỮU · 7 BIẾT · còn lại CẮT"]
+    C --> P["🎯 <b>in-practice/</b> — ÁP VÀO VIỆC THẬT<br/><i>libdisplay · HAL C++ interface</i><br/>🅰️ TIÊU CHUẨN (hệ thật) + 🅱️ CẢI TIẾN (làm lại)"]
     ST --> P
     B --> P
 ```
@@ -33,14 +33,14 @@ flowchart TD
 | 2 | [creational.md](creational.md) | **Factory Method · Abstract Factory · Singleton** (*vì sao Meyers thread-safe*, *"một instance" qua `.so`*) **· Object Pool**; Builder ở mức nhận diện | ✅ |
 | 3 | [structural.md](structural.md) | **Bridge** (+ *Pimpl*) **· Adapter · Facade**; Proxy/Decorator ở mức nhận diện — mở đầu bằng bảng phân biệt *4 cách bọc object* | ✅ |
 | 4 | [behavioral.md](behavioral.md) | **Strategy · Template Method · Observer · State · Command · Memento · Null Object** — sợi chỉ đỏ: *pattern mua cấu trúc, không mua tính đúng đắn của miền* | ✅ |
-| 5 | 🎯 **[in-practice/](in-practice/)** | **Pattern trong việc của BẠN** — case study `lib_display` + mổ chính code HAL bạn viết | ✅ |
+| 5 | 🎯 **[in-practice/](in-practice/)** | **Pattern trong việc của BẠN**, chia hai phần: 🅰️ **TIÊU CHUẨN** (`libdisplay` — hệ thật, đã khử nhạy cảm + HAL C++ interface có pack code & 5 lab 🧪) · 🅱️ **CẢI TIẾN** (cùng bối cảnh, làm lại) | ✅ |
 
 ## 🎯 Hai tầng của topic này — đọc đúng tầng
 
 | | Bốn file 1–4 (generic) | **[in-practice/](in-practice/)** (bám việc thật) |
 |---|---|---|
 | Trả lời câu hỏi | *"Pattern X **là gì**?"* | *"Quyết định nào trong hệ display **đẻ ra** pattern nào?"* |
-| Ví dụ | `Shape`, `Logger`, `HttpRequest` | dimming global/local/oled · video-enhancer theo SoC · `IDisplay`/`DisplayImpl` |
+| Ví dụ | `Shape`, `Logger`, `HttpRequest` | `libdisplay` · dimming Global/Local/OLED × chip · `IDisplay`/`DisplayImpl` |
 | Đo tầng nào | **T1** — biết & nói gọn | **T2** — vận dụng & đánh đổi ([config §6](../14-prep/mock-interview/config.md)) |
 | Phạm vi | Đủ 4 nhóm, dàn đều | **Chọn lọc có chủ đích** — 5 pattern sở hữu, 4 pattern biết, phần còn lại **cắt** |
 
@@ -61,4 +61,5 @@ flowchart TD
 - Nền tảng OOP: [01-cpp-fundamentals/oop.md](../01-cpp-fundamentals/oop.md)
 - Thiết kế API: [07-shared-libraries/api-design.md](../07-shared-libraries/api-design.md)
 - Câu hỏi phỏng vấn: domain `DP` trong [bank/design-patterns.md](../14-prep/mock-interview/bank/design-patterns.md) — mục **E** là case study hệ display (`DP-021`…`DP-032`)
-- Code thật được mổ trong `in-practice/`: [project_implementation/HAL_layer](../14-prep/mock-interview/project_implementation/HAL_layer)
+- Code được mổ trong `in-practice/`: [project_implementation/HAL_layer](../14-prep/mock-interview/project_implementation/HAL_layer) *(bị `.gitignore` — pack đầy đủ nằm trong [A2 §6](in-practice/A2-cpp-interface-hal.md))*
+- ⚠️ **Mọi định danh trong `in-practice/` là tên tài liệu, không phải tên thật** — bộ từ vựng chuẩn ở [in-practice/README](in-practice/README.md)

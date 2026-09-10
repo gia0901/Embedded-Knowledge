@@ -38,21 +38,21 @@ Ba bước đó ánh xạ thẳng vào 5 nguyên lý:
 ```cpp
 // ❌ Ba lý do thay đổi trong một class:
 //    đổi thuật toán đọc · đổi định dạng lưu · đổi cách log
-class Sensor {
+struct Sensor {
     double read();
     void   saveToFile();
     void   formatReport();
 };
 
 // ✅ Mỗi class một lý do
-class Sensor        { double read(); };
-class SensorStorage { void save(double); };
-class SensorReport  { std::string format(double); };
+struct Sensor        { double read(); };
+struct SensorStorage { void save(double); };
+struct SensorReport  { std::string format(double); };
 ```
 
 > 💡 **"Một trách nhiệm" đo bằng LÝ DO THAY ĐỔI, không đo bằng số hàm.** Một class 20 hàm cùng phục vụ một mối quan tâm vẫn đúng SRP; một class 2 hàm mà một hàm đổi vì phần cứng, hàm kia đổi vì yêu cầu UI thì đã sai.
 
-**Áp vào hệ display:** `DisplayImpl` điều phối; thuật toán dimming nằm ở `IDimming`; đường xuống phần cứng nằm ở backend. Đổi thuật toán không đụng đường xuống HW, và ngược lại — đó là SRP ở mức kiến trúc ([in-practice/01](in-practice/01-display-stack.md)).
+**Áp vào hệ display:** `DisplayImpl` điều phối; thuật toán dimming nằm ở `IDimming`; đường xuống phần cứng nằm ở backend. Đổi thuật toán không đụng đường xuống HW, và ngược lại — đó là SRP ở mức kiến trúc ([in-practice/01](in-practice/B1-redesign-architecture.md)).
 
 ---
 
@@ -80,7 +80,7 @@ struct Square : Shape { double area() const override; };
 
 ⚠️ **Hiểu nhầm phổ biến — "OCP nghĩa là không được sửa file cũ".** Không phải. OCP nói *đừng sửa **logic đã đúng** để nhét biến thể mới*. Sửa để **vá bug** hay **đơn giản hoá** là chuyện khác hoàn toàn.
 
-⚠️ **Và OCP không xoá được `switch`, nó chỉ DỒN `switch` về một chỗ.** Ở đâu đó vẫn phải ánh xạ *config → class cụ thể*. Mục tiêu là **đúng một** `switch` (trong factory), thay vì mười cái rải rác — xem [in-practice/01 §2.2](in-practice/01-display-stack.md).
+⚠️ **Và OCP không xoá được `switch`, nó chỉ DỒN `switch` về một chỗ.** Ở đâu đó vẫn phải ánh xạ *config → class cụ thể*. Mục tiêu là **đúng một** `switch` (trong factory), thay vì mười cái rải rác — xem [in-practice/B1 §4](in-practice/B1-redesign-architecture.md).
 
 ---
 
@@ -97,10 +97,19 @@ struct Square : Shape { double area() const override; };
 
 ```cpp
 // ❌ Kinh điển: Square is-a Rectangle về DỮ LIỆU, không về HÀNH VI
-class Rectangle { virtual void setW(int); virtual void setH(int); };
-class Square : Rectangle {
-    void setW(int w) override { width = height = w; }   // pha ky vong "doi W khong doi H"
+struct Rectangle {
+    virtual ~Rectangle() = default;
+    virtual void setW(int w) { width = w; }
+    virtual void setH(int h) { height = h; }
+    int width = 0, height = 0;
 };
+struct Square : Rectangle {                              // ke thua PUBLIC — moi thay the duoc
+    void setW(int w) override { width = height = w; }    // pha ky vong "doi W khong doi H"
+    void setH(int h) override { width = height = h; }
+};
+
+// Code viet cho Rectangle, chay dung voi Rectangle, SAI voi Square:
+void resize(Rectangle& r) { r.setW(5); r.setH(4); /* ky vong dien tich = 20 */ }
 ```
 
 ⭐ **Vi phạm LSP nguy hiểm hơn vi phạm các nguyên lý khác** — bốn nguyên lý kia hỏng thì code *khó sửa*; LSP hỏng thì code **chạy ra kết quả sai** qua đúng con đường đa hình mà bạn tin tưởng.
@@ -127,7 +136,7 @@ struct IPrinter { virtual void print()=0; };
 struct IScanner { virtual void scan()=0; };
 ```
 
-🔴 **ISP đắt hơn bình thường khi interface đi qua ranh giới `.so`.** Ở đó, thêm một method vào interface **không chỉ** làm impl phải sửa — nó **đổi vtable**, tức là **ABI break**, và mọi `.so` đã build trước đó thành không dùng được ([in-practice/02 §3.3](in-practice/02-interface-impl-plugin.md)). Nói cách khác: **interface càng béo thì càng nhiều lý do phải đổi nó, mà mỗi lần đổi ở đây đắt gấp bội.**
+🔴 **ISP đắt hơn bình thường khi interface đi qua ranh giới `.so`.** Ở đó, thêm một method vào interface **không chỉ** làm impl phải sửa — nó **đổi vtable**, tức là **ABI break**, và mọi `.so` đã build trước đó thành không dùng được ([in-practice/A2 §3.3](in-practice/A2-cpp-interface-hal.md)). Nói cách khác: **interface càng béo thì càng nhiều lý do phải đổi nó, mà mỗi lần đổi ở đây đắt gấp bội.**
 
 > ⚖️ **Căng thẳng thật giữa ISP và Null Object.** Null Object *cố ý* cho phép impl không cài đặt một số API (rơi về `-ENOTSUP`) — nhìn qua là "interface béo". Ranh giới: **vài** API tuỳ chọn trên một interface gắn kết là chấp nhận được và mua được tương thích; **phần lớn** API trả `-ENOTSUP` nghĩa là bạn đã gộp hai thiết bị khác nhau vào một interface — lúc đó ISP thắng, phải tách.
 
@@ -157,7 +166,7 @@ public:
 
 ⭐ **"Đảo ngược" ở đây đảo cái gì?** Không phải đảo chiều lời gọi — cấp cao vẫn gọi xuống. **Đảo chiều SỞ HỮU HỢP ĐỒNG:** trước đây cấp thấp định nghĩa API và cấp cao phải theo; giờ **cấp cao định nghĩa interface nó cần**, cấp thấp phải khớp vào. Nói được đúng câu này là khác biệt giữa 3 điểm và 4 điểm ở [DP-011](../14-prep/mock-interview/bank/design-patterns.md).
 
-**Đây là nguyên lý sát công việc của bạn nhất.** HAL chính là DIP đóng gói thành kiến trúc: app phụ thuộc `IDisplay` (abstraction), `.so` cũng phụ thuộc `IDisplay`, và **không bên nào phụ thuộc bên kia**. Nhờ vậy một binary chạy nhiều board ([in-practice/02](in-practice/02-interface-impl-plugin.md)).
+**Đây là nguyên lý sát công việc của bạn nhất.** HAL chính là DIP đóng gói thành kiến trúc: app phụ thuộc `IDisplay` (abstraction), `.so` cũng phụ thuộc `IDisplay`, và **không bên nào phụ thuộc bên kia**. Nhờ vậy một binary chạy nhiều board ([in-practice/02](in-practice/A2-cpp-interface-hal.md)).
 
 ---
 
@@ -188,16 +197,23 @@ Phần này quan trọng ngang 5 phần trên — và là câu hỏi 🔴 [DP-01
 | Chi phí | Cụ thể |
 |---|---|
 | Đọc hiểu | Thêm file phải mở, thêm một lần "nhảy" để tìm code thật sự chạy |
-| Runtime | Virtual call không inline được (~vài ns) + con trỏ vtable mỗi object |
+| Runtime | Con trỏ vtable mỗi object + **mất khả năng inline** (chi phí lớn hơn hẳn bản thân lời gọi) |
 | **ABI** | Interface qua `.so` = **hợp đồng nhị phân giữ vĩnh viễn** — đắt nhất, và hay bị quên khi tính |
 | Nhận thức | Abstraction **nói dối** nếu chỉ có một implementation: người đọc sau đi tìm biến thể không tồn tại |
+
+> 📏 **Đo thật, đừng nói cảm tính** (x86-64, gcc `-O2`, dispatch qua con trỏ lấy từ `vector`):
+> ```
+> virtual, đích ổn định : 1,13 ns/lần
+> virtual, đích xen kẽ  : 1,15 ns/lần   ← branch predictor xử lý được, KHÔNG phải thủ phạm
+> ```
+> ⟹ Bản thân lời gọi virtual là **~1 ns**, không phải "vài ns". Chi phí thật nằm ở chỗ khác: **compiler không inline được**, nên mất luôn các tối ưu xuyên hàm quanh nó. Trên đường **cấu hình** thì cả hai đều không đáng kể; trên đường **mỗi khung hình** thì thứ phải lo là *inlining*, không phải *dispatch*.
 
 **Ba câu hỏi lọc — "không" ở bất kỳ câu nào thì đừng trừu tượng hoá:**
 1. Đã có **≥ 2 biến thể thật** chưa (không phải "sau này biết đâu")?
 2. Chúng khác nhau về **hành vi**, hay chỉ khác **tham số**? *(Chỉ khác tham số ⟹ truyền tham số.)*
 3. Có ai thật sự cần **hoán đổi** chúng không?
 
-> **Ví dụ đối chứng trong chính hệ display:** `dimming` đạt cả ba ⟹ interface + factory. `frc`/`tcon` trượt cả ba ⟹ **để nguyên hàm gọi thẳng**. Nói được chỗ mình *cố tình không* áp SOLID là tín hiệu senior mạnh hơn kể tên năm pattern ([in-practice/01 §4](in-practice/01-display-stack.md)).
+> **Ví dụ đối chứng trong chính hệ display:** `dimming` đạt cả ba ⟹ interface + factory. `frc`/`tcon` trượt cả ba ⟹ **để nguyên hàm gọi thẳng**. Nói được chỗ mình *cố tình không* áp SOLID là tín hiệu senior mạnh hơn kể tên năm pattern ([in-practice/B1 §7.1](in-practice/B1-redesign-architecture.md)).
 
 **Riêng embedded, thêm hai lưu ý:** ① virtual trên đường **mỗi khung hình** thì đáng đo, trên đường **cấu hình** thì miễn phí — chi phí nằm ở *tần suất gọi*, không ở việc có dùng abstraction hay không; ② **cấm cấp phát động trên đường nóng** kể cả khi pattern gợi ý làm vậy.
 
