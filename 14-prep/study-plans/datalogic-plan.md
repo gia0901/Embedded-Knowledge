@@ -1,219 +1,257 @@
-# 🎯 Datalogic — Embedded Linux Engineer (C++17, Linux) · Plan ôn
+# 🎯 Datalogic — Software Engineer (C/C++17, Embedded Linux) · SPRINT 3–4 NGÀY
 
-> Kế hoạch ôn **nhắm đúng JD** [Embedded Linux Engineer @ Datalogic Việt Nam](https://itviec.com/it-jobs/embedded-linux-engineer-c-linux-datalogic-viet-nam-2835).
-> Không phải kiến thức mới — mọi mục **link tới tài liệu + bank câu hỏi** sẵn có. Ký hiệu: 🎯 xác suất gặp cao · 🎤 phiên mock · 🔁 ôn lặp lại · 🧪 lab ngồi máy.
+> ♻️ **Viết lại hoàn toàn 2026-09-11.** Plan cũ (28 ngày, tối ưu **độ phủ bank**, kèm 3 bộ lab phần cứng) đã **bỏ** — nó nhắm sai mục tiêu cho một buổi phỏng vấn sau 3–4 ngày. Bản cũ còn trong git (`git show a254388:14-prep/study-plans/datalogic-plan.md`).
+> Nguyên tắc mới, thay cho "phủ bank": **xác suất bị hỏi × mức độ sẽ ú ớ**. Không mở rộng kiến thức mới; chỉ chuyển thứ đã biết thành **câu nói ra được** và **dòng code viết tay được**.
 
 ---
 
 ## 📍 Tiến độ hiện tại — **RESUME Ở ĐÂY** (nguồn tracking DUY NHẤT)
 
-> ⚠️ **Đây là TRẠNG THÁI, không phải nhật ký.** Sau mỗi phiên: **SỬA** đúng bốn chỗ — *Buổi gần nhất* · *Lịch sử điểm* · *▶️ LÀM TIẾP* · ô `Xong?` của bảng lab — và **không thêm dòng mới**.
-> *(File này từng phình lên 16.000 từ vì mỗi phiên **thêm** một đoạn thay vì **sửa** dòng cũ, dẫn tới ba mốc "buổi gần nhất" mâu thuẫn nhau. Dọn 2026-09-08.)*
-> Diễn biến từng phiên sống ở [`sessions/`](../mock-interview/sessions/) · câu yếu ở [weak-register](../mock-interview/weak-register.md) · lỗ hổng tài liệu ở [gap-register](gap-register.md). Ba nơi đó là lịch sử; chỗ này không phải.
+> ⚠️ **TRẠNG THÁI, không phải nhật ký.** Sau mỗi buổi: **SỬA** ô `Xong?` + dòng *Buổi gần nhất* + *▶️ LÀM TIẾP*. **Không thêm dòng mới.**
+> Diễn biến từng phiên → [`sessions/`](../mock-interview/sessions/) · câu yếu → [weak-register](../mock-interview/weak-register.md) · lỗ hổng tài liệu → [gap-register](gap-register.md).
 
 ### Trạng thái
 
 | | |
 |---|---|
-| **Plan** | 🎯 Datalogic (file này), bắt đầu **2026-08-03** |
-| **Buổi gần nhất** | `retention track all` — **2026-09-04**, 30/40 = **3.00**, 10 câu ([log](../mock-interview/sessions/2026-09-04--retention--all.md)) |
-| **Retention kế tiếp** | **18–23/09** — 8 câu, góc hỏi đã ghi sẵn trong [weak-register](../mock-interview/weak-register.md). Không có gì quá hạn |
-| **Độ phủ** | **đo bằng lệnh**, đừng chép số vào đây — cách đếm ở [bank/README](../mock-interview/bank/README.md). Lần đo 06/09: `178/457 = 38%`; **`NET` 0%** 🔴 · `BLD` 13% · `BSP` 29% |
-| **Lịch sử điểm** | 3.25 · 3.3 · 2.83 · 3.17 · 3.67 · 3.0 · 3.0 · 2.67 · **2.1** · 3.67 · **3.92** · 3.67 · 3.33 · 3.0 · **3.42** · 3.33 · 3.00 *(theo thứ tự thời gian 03/08 → 04/09; ⚠️ **không so ngang** — `rapid` và `daily`/`by-level` dùng thang khác nhau, xem [config §4](../mock-interview/config.md))* |
-| **Đang treo** | 🧪 lab BSP 6/8 chưa làm · 🧪 lab DBG 12/12 chưa làm · `NET` chưa hỏi một câu nào |
+| **Mục tiêu** | Buổi phỏng vấn kỹ thuật — **3–4 ngày nữa** tính từ 2026-09-11 |
+| **Ngân sách** | ~2h/ngày × 4 buổi ≈ **8h**. Vượt ngân sách = cắt, không kéo dài |
+| **Ngôn ngữ PV** | **50% Việt / 50% Anh** ⇒ mọi câu ruột phải nói được **cả hai thứ tiếng** |
+| **Hình thức coding** | **Trên giấy** — 3 dạng: (1) coding problem · (2) implement DS cơ bản · (3) **đọc code tìm lỗi** |
+| **Buổi gần nhất** | *(chưa chạy buổi nào của sprint này)* — lần cuối trước reset: `retention track all` 04/09, 3.00 |
+| **Chẩn đoán còn hiệu lực** | **T1 3.67 · T2 2.1** ⇒ nền chắc, hụt ở **vận dụng**. Không đọc thêm tài liệu mới |
 
-⭐ **Chẩn đoán còn hiệu lực (15–16/08):** `rapid` (đo **T1** — biết & nói gọn) = **3.67** · `by-level 🟠` (đo **T2** — vận dụng) = **2.1**. ⇒ **Nền kiến thức CHẮC, chỗ hụt nằm ở tầng VẬN DỤNG.** Hệ quả: **không cần đọc thêm tài liệu mới** — cần chuyển thứ đã biết thành *quyết định* và *dòng code sửa*. Ở phỏng vấn thật, áp lực sẽ dồn vào **phần giữa**, khi interviewer hỏi *"giờ bạn làm gì"*.
+### ▶️ LÀM TIẾP — 4 buổi, chạy đúng thứ tự
 
-### ▶️ LÀM TIẾP
+| # | Buổi | Nội dung | ~ | Xong? |
+|---|---|---|---|---|
+| **B1** | 🗣️ **RESUME + dẫn chuyện + process JD** | §3 bản đồ phủ resume · §4 opening 3 móc · §5 behavioral theo JD mới | 120′ | ⬜ |
+| **B2** | ✍️ **CODING GIẤY** | 3 bài implement viết tay + 6 snippet bug-hunt + DSA rapid (§6) | 120′ | ⬜ |
+| **B3** | ⚙️ **C++17 + C-kernel + vá gap JD** | §7 C++17 ba tầng · C thuần · **I2C/SPI (cầu nối)** · §8 ba câu trả lời trung thực | 120′ | ⬜ |
+| **B4** | 🎬 **Giả lập vòng thật** | `comprehensive` cấu hình riêng JD (75′) + coding từ **file trống** (45′) | 120′ | ⬜ |
 
-**Hàng đợi, theo thứ tự:**
+**Nguyên tắc khi phải cắt:** giữ **B1 và B2** bằng mọi giá. B3 cắt được phần C-kernel. B4 cắt được phần coding-file-trống. **Không bao giờ cắt B1** — 40% JD này nằm ở resume/process.
 
-| # | Việc | Vì sao xếp ở đây |
-  |---|------|------------------|
-| **1** | 🧪 `BSP-031` *(→ 032 → 033)* | phần cứng vừa thông, đừng để nguội |
-| **2** | `/mock rapid track networking` | 🔴 **`NET` 0% — domain DUY NHẤT chưa từng hỏi một câu**, và đã bị gắn cờ *"rủi ro số 1"* từ **24/08** mà **13 ngày sau vẫn 0%**. 12 câu ~15′. Vá luôn `LNX-005` (*TCP luồng byte*) đang **đứng yên 2 phiên ở 2đ** và nằm đúng vùng này |
-| **3** | 🗣️ `RES-016` — thuộc **một câu** chặn dòng AI | **0 điểm**, và là việc có **tỉ lệ giá trị/công sức cao nhất** trong cả plan: đúng một câu + một ví dụ. Xem [bank RES-016](../mock-interview/bank/resume.md) |
-| **4** | 🗣️ `RES-001` — đọc to **bản nói 45 giây**, ghi âm | lỗi lặp **3 lần**; [bản nói 4 nhịp đã viết sẵn](../mock-interview/bank/resume.md), chỉ cần nói to và bấm giờ |
-| **5** | `/mock rapid track build-systems` | `BLD` **13%** — vừa thêm **17 câu** CI/test-farm chưa hỏi câu nào, mà đó là trụ JD *"Yocto + CMake/CI"* |
-| **6** | `/mock daily track bsp` ở **T2** | chỉ sau khi đã đọc lại; [config §6](../mock-interview/config.md) cấm đưa câu 0–2đ thẳng lên T2 |
+---
 
-📌 **Resume đổi 07/09 — mục SDM:** bỏ nhãn *"C++17"* (app build tới C++20, thứ C++17 duy nhất dùng là `std::optional` ⇒ nhãn đó tự mời câu hỏi không trả lời được) và **thêm thành tựu**: **Preset + import/export preset giữa các màn hình, xong trong 1 tháng, kịp release 1.0** *(phần lưu JSON đã có sẵn trước khi vào — không nhận)*. Dòng mới ⇒ câu hỏi mới **[RES-022](../mock-interview/bank/resume.md)** *(phạm vi · ranh giới công lao · đánh đổi đã chấp nhận)* — **chưa nói lần nào**, ghép vào việc **4** vì cùng là bài nói to bấm giờ. Sửa song song ở `RESUME_bosch.tex`; `RESUME_cpp_linux.tex` **chưa có** thành tựu này.
+## 1. JD mới → gap map (đọc trước mọi buổi)
 
-### 🧪 Ba bộ lab — trạng thái
+**JD này ~40% là process & communication**, không phải kỹ thuật thuần: *quản lý requirement · tham gia định nghĩa architecture · **tự quyết design rồi bảo vệ trong deep technical discussion** · làm việc với đội **V&V** · benchmark đối thủ · viết tài liệu · **peer review***. Đây là phần plan cũ bỏ trắng hoàn toàn.
 
-**Bộ lab DBG — 12 bài** *(7 bài gốc 17/08 + 5 bài gdb 08/09)*: bank có type thứ tư, **câu `lab` 🧪 "NGỒI MÁY LÀM"** (code có bug thật + nhiệm vụ + **output thật đã chạy** để đối chiếu; quy ước ở [bank/README.md](../mock-interview/bank/README.md) và [CLAUDE.md §6](../../CLAUDE.md)). Xếp theo **TRIỆU CHỨNG, không theo công cụ** — vì ngoài đời luôn bắt đầu từ triệu chứng, và đó đúng là lỗ hổng đã đo (*chẩn đoán được, chọn công cụ không được*):
+| Trụ JD | Resume có | Trạng thái | Xử lý |
+|---|---|---|---|
+| C/C++17, Python | ✅ | 🟢 mạnh | §7 — nhưng có **rủi ro C++17**, xem cảnh báo |
+| Linux userspace + debug | ✅ IPC/thread/shared lib, GDB | 🟢 mạnh | rapid ở B3 |
+| Kernel space + driver | ✅ driver, DT, **5.10→6.12** | 🟢 **mạnh nhất** | móc #3 của opening |
+| Driver **I2C / SPI** | ⚠️ có chạm, resume **không nêu tên bus** | 🟡 | ⭐ **B3 — cầu nối quan trọng nhất**, xem §8.A |
+| Driver **Ethernet** | ❌ | 🔴 | §8.B — trả lời trung thực + khung netdev |
+| **Yocto** | ❌ chỉ CMake/Makefile | 🔴 **gap lớn nhất** | §8.C — trung thực + mental model |
+| **Jenkins / CI** | ❌ | 🟠 | §8.D gộp |
+| **Oscilloscope / logic analyzer** | ❌ | 🟠 | §8.D gộp |
+| Design subsystem · lead discussion · V&V · peer review | ✅ chất liệu có, **chưa đóng gói** | 🔴 **ăn điểm nhiều nhất** | §5 |
 
-    | Triệu chứng | Bài | Công cụ | Vá lỗ hổng | Xong? |
-    |---|---|---|---|---|
-    | Chết ngay khi khởi động | [DBG-030](../mock-interview/bank/debugging.md) | `strace` | DBG-005 | ⬜ |
-    | Rò tài nguyên (fd/RAM tăng dần) | [DBG-031](../mock-interview/bank/debugging.md) | `/proc/fd` | **LNX-023** (sổ yếu) | ⬜ |
-    | Sai dữ liệu ngầm, không crash | [DBG-032](../mock-interview/bank/debugging.md) | ASan | DBG-024/025 | ⬜ |
-    | Crash, mình không có mặt lúc đó | [DBG-033](../mock-interview/bank/debugging.md) | core dump + `gdb bt` | DBG-003 | ⬜ |
-    | **Treo**, không crash không log | [DBG-034](../mock-interview/bank/debugging.md) | `/proc` `State`+`wchan` | LNX-023 | ⬜ |
-    | Lúc được lúc không (đa luồng) | [DBG-035](../mock-interview/bank/debugging.md) | TSan | DBG-013 | ⬜ |
-    | Đọc biến chưa khởi tạo | [DBG-036](../mock-interview/bank/debugging.md) | **valgrind** *(ASan mù)* | DBG-011 | ⬜ |
-    | Lỗi ở lần lặp thứ N giữa hàng nghìn lần | [DBG-037](../mock-interview/bank/debugging.md) | `break … if` · `ignore` | DBG-002/017 | ⬜ |
-    | Bug chỉ có ở `-O2`, `-O0` thì hết | [DBG-038](../mock-interview/bank/debugging.md) | `-Og` · `-fno-inline` · UBSan | **DBG-001** *(vốn chỉ dạy `-O0`)* | ⬜ |
-    | Binary đã strip, chỉ còn core dump | [DBG-039](../mock-interview/bank/debugging.md) | `objcopy` · build-id · `set sysroot` | DBG-003 · nối [CI](../../06-build-systems/ci-and-test-farm.md) | ⬜ |
-    | Treo đa luồng — phải chỉ ra vòng chờ | [DBG-040](../mock-interview/bank/debugging.md) | `thread apply all bt` | DBG-013 · OS-003 | ⬜ |
-    | Breakpoint không ăn trong `.so` nạp lúc chạy | [DBG-041](../mock-interview/bank/debugging.md) | gdb pending bp | **DBG-018** · nối [linking-loading](../../07-shared-libraries/linking-loading.md) | ⬜ |
+> 📌 **YOE 2–4** ⇒ bar coding là **cơ bản → trung bình**. Điều này *xác nhận* quyết định giới hạn DSA ở §6.
 
-    **💻 Chạy ở đâu:** cả 12 bài là **userspace thuần** — chạy được trên **server Ubuntu bằng user thường**, không cần máy cá nhân, không cần root. Thứ duy nhất cần quyền là **cài gói**: `gcc/g++`, `gdb`, `strace`, `valgrind` *(ASan/TSan đi kèm gcc)*. Không cài được `valgrind` thì **chỉ DBG-036 chết**, mười một bài kia nguyên vẹn. ⭐ **DBG-041 khác các bài còn lại**: nó chạy trên **codebase nhiều file + `.so`** — dùng luôn `project_implementation/HAL_layer`, không viết file mới. Ba bẫy môi trường (`ptrace_scope=1` · `core_pattern` bơm vào apport · TSan xung đột ASLR kernel ≥6.5) đều đã có đường vòng ghi sẵn trong chính đề bài 033/034/035 — **không sửa sysctl trên máy dùng chung**.
+---
 
-**Bộ lab BSP trên phần cứng thật — 8 bài** ([BSP-031…038](../mock-interview/bank/bsp.md), mục *J — LAB NGỒI MÁY*). BeagleBone Black + 2 thẻ SD + **cáp USB–TTL 3.3V (bắt buộc)**.
+## 2. Ba dạng bài coding trên giấy — và gap của repo
 
-    ⭐ **Cấu trúc KHÁC bộ DBG có chủ đích** — vì nhắm **lỗ hổng khác**:
-
-    | | DBG lab | **BSP lab** |
-    |---|---|---|
-    | Lỗ hổng đã đo | *"chẩn đoán được, **chọn công cụ** không được"* | *"**thuộc bài ≠ hiểu bài**"* (19/08) |
-    | Cấu trúc | **Triệu chứng trước** | **Khái niệm trước** — triệu chứng thành bước kiểm chứng |
-
-    Ở DBG mô hình **đã có**, chỉ thiếu ánh xạ triệu chứng→công cụ. Ở BSP **mô hình chưa có**, nên đưa triệu chứng ra trước là bắt chẩn đoán một hệ thống chưa hình dung được. *(Lỗi này interviewer mắc lúc đầu khi sao chép cấu trúc DBG — ứng viên phát hiện và sửa.)*
-
-    **Bốn bước, áp cho mọi bài:** ① **ĐỌC** khái niệm (ngắn) → ② **QUAN SÁT** nó chạy đúng, bắt log thật → ③ **PHÁ có chủ đích** (viết **dự đoán ra giấy TRƯỚC**) → ④ **ĐỐI CHIẾU** bảng tự dựng với bảng trong repo.
-    ⇒ Bước ③ là chỗ khác biệt: **không chờ triệu chứng, mà gây ra nó** — biết ground truth nên mọi suy luận ở ④ kiểm chứng được. Chỗ **dự đoán sai** = chỗ mô hình còn hổng.
-
-    | # | Bài | Vá lỗ hổng | Xong? |
-    |---|---|---|---|
-    | 🅰️ | [BSP-031](../mock-interview/bank/bsp.md) — 4 giai đoạn boot, nhận ra trên log thật | BSP-001/002/022 · **đóng vòng "thuộc bài ≠ hiểu bài"** | 🟡 **② XONG 06/09** (log đã dán, 5/5 ranh giới đúng) · ③④ chờ thẻ tự `dd` |
-    | 🅰️ | [BSP-032](../mock-interview/bank/bsp.md) — U-Boot trao tay kernel (bootargs/loadaddr/DTB) | BSP-002 | ⬜ |
-    | 🅰️ | [BSP-033](../mock-interview/bank/bsp.md) — rootfs & initramfs, tự chứng minh khi nào KHÔNG cần | 🔴 **BSP-029 (sổ yếu, 2đ)** | ⬜ |
-    | 🅰️ | [BSP-034](../mock-interview/bank/bsp.md) — đo boot chậm *(bài duy nhất giữ dạng triệu chứng)* | câu chuyện tối ưu **không vướng NDA** | ⬜ |
-    | 🅰️ | [BSP-035](../mock-interview/bank/bsp.md) — FIT + ký RSA, U-Boot **từ chối** image sửa 1 byte | **BSP-004** + gap 🟠 *secure boot* | ⬜ |
-    | 🅱️ | [BSP-036](../mock-interview/bank/bsp.md) — Yocto dựng lại đúng thứ vừa làm tay, **so hai bên** | BSP-017 | ⬜ |
-    | 🅱️ | [BSP-037](../mock-interview/bank/bsp.md) — bbappend + **bắt tận tay chỗ `shlibs` mù với `dlopen`** | 🔴 **BSP-018** *(19/08 trả lời "chưa rõ")* | ⬜ |
-    | 🅱️ | [BSP-038](../mock-interview/bank/bsp.md) — sstate, đo ba phép đo thật | BSP-017/018 | ✅ **XONG 06/09** — 3/3 phép đo + xác minh |
-
-    **🎯 TÁCH hai thẻ, ba giai đoạn — quyết định có lý do, không phải cho tiện:** Thẻ A làm chuỗi boot **bằng tay** trước, Thẻ B để **Yocto dựng lại** sau. Ba căn cứ: ① học hai thứ khó cùng lúc thì hỏng không biết hỏng ở đâu · ② vòng lặp phản hồi lệch ~100 lần (sửa env U-Boot: vài giây; qua bitbake: vài phút) · ③ ⭐ **làm tay trước khiến giá trị Yocto trở nên hiển nhiên** — nếu Yocto đi trước, U-Boot chỉ là hộp đen bitbake nhả ra. *(Máy build Ryzen 9 9950X/24 luồng ⇒ **thời gian build KHÔNG phải lý do tách**; lý do là sư phạm.)* Giữ **Thẻ A luôn boot được** làm thẻ cứu hộ.
-
-    **🔧 SETUP — một chỗ duy nhất: [14-prep/lab-setup.md](../lab-setup.md)** *(phần cứng cần mua · đấu nối serial J1 · gói host · bố cục thẻ SD · Yocto host deps · **6 bẫy đã biết** · **checklist sẵn sàng**)*. Không chép vào từng lab — 8 bài dùng chung. ⭐ **Chưa tick đủ checklist thì đừng bắt đầu bài 031.**
-
-    **⚠️ Ba cảnh báo phần cứng (chi tiết ở lab-setup):** ① **không có cáp USB–TTL 3.3V thì toàn bộ Thẻ A vô nghĩa** (cáp 5V làm hỏng board) · ② **eMMC của BBB tranh boot với thẻ SD** — không giữ nút **S2** lúc cấp nguồn thì triệu chứng giống hệt "image mình hỏng", đây là bẫy số 1 của người mới · ③ 🔴 **secure boot thật KHÔNG làm được trên BBB** — AM335x bán lẻ là **GP silicon**, eFuse chưa blow, không có chain of trust từ ROM. Làm được (và đúng thứ interview hỏi) là **U-Boot verified boot**. Nói đúng ranh giới này ở phỏng vấn là **điểm cộng**.
-
-**Bộ lab DP (design patterns) trên code C++ của chính mình — 5 bài** *(thêm 09/09)*: sống ở [11-design-patterns/in-practice/A2 §7](../../11-design-patterns/in-practice/A2-cpp-interface-hal.md), chạy trên **pack code hoàn chỉnh ở §6 cùng file** (9 file, 301 dòng — `HAL_layer` bị `.gitignore` nên pack là bản mang đi được). ⭐ **Khác hai bộ kia:** không cần phần cứng, không cần root, **userspace thuần**, và đối tượng phá là **code do chính mình viết** — nên sai ở đâu là lộ ngay mô hình của mình hổng ở đó.
-
-    | # | Bài | Phá cái gì | Vá lỗ hổng | Xong? |
-    |---|---|---|---|---|
-    | 0 | Null Object | giấu `.so` đi | `DP-028` | ⬜ |
-    | 1 | Data race trong Singleton | đưa `getInstance()` về dạng gốc | `DP-026` · 🔴 **`DP-002`** (sổ yếu, regression 4→1) | ⬜ |
-    | 2 | Self-registration & `-rdynamic` | tắt `ENABLE_EXPORTS` | `DP-029` | ⬜ |
-    | 3a | vtable ABI — chèn slot vào giữa | API mới đặt **trước** destructor | `DP-027` · **`DP-033`** | ⬜ |
-    | 3b | vtable ABI — `.so` cũ thiếu slot | build `.so` ở v1, app ở v2 | `DP-028` | ⬜ |
-
-    **📌 Hai phát hiện đo được khi dựng bộ lab này (09/09), đáng nhớ hơn cả bài lab:** ① race trong `getInstance()` **không hiếm** — **178/200** lần chạy 8 luồng dựng object hai lần, thấy được **không cần sanitizer**; ② **version check khớp nhau vẫn gọi nhầm hàm** — version bảo vệ API *thiếu*, không bảo vệ slot *bị đảo*. Điều ② bác bỏ một khẳng định sai trong chính tài liệu (đã sửa cả doc lẫn bank `DP-028`).
-
-        **⬜ Hoãn có chủ đích: bộ lab DBG** — 12/12 chưa làm bài nào. Căn cứ: `DBG` **3.67** vs `BSP` **3.33** (thấp nhất), và BSP là trụ số 1 JD. Đã ghi vào [gap-register](gap-register.md) để lần sau không ai đảo ngược trong im lặng.
-
-    **Bộ công cụ lõi đã chốt:** `gdb` · `strace` · ASan · `/proc`+`/sys` · valgrind (đúng một việc: biến chưa khởi tạo) · TSan (đa luồng). **Cắt hẳn:** `perf`, `ltrace`, `gdbserver`/`addr2line` bài riêng — giữ ở mức câu `concept` là đủ. Lý do cắt: phỏng vấn embedded hỏi *"nó crash/treo"* nhiều hơn hẳn *"nó chậm"*.
-    **⚠️ Ba bẫy môi trường đã đo thật và viết thẳng vào bài** (đây là thứ làm người ta bỏ cuộc, không phải kiến thức debug): `core_pattern` pipe vào apport ⇒ `ulimit -c` một mình **không đủ**, apport còn **vứt luôn** core của binary tự build · `ptrace_scope=1` chặn `gdb -p` · **TSan chết ngay khi khởi động trên kernel 6.x** vì xung đột ASLR, phải `setarch -R`.
-    **📌 Phát hiện đáng nhớ:** cùng một data race, build `-O2` thì **5/5 lần chạy đều ra kết quả ĐÚNG** (compiler gộp vòng lặp thành một phép cộng), `-O0` thì sai 4/5. Và ASan **làm lộ** giá trị rác (`0xbebebebe`) nhưng **không báo lỗi**, thoát mã 0.
-
-### 📌 Bài học còn hiệu lực
-
-*Chín điều rút từ các phiên đã chạy. Đây là phần duy nhất của lịch sử vẫn còn thay đổi cách ôn — chi tiết ở log gốc.*
-
-| # | Bài học | Nguồn |
+| Dạng | Bank hiện có | Trạng thái |
 |---|---|---|
-| 1 | **Nền chắc, hụt ở vận dụng** — T1 3.67 vs T2 2.1 ⇒ đọc thêm tài liệu không chữa được | [15/08](../mock-interview/sessions/2026-08-15--by-level--linux-sysprog.md) · [16/08](../mock-interview/sessions/2026-08-16--rapid--debugging.md) |
-| 2 | **Độ phủ KHÔNG đo được độ vững** — `DRV` phủ 0% nhưng đạt **3.92** vì trùng việc hằng ngày ⇒ ưu tiên = *phủ thấp × **chưa có bằng chứng** về độ vững* | [17/08](../mock-interview/sessions/2026-08-17--rapid--drivers-dt.md) |
-| 3 | **Lỗi ĐÓNG GÓI ≠ lỗ hổng kiến thức** — cùng một kiến thức, đổi khung câu hỏi (kỹ thuật → resume) thì không truy xuất được. Chữa bằng **nói to bấm giờ**, không phải đọc thêm | [18/08](../mock-interview/sessions/2026-08-18--rapid--resume.md) |
-| 4 | **Thuộc bài ≠ hiểu bài** — tái hiện bank gần nguyên văn nhưng không hiểu chính cụm từ vừa nói. Nói ra một thuật ngữ là **mời interviewer hỏi vào đúng nó** | [19/08](../mock-interview/sessions/2026-08-19--rapid--bsp.md) |
-| 5 | **"Repo không có tài liệu về X" trong khi repo CÓ** — 2 phiên liên tiếp. Không phải lỗ hổng kiến thức mà là **thói quen tra cứu**: chưa chắc thì `grep`, đừng kết luận | [18/08](../mock-interview/sessions/2026-08-18--rapid--resume.md) · [19/08](../mock-interview/sessions/2026-08-19--rapid--bsp.md) |
-| 6 | **Rơi vì REPO hụt, không phải ứng viên quên** — mẫu lặp **4 lần**. Trước khi kết luận "quên", kiểm xem bank/tài liệu có thật sự dạy điều đó không | [21/08](../mock-interview/sessions/2026-08-21--daily--cpp-system.md) |
-| 7 | **STAR phải kết bằng CON SỐ** — 0/12 câu tự đi tới R ⇒ **2.42**; dựng khung trong một ngày ⇒ **3.42**, số câu phải probe 6/12 → **0/12** | [23/08](../mock-interview/sessions/2026-08-23--rapid--behavioral.md) · [24/08](../mock-interview/sessions/2026-08-24--rapid--behavioral.md) |
-| 8 | **Khẳng định không đối chiếu được** — nói *"đã build minimal image trên BBB"* trong khi tracking ghi 8/8 lab ⬜. Chốt 06/09: **đúng một nửa** (board + serial thật, "build image" sai). Là **gộp nhầm**, không phải bịa — nhưng interviewer không phân biệt được hai thứ đó | [29/08](../mock-interview/sessions/2026-08-29--rapid--resume.md) |
-| 9 | **Số đo bác bỏ giả định, không phải ngược lại** — interviewer nghi phép đo `BSP-038` sai vì *"build U-Boot phải mất vài phút"*; chạy lại ra `real 0m20,096s`. Giả định sai, số đo đúng | [BSP-038](../mock-interview/bank/bsp.md) |
+| Coding problem | [`COD-001…010`](../mock-interview/bank/coding.md) — 10 bài cỡ nhỏ | ✅ đủ, đúng cỡ |
+| Implement DS cơ bản | + [`COD-011/012/013`](../mock-interview/bank/coding.md) — dynamic array · hash map chaining · queue bằng 2 stack | ✅ **đã soạn 11/09**, bản mẫu compile + chạy sạch |
+| **Đọc code tìm lỗi** | [`COD-014…026`](../mock-interview/bank/coding.md) — **13 snippet**, mục mới `## B` | ✅ **đã soạn 11/09**, mỗi bài có **output thật đã chạy** |
 
-### Nợ lại
+**"Trên giấy" đổi QUY TRÌNH, không đổi nội dung** — không compiler, không autocomplete, không chạy test. Luyện và chấm đúng **5 nhịp**:
 
-- ① ⬜ **Bài coding** — `SocketHandle` ([CPP-054](../mock-interview/bank/cpp.md)) + `ring_buffer_v2` bản mutex ([COD-006](../mock-interview/bank/coding.md)), làm từ file trống qua `/mock coding track cpp-system`. *(Cần một phiên mock, không tự làm hộ được.)*
-- ② 🟡 **Nợ chất lượng bank — đang co dần:** ~68 câu 🟠🔴 còn đáp án < 700 ký tự (chưa đạt khung 5 phần của [bank/README](../mock-interview/bank/README.md)). **Không viết lại hàng loạt** — [config §1 Bước 4](../mock-interview/config.md) bắt nâng cấp đáp án của câu ≤ 2 điểm ngay sau mỗi phiên, nên nợ tự co đúng chỗ đang ôn. *(Câu 🟢 ngắn là **đúng chuẩn** — trần cứng có chủ đích, đừng giãn.)*
-- ③ 🔴 **Nợ tài liệu** → đã chuyển hẳn sang [gap-register](gap-register.md). Giữ bảng chi tiết ở hai nơi chính là lỗi *"một sự thật, hai chỗ"*.
-  > **Luật rút ra:** trước khi đưa một câu 🟠🔴 vào pool ôn, **kiểm link nguồn có thật sự chứa nội dung không**. Câu không có tài liệu nền thì hỏi ra chỉ đo được *"đã từng gặp ngoài đời chưa"*, không đo được kết quả ôn tập.
+1. **Hỏi spec trước khi viết** — *"mảng có sorted không? có null không? in-place hay được cấp thêm? kích thước tối đa?"*
+2. **Nói approach + O(time)/O(space)** trước khi đặt bút.
+3. **Viết tay** — chữ đọc được, đặt tên biến tử tế.
+4. **Tự dry-run bằng bảng giá trị** — 1 ca thường + 1 ca biên. *(Đây là nhịp thay thế compiler.)*
+5. **Tự nêu cái mình biết là chưa xử lý.**
 
-### Sổ yếu
+> ⭐ JD ghi *"take design choice autonomously"* và *"attention to details"* ⇒ nhịp **①** và **⑤** được chấm **ngang với code**. Người viết code đúng mà không hỏi spec vẫn thua người hỏi spec rồi viết code gần đúng.
 
-**Nguồn duy nhất: [weak-register.md](../mock-interview/weak-register.md)** — trạng thái từng câu, cột *"lần sau hỏi mức nào"*, và bảng 🔁 *Lịch kiểm tra lại*. **Không chép danh sách câu ra đây** (đã từng lệch: bản chép còn ghi `OS-003`/`CPP-029`/`DP-002` là điểm yếu trong khi cả ba đã được gỡ).
+**Bộ 13 snippet bug-hunt (`COD-014…026`), đã soạn:** off-by-one · buffer overflow (`sprintf`) · `memcpy` vùng chồng lấn · trả reference tới local · thiếu `volatile` (cờ ISR) · so sánh signed ↔ unsigned · `strncpy` không NUL · shift ≥ độ rộng kiểu · thiếu `break` · Rule of Three vỡ → double free · mutex không RAII → deadlock · struct padding & misalignment · **thứ tự đánh giá đối số hàm** *(C++17 đã sửa `<<`, `[]`, `=` — nhưng KHÔNG sửa đối số hàm)*.
+
+> 📌 **Số liệu đo thật khi dựng bộ này** (`gcc/g++ 11.4.0`): `-Wall -Wextra` bắt **3/13 ở `-O0`**, **5/13 ở `-O2`** — **8 bài compile sạch ở mọi mức**, gồm double free, deadlock, đọc ngoài mảng. Và **chính cảnh báo cũng phụ thuộc `-O`**: build debug cảnh báo *ít hơn* build release. Ba bài `COD-016/018/023` **chạy đúng ở `-O0`, hỏng ở `-O2`** — nguyên mẫu *"lab thì đúng, hiện trường thì sai"*.
 
 ---
 
-## Hai nguyên tắc xuyên suốt (đọc trước)
+## 3. Bản đồ phủ RESUME — không được bỏ sót dòng nào (buổi B1)
 
-**① Ưu tiên TƯ DUY, không phải cú pháp.** Đặc biệt với **build system (Yocto/CMake/CI)**: phỏng vấn hỏi *"layer/bbappend để làm gì", "sstate giải quyết gì", "DEPENDS vs RDEPENDS", "vì sao CMake target-based"* — tức **mental model** (vấn đề → kiến trúc → đánh đổi), **không** bắt viết recipe/CMakeLists chính xác. Nguyên tắc này áp cho mọi mảng: nói được *bản chất & khi nào dùng* quan trọng hơn nhớ flag.
+> Bank [`RES`](../mock-interview/bank/resume.md) có **22 câu** nhưng neo vào `RESUME_embedded_linux.tex` (bản cũ). Cột **Việc** = phải làm gì cho `RESUME_current.tex`.
 
-**② Xen kẽ + lặp lại ngắt quãng.** Hai cơ chế kéo kiến thức cũ quay lại:
-- **🔁 Khởi động trộn (~5–10′) mỗi buổi:** `/mock weak-review`, hoặc rút 2–3 câu đến hạn trong bảng [🔁 Lịch kiểm tra lại](../mock-interview/weak-register.md). Trộn domain là **cố ý** — phỏng vấn thật cũng hỏi ngẫu nhiên. Câu đến hạn tụt < 3 điểm ⇒ kéo về sổ yếu.
-- **🔁 Ôn dồn tích:** mỗi đợt chốt quét *tất cả* phần đã học, không chỉ phần vừa rồi.
-
-**③ Đọc/Hiểu chuẩn bị TRƯỚC; mock cứ để NGẪU NHIÊN.** Phần đọc là *chuẩn bị*; mock **được phép hỏi lệch chủ đề** (rút từ track rộng + weak-register + retention) để luyện **phản ứng**. Bị hỏi trúng chỗ chưa ôn là **tín hiệu** để ghi vào weak-register, không phải lỗi của plan.
-
----
-
-## JD → tài liệu (bản đồ)
-
-| Trụ JD | Đọc | Test (bank/mock) |
+| Dòng resume | Câu | Việc |
 |---|---|---|
-| **C++17** | [02-modern-cpp](../../02-modern-cpp/), [EMC summary](../../15-book-summaries/effective-modern-cpp.md) | `CPP-*` (nhất là 026, 037, 040–051 emc) |
-| **Linux userspace + debug** 🎯 | [04-linux-system-programming](../../04-linux-system-programming/), [09-debugging](../../09-debugging/) | `LNX-*`, `DBG-*` |
-| **Kernel space** | [05-drivers-device-tree](../../05-drivers-device-tree/), [lkd](../../15-book-summaries/lkd/) | `DRV-*`, `BSP-B` |
-| **Drivers I2C/SPI/PCI/USB** 🎯 | [driver-basics](../../05-drivers-device-tree/driver-basics.md), [pci-usb-drivers](../../05-drivers-device-tree/pci-usb-drivers.md) | `BUS-*`, `DRV-019…027` |
-| **Yocto + CMake/CI** *(học TƯ DUY, không cú pháp — xem nguyên tắc ①)* | [yocto](../../06-build-systems/yocto.md), [cmake](../../06-build-systems/cmake.md), [cross-compilation](../../06-build-systems/cross-compilation.md) | `BLD-*`, `BSP-017…019` |
-| **Design subsystem + lead + code review** | [10/system-design](../../10-thinking/system-design.md), [07-shared-libraries](../../07-shared-libraries/) | `SD-*`, `BEH-*` |
+| SUMMARY — 3 năm, TV + enterprise display, ARM SoC | `RES-001` | ⭐ thành **opening §4**. Đã **lỗi 3 lần** ⇒ ưu tiên #1 |
+| Skills: IPC (mq, shm), thread, shared lib | `RES-005` | ✅ |
+| Skills: **AI-assisted development** | `RES-016` | 🔴 **0 điểm.** JD có *"python, scripting"* ⇒ sẽ bị hỏi *"code AI sinh thì kiểm soát chất lượng sao"*. Thuộc **một câu + một ví dụ** |
+| Skills: CMake/Makefile/Git/Perforce | — | + Jenkins khái niệm (§8.D) |
+| Core: display enhancement (dimming/FRC/timing) | `RES-007` | ✅ |
+| Core: **1 interface đa chipset + function-pointer table** | `RES-002`, `RES-003` | ⭐ **câu mạnh nhất** — khớp thẳng JD *"design complex subsystems"* |
+| Core: port driver + DT + **kernel 5.10→6.12** giữ backward compat | `RES-004`, `RES-010` | ✅ câu nặng, ôn kỹ |
+| Core: cross-layer debugging | `RES-008` | ✅ |
+| Core: **công tác Hàn Quốc 2 lần/năm** | ❌ | 🟡 **thêm câu** — khớp JD *"dynamic international team"* + *"proficiency in English"* |
+| S-Box: **ALS adaptive brightness không nháy** | `RES-006` | ⭐ **thêm câu về BUS của sensor** → §8.A, cầu nối duy nhất tới *"I2C/SPI driver"* |
+| S-Box: sync qua POSIX mq, **1 binary 2 mode** | `RES-005` | ✅ |
+| Driver load **3–4s → <0.5s**, verify 100 boot | `RES-013/014/015` | ⭐ khớp JD *"autonomous design choice"* **+ "V&V"** |
+| SDM Preset (MVVM, Windows) | `RES-011`, `017–022` | ✅ |
+| **Porting tool Python** | `RES-009` | xem dưới ⬇️ |
+| Best Employee Q1/2026 · TOEIC 895 · DSA cert | ❌ | 🟡 1 câu ngắn; cert = **cơ bản**, nói được trong 1 câu là đủ |
 
-**Chạy mock cho JD này:** dùng `track bsp` (trụ chính) hoặc `track all` khi muốn trộn đúng phổ domain liệt kê trên.
+### ⚠️ Porting tool — hỏi vừa đủ, nhưng **đừng hạ thấp**
+
+JD ghi rõ *"python, scripting languages"* và *"anticipate needs… shows initiative"* ⇒ đây là dòng khớp JD **trực tiếp nhất ngoài kernel**. Họ sẽ **không** hỏi Python nâng cao. Chuẩn bị đúng **4 ý, không hơn**:
+
+1. Bài toán thật là gì (port driver/library qua chipset: sửa build system + adapt source).
+2. Tool tự động tới đâu.
+3. ⭐ **Cái gì tool CỐ Ý không làm** — chỗ con người vẫn phải xem.
+4. ⭐ **Làm sao verify bản port ra là đúng.**
+
+> Ý **③** và **④** là chỗ dễ hụt nhất và cũng là chỗ ghi điểm senior. Người kể "tôi viết script tiết kiệm thời gian" thì bình thường; người nói được ranh giới tự động hoá và cách kiểm chứng thì khác hẳn.
 
 ---
 
-## 🔄 Ba luật vận hành phiên mock *(chốt 2026-08-17, vẫn đang áp dụng)*
+## 4. 🗣️ Opening — thả 3 móc câu (75–90 giây)
 
-> **Bối cảnh:** sau 15/28 ngày, `CPP` 71% và `LNX` 59% trong khi **`DRV` 0%**, `BSP` 6%, `NET`/`BEH`/`RES` 0%. Nguyên nhân: **độ sâu ăn hết ngân sách thời gian** — [config §6](../mock-interview/config.md) viết để chống phiên nông đã bị **áp quá tay**, trong khi §6 vốn **đã miễn trừ `rapid`**. Ba luật dưới đây sinh ra từ đó.
+**Mục tiêu không phải "giới thiệu hay".** Mục tiêu là **bạn chọn trước 3 chủ đề họ sẽ đào**, thay vì để họ tự bốc từ resume.
 
-**① `rapid` là phương tiện chính, không phải phụ.** Phỏng vấn thật mở màn *"em có biết về X không"* rồi mới follow-up 1–2 tầng. `rapid` (12 câu/~15′) đúng là thứ luyện điều đó, và là cách duy nhất kéo phủ lên kịp.
+**① Định vị — 1 câu.** 3 năm system software C/C++ cho Smart TV & enterprise display trên SoC ARM.
 
-**② TẠM DỪNG `by-level 🟠` và `deep-dive`** cho tới khi phủ ≥ 70%. Không phải vì chúng sai — vì **sai thời điểm**.
+**② Phạm vi dọc — đây là điểm khác biệt.** *"Tôi làm xuyên tầng: từ C++ interface của shared library, xuống HAL, xuống kernel driver nói chuyện với SoC."*
 
-**③ Mỗi domain đi HAI LƯỢT — nhưng lượt 2 PHÂN LOẠI THEO ĐIỂM, không phải "đào sâu chỗ yếu".**
+**③ Ba móc — mỗi móc đúng MỘT câu rồi DỪNG:**
 
-`rapid` quét rộng → rồi **một** `daily`, và `daily` đó **chỉ lấy câu đã đạt 3–4** để đào lên T2.
+| Móc | Câu thả | Cắn vào JD dòng nào | STAR sẵn ở |
+|---|---|---|---|
+| 🅐 **Design** | *"một interface C++ chung cho nhiều chipset — library chọn implementation lúc boot theo board config, kernel dispatch qua function-pointer table"* | *"design and implement complex software subsystems"* | `RES-002/003` |
+| 🅑 **Đo lường + V&V** | *"tối ưu thời gian nạp driver 3–4s xuống dưới 0.5s — đo hai phương án rồi verify qua 100 lần boot"* | *"take design choice autonomously"* · *"drive the relation with V&V"* | `RES-013/014/015` |
+| 🅒 **Kernel** | *"port driver qua các thế hệ chipset và migrate kernel 5.10 → 6.12 mà vẫn giữ tương thích ngược"* | *"Linux kernel space and driver programming"* | `RES-004/010` |
 
-| Điểm ở `rapid` | Nghĩa | Đi đường nào |
+**④ Đóng bằng lý do khớp JD.** Muốn đi sâu hơn kernel/driver và làm với quy trình sản phẩm bài bản (Yocto, Jenkins, V&V).
+
+> 🎯 **Kỷ luật: thả móc rồi IM.** Không kể hết. Ba móc trên phủ đúng ba thứ JD hỏi nhiều nhất — interviewer cắn móc nào thì bạn mở STAR 2 phút cho móc đó.
+> 🇬🇧 **Bản tiếng Anh bắt buộc** — PV 50/50. Luyện: nói Việt → nói Anh → bấm giờ cả hai, mỗi bản ≤ 90s.
+
+---
+
+## 5. Process & communication theo JD mới (buổi B1, phần chưa từng ôn)
+
+Năm câu gần như chắc chắn gặp, mỗi câu **một ví dụ thật + một con số**:
+
+| Câu | JD neo vào | Chất liệu từ resume |
 |---|---|---|
-| **0–1** | T1 trắng — chưa biết | **Đọc lại tài liệu** → hỏi lại ở **T1, góc khác**. ❌ **KHÔNG đào T2** |
-| **2** | Biết nhưng lủng củng / thiếu nửa | Tách hai ca ([config §4](../mock-interview/config.md)): thiếu **kiến thức** → như trên · chỉ **diễn đạt chậm** → hỏi lại ở `rapid`, luyện nói gọn |
-| **3–4** | ✅ T1 chắc | ⭐ **Đây mới là câu đưa vào `daily` để đào T2** |
+| *"Kể một subsystem phức tạp bạn thiết kế"* | *design complex subsystems* | 🅐 interface đa chipset + function-pointer table |
+| *"Lần bạn tự quyết một design choice rồi phải bảo vệ nó"* | *take design choice autonomously… lead deep technical discussion* | 🅑 chọn giữa parallel load vs raising priority — **có số đo** |
+| *"Bạn làm việc với đội test/V&V thế nào khi họ báo bug bạn không tái hiện được"* | *drive the relation with V\&V in a fruitful manner* | cross-layer debugging + 100 boot cycles |
+| *"Bạn review code của người khác theo tiêu chí gì"* | *peer-reviews of solution designs and related code* | tiêu chí: đúng đắn → an toàn tài nguyên → đọc được; góp ý dựa dữ liệu |
+| *"Requirement mơ hồ thì bạn làm gì"* | *solicit, generate and manage requirements* | công tác HQ: làm rõ yêu cầu trực tiếp với R\&D HQ |
 
-> ⚠️ **Vì sao KHÔNG đào sâu câu điểm thấp** *(sửa 2026-08-17 — luật cũ ghi ngược, ứng viên phát hiện)*: hỏi T2 lên trên một nền T1 trống thì **không đo được gì và không dạy được gì** — người học chỉ ngồi im lần thứ hai. Đó đúng là căn bệnh của Giai đoạn 1: *"khái niệm chưa cứng đã phải trả lời câu chuyên sâu"*.
->
-> Và nó bỏ phí đúng chỗ đáng đào nhất: **câu trả lời tốt mới là câu SẴN SÀNG cho T2**. Phỏng vấn thật cũng vận hành đúng vậy — trả lời khái niệm gọn ⇒ interviewer follow-up sâu hơn; ú ớ ở khái niệm ⇒ họ **chuyển câu khác**, không khoan tiếp.
->
-> **Không câu nào bị bỏ rơi:** câu yếu → [weak-register](../mock-interview/weak-register.md), đọc lại rồi hỏi lại **T1 góc mới**. Câu mạnh → ngắn hạn lên T2 ở `daily`, dài hạn vào bảng 🔁 *Lịch kiểm tra lại* (retention, hạn = tuần gỡ + 2).
-
-> **Đọc code / bài coding:** giữ **tối đa 1 snippet ngắn** mỗi phiên `comprehensive`, **không** ra bài code từ đầu ở phiên thường. Phần code nặng chuyển hẳn sang **[bộ lab 🧪 DBG](../mock-interview/bank/debugging.md)** — tự làm ngoài phiên, không tính điểm mock. Lý do: phỏng vấn embedded mid-level chủ yếu **giải thích miệng + whiteboard**, snippet ngắn có xuất hiện nhưng "ngồi code một class từ đầu" thì hiếm.
-
-> **Phạm vi `embedded-fundamentals` (EMB) cho JD này:** chỉ ôn **A** (C/thanh ghi/`volatile`/bit-manip) + **C** (khái niệm ISR) như *đệm* — vì chúng chuyển thẳng sang MMIO driver + kernel IRQ. **Hoãn** B (startup/linker chi tiết), **D (RTOS)**, F/G/H (CRC/MISRA, low-power, JTAG/SWD): JD là Embedded **Linux** (có MMU, không RTOS/bare-metal firmware) nên các phần này là "nice-to-have" ghi điểm nếu bị hỏi lan, không phải câu loại.
+> ⚠️ **Bài học #7 còn hiệu lực: STAR phải kết bằng CON SỐ.** Đo được: 0/12 câu tự đi tới Result ⇒ **2.42 điểm**; dựng khung trong một ngày ⇒ **3.42**, số câu phải probe từ 6/12 xuống **0/12**. Câu nào không có số thì tìm số trước khi vào phòng.
 
 ---
 
-## Behavioral riêng cho JD (JD nhấn "lead junior + code review")
+## 6. DSA — phạm vi CHỐT (buổi B2)
 
-Chuẩn bị STAR ([BEH](../mock-interview/bank/behavioral.md)) cho các câu **rất khả năng gặp** với JD này:
-- **"Kể lần bạn mentor/hướng dẫn một junior"** → dùng chất liệu Samsung (hướng dẫn quy trình, AI skill, chip porting tool).
-- **"Cách bạn review code / xử lý bất đồng kỹ thuật khi review"** → nêu tiêu chí review (đúng đắn, an toàn, đọc được), góp ý xây dựng, dựa dữ liệu.
-- **"Thiết kế một subsystem phức tạp bạn từng làm"** → chọn case cross-layer (S-Box/brightness) hoặc multi-chipset HAL, trình bày theo khung [SD](../mock-interview/bank/system-design.md).
-- **"Vì sao rời công ty cũ"** ([BEH-008](../mock-interview/bank/behavioral.md)) + **câu hỏi ngược** ([BEH-009](../mock-interview/bank/behavioral.md)) — hỏi về SoC/nền tảng, tỉ lệ kernel vs userspace, quy trình Yocto/CI, đội ngũ.
-- Chuẩn bị nói **tiếng Anh** cho 2–3 câu ruột (JD yêu cầu English).
+> ✅ Cert *"Samsung Software Certificate (DSA) — Advanced"* xác nhận nội dung **cơ bản** (array/list/stack/queue/hash, sort, search) ⇒ **không mâu thuẫn** với phạm vi dưới. Cần nói được cert test gì trong **một câu** nếu bị hỏi.
 
-## Lịch nước rút
+| ✅ Phải trơn tay | 🟡 Nói được, không cần code trơn | ❌ Bỏ hẳn |
+|---|---|---|
+| Array/string tại chỗ · linked list (reverse, cycle, merge) · stack/queue · **ring buffer** · hash map (dùng + nguyên lý collision) · two-pointer · sliding window · bit manipulation · sort cơ bản + `std::sort`/`lower_bound` | Binary search trên mảng sorted · BFS/DFS đơn giản · duyệt cây iterative · **đệ quy 1 tầng** (reverse list đệ quy) | **DP** · backtracking · graph nâng cao (Dijkstra/union-find) · segment tree · trie · cây tự cân bằng |
 
-Không còn lịch cố định theo ngày — thứ tự việc nằm ở **▶️ LÀM TIẾP** phía trên, sắp lại sau mỗi phiên.
+> ⚠️ **Sửa so với ý ban đầu:** *recursion* **không** nằm nhóm bỏ. Đảo linked list đệ quy và duyệt cây cơ bản là câu **rẻ, hay ra**. Thứ đáng bỏ là **DP + backtracking + graph nâng cao**.
 
-**Nguyên tắc khi phải cắt:** giữ mọi việc 🎯 (trụ JD) + **một** phiên `comprehensive` cuối. Bỏ trước: buổi đọc-thêm, domain 🟡, và lượt 2 của domain đã có bằng chứng vững.
+**Cộng thêm phần embedded thực sự đo** (quan trọng ngang thuật toán): `vector` vs `list` vs `map` vs `unordered_map` — cache locality, cấp phát động, footprint · vì sao embedded ngại `std::map`/`std::any` · khi nào mảng tĩnh thắng container · `reserve()`.
 
-## Vá điểm yếu đã biết
+---
 
-Nguồn duy nhất là [weak-register](../mock-interview/weak-register.md).
+## 7. ⚙️ C++17 — ôn theo BA TẦNG, không theo feature list (buổi B3)
 
-- **Sổ yếu** → chèn vào phiên `weak-review` (5′ khởi động).
-- **Retention đến hạn** → bảng *🔁 Lịch kiểm tra lại*, rải vào slot khởi động.
-- **Debug** (điểm yếu tự nhận, mà resume lại liệt kê là kỹ năng — xem [RES-008](../mock-interview/bank/resume.md)) → **12 bài [🧪 lab](../mock-interview/bank/debugging.md)**, ưu tiên làm sớm.
+Họ không đo bạn thuộc feature. Họ đo: **code có an toàn tài nguyên không**, và **bạn có chọn feature vì lý do kỹ thuật không**.
+
+### Tầng 1 — NỀN (~70% điểm, bị hỏi dưới nhãn "C++17")
+RAII & ownership (`unique_ptr`/`shared_ptr`/`weak_ptr`; **khi nào raw pointer vẫn đúng** — non-owning observer) · rule of 0/3/5 · move semantics và **khi nào move KHÔNG xảy ra** · const-correctness & lifetime/dangling · virtual destructor + chi phí vtable · exception vs codebase tắt exception (câu đánh đổi rất hợp embedded).
+→ Chỗ bạn **mạnh nhất** vì bạn viết shared-library interface. **Đừng ôn ít phần này để dành giờ cho feature mới.** [02-modern-cpp](../../02-modern-cpp/) · bank `CPP-A/C/D`.
+
+### Tầng 2 — C++17 ESSENTIAL (mỗi cái phải kèm *"tôi dùng ở đâu"*, không phải định nghĩa)
+
+| Feature | Vì sao embedded quan tâm | Bẫy phải biết |
+|---|---|---|
+| `std::optional` | thay sentinel `-1`/`nullptr`/bool out-param | ✅ **bạn đã dùng thật ở SDM** |
+| `std::string_view` | truyền chuỗi **không cấp phát**, hợp parse config | 🔴 **dangling** + **không đảm bảo NUL** → đừng đưa thẳng vào API C |
+| structured bindings | `auto [it, ok] = map.insert(...)`, duyệt map | — |
+| `if constexpr` | bỏ SFINAE, gọn trong template HAL | — |
+| `std::variant` + `visit` | thay tagged union kiểu C | cost of `visit` |
+| `std::scoped_lock` | khoá **nhiều** mutex không deadlock | thay `lock_guard` + `std::lock` |
+| `std::shared_mutex` | reader/writer | writer starvation |
+| `[[nodiscard]]` `[[maybe_unused]]` `[[fallthrough]]` | ⭐ rất hợp **API library của bạn** | — |
+| inline variable · nested namespace | header-only constant, hết ODR trick | — |
+| **guaranteed copy elision** | thay đổi **thật** của C++17 | trả về type không copy/move được |
+| `std::byte` · `std::clamp` · `std::size` | tiện, hợp embedded | — |
+
+### Tầng 3 — chỉ NHẬN DIỆN, không đào
+PMR · `std::launder` · parallel algorithms · fold expression · CTAD · `std::any` (**và vì sao embedded tránh** — cấp phát động).
+
+### 🔴 Rủi ro cụ thể — xử lý TRƯỚC buổi PV
+
+Resume ghi *"Modern C++ (11/14/17)"*. Ghi nhận 07/09: app SDM build tới C++20 và thứ C++17 **duy nhất dùng thật là `std::optional`**. Bị hỏi *"kể C++17 bạn dùng trong công việc"* mà chỉ có `optional` là **hụt ngay**. Chọn một:
+
+1. **Rà lại codebase Samsung** tìm cho ra **3 ví dụ thật** (`string_view`? structured binding? `scoped_lock`? `[[nodiscard]]`?).
+2. **Trả lời thẳng:** *"Codebase chính chốt ở C++11 do toolchain SoC; phần tôi tự chủ được thì dùng `optional`, structured binding. C++17 tôi nắm và đọc được nhưng chưa áp diện rộng."* → **Trung thực + nêu cái đã áp luôn tốt hơn kể vẹt** — JD có *"attention to details, open minded"*, họ nhận ra ngay khi bạn đọc thuộc lòng.
+
+### C thuần — phần kernel driver (JD ghi "C/C++ 17")
+`volatile` · bit field · alignment & padding · `static`/`inline` · bẫy macro · **integer promotion** · `restrict`.
+→ Đây **cũng chính là nguyên liệu** của bộ snippet bug-hunt §2. Ôn một lần, dùng hai chỗ.
+
+---
+
+## 8. Bốn câu trả lời cho gap JD — soạn sẵn, NÓI TO, bấm giờ (buổi B3)
+
+> **Khung chung cho mọi gap:** ① nói thẳng chưa làm · ② chứng minh **có mental model** · ③ nối về **việc thật tương đương** đã làm · ④ cam kết cụ thể. Bốn nhịp, ≤ 60 giây.
+> ⚠️ **Bài học #8:** đừng gộp nhầm thành *"em có làm rồi"* khi mới chỉ đọc/quan sát. Interviewer không phân biệt được "gộp nhầm" với "bịa".
+
+### 🅐 I2C / SPI — **không phải gap, mà là CẦU NỐI chưa khai thác** ⭐
+
+Đây là việc **giá trị cao nhất** của buổi B3. JD ghi rõ *"device drivers for I2C, SPI, Ethernet"*; resume của bạn **không nêu tên bus nào** dù ambient light sensor của S-Box gần như chắc chắn đi qua **I2C**.
+
+**Phải chốt trước buổi PV:** sensor đó nói chuyện qua bus gì · ai viết driver cho nó (bạn / vendor / có sẵn trong kernel) · bạn chạm tới tầng nào (đọc register qua sysfs? gọi API? sửa device tree node cho nó?). Có câu trả lời cụ thể ⇒ **một gap JD biến thành một điểm mạnh**.
+
+**Nền lý thuyết cần chắc** ([bus-protocols.md](../../05-drivers-device-tree/bus-protocols.md), bank `BUS-*`): I2C 2 dây/địa chỉ/ACK/**clock stretching** · SPI 4 dây/CPOL-CPHA/full-duplex/chip-select · **khi nào chọn cái nào** (số dây, tốc độ, số slave, khoảng cách) · driver model Linux: `i2c_driver`/`spi_driver` + `probe()` + match qua **device tree compatible** · vì sao không được ngủ/`msleep` trong ngữ cảnh atomic.
+
+### 🅑 Ethernet driver — chưa làm
+*"Sản phẩm tôi làm không có driver Ethernet — phần mạng ở tầng userspace, S-Box sync qua POSIX message queue. Về driver mạng tôi nắm khung: netdev đăng ký qua `net_device_ops`, `ndo_start_xmit` đẩy `sk_buff` xuống, **NAPI** để chuyển từ interrupt-per-packet sang polling khi tải cao tránh interrupt storm, DMA ring cho TX/RX. Mô hình đó gần với thứ tôi đã làm ở driver display: đăng ký, probe theo device tree, xử lý interrupt và bottom half."*
+→ Nền: [driver-basics.md](../../05-drivers-device-tree/driver-basics.md) · [lkd/02-interrupts-bottomhalves](../../15-book-summaries/lkd/02-interrupts-bottomhalves.md).
+
+### 🅒 Yocto — gap lớn nhất, trả lời bằng MENTAL MODEL
+*"Tôi chưa dùng Yocto trong sản phẩm — build ở chỗ tôi là CMake/Makefile cộng hệ nội bộ. Mô hình thì tôi nắm: BitBake đọc **recipe** mô tả fetch/configure/compile/install một package; **layer** tách phần BSP của vendor khỏi distro và khỏi ứng dụng để nâng cấp độc lập; **bbappend** sửa recipe của layer khác mà không phải fork nó; **sstate-cache** cache kết quả từng task nên build lại chỉ chạy phần đổi; **SDK** sinh toolchain + sysroot cho người viết app. Việc tương đương tôi đã làm là cross-compilation và quản lý sysroot bằng tay, cộng port driver qua nhiều chipset — cùng bài toán 'một source, nhiều board', khác công cụ."*
+→ Nền: [yocto.md](../../06-build-systems/yocto.md) · [cross-compilation.md](../../06-build-systems/cross-compilation.md) · bank `BLD-*`.
+⚠️ **Học TƯ DUY, không cú pháp.** Họ hỏi *"layer để làm gì", "sstate giải quyết gì", "DEPENDS vs RDEPENDS"* — không bắt viết recipe.
+
+### 🅓 Oscilloscope / logic analyzer + Jenkins — gộp một câu ngắn
+Scope: *"tôi debug ở tầng phần mềm — GDB, dmesg/printk, cross-layer. Chưa tự cầm scope; khi cần đo tín hiệu tôi làm việc với đội hardware. Tôi hiểu dùng nó để làm gì: xác nhận tín hiệu bus có thật sự ra chân không, đo timing, tách bạch lỗi phần mềm với lỗi phần cứng — đúng lúc log không kết luận được."*
+Jenkins: nói bằng khái niệm CI đã có ([ci-and-test-farm.md](../../06-build-systems/ci-and-test-farm.md)) — gated check-in, build matrix, smoke test, test farm — và nối về việc thật: **verify qua 100 boot cycles** chính là tư duy automated regression.
+
+---
+
+## 9. 📌 Bài học còn hiệu lực (giữ lại từ plan cũ — 5 điều đổi cách chạy sprint này)
+
+| # | Bài học | Áp vào đâu |
+|---|---|---|
+| 1 | **Nền chắc, hụt ở vận dụng** (T1 3.67 vs T2 2.1) ⇒ đọc thêm tài liệu **không** chữa được | Cả sprint: không đọc mới, chỉ luyện nói + viết |
+| 3 | **Lỗi ĐÓNG GÓI ≠ lỗ hổng kiến thức** — cùng kiến thức, đổi khung (kỹ thuật → resume) thì không truy xuất được. Chữa bằng **nói to bấm giờ** | B1 toàn bộ |
+| 4 | **Thuộc bài ≠ hiểu bài** — nói ra một thuật ngữ là **mời interviewer hỏi vào đúng nó** | §7 tầng 2: mỗi feature phải kèm ví dụ thật |
+| 7 | **STAR phải kết bằng CON SỐ** — 0/12 câu tới Result ⇒ 2.42; có khung ⇒ **3.42** | §5 + §4 ba móc |
+| 8 | **Khẳng định không đối chiếu được** — từng nói *"đã build minimal image trên BBB"* trong khi thực tế chưa. **Gộp nhầm**, không phải bịa — nhưng interviewer không phân biệt | §8 toàn bộ, nhất là 🅐 |
+
+---
+
+## 10. ❄️ Đóng băng — việc dài hạn tạm dừng, KHÔNG mất
+
+Ba bộ lab của plan cũ **hoãn tới sau buổi PV** (không kịp và không sinh giá trị cho 3–4 ngày tới). Ghi lại trạng thái để không biến mất trong im lặng:
+
+- 🧪 **Lab BSP phần cứng (BeagleBone)** — `BSP-031…038`: **1/8 xong** (`BSP-038` sstate ✅ 06/09) · `BSP-031` 🟡 bước ② xong. Setup: [lab-setup.md](../lab-setup.md).
+- 🧪 **Lab DBG** — `DBG-030…041`: **0/12**.
+- 🧪 **Lab DP** — 5 bài ở [A2 §7](../../11-design-patterns/in-practice/A2-cpp-interface-hal.md): **0/5**.
+- 📚 **Nợ chất lượng bank** — ~68 câu 🟠🔴 đáp án < 700 ký tự; tự co theo [config §1 Bước 4](../mock-interview/config.md).
+- 📉 **Độ phủ bank** — lần đo 06/09: `178/457 = 38%`. **Không phải mục tiêu của sprint này**; đừng để nó lái quyết định.

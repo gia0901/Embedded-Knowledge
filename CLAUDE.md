@@ -12,7 +12,9 @@
 - File này đã được hoàn thiện (không còn là bản nháp mơ hồ). Vẫn có thể tinh chỉnh khi phát sinh nhu cầu mới.
 - Xem **Mục 7 — Tiến độ** để biết tài liệu nào đã/đang/chưa viết.
 
-> 🎯 **ĐANG THỰC THI PLAN PHỎNG VẤN (Datalogic).** Conversation mới muốn tiếp tục ôn: mở **[`14-prep/study-plans/datalogic-plan.md`](14-prep/study-plans/datalogic-plan.md) → §📍 Tiến độ hiện tại** (ngay đầu file) để biết đang ở buổi nào + lệnh làm tiếp. Đó là **nguồn tracking DUY NHẤT** cho tiến độ ôn — không suy đoán từ nơi khác.
+> 🎯 **ĐANG CHẠY SPRINT PHỎNG VẤN 3–4 NGÀY (Datalogic, JD mới).** Plan 28 ngày cũ đã **bỏ hẳn 2026-09-11**; bản hiện tại là sprint 4 buổi bám `RESUME_current.tex` + JD mới (coding **trên giấy**, PV **50% Việt / 50% Anh**).
+> Conversation mới muốn tiếp tục ôn: mở **[`14-prep/study-plans/datalogic-plan.md`](14-prep/study-plans/datalogic-plan.md) → §📍 Tiến độ hiện tại** (ngay đầu file) để biết đang ở buổi nào (B1–B4) + việc làm tiếp. Đó là **nguồn tracking DUY NHẤT** — không suy đoán từ nơi khác.
+> ❄️ Ba bộ lab 🧪 (BSP phần cứng · DBG · DP) và mục tiêu **độ phủ bank** đã **đóng băng** tới sau buổi PV — xem §10 của plan.
 
 ---
 
@@ -216,7 +218,7 @@ Embedded-Interview/
 | 12 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
 | 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
-| 14 Prep | 🟡 Đang dùng | **study-plans/** (`datalogic-plan` — plan JD đang chạy, §📍 là nguồn tracking duy nhất — + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
+| 14 Prep | 🟡 Đang dùng | **study-plans/** (`datalogic-plan` — **SPRINT 4 buổi trước phỏng vấn**, viết lại 11/09, §📍 là nguồn tracking duy nhất — + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
 | 15 Book summaries | 🟡 Đang viết | **8 cuốn đã xong**, tất cả đối chiếu PDF (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset, **cpp-high-performance** — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); TLPI ✅ 10/10 cụm (đủ 64 chương); **cpp-high-performance là bản CHỌN LỌC 3/14 chương có chủ đích** (bỏ phần trùng EMC/Williams + ~30% là C++20 ngoài JD C++17); còn LDD3/Bootlin ⬜. Tiến độ chi tiết từng cuốn xem `15-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu

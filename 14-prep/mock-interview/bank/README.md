@@ -40,7 +40,7 @@
 | `NET` | [networking.md](networking.md) | Networking | [13](../../../13-networking/) |
 | `SD` | [system-design.md](system-design.md) | Tư duy & system design | [10](../../../10-thinking/), [07](../../../07-shared-libraries/) |
 | `BEH` | [behavioral.md](behavioral.md) | Behavioral / HR (STAR) | — |
-| `COD` | [coding.md](coding.md) | Bài coding tại chỗ | [12](../../../12-dsa/) |
+| `COD` | [coding.md](coding.md) | Bài coding tại chỗ — **A** implement từ đầu (`001…013`) · **B** 🔎 đọc code tìm lỗi (`014…026`) | [12](../../../12-dsa/) |
 | **`RES`** ⭐ | [resume.md](resume.md) | **Bám RESUME của ứng viên** — phần **chắc chắn 100% bị hỏi** (phỏng vấn thật dành 30–50% thời gian ở đây) | [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex) |
 
 ## Quy ước metadata mỗi câu
