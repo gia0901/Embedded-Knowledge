@@ -354,6 +354,60 @@ Scheduler cổ điển (Linux O(1)) phải **đoán** tiến trình nào là I/O
 
 ---
 
+#### OS-029 · 🟠 · concept · ⭐ · 🎤 2026-09-12 · [→ scheduling](../../../03-operating-system/scheduling.md)
+**"Một tiến trình của bạn bị chen mất CPU lúc boot. Hạ `nice` xuống -20 có giải quyết được không? Khác gì so với `SCHED_FIFO`, và vì sao team Performance sợ `SCHED_FIFO`?"**
+<details><summary>Đáp án</summary>
+
+⭐ **Câu chốt:** hạ `nice` **không** cho bạn **quyền ưu tiên**, nó chỉ cho bạn **phần bánh to hơn**. Bất kỳ task `SCHED_FIFO` nào cũng **preempt sạch mọi** task `SCHED_OTHER`, bất kể `nice` bao nhiêu. Đó là **hai thế giới**, không phải một thang liên tục.
+
+```
+prio (thang noi bo kernel, THAP hon = uu tien CAO hon)
+  0 ....................... 99 | 100 ......... 120 ......... 139
+  |<---- REALTIME ---------->| |<-------- CFS / EEVDF ------>|
+    SCHED_FIFO / SCHED_RR         SCHED_OTHER (nice -20..+19)
+    rt_priority 99..1              nice 0  ==  prio 120
+```
+
+| Policy | Cơ chế | Dùng khi |
+|---|---|---|
+| `SCHED_OTHER` | **CFS/EEVDF** — chia CPU **theo tỉ lệ**; `nice` đổi **trọng số** (mỗi nấc ≈ 1.25×, ~10% CPU) | mặc định |
+| `SCHED_BATCH` | như trên, coi là CPU-bound, ít ưu tiên khi đánh thức | job nền |
+| `SCHED_IDLE` | trọng số cực thấp | chỉ chạy khi máy rảnh |
+| `SCHED_FIFO` | chạy tới khi **tự block hoặc nhường** — **không** timeslice | latency cứng |
+| `SCHED_RR` | như FIFO + timeslice giữa các task **cùng** prio | nhiều RT task ngang hàng |
+| `SCHED_DEADLINE` | EDF — khai báo `runtime / period / deadline` | task chu kỳ |
+
+**Vì sao Performance team sợ `SCHED_FIFO`:** một task FIFO **quay vòng không block** sẽ chiếm CPU đó **vô hạn** — audio, network, watchdog đều đói. Trên hệ một lõi thì treo máy.
+
+⭐ **Van an toàn phải biết — đây là câu gỡ lo ngại đó:**
+```
+/proc/sys/kernel/sched_rt_runtime_us  = 950000
+/proc/sys/kernel/sched_rt_period_us   = 1000000
+```
+Kernel **chừa 5% CPU** cho non-RT mỗi chu kỳ 1 giây. Biết con số này là biết **giới hạn rủi ro**, không chỉ biết rủi ro tồn tại.
+
+**Phương án trung dung (hay bị bỏ sót):** `SCHED_RR` prio **thấp** (vd 10) **chỉ trong cửa sổ cần thiết** rồi hạ về `SCHED_OTHER`. Gần trọn lợi ích RT, rủi ro **bị giới hạn theo thời gian**. Hoặc ghim CPU riêng (`taskset`/cpuset) — không đụng priority nên dễ được duyệt hơn.
+
+🆕 **Từ kernel 6.6, CFS đã bị thay bằng EEVDF** (Earliest Eligible Virtual Deadline First) — vẫn fair-share, thêm *lag* và *virtual deadline* nên task ngắn được phục vụ nhanh hơn. Trả lời *"scheduler Linux là CFS"* trong ngữ cảnh kernel ≥ 6.6 là **hơi cũ**; nói *"CFS, và từ 6.6 là EEVDF"* là tín hiệu đọc kernel thật.
+
+**Preemption model:** `PREEMPT_NONE` → `VOLUNTARY` → `PREEMPT` → `PREEMPT_RT`. Sang phải: latency tốt hơn, throughput kém hơn.
+
+**Công cụ:**
+| Việc | Lệnh |
+|---|---|
+| Thời gian từng initcall lúc boot | `initcall_debug` trên cmdline + `dmesg` |
+| Cái gì chậm lúc boot (systemd) | `systemd-analyze blame` · `critical-chain` |
+| Policy + prio của tiến trình | `chrt -p <pid>` |
+| Thống kê scheduling | `/proc/<pid>/sched` · `/proc/<pid>/stat` (trường 18 = priority, 19 = nice) |
+| Thử đổi policy | `chrt -f 50 <cmd>` · `nice -n -20 <cmd>` |
+
+**Bẫy:** ① nghĩ `nice -20` "gần bằng realtime" — sai bản chất · ② nghĩ RT priority càng lớn càng thấp (ngược: `rt_priority` **lớn hơn** = **ưu tiên cao hơn**, nhưng `prio` nội bộ thì **nhỏ hơn** = cao hơn — hai thang ngược nhau) · ③ dùng FIFO cho task có thể chạy dài mà không có van an toàn.
+
+**Áp vào việc thật:** [RES-028](resume.md) — bài tối ưu boot time khi `SCHED_FIFO` bị Performance team từ chối.
+</details>
+
+---
+
 ## C — Memory management
 
 #### OS-008 · 🟡 · concept · [→ memory-management](../../../03-operating-system/memory-management.md)

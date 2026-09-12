@@ -18,17 +18,33 @@
 | **Ngân sách** | ~2h/ngày × 4 buổi ≈ **8h**. Vượt ngân sách = cắt, không kéo dài |
 | **Ngôn ngữ PV** | **50% Việt / 50% Anh** ⇒ mọi câu ruột phải nói được **cả hai thứ tiếng** |
 | **Hình thức coding** | **Trên giấy** — 3 dạng: (1) coding problem · (2) implement DS cơ bản · (3) **đọc code tìm lỗi** |
-| **Buổi gần nhất** | *(chưa chạy buổi nào của sprint này)* — lần cuối trước reset: `retention track all` 04/09, 3.00 |
+| **Buổi gần nhất** | ✅ **B1 — 2026-09-12**, 42/60 = **3.00**, 15 câu ([log](../mock-interview/sessions/2026-09-12--B1--resume.md) — 856 dòng, tự chứa, có **§A–§E** là tài liệu ôn) |
 | **Chẩn đoán còn hiệu lực** | **T1 3.67 · T2 2.1** ⇒ nền chắc, hụt ở **vận dụng**. Không đọc thêm tài liệu mới |
 
 ### ▶️ LÀM TIẾP — 4 buổi, chạy đúng thứ tự
 
 | # | Buổi | Nội dung | ~ | Xong? |
 |---|---|---|---|---|
-| **B1** | 🗣️ **RESUME + dẫn chuyện + process JD** | §3 bản đồ phủ resume · §4 opening 3 móc · §5 behavioral theo JD mới | 120′ | ⬜ |
+| **B1** | 🗣️ **RESUME + dẫn chuyện + process JD** | §3 bản đồ phủ resume · §4 opening 3 móc · §5 behavioral theo JD mới | 120′ | ✅ **3.00** |
 | **B2** | ✍️ **CODING GIẤY** | 3 bài implement viết tay + 6 snippet bug-hunt + DSA rapid (§6) | 120′ | ⬜ |
 | **B3** | ⚙️ **C++17 + C-kernel + vá gap JD** | §7 C++17 ba tầng · C thuần · **I2C/SPI (cầu nối)** · §8 ba câu trả lời trung thực | 120′ | ⬜ |
 | **B4** | 🎬 **Giả lập vòng thật** | `comprehensive` cấu hình riêng JD (75′) + coding từ **file trống** (45′) | 120′ | ⬜ |
+
+### ⏭️ Trước khi vào B2 — 5 việc, ~60 phút
+
+| # | Việc | ~ |
+|---|---|---|
+| 1 | 🎙️ Đọc to **[RES-001 Bản C](../mock-interview/bank/resume.md) bản Việt** 5 lần, bấm giờ, tới khi ổn định **≤ 90s** | 15′ |
+| 2 | 🎙️ Đọc to **[RES-032](../mock-interview/bank/resume.md) bản English** 5 lần, ≤ 90s | 15′ |
+| 3 | 🎙️ Đọc to **[BEH-016](../mock-interview/bank/behavioral.md)** (vì sao ứng tuyển — 3 nhịp) 3 lần | 10′ |
+| 4 | Đọc **[OS-029](../mock-interview/bank/os.md)**, nhớ đúng 3 thứ: **`nice` ≠ ưu tiên** · **FIFO preempt sạch OTHER** · **`sched_rt_runtime_us` chừa 5%** | 20′ |
+| 5 | Thuộc **quy tắc số ba** ([RES-029](../mock-interview/bank/resume.md)): 0 lỗi / n lần ⟹ tỉ lệ < 3/n ở 95% ⇒ **100 lần ⟹ < 3%** | 2′ |
+
+### 📉 Ba lỗ hổng đo được ở B1 — mang sang các buổi sau
+
+1. 🔴 **ĐÓNG GÓI, không phải kiến thức.** Cả 4 câu điểm 2 (`RES-001`, `BEH-016`, `RES-032`, và câu chốt của `RES-016`) đều là **nội dung có sẵn, không ra được hình dạng người nghe cần**. Bằng chứng đanh nhất: câu HAL đa chipset đạt **4 điểm**, nhưng khi phải **tự chọn** kể gì trong 90 giây thì đúng nội dung đó **không xuất hiện**. **Bài học #3 tái phát lần thứ tư.**
+2. 🔴 **DEBUG — lỗi TRUY XUẤT, không phải lỗ hổng.** `RES-008` = 2đ, trong khi **bank đã dạy đúng phần "cắt đôi" từ trước phiên**. ⇒ **Đọc lại không chữa được.** Phải luyện phản xạ: nghe triệu chứng ⇒ hỏi ngay *"phép đo nào chia đôi được?"*. Cân nhắc **mở lại 2 bài 🧪 `DBG` ngay sau buổi PV**.
+3. 🟠 **Chưa biến số đo thành lập luận.** *"100 lần"* mà không biết vì sao (§`RES-029`) · verify porting tool hoàn toàn thủ công ở cuối đường · V&V thì **xin** dữ liệu thay vì **gửi build có đo** (`BEH-015`). Cùng một hình dạng, và JD gọi đúng tên nó: *"drive the relation with V&V in a fruitful manner"*.
 
 **Nguyên tắc khi phải cắt:** giữ **B1 và B2** bằng mọi giá. B3 cắt được phần C-kernel. B4 cắt được phần coding-file-trống. **Không bao giờ cắt B1** — 40% JD này nằm ở resume/process.
 
@@ -92,7 +108,7 @@
 | Core: **1 interface đa chipset + function-pointer table** | `RES-002`, `RES-003` | ⭐ **câu mạnh nhất** — khớp thẳng JD *"design complex subsystems"* |
 | Core: port driver + DT + **kernel 5.10→6.12** giữ backward compat | `RES-004`, `RES-010` | ✅ câu nặng, ôn kỹ |
 | Core: cross-layer debugging | `RES-008` | ✅ |
-| Core: **công tác Hàn Quốc 2 lần/năm** | ❌ | 🟡 **thêm câu** — khớp JD *"dynamic international team"* + *"proficiency in English"* |
+| Core: **công tác Hàn Quốc 2 lần/năm** | (hỏi ở B1, gộp vào `RES-031`) | ✅ đã hỏi — *"bring-up/test model chưa ra mắt, không có ở VN"* |
 | S-Box: **ALS adaptive brightness không nháy** | `RES-006` | ⭐ **thêm câu về BUS của sensor** → §8.A, cầu nối duy nhất tới *"I2C/SPI driver"* |
 | S-Box: sync qua POSIX mq, **1 binary 2 mode** | `RES-005` | ✅ |
 | Driver load **3–4s → <0.5s**, verify 100 boot | `RES-013/014/015` | ⭐ khớp JD *"autonomous design choice"* **+ "V&V"** |

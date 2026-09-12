@@ -74,6 +74,48 @@ SoC (Dimming, FRC, TCON)
 
 ---
 
+---
+
+### 🎙️ BẢN C — MỞ MÀN 3 MÓC *(thêm 2026-09-12 — dùng cho `RESUME_current.tex`)*
+
+> ⚠️ **`RES-001` đã hỏng LẦN THỨ TƯ** (18/08 → 23/08 qua `BEH-001` → 29/08 → **12/09**). Bản A/B ở trên trả lời câu *"project tâm đắc nhất"*. Bản C trả lời câu **mở màn thuần** — *"em giới thiệu qua về bản thân"* — là câu **thật sự** được hỏi ngày 12/09, và là câu bị hỏng.
+>
+> **Khác biệt cốt lõi:** bản A/B kể **một** thứ cho sâu. Bản C thả **ba móc** rồi **dừng** — mục tiêu không phải kể hay, mà là **chọn trước ba chủ đề interviewer sẽ đào**.
+
+**🇻🇳 Bản Việt — 80 giây:**
+> *"Em là Software Engineer tại Samsung, ba năm làm system software cho TV và dòng enterprise display trên SoC ARM.*
+> *Công việc của em **xuyên tầng**: từ C++ interface mà shared library phơi ra, xuống HAL, xuống kernel driver nói chuyện với SoC.*
+> *Có ba thứ em làm mà em nghĩ đáng nói:*
+> *— Một, bọn em có **một interface C++ chung cho nhiều chipset**: library chọn implementation lúc chạy theo board config, còn kernel dispatch qua function-pointer table — app ở trên không phải build lại.*
+> *— Hai, em **tối ưu thời gian nạp driver từ 3–4 giây xuống dưới 0.5 giây**, sau khi đo hai phương án và verify qua 100 lần boot.*
+> *— Ba, em **port driver qua các thế hệ chip** hằng năm, và migrate kernel lên 6.12 mà vẫn giữ tương thích ngược với nhánh cũ.*
+> *Em đang muốn đi sâu hơn về kernel/driver và làm với quy trình sản phẩm bài bản hơn — Yocto, CI, V&V. Anh muốn nghe kỹ phần nào ạ?"*
+
+**🇬🇧 Bản English — 80 giây:** xem [RES-032](resume.md).
+
+**Ba móc ↔ JD:**
+
+| Móc | Cắn vào dòng JD |
+|---|---|
+| 🅐 interface đa chipset + fn-ptr table | *"design and implement complex software subsystems"* |
+| 🅑 3–4s → 0.5s, đo 2 phương án, 100 boot | *"take design choice autonomously"* · *"drive the relation with V&V"* |
+| 🅒 port driver + kernel migration | *"Linux kernel space and driver programming"* |
+
+**Bốn lỗi của bản đã nói ngày 12/09 — kiểm lại mỗi lần luyện:**
+
+| ❌ Đã mắc | ✅ Phải là |
+|---|---|
+| *"hoàn thành **kịp tiến độ** adaptive brightness"* | *"3–4 giây xuống dưới 0.5 giây, verify 100 lần boot"* — "kịp tiến độ" là phát biểu về **lịch**, không mở ra câu hỏi nào |
+| **Không nhắc** HAL đa chipset | Là **móc số một** — đúng câu đạt **4 điểm** 5 phút sau đó |
+| *"Em có thể trình bày lại nếu anh muốn?"* | *"Anh muốn nghe kỹ phần nào?"* — câu **có/không** đá bóng về chân mình |
+| Không có lý do ứng tuyển | Có, nối vào JD — dọn sẵn đường cho [BEH-016](behavioral.md) |
+
+⚠️ **Kỷ luật: thả móc rồi IM.** Mỗi móc đúng **một câu**. Interviewer cắn móc nào thì mở STAR 2 phút cho móc đó.
+
+⏱️ **Cách luyện:** nói to, bấm giờ, tới khi ổn định **≤ 90s** — cả bản Việt lẫn bản Anh. Rồi tự hỏi *"nghe xong, người ta sẽ hỏi mình cái gì?"* — nếu câu trả lời không rơi vào một trong ba móc thì móc chưa hoạt động.
+
+---
+
 **Bẫy:** ① kể theo trình tự thời gian *"đầu tiên em được giao…"* — chán và không lộ năng lực · ② nhảy thẳng vào chi tiết kỹ thuật mà không dựng bối cảnh, interviewer không theo kịp · ③ chọn project Windows cho một JD Embedded Linux · ④ nói *"em làm theo yêu cầu team"* — triệt tiêu mọi cơ hội ghi điểm.
 </details>
 
@@ -277,6 +319,11 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
 
 🧪 **Chuẩn bị bằng tay:** làm [DBG-030…036](debugging.md) — 7 bài lab đúng cho câu này, đặc biệt [DBG-033](debugging.md) (core dump), [DBG-034](debugging.md) (treo).
 
+
+> 🔴 **BẰNG CHỨNG 2026-09-12 — đọc kỹ trước khi ôn tiếp.** Phần "cắt đôi" dưới đây **đã nằm sẵn trong bank từ trước phiên B1**. Trong phiên đó, ứng viên vẫn trả lời bằng **quét tuần tự từ trên xuống**, và **giữ nguyên câu trả lời sau HAI lần được làm rõ rằng câu hỏi muốn một phép cắt đôi** ⇒ **2 điểm**.
+>
+> ⇒ Đây **không phải lỗ hổng nội dung, mà là lỗi TRUY XUẤT.** Đọc lại mục này lần nữa **sẽ không chữa được** — cùng một cách đã thất bại. Cách chữa: **luyện phản xạ** — mỗi khi nghe một triệu chứng, câu đầu tiên bật ra phải là *"phép đo nào chia đôi được?"*, trước cả khi nghĩ tới log.
+> 🧪 Bộ lab `DBG-030…041` tồn tại đúng cho việc này (đang ❄️ đóng băng tới sau buổi PV — **mở lại 2 bài ngay sau đó**).
 
 **⭐ Câu này hỏi CẮT ĐÔI, không hỏi quy trình:**
 
@@ -710,6 +757,266 @@ Với công ty đang tuyển **kỹ sư C++ nhúng**, dòng đó có thể đọ
 **Nguyên tắc chung áp cho mọi dòng resume:** mỗi dòng nên tự hỏi *"câu này mở ra câu hỏi nào?"*. Dòng nói về **công cụ** luôn mở ra câu hỏi *"còn năng lực của bạn ở đâu?"*; dòng nói về **chẩn đoán** thì không.
 
 **Bẫy:** ① nói *"code/test hoàn toàn có thể do AI làm tốt"* — nói với người đang tuyển kỹ sư viết code là **rủi ro thật** · ② thanh minh dài dòng ⇒ nghe như đang chột dạ · ③ chối bỏ dùng AI ⇒ mâu thuẫn với chính resume.
+</details>
+
+---
+
+---
+
+## 🎤 Từ phiên B1 (2026-09-12) — bám `RESUME_current.tex`
+
+#### RES-023 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ RESUME: "the kernel driver dispatches through a function-pointer table"]
+**"CV nói kernel driver dispatch qua function-pointer table. Vì sao cần tới HAI tầng bảng đó? Ai điền bảng, điền lúc nào?"**
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** bạn có phân biệt được **cơ chế** với **lý do tồn tại của cơ chế** không. Ai cũng mô tả được function pointer; ít người nói được vì sao có *hai* tầng.
+
+**Câu trả lời tốt — hai tầng, hai lý do KHÁC nhau:**
+
+| Tầng | Nằm giữa | Tồn tại vì |
+|---|---|---|
+| 1 | driver nền (**GPL**) ⟷ bridge driver (**private**) | **Ranh giới license.** Symbol `EXPORT_SYMBOL_GPL` không dùng được từ module proprietary ⇒ cần một đường không phải link trực tiếp |
+| 2 | bridge driver ⟷ chip driver (**proprietary**) | **Đa hình theo chip** — đúng vai trò của vtable trong C++ |
+
+**Cơ chế đăng ký:** driver nền xác định board dùng chip A → `insmod` chip A → **chip driver tự map hàm của nó vào bảng trong bridge** → từ đó mọi lời gọi tự tới đúng chip. Đây là **self-registration**, không phải bridge đi tìm chip.
+
+⭐ **Câu chốt phải nói ra sớm, đừng chôn ở cuối:** *"Hai tầng tồn tại vì hai lý do khác nhau — một là **ranh giới license**, một là **đa hình**."*
+
+**Nền kỹ thuật phải nắm:** `EXPORT_SYMBOL` vs `EXPORT_SYMBOL_GPL` · lan truyền `TAINT_PROPRIETARY_MODULE` (module GPL **phụ thuộc** module proprietary thì **mất** quyền dùng symbol GPL — nên trò "module đệm GPL re-export" đã bị chặn) · vì sao ngành hay đẩy phần proprietary lên **userspace** (char device/ioctl, UIO/VFIO) thay vì vật lộn trong kernel.
+
+**Bẫy:** ① mô tả cơ chế mà không nêu lý do ⇒ nghe như over-engineering · ② nói "cho nó OOP" rồi dừng — bỏ mất phần hay nhất · ③ khẳng định nhân quả về Nvidia mà không chắc; kể **cơ chế** thì an toàn, kể **nhân quả** thì đừng khẳng định.
+
+**Trình bày:** xem khung *"một nguyên tắc, hai lần áp dụng"* — [log B1 §B](../sessions/2026-09-12--B1--resume.md).
+</details>
+
+#### RES-024 · 🟡 · concept · ⭐ · 🎤 2026-09-12 · [→ RESUME: "ambient light sensor"; nối [bus-protocols](../../../05-drivers-device-tree/bus-protocols.md)]
+**"Cảm biến ánh sáng của S-Box nối vào bằng bus gì? Ai viết driver cho nó — em chạm tới tầng nào?"**
+<details><summary>Khung trả lời</summary>
+
+**Vì sao câu này quan trọng:** JD ghi thẳng *"device drivers for **I2C**, SPI, Ethernet"* mà CV **không nêu tên bus nào**. Đây là **cầu nối duy nhất** giữa việc thật và một trụ JD — bỏ lỡ nó là bỏ lỡ điểm miễn phí.
+
+**Trả lời trung thực có cấu trúc — ba tầng, nói rõ mình ở tầng nào:**
+1. **Bus:** I2C.
+2. **Ai lo:** library sẵn có (monitor sensor theo tần số riêng, xử lý số liệu, cache).
+3. **Mình chạm gì:** request giá trị đã xử lý; phần thuật toán và chính sách độ sáng là của mình.
+
+⚠️ **Đừng gộp nhầm thành "em làm driver I2C".** [Bài học #8](../../study-plans/datalogic-plan.md): interviewer không phân biệt được "gộp nhầm" với "bịa".
+
+⭐ **Cách nâng câu này thành điểm cộng** — nối sang cái mình **thật sự** quyết định: *"Phần I2C thì library lo. Cái em quyết là **chính sách phía trên**: chu kỳ tính target, bước chuyển, và đánh đổi giữa độ trễ với khả năng lọc nhiễu."* ([RES-025](resume.md))
+</details>
+
+#### RES-025 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ RESUME: "without flickering when lighting changes quickly"]
+**"Chống nháy khi ánh sáng đổi nhanh — em chặn ở đâu, tham số nào quyết định nhạy hay ì? Có cách nào lọc nhiễu mà KHÔNG trả giá bằng độ trễ không?"**
+<details><summary>Khung trả lời</summary>
+
+**Cơ chế:** tính **target** → **step** dần tới target (nấc ~200ms). Hai tham số điều khiển hành vi:
+
+| Tham số | Tăng lên thì | Giảm xuống thì |
+|---|---|---|
+| **Chu kỳ tính target** (vd 4s) | Lọc nhiễu tốt, ì hơn | Nhạy, nhưng dễ dao động khi sensor không ổn định |
+| **Bước step** (vd 200ms/nấc) | Chuyển nhanh, dễ thấy giật | Mượt, nhưng lâu tới target |
+
+**Phần T2 — các cách lọc nhiễu KHÔNG phải trả bằng độ trễ:**
+
+| Cách | Ý tưởng | Cái giá |
+|---|---|---|
+| **Trung bình trượt / low-pass** | Lấy mẫu **nhanh**, làm mượt trên cửa sổ ⇒ vẫn phản ứng nhanh với thay đổi **bền**, bỏ qua xung | Cần tầng đọc+cache riêng; **đa hình theo loại sensor** nếu mỗi loại lấy mẫu khác nhau |
+| **Median filter** | Bỏ hẳn xung đơn lẻ (đèn chớp) | Cửa sổ nhỏ vẫn rẻ; hơi tốn RAM |
+| **Hysteresis / dead band** | Chỉ đổi khi lệch quá ngưỡng ⇒ không dao động quanh biên | Phải chọn ngưỡng; đổi nhỏ sẽ bị bỏ qua |
+
+⭐ **Điểm được chấm không phải "chọn đúng", mà là NÊU ĐƯỢC LÝ DO BỎ.** Ví dụ mẫu: *"Trung bình trượt tốt hơn về lý thuyết, nhưng nó kéo theo một tầng đọc-và-cache phải đa hình theo từng loại sensor, trong khi lợi ích chỉ để phòng ca hiếm — và lúc đó còn 2 tuần tới release. Em chọn giãn chu kỳ vì thiết bị đặt cố định trong phòng họp, độ sáng vốn ổn định."*
+
+**Bẫy:** nêu con số (4 giây) mà không nêu **vì sao chấp nhận được trong bối cảnh này**. Con số không có bối cảnh nghe như tuỳ tiện.
+
+**Nối:** [B2-redesign-events](../../../11-design-patterns/in-practice/B2-redesign-events.md) — Observer + hysteresis.
+</details>
+
+#### RES-026 · 🟠 · concept · ⭐ · 🎤 2026-09-12 · [→ RESUME: "Synchronized brightness across multiple S-Box units over POSIX message queues"]
+**"POSIX message queue là IPC trong MỘT máy. Video wall là NHIỀU máy. Dòng CV này khớp thế nào?"**
+<details><summary>Khung trả lời</summary>
+
+⚠️ **Đây là câu CV tự mời.** Câu chữ hiện tại đọc tự nhiên thành *"các unit đồng bộ với nhau **bằng** POSIX mq"* — sai, vì mq không qua được ranh giới máy. Người đọc kỹ sẽ nghĩ một trong hai: ứng viên **nhầm khái niệm IPC**, hoặc đang **phóng đại**. Cả hai đều xấu.
+
+**Sự thật (kiến trúc đúng):**
+```
+[unit MASTER]  lib --mq--> app  --Ethernet-->  app [unit SLAVE] --> lib
+                    ^                                ^
+              IPC trong 1 may                  giua cac may
+```
+mq là **đường ra một chiều từ library lên app trong cùng máy**; giữa các unit là **Ethernet**.
+
+⭐ **Phải nói CHỦ ĐỘNG, trước khi bị hỏi:**
+> *"Trong dòng đó, message queue là đường từ library lên app **trong cùng một máy**; giữa các unit thì đi **Ethernet**. Em viết gọn quá nên dễ gây hiểu nhầm."*
+
+Tự nêu ⇒ **chính xác hoá**. Bị moi ra ⇒ **bắt lỗi**. Cùng một sự thật, hai kết quả.
+
+**Nền phải nắm:** vì sao mq/shm/pipe **không** qua được ranh giới máy (chúng là đối tượng của kernel một máy) · khi nào chọn mq thay vì socket **trong cùng máy** (có priority, có ranh giới thông điệp, không cần xử lý luồng byte) — nối [LNX-005](linux-sysprog.md).
+</details>
+
+#### RES-027 · 🟡 · design · 🏗️ · 🎤 2026-09-12 · [→ RESUME: "a single binary serving both standalone and synchronized modes"]
+**"Một binary hai mode: nó biết mình ở mode nào bằng cách nào, ai là master? Hai unit cùng bật adaptive thì sao? Master mất điện thì sao?"**
+<details><summary>Khung trả lời</summary>
+
+**Phần cơ chế:** cờ cấu hình (vd `multi_sbox`) rẽ nhánh luồng logic; bật adaptive ⇒ unit đó thành master, tính giá trị chuẩn rồi **đẩy lệnh xuống slave**.
+
+⭐ **Chìa khoá để hai câu ca biên không thành lỗ hổng: luồng điều khiển là PUSH từ master, không phải mỗi unit tự kéo.** Vì mq một chiều (lib → app) và app slave không đọc mq của chính nó, "hai master" **không** phải failure mode.
+
+**Ca "master mất điện" — điểm nằm ở CÁCH KỂ, không ở nội dung:**
+
+| ❌ Mô tả | ✅ Quyết định đã cân nhắc |
+|---|---|
+| *"Slave không bật adaptive nên giữ nguyên độ sáng."* | *"Bọn em **chấp nhận** không có failover. Wall là thiết bị cố định có người vận hành; mất master thì wall đứng ở độ sáng cuối — sai lệch **nhìn thấy được nhưng không nguy hiểm**. Làm bầu master tự động thì phải thêm heartbeat + xử lý split-brain, chi phí không tương xứng."* |
+
+Cùng một sự thật: một bên nghe như **chưa nghĩ tới**, một bên nghe như **đã cân nhắc rồi bỏ**.
+
+**Luật chung:** mọi ca biên chưa xử lý phải kể ở dạng *"đã cân nhắc và chấp nhận"*, **kèm cái giá của phương án bị loại**.
+</details>
+
+#### RES-028 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ RESUME: "raising scheduling priority"; nối [scheduling](../../../03-operating-system/scheduling.md)]
+**"Team Performance từ chối `SCHED_FIFO` vì sợ đẩy trễ audio/network lúc boot. Giải pháp tốt nhất của em vừa bị chặn — còn phương án nào?"**
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** bạn có **một** khung tư duy hay **nhiều** khung. Đây là câu phân loại.
+
+⭐ **Luật phải thuộc: bài "cái gì đó chậm" LUÔN có hai vế — *làm nhanh hơn* và *làm ít hơn*.** Trả lời chỉ một vế là lộ ra chỉ có một khung.
+
+| Vế | Phương án | Đánh đổi |
+|---|---|---|
+| Giành CPU | `nice` âm | Yếu — `nice` chỉ đổi **trọng số** CFS, **không** cho quyền ưu tiên. Nhưng an toàn: không starve được ai |
+| Giành CPU | `SCHED_RR` prio **thấp**, **chỉ trong cửa sổ insmod** rồi hạ về | Gần trọn lợi ích RT, rủi ro bị **giới hạn theo thời gian** |
+| Giành CPU | Ghim CPU riêng (`taskset`/cpuset) | Không đụng priority ⇒ Performance team dễ chấp nhận |
+| **Giảm việc** | Rút ngắn `probe()`: tách phần chờ phần cứng ra **thread**, **lazy init** cho resolve symbol | Phức tạp hơn; phải xử lý đường đua lần gọi đầu |
+| **Giảm việc** | Build thẳng vào kernel thay vì `insmod` | Mất tính module hoá |
+| **Giảm việc** | Gộp nhiều sub-driver thành một | Phá tính private của source; boot team phải biết combination |
+| **Đổi thời điểm** | Nạp **sau** đường tới hạn, chỉ cần xong trước lúc hiển thị | Không tranh giành với ai cả — thường là lời giải rẻ nhất |
+
+**Câu ghi điểm về `nice` (hay bị nói mơ hồ):** *"Hạ `nice` không cho em **quyền ưu tiên**, nó chỉ cho em **phần bánh to hơn** — task khác vẫn chen vào. Còn bất kỳ task `SCHED_FIFO` nào cũng preempt **sạch mọi** task `SCHED_OTHER`, bất kể nice. Đó chính là lý do team Performance lo."*
+
+**Và cách gỡ lo ngại đó:** `sched_rt_runtime_us=950000 / sched_rt_period_us=1000000` — kernel **chừa 5% CPU** cho non-RT, nên một task FIFO quay vòng không treo cả máy. Biết con số này là biết **giới hạn rủi ro**, không chỉ biết rủi ro tồn tại.
+
+**Nối:** [OS-029](os.md) · [log B1 §D](../sessions/2026-09-12--B1--resume.md)
+</details>
+
+#### RES-029 · 🟡 · concept · ⭐ · 🎤 2026-09-12 · [→ RESUME: "verified it over 100 boot cycles"]
+**"Vì sao 100 lần boot là đủ? Con số đó ở đâu ra?"**
+<details><summary>Khung trả lời</summary>
+
+**Có câu trả lời định lượng — đây là *quy tắc số ba* (rule of three):**
+
+> Chạy **n** lần độc lập, **0** lần lỗi ⟹ với độ tin cậy **95%**, tỉ lệ lỗi thật **< 3/n**.
+
+| n, 0 lỗi | Kết luận (95%) |
+|---|---|
+| 30 | < 10% |
+| **100** | **< 3%** |
+| 300 | < 1% |
+| 3000 | < 0,1% |
+
+⭐ **Cách nói — biến "100" từ con số quy ước thành quyết định kỹ thuật:**
+> *"100 lần không tuỳ tiện. Với 0 lỗi trên 100 lần, em kết luận được tỉ lệ lỗi dưới 3% ở tin cậy 95%. Nếu team cần dưới 1% thì phải 300 lần — đó là con số em đưa ra để họ quyết định đánh đổi thời gian test."*
+
+Đây đúng thứ JD gọi là *"drive the relation with V&V in a fruitful manner"*: **không xin họ số, mà đưa họ công thức để chọn số.**
+
+⚠️ **Điều kiện áp dụng — nói được là điểm cộng:** các lần chạy phải **độc lập** và **cùng điều kiện**. Bug phụ thuộc nhiệt thì 100 lần boot nguội không nói gì về boot nóng.
+
+**Dùng lại ở:** [BEH-015](behavioral.md) — chốt chung với V&V định nghĩa *"chạy bao nhiêu lần thì tính là tái hiện / là đã fix"*.
+</details>
+
+#### RES-030 · 🟡 · concept · 🏗️ · 🎤 2026-09-12 · [→ RESUME: "Samsung Display Manager (Windows Application)"]
+**"Đây là dòng duy nhất trong CV không phải Linux/embedded. Nó liên quan gì tới vị trí này?"**
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** bạn có tự đọc được CV bằng mắt người tuyển không — và bạn xử lý một dòng "lạc quẻ" bằng cách thanh minh hay bằng cách bắc cầu.
+
+**Bước 1 — thừa nhận thẳng, một mệnh đề rồi đi tiếp ngay.** *"Không liên quan trực tiếp."* Đừng vòng vo.
+
+**Bước 2 — bắc cầu. Có hai loại cầu, và loại thứ hai MẠNH HƠN:**
+
+| Loại cầu | Ví dụ | Sức nặng |
+|---|---|---|
+| **Kỹ thuật** | MVVM ↔ HAL + implementation theo phần cứng · Modern C++ dùng chung · cơ chế lưu cấu hình / xử lý file | 🟡 Có lý nhưng nghe hơi gượng — ai cũng bắc được |
+| ⭐ **Hành vi** | *"Đội thiếu người, cần release. Em nhận một feature chưa ai làm và giao đúng hạn."* | 🟢 **Mạnh hơn** — JD viết thẳng *"shows initiative, ownership, and commitment"* |
+
+**Bẫy hay mắc:** để cầu hành vi ở vai trò **lời giải thích bối cảnh** thay vì **luận điểm chính**. Nói *"dự án thiếu người nên em hỗ trợ"* rồi chuyển sang nói MVVM là **đặt cái mạnh xuống dưới cái yếu**.
+
+**Bước 3 — chốt ranh giới công lao trước khi bị hỏi** ([RES-022](resume.md)): phần nào đã có sẵn, phần nào là mình.
+</details>
+
+#### RES-031 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ JD: "Solicit, generate and manage requirements"]
+**"Kể một lần requirement đến tay em ở dạng chưa dùng được. Nó hổng ở đâu, em tìm ra bằng phương pháp gì?"**
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** JD có *"anticipate needs and potential technical issues **in the development phase**"*. Họ muốn biết bạn phát hiện lỗ hổng **trước khi code** hay **sau khi QA báo**.
+
+**Ví dụ mẫu (S-Box):** requirement chỉ có *bật Adaptive → lấy sensor → tính thanh ghi → gửi mq → hết*. Ba lỗ hổng, cả ba đều là **cạnh chuyển trạng thái**:
+1. Đang tắt, bật adaptive → nhảy ngay hay **chuyển dần**?
+2. Tắt adaptive → **giữ nguyên** hay **quay về** giá trị trước khi bật?
+3. Bật adaptive rồi **reboot** → hành vi ra sao?
+
+⭐ **Phần được chấm nặng nhất là PHƯƠNG PHÁP, không phải danh sách.** *"Em gặp lúc code thì thấy"* và *"em rà theo bảng chuyển trạng thái"* là hai tín hiệu hoàn toàn khác nhau dù kết quả giống hệt.
+
+**Phương pháp có tên: bảng chuyển trạng thái (state transition table).** Liệt kê mọi **trạng thái × sự kiện**, buộc mỗi ô có câu trả lời:
+
+| Trạng thái ↓ / Sự kiện → | Bật adaptive | Tắt adaptive | User set tay | Reboot | Mất sensor |
+|---|---|---|---|---|---|
+| **OFF** | ? ① | – | đặt giá trị | ? ③ | – |
+| **ON, đang chuyển** | – | ? ② | ? | ? | ? |
+| **ON, đã ổn định** | – | ? ② | ? | ? | ? |
+
+Bảng **tự sinh ra** cả ba lỗ hổng trên, **cộng thêm** hai ô mà cách gặp-thì-thấy không tìm ra: *"đang chuyển dở thì user set tay"* và *"sensor hỏng giữa chừng"*.
+
+**Cách nói:** *"Requirement chỉ mô tả **đường thành công**. Em kẻ bảng trạng thái × sự kiện rồi buộc mỗi ô phải có câu trả lời — ô trống là một câu hỏi gửi lại bên yêu cầu."*
+
+**Nối:** [10/problem-solving.md](../../../10-thinking/problem-solving.md)
+</details>
+
+#### RES-032 · 🟡 · concept · ⭐ · 🎤 2026-09-12 · [→ 🇬🇧 phiên 50% tiếng Anh]
+🇬🇧 **"Could you introduce yourself and walk me through what you're working on?"** — trả lời bằng tiếng Anh, ≤ 90 giây.
+<details><summary>Khung trả lời</summary>
+
+⚠️ **Hiện tượng đã đo (12/09):** bản Việt 120s có đủ bring-up/porting + ba thành tựu; bản Anh **không có móc nào**. Sang tiếng Anh, ứng viên **thu mình về phần an toàn nhất**. Đây là chuyện bình thường và **cách chữa là kịch bản viết sẵn**, không phải "cải thiện tiếng Anh".
+
+**Bản mẫu 80 giây:**
+> *"I'm a software engineer at Samsung, three years building system software for TVs and enterprise display products on ARM SoCs.*
+> *My work spans the full stack — from the C++ interface our shared library exposes, down through the HAL, to the kernel driver talking to the SoC.*
+> *Three things I'd highlight:*
+> *— First, we have **one C++ interface across several chipsets**. The library picks its implementation at runtime from board configuration, and the kernel driver dispatches through a function-pointer table, so applications above never change.*
+> *— Second, I **cut driver load time from three-to-four seconds down to under half a second** — I measured two options and verified the fix over a hundred boot cycles.*
+> *— Third, I **port drivers across chip generations** every year, including a kernel migration to 6.12 while keeping backward compatibility with the older branch.*
+> *What I'm looking for is to go deeper on the kernel side and work with a more formal product process — Yocto, CI, validation. **Which of those would you like me to go into?**"*
+
+**Ba lỗi ngôn ngữ hay mắc:**
+
+| Sai | Đúng | Vì sao |
+|---|---|---|
+| *"I **developed** System SW"* | *"I **develop**"* / *"I've **been developing**"* | Việc **đang** làm |
+| *"the full **system layer**"* | *"the full **stack**"* / *"**all system layers**"* | Số ít nghe như chỉ một tầng |
+| *"**Do you want me to** walk through them?"* | *"**Which of those** would you like me to go into?"* | Câu **có/không** đá bóng về chân mình; câu **chọn-một-trong-ba** giới hạn sân |
+
+**Bẫy lớn nhất:** kết bằng câu hỏi có/không. Họ nói *"sure"* rồi bạn **lại phải tự chọn** — đúng thứ vừa thất bại.
+</details>
+
+#### RES-033 · 🟠 · concept · ⭐ · 🎤 2026-09-12 · [→ 🇬🇧 giải thích kỹ thuật bằng tiếng Anh]
+🇬🇧 **"You mentioned the kernel driver dispatches through a function-pointer table. Why do you need two levels of that? Walk me through it."**
+<details><summary>Khung trả lời</summary>
+
+**Nội dung: giống [RES-023](resume.md).** Câu này đo thêm một thứ khác — **nội dung có sống sót qua đổi ngôn ngữ không**.
+
+⭐ **Luật cho mọi câu kỹ thuật bằng tiếng Anh: mở bằng MỘT CÂU TÓM rồi mới đi vào chi tiết.**
+> *"There are two levels because they solve two different problems — one is a **license boundary**, the other is **polymorphism**."*
+
+Người nghe có khung rồi thì ngữ pháp lệch vài chỗ cũng không cản trở.
+
+**Từ vựng nghiệp vụ hay chệch:**
+
+| Hay nói | Nên nói |
+|---|---|
+| *"the chip-**depend** driver"* | *"the chip-**specific** driver"* |
+| *"they **match** their implementation to the table"* | *"it **registers** its implementation **into** the table"* |
+| *"the polymorphism is complete"* | *"…which gives us polymorphism in kernel space"* |
+| *"**achieve** the GPL license rule"* | *"…to stay on the right side of the **GPL boundary**"* |
+
+**Với câu "kể thành tựu 30 giây" bằng tiếng Anh:** phải đóng bằng **kết quả**, không phải bằng nỗ lực. *"…in about two weeks"* là nỗ lực; *"…and it shipped with the product"* là kết quả.
 </details>
 
 ---

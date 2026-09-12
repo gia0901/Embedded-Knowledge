@@ -198,4 +198,99 @@ Chuẩn bị 4–5 câu chuyện, mỗi câu xoay được nhiều câu hỏi (t
 - [ ] Ngủ đủ; tới sớm; mang CV in.
 
 ---
+
+## 🎤 Từ phiên B1 (2026-09-12) — bám JD mới (process & communication)
+
+#### BEH-014 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ JD: "Participating in peer-reviews of solution designs and related code"]
+**"Một MR sửa driver: code chạy đúng, test pass, nhưng nhét nhánh `if` chip-specific vào driver nền thay vì đi qua bảng function pointer. Bạn đó nói 'đang gấp deadline, để sau refactor'. Em viết gì vào comment, và có approve không?"**
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** bạn **chặn người khác** hay bạn **làm nợ trở nên nhìn thấy được**. Người review chặn MR vì lý do kiến trúc trong lúc gấp là người khó làm việc cùng; người approve rồi im lặng là người để nợ mục ruỗng. Họ muốn đường thứ ba.
+
+**Thứ tự review (nói được thứ tự là đã ăn nửa điểm):**
+> ① **mục đích** — code này định làm gì → ② **hợp đồng** — có phá ABI / tương thích ngược / thêm phụ thuộc mới giữa module không → ③ **tính đúng đắn & lỗi ngầm** (null deref, quên free, đường thoát sớm) → ④ **đọc được** (lồng sâu, logic dư, SOLID) → ⑤ **test có phủ đúng phần vừa đổi không**
+
+⚠️ Tầng ② hay bị xếp nhầm chung với "style". Trong ngữ cảnh **shared library + kernel driver**, nó **nặng hơn** lỗi ngầm — lỗi ngầm hỏng một lần, phá ABI hỏng mọi người dùng.
+
+**Trả lời mẫu — bốn việc trong một comment:**
+> *"Approve để kịp release. Nhưng nhánh `if` này bỏ qua bảng function pointer, nên chip tiếp theo sẽ phải thêm nhánh nữa — sau 3 chip là không ai đọc nổi. Mình đã mở [JIRA-1234], hạn <ngày sau release>, gán cho bạn, có ghi rõ đường đi đúng. Và bổ sung giúp mình một test phủ nhánh mới trước khi merge nhé — chỗ đó hiện chưa có test nào chạm tới."*
+
+| Việc | Vì sao |
+|---|---|
+| **Approve** | Không chặn người ta trong lúc gấp |
+| Nói cái giá **bằng số** (*"sau 3 chip"*) | Cái giá trừu tượng không thuyết phục ai |
+| Nợ có **chủ + hạn + chỗ có người nhắc** | Comment trong code sẽ mục; Jira có deadline thì không |
+| Xin **một** thứ rẻ mà có giá trị ngay (test) | Đổi được thiện chí lấy phòng vệ thật |
+
+**Bẫy:** ① chỉ *"comment cảnh báo trong code"* — 6 tháng sau không ai đọc · ② chặn MR ⇒ mang tiếng cản đường · ③ approve rồi tự đi sửa ⇒ mất cơ hội dạy, và người kia lặp lại lần sau.
+
+**Follow-up hay bị hỏi:** *"Ticket tới hạn, không ai làm, bạn kia đã đổi team. Em làm gì?"*
+</details>
+
+#### BEH-015 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ JD: "drive the relation with Validation and Verification team in a fruitful manner"]
+**"V&V báo một lỗi. Em chạy lại không tái hiện được, ba vòng qua lại vẫn không. Bên kia bắt đầu cho rằng em đá bóng về phía họ. Em làm gì?"**
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** JD dùng đúng chữ *"in a fruitful manner"* — họ đã gặp kỹ sư biến quan hệ với V&V thành đấu tố. Câu này đo **ai nhận phần việc về mình**.
+
+**Vòng 1 — hỏi đúng thứ tự (hai nguyên nhân phổ biến nhất trước):**
+1. **Hardware revision** — bản pre-development hay bản đã chốt?
+2. **Image version** chính xác.
+3. Bối cảnh: nhiệt độ, thời lượng chạy, mạng, kịch bản thao tác.
+4. Có `dmesg` / log app / coredump tại thời điểm lỗi không.
+
+⭐ **Vòng 2 — điểm xoay của cả câu: thôi XIN dữ liệu, bắt đầu LÀM cho dữ liệu tự sinh ra.**
+
+| Việc | Vì sao nó gỡ được bế tắc |
+|---|---|
+| ⭐ **Gửi build có đo sẵn** (log ở đúng đường nghi ngờ, tracepoint, vòng đệm trạng thái) | Họ **không phải làm gì khác** — vẫn chạy kịch bản cũ, nhưng mỗi lần chạy giờ sinh dữ liệu cho bạn. Bạn **thôi phụ thuộc vào việc tái hiện được** |
+| **Script thu thập một lệnh** (`collect.sh` gom dmesg + log + `/proc` + version + coredump) | Đừng bắt người khác nhớ phải lấy gì — họ sẽ quên, và bạn mất thêm một vòng |
+| **Chốt chung định nghĩa "tái hiện"** (*"chạy 20 lần, bị ≥1 lần"*) | Không có định nghĩa chung thì hai bên cãi về **sự tồn tại** của bug thay vì về **nguyên nhân**. Nối [RES-029](resume.md) — quy tắc số ba |
+
+**Câu nói gỡ quan hệ, dùng được nguyên văn:**
+> *"Em tin là có bug — em chỉ chưa dựng lại được ở đây. Em gửi anh/chị một build có log ở đúng chỗ nghi ngờ, cùng một script chạy một lệnh là gom hết. Anh/chị cứ chạy đúng kịch bản cũ; lần bị tiếp theo em sẽ có đủ dữ liệu mà không cần phiền thêm."*
+
+Ba việc trong một câu: **công nhận bug là thật** (gỡ ngòi) · **nhận phần việc về mình** · **họ không phải làm gì thêm**.
+
+**Bẫy:** ① *"bên em test không thấy"* — câu này chấm dứt hợp tác · ② chỉ xin thêm log qua từng vòng mail · ③ đòi mượn unit như phương án **duy nhất** (thường không mượn được: khác site, thiết bị không rời phòng lab).
+
+**Follow-up:** *"Build có log gửi đi, chạy 2 tuần không bị lần nào. Em kết luận gì?"* → *"không tái hiện"* **cũng là dữ liệu**: thêm log làm đổi timing ⇒ nghi **race condition** (Heisenbug).
+</details>
+
+#### BEH-016 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ JD; đi kèm [BEH-008](behavioral.md) "vì sao rời công ty cũ"]
+**"Vì sao em ứng tuyển vị trí này?"** — *(khác hẳn "vì sao nên tuyển em" — xem bẫy)*
+<details><summary>Khung trả lời</summary>
+
+🔴 **Bẫy số một, và là bẫy đã mắc thật (12/09): trả lời nhầm sang câu khác.**
+
+| Câu hỏi | Họ dò gì |
+|---|---|
+| *"Vì sao nên nhận em?"* → [BEH-007](behavioral.md) | **Năng lực** — em làm được gì |
+| *"Vì sao em chọn chỗ này?"* → câu này | **Động lực** — em có hiểu chỗ này làm gì không, lý do em tới có thật không |
+
+Câu này tồn tại vì **người đến vì lương sẽ đi vì lương**. Trả lời bằng năng lực là **né mất câu hỏi**, và người phỏng vấn có kinh nghiệm nhận ra ngay.
+
+**Cấu trúc 3 nhịp — cái *kéo*, không phải cái *đẩy*:**
+
+> **① Cái em đã có — một câu, đặt bối cảnh.**
+> *"Ba năm qua em làm xuyên tầng — C++ interface, shared library, kernel driver — nhưng luôn trong **một** dòng sản phẩm và **một** hệ build nội bộ."*
+>
+> **② Cái JD có mà chỗ em không có — nói THẲNG tên.**
+> *"Hai thứ ở đây em chưa có: **Yocto** — em hiểu bài toán nó giải và các thành phần, nhưng chưa vận hành trong sản phẩm thật; và **driver cho I2C/SPI/Ethernet** — em đã làm việc với thiết bị I2C qua subsystem, nhưng phần driver là do library sẵn lo. Em muốn tới chỗ mà hai thứ đó là việc hằng ngày."*
+>
+> **③ Cái em mang tới đổi lại — trích chữ của JD.**
+> *"Đổi lại, JD có 'design complex subsystems' và 'take design choice autonomously' — đó đúng là thứ em đã làm: một interface chung cho nhiều chipset, và một quyết định tối ưu boot time em tự đo hai phương án rồi chọn."*
+
+**Ba luật:**
+1. **Nói tên gap ra trước khi họ hỏi.** Tự nêu ⇒ **tự nhận thức**. Bị moi ⇒ **chỗ hổng**.
+2. **Cấm "môi trường tốt", "học hỏi nhiều".** Không phân biệt được với 200 ứng viên khác.
+3. **Phải trích ≥1 cụm chữ từ JD.** Nó chứng minh đã đọc.
+
+**Kèm — nâng [BEH-008](behavioral.md) *"vì sao rời"* từ chung chung lên cụ thể:**
+> *"Samsung cho em nền rất chắc về system software — ba năm qua em đi hết **chiều dọc** của một dòng sản phẩm. Cái em thiếu bây giờ là **chiều ngang**: dòng sản phẩm khác, hệ build khác, phần cứng khác. Ở chỗ cũ điều đó khó xảy ra vì kiến trúc đã ổn định và em sẽ lặp lại chu kỳ port chip hằng năm."*
+
+⚠️ **Không chê công ty cũ.** Câu trên nói về **cái mình muốn**, không nói về **cái họ thiếu** — đó là ranh giới.
+</details>
+
+---
 ⬅️ [Bank index](README.md)
