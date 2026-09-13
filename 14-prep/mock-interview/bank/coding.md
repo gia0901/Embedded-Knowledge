@@ -57,6 +57,23 @@ bool hasCycle(Node* head) {
 }
 ```
 **O(n) time, O(1) space.**
+
+**🔁 Vì sao chắc chắn gặp nhau, và vì sao O(n)** *(hỏi 2026-09-13, ứng viên tự nêu là chỗ mình chưa rõ):*
+> Trong vòng, mỗi lần lặp `fast` đi 2, `slow` đi 1 ⇒ **`fast` ăn thêm đúng 1 bước**. Đo theo chiều đi, khoảng cách từ `fast` tới `slow` **giảm đúng 1** mỗi vòng lặp. Khoảng cách ban đầu **< L** (chu vi), giảm đúng 1 nên **không bao giờ nhảy qua 0** ⇒ gặp nhau sau **tối đa L** lần lặp. Cộng đoạn đi tới vòng (`m` bước) ⇒ **O(m + L) = O(n)**.
+
+⭐ **Đó cũng là câu trả lời cho *"vì sao fast đi 2 bước mà không phải 3?"*** — với bước 3, khoảng cách giảm **2** mỗi lần và **có thể nhảy qua nhau** mà không bao giờ bằng nhau.
+
+**🔁 Mở rộng gần như chắc chắn bị hỏi tiếp — tìm NODE BẮT ĐẦU vòng, vẫn O(1) space:**
+```cpp
+// sau khi slow == fast:
+slow = head;
+while (slow != fast) { slow = slow->next; fast = fast->next; }  // CA HAI di 1 buoc
+return slow;   // diem gap = dau vong
+```
+**Chứng minh.** Gọi `m` = quãng head → đầu vòng, `L` = chu vi, `k` = quãng đầu vòng → điểm gặp.
+Lúc gặp: `slow` đi `m+k`, `fast` đi `2(m+k)`, và `fast` hơn `slow` đúng một số nguyên lần chu vi ⇒ `m + k = i·L` ⇒ **`m = i·L − k`** = đúng quãng từ **điểm gặp** đi tiếp tới **đầu vòng**. Nên đặt một con trỏ về `head`, cả hai đi **1 bước**, chúng gặp nhau tại đầu vòng.
+
+**Ca biên phải chạy đúng** (đã kiểm, xem [reviewed](../coding-arena/reviewed/2026-09-13--COD-002--floyd-cycle.cpp)): list rỗng · 1 node không vòng · **1 node self-loop** · 2 node có/không vòng · vòng bắt đầu ở giữa (m=2, L=4) · vòng dài m=99, L=1.
 </details>
 
 #### COD-003 · 🟡 · coding · ⭐ · [→ algorithm-patterns](../../../12-dsa/algorithm-patterns.md)

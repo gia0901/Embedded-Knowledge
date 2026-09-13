@@ -566,6 +566,44 @@ TSan dựng quan hệ **happens-before** giữa các truy cập: nó ghi nhận 
 
 ---
 
+#### DBG-042 · 🟡 · concept · ⭐ · 🎤 2026-09-13 · [→ memory-bugs](../../../09-debugging/memory-bugs.md)
+**"Bạn có ba lỗi: (a) đọc vượt biên mảng, (b) use-after-free, (c) data race giữa hai luồng. Với mỗi lỗi, bạn bật sanitizer nào? Cái nào bắt được cái gì?"**
+<details><summary>Đáp án</summary>
+
+| | Vượt biên (buffer overflow) | Use-after-free / double free | Data race |
+|---|:--:|:--:|:--:|
+| **ASan** `-fsanitize=address` | ✅ | ✅ | ❌ |
+| **TSan** `-fsanitize=thread` | ❌ | ✅ | ✅ |
+| **UBSan** `-fsanitize=undefined` | một phần (VLA, một số ca) | ❌ | ❌ |
+| **valgrind memcheck** | ✅ | ✅ | ❌ (dùng `helgrind`) |
+| **MSan** `-fsanitize=memory` | ❌ | ❌ | ❌ — chuyên **biến chưa khởi tạo** |
+
+⭐ **Quy tắc để nhớ:** *ASan trông chừng **địa chỉ**; TSan trông chừng **thứ tự giữa các luồng** — và nhân tiện cũng theo dõi vòng đời heap.* Mặc định cho lỗi bộ nhớ: **ASan**.
+
+⚠️ **Ô hay bị trả lời sai nhất là TSan × vượt biên.** Nhiều người nghĩ "sanitizer nào cũng bắt lỗi bộ nhớ". Đo thật (gcc 11.4.0):
+```
+TSan / vuot bien      : sum=15, exit=0                 <- KHONG bao gi
+TSan / use-after-free : WARNING: heap-use-after-free   <- bat duoc
+ASan / vuot bien      : ERROR: heap-buffer-overflow    <- bat duoc
+```
+TSan **có** allocator riêng nên theo dõi được vòng đời heap ⇒ bắt UAF; nhưng nó **không** đặt redzone quanh mảng ⇒ mù với vượt biên.
+
+**Ba điều thực chiến:**
+1. **ASan và TSan không dùng chung được** trong một lần build. Phải build hai bản.
+2. **Chi phí:** ASan ~2× thời gian, ~3× RAM; TSan ~5–15× thời gian, ~5–10× RAM. Trên target embedded RAM nhỏ thường **không chạy nổi** ⇒ chạy trên host với bản build x86.
+3. ⚠️ **Bẫy kernel ≥ 6.x:** TSan **chết ngay khi khởi động** vì xung đột ASLR —
+   ```
+   FATAL: ThreadSanitizer: unexpected memory mapping 0x5d34204f0000-...
+   ```
+   Đường vòng: `setarch -R ./a.out`.
+
+**Khi nào sanitizer KHÔNG cứu được:** ① lỗi chỉ xảy ra trên target thật (timing phần cứng) ② vùng chồng lấn của `memcpy` — **không sanitizer nào bắt**, chỉ `valgrind memcheck` báo *"Source and destination overlap"* ([COD-016](coding.md)) ③ thiếu `volatile` — không phải lỗi bộ nhớ, phát hiện bằng **so `-O0` với `-O2`** ([COD-018](coding.md)).
+
+**Bẫy:** trả lời *"dùng TSan"* cho lỗi vượt biên — đây là lỗi đã mắc thật ngày 13/09.
+</details>
+
+---
+
 ## E — Kernel debugging
 
 #### DBG-019 · 🟡 · concept · [→ kernel-debugging](../../../09-debugging/kernel-debugging.md)

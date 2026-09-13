@@ -18,7 +18,8 @@
 | **Ngân sách** | ~2h/ngày × 4 buổi ≈ **8h**. Vượt ngân sách = cắt, không kéo dài |
 | **Ngôn ngữ PV** | **50% Việt / 50% Anh** ⇒ mọi câu ruột phải nói được **cả hai thứ tiếng** |
 | **Hình thức coding** | **Trên giấy** — 3 dạng: (1) coding problem · (2) implement DS cơ bản · (3) **đọc code tìm lỗi** |
-| **Buổi gần nhất** | ✅ **B1 — 2026-09-12**, 42/60 = **3.00**, 15 câu ([log](../mock-interview/sessions/2026-09-12--B1--resume.md) — 856 dòng, tự chứa, có **§A–§E** là tài liệu ôn) |
+| **Buổi gần nhất** | ✅ **B2 — 2026-09-13**, 44/56 = **3.14**, 14 câu ([log](../mock-interview/sessions/2026-09-13--B2--coding.md)) · *trước đó:* B1 12/09, 3.00 ([log](../mock-interview/sessions/2026-09-12--B1--resume.md)) |
+| **Lịch sử điểm sprint** | B1 **3.00** · B2 **3.14** *(rapid 3.80 · implement 2.67 · bug hunt 2.83 — **không so ngang**, [config §4](../mock-interview/config.md))* |
 | **Chẩn đoán còn hiệu lực** | **T1 3.67 · T2 2.1** ⇒ nền chắc, hụt ở **vận dụng**. Không đọc thêm tài liệu mới |
 
 ### ▶️ LÀM TIẾP — 4 buổi, chạy đúng thứ tự
@@ -26,11 +27,28 @@
 | # | Buổi | Nội dung | ~ | Xong? |
 |---|---|---|---|---|
 | **B1** | 🗣️ **RESUME + dẫn chuyện + process JD** | §3 bản đồ phủ resume · §4 opening 3 móc · §5 behavioral theo JD mới | 120′ | ✅ **3.00** |
-| **B2** | ✍️ **CODING GIẤY** | 3 bài implement viết tay + 6 snippet bug-hunt + DSA rapid (§6) | 120′ | ⬜ |
+| **B2** | ✍️ **CODING GIẤY** | 3 bài implement viết tay + 6 snippet bug-hunt + DSA rapid (§6) | 120′ | ✅ **3.14** |
 | **B3** | ⚙️ **C++17 + C-kernel + vá gap JD** | §7 C++17 ba tầng · C thuần · **I2C/SPI (cầu nối)** · §8 ba câu trả lời trung thực | 120′ | ⬜ |
 | **B4** | 🎬 **Giả lập vòng thật** | `comprehensive` cấu hình riêng JD (75′) + coding từ **file trống** (45′) | 120′ | ⬜ |
 
-### ⏭️ Trước khi vào B2 — 5 việc, ~60 phút
+### ⏭️ Trước khi vào B3 — 4 việc, ~60 phút
+
+| # | Việc | ~ |
+|---|---|---|
+| 1 | Đọc [12-dsa/complexity-and-structures.md](../../12-dsa/complexity-and-structures.md) mục **amortized**; nói to được *"mỗi phần tử chuyển đúng 1 lần ⇒ n thao tác tốn O(n)"* | 15′ |
+| 2 | 🧪 Làm **2 bài** lab DBG — [`DBG-032`](../mock-interview/bank/debugging.md) (ASan) + [`DBG-036`](../mock-interview/bank/debugging.md) (valgrind, ASan mù). **Ngoại lệ có chủ đích với lệnh đóng băng lab ở §10** — vì lỗ hổng "chọn công cụ" đã lặp **lần thứ hai** | 40′ |
+| 3 | Thuộc bảng [`DBG-042`](../mock-interview/bank/debugging.md) ASan/TSan/UBSan/valgrind | 5′ |
+| 4 | Thuộc: *"`-O0` chạy, `-O2` hỏng ⇒ nghi **thiếu `volatile`** hoặc **UB**"* | 2′ |
+
+### 📉 Lỗ hổng đo được ở B2 — mang sang B3/B4
+
+1. 🔴 **Hai câu EMBEDDED nhất lại là hai câu THẤP nhất.** `COD-018` (`volatile`) **1đ** · `COD-025` (misalignment) **2đ** — trong khi hai câu C++ thuần (`COD-023` Rule of Three, `COD-024` mutex) đều **4đ**. **Ngược với kỳ vọng cho một JD embedded** ⇒ B3 phải thêm khối `volatile` / MMIO / alignment vào phần C thuần.
+2. 🔴 **Phân tích độ phức tạp dừng ở worst-case.** `COD-013` = 2đ dù được báo trước điểm nằm ở đâu; không dùng chữ *amortized* lần nào. Đây là **T1**, chữa bằng đọc lại + hỏi lại T1 góc khác.
+3. 🟠 **Chọn công cụ — lặp lại chẩn đoán 17/08.** 4/6 câu bug hunt sai hoặc bỏ trống vế *"phát hiện bằng công cụ gì"*. Chữa bằng **làm lab**, không bằng đọc thêm.
+
+> ✅ **Tin tốt của B2:** **code không có lỗi nào** — cả 3 bài compile sạch, chạy đúng mọi ca biên. Điểm mất **hoàn toàn** ở lý luận và công cụ. Và phần rapid **3.80/4** xác nhận lại: nền T1 chắc.
+
+### ⏭️ Trước khi vào B2 — 5 việc, ~60 phút *(đã xong 12/09)*
 
 | # | Việc | ~ |
 |---|---|---|
