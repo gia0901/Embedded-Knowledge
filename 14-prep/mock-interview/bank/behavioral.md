@@ -292,5 +292,39 @@ Câu này tồn tại vì **người đến vì lương sẽ đi vì lương**. 
 ⚠️ **Không chê công ty cũ.** Câu trên nói về **cái mình muốn**, không nói về **cái họ thiếu** — đó là ranh giới.
 </details>
 
+#### BEH-017 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-09-14 · [→ JD: Ethernet driver · oscilloscope · Jenkins]
+**"JD nhắc driver Ethernet, oscilloscope và Jenkins. Em có kinh nghiệm nào với ba thứ này không?"** — *(câu hỏi về KHOẢNG TRỐNG kỹ năng, dạng tổng quát)*
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** không phải *"em có biết không"* — họ đã biết là không, JD liệt kê nhiều thứ hơn bất kỳ ai có đủ. Họ dò **cách bạn xử lý khoảng trống**: nói dối, im lặng, hay bắc cầu được.
+
+🔴 **Hai lỗi NGƯỢC nhau, cùng gốc — đo được trong một buổi (14/09):**
+
+| Lỗi | Biểu hiện thật | Vì sao chết |
+|---|---|---|
+| **Nói quá** | *"…và đã thành công build một minimal image"* trong khi tracking ghi chưa làm | Một câu bị bóc ra làm hỏng **mọi** câu trước đó, kể cả câu thật |
+| **Nói thiếu** | *"Không có kinh nghiệm gì về 3 thứ này."* — hết, 3 giây | Bỏ trắng một câu hoàn toàn ghi điểm được |
+
+**Gốc chung: không có kịch bản sẵn** ⇒ mỗi lần trả lời một kiểu tuỳ tâm trạng.
+
+⭐ **KHUNG 4 NHỊP — áp cho MỌI khoảng trống, ≤ 60 giây:**
+> ① **Nói thẳng chưa làm** (một mệnh đề, rồi đi tiếp ngay — không thanh minh)
+> ② **Chứng minh có mental model** (nêu 2–3 khái niệm lõi, cho thấy hiểu *nó giải bài toán gì*)
+> ③ **Nối về việc thật tương đương** đã làm
+> ④ **Cam kết cụ thể** (không phải *"em học nhanh lắm"*)
+
+**Bản mẫu cho đúng ba thứ này:**
+> *"Ba thứ đó em xử lý khác nhau.*
+> *— **Ethernet driver**: em chưa viết. Sản phẩm em làm không có, phần mạng ở userspace. Nhưng mô hình driver mạng gần với thứ em đã làm: đăng ký qua `net_device_ops`, `ndo_start_xmit` đẩy `sk_buff` xuống, **NAPI** chuyển từ interrupt-mỗi-gói sang polling khi tải cao để tránh interrupt storm, DMA ring cho TX/RX. Cái khung 'đăng ký — probe theo device tree — xử lý interrupt và bottom half' thì em làm hằng ngày với driver display.*
+> *— **Oscilloscope**: em debug ở tầng phần mềm — GDB, `dmesg`/`printk`, cross-layer. Chưa tự cầm scope; khi cần đo tín hiệu em làm việc với đội hardware. Em hiểu dùng nó để làm gì: xác nhận tín hiệu bus có thật sự ra chân không, đo timing, **tách bạch lỗi phần mềm với lỗi phần cứng** — đúng lúc log không kết luận được.*
+> *— **Jenkins**: em chưa dựng pipeline. Nhưng thứ tương đương em đã làm là **verify qua 100 chu kỳ boot** — đó chính là tư duy automated regression, chỉ là chạy tay."*
+
+⚠️ **Luật chống nói quá — quan trọng hơn cả khung trên:** trước khi nói *"em đã làm X"*, tự hỏi **"nếu họ đào ba câu nữa, em còn trả lời được không?"**. Người đã build Yocto thật nhớ được `bitbake core-image-minimal`, giá trị `MACHINE` chính xác, và cái `DL_DIR`/`SSTATE_DIR` phải đặt vì hết ổ đĩa. Không nhớ nổi ba chi tiết đó ⇒ **đừng khẳng định đã làm**.
+
+> Nhớ [bài học #8](../../study-plans/datalogic-plan.md): *"gộp nhầm, không phải bịa — nhưng **interviewer không phân biệt được hai thứ đó**"*.
+
+**Bẫy:** ① thanh minh dài ⇒ nghe như chột dạ · ② *"em học nhanh lắm"* mà không có bằng chứng · ③ chê thứ mình chưa biết (*"Jenkins cũng chỉ là CI thôi mà"*) · ④ trả lời ba thứ thành ba đoạn rời — nối liền mạch nghe tự tin hơn hẳn.
+</details>
+
 ---
 ⬅️ [Bank index](README.md)

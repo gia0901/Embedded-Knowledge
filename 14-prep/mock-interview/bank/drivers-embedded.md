@@ -1232,6 +1232,16 @@ Ràng buộc vật lý: thời gian sườn lên ≈ **R × C**, với C là **�
 **Cảm biến I2C mới gắn không phản hồi (`NAK` mọi giao dịch). Bạn debug theo trình tự nào?**
 <details><summary>Đáp án</summary>
 
+> 🔴 **BẰNG CHỨNG 2026-09-14 — đọc trước khi ôn tiếp.** Toàn bộ trình tự dưới đây **đã nằm sẵn trong bank từ trước phiên B3**, kèm cả bước cắt đôi. Ứng viên vẫn trả lời **"không rõ"** cho cả câu. Nhưng khi thu hẹp về cơ chế (*"ai phát ACK/NAK?", "NAK ở địa chỉ khác NAK ở dữ liệu thế nào?"*) thì trả lời **đúng ngay**.
+> ⇒ **T1 CÓ, không ráp thành QUY TRÌNH được.** Đây là **lỗi truy xuất**, giống hệt [RES-008](resume.md) ngày 12/09 — đọc lại lần nữa sẽ không chữa được. Cách chữa: **luyện ráp quy trình** — nghe triệu chứng thì viết ra 4 bước trước khi nói bất cứ điều gì khác.
+
+⚡ **Nếu có shell Linux trên target — làm bước này TRƯỚC cả bảng dưới:**
+```bash
+i2cdetect -y <bus>          # thiet bi co HIEN tren bus khong?
+i2cget -y <bus> <addr> <reg>  # doc tay, bo qua driver cua minh
+```
+`i2cdetect` là **phép cắt đôi rẻ nhất**: **hiện** ⇒ điện + pull-up + địa chỉ đều ổn, lỗi nằm ở **phần mềm/driver**; **không hiện** ⇒ lỗi ở **điện hoặc địa chỉ**, khỏi mở code ra đọc. Nếu `i2cdetect` thấy mà `i2cget` cũng đọc được ⇒ lỗi nằm trong **driver của chính mình**.
+
 **Nguyên tắc: đi từ tầng VẬT LÝ lên tầng phần mềm** — vì lỗi phần cứng biểu hiện y hệt lỗi phần mềm, mà kiểm phần cứng lại **nhanh hơn nhiều**. Sai thứ tự là mất hàng ngày đọc code trong khi vấn đề là một chân chưa hàn.
 
 | # | Kiểm gì | Cách kiểm | Loại trừ được |

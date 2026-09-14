@@ -55,6 +55,94 @@ Map bằng con trỏ tới `volatile`: `#define REG (*(volatile uint32_t*)0x4002
 - Kết hợp hay gặp: `volatile` cho biến ISR; `const volatile` cho thanh ghi chỉ-đọc (status) — vừa cấm ghi vừa cấm tối ưu đọc.
 </details>
 
+#### EMB-037 · 🟡 · concept · ⭐ · 🎤 2026-09-14 · [→ bare-metal-c](../../../08-embedded-systems/bare-metal-c.md)
+**Hai đoạn driver, cả hai compile được. Mỗi đoạn chạy ra gì, và cơ chế gốc chung là gì?**
+```c
+/* (A) */
+uint8_t status = 0x8F;
+if (~status == 0x70) { handle(); }
+
+/* (B) */
+uint32_t timeout_ms = 100;
+int      elapsed_ms = -5;          /* dong ho nhay lui */
+if (elapsed_ms < timeout_ms) { keep_waiting(); }
+```
+<details><summary>Đáp án</summary>
+
+**Cơ chế gốc chung: *integer promotion* + *usual arithmetic conversions*.** Trước mọi phép toán, kiểu nhỏ hơn `int` được **nâng lên `int`**; và khi trộn signed với unsigned **cùng hạng**, signed bị **đổi sang unsigned**.
+
+**Output thật** (gcc 11.4.0, x86-64):
+```
+status          = 0x8F
+~status (int)   = 0xFFFFFF70   <-- da PROMOTE len int
+~status == 0x70 ?           SAI
+(uint8_t)~status == 0x70 ?  dung
+
+elapsed_ms = -5, timeout_ms = 100
+elapsed_ms < timeout_ms ?   SAI   -> keep_waiting() KHONG chay
+elapsed_ms sau khi doi sang unsigned = 4294967291
+```
+
+**(A)** `status` nâng lên `int` **trước** khi `~` ⇒ `~0x0000008F = 0xFFFFFF70`, không bằng `0x70`. `handle()` **không chạy**, dù logic của người viết là đúng.
+⚠️ **Lưu ý ranh giới:** nếu mask chỉ phủ các bit thấp (`~status & 0x0F`) thì kết quả **giống nhau** dù có promote hay không — bug **không lộ ra**. Nó chỉ lộ khi **so sánh trực tiếp** hoặc gán ngược vào kiểu nhỏ.
+
+**(B)** `int` đổi sang `unsigned` ⇒ `-5` thành **4.294.967.291** > 100 ⇒ `keep_waiting()` **không chạy**, đúng lúc cần chạy nhất.
+
+⭐ **Hai quy tắc phải thuộc:**
+1. **Sau mọi `~` hoặc `<<` trên kiểu nhỏ hơn `int`, ép lại kiểu:** `(uint8_t)(~status)`.
+2. **Không bao giờ so sánh signed với unsigned.** Chọn một kiểu cho cả hai vế.
+
+✅ **gcc CÓ bắt được (B)** — nằm trong `-Wextra`:
+```
+warning: comparison of integer expressions of different signedness: 'int' and 'uint32_t' [-Wsign-compare]
+```
+⇒ **Bật `-Wextra` và không bỏ qua warning là chặn được cả lớp bug này.** Ca (A) thì có `-Wsign-compare` cảnh báo dạng *"comparison of promoted bitwise complement"*.
+
+**Cùng lớp bug:** [COD-019](coding.md) (`v.size() - 1` trên vector rỗng) · [COD-021](coding.md) (`1u << 32`).
+</details>
+
+#### EMB-038 · 🟡 · concept · ⭐ · 🎤 2026-09-14 · [→ architecture](../../../08-embedded-systems/architecture.md)
+**Cùng bốn field, hai cách khai báo. `sizeof` mỗi cái là bao nhiêu — và quy tắc cơ học để tự sắp ra layout tốt nhất?**
+```c
+struct A { uint8_t  a; uint32_t b; uint8_t  c; uint16_t d; };
+struct B { uint32_t b; uint16_t d; uint8_t  a; uint8_t  c; };
+```
+<details><summary>Đáp án</summary>
+
+**Output thật** (`offsetof` in ra từ chính chương trình):
+```
+sizeof(A) = 12   (a@0 b@4 c@8 d@10)
+sizeof(B) = 8    (b@0 d@4 a@6 c@7)
+10000 ban ghi: A = 120000 byte, B = 80000 byte, chenh = 40000 byte
+```
+
+**Layout `A` — 4 byte lãng phí:**
+```
+offset: 0    1  2  3    4  5  6  7    8    9    10 11
+        [a] [.][.][.]  [   b       ]  [c]  [.]  [ d  ]
+         1B  <-pad 3->      4B        1B  pad1    2B      => 12
+```
+**Layout `B` — 0 byte lãng phí:**
+```
+offset: 0  1  2  3    4  5    6    7
+        [    b    ]  [ d ]  [a]  [c]                      => 8
+```
+
+**Hai luật sinh ra padding:**
+1. Mỗi member phải nằm ở offset **chia hết cho alignment của nó** (`uint32_t` → bội 4).
+2. `sizeof(struct)` phải là **bội số của alignment lớn nhất** trong struct (để mảng struct vẫn thẳng hàng).
+
+⭐ **Quy tắc cơ học — sắp field theo alignment/kích thước GIẢM DẦN:** 8 byte → 4 → 2 → 1. Gần như luôn cho layout tối ưu, nhớ được trong 5 giây. Đó chính xác là điều `struct B` làm.
+
+**Vì sao đáng quan tâm trên embedded:** 10.000 bản ghi trên thiết bị 256 KB ⇒ chênh **40 KB = 15% tổng RAM**, chỉ vì thứ tự khai báo. Trên hệ có RAM dư thì đây là chuyện nhỏ; trên hệ này thì nó là chuyện sống còn.
+
+⚠️ **Đừng nhảy sang `__attribute__((packed))` để tiết kiệm:** nó bỏ padding nhưng khiến mọi truy cập thành **misaligned** — compiler tự sinh code đọc từng byte (chậm hơn), và trên ARM cấu hình chặt thì lấy địa chỉ member trong struct packed là bẫy mới. `packed` dành cho **wire format**, không dành cho tiết kiệm RAM. Và với wire format thì cách đúng vẫn là **giải mã từng field bằng `memcpy`** ([COD-025](coding.md)).
+
+**Công cụ:** `pahole <binary>` in ra layout + chỗ hổng của mọi struct. `offsetof()` để tự kiểm nhanh.
+</details>
+
+---
+
 ## B — Bộ nhớ bare-metal & khởi động
 
 #### EMB-005 · 🟡 · concept · ⭐ · [→ constraints](../../../08-embedded-systems/constraints.md)

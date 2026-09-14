@@ -1408,6 +1408,152 @@ Vì C++ phơi bày nhiều chi tiết triển khai ra ABI: name mangling không 
 
 ---
 
+#### CPP-066 · 🟠 · concept · ⭐ · 🎤 2026-09-14 · [→ 02-modern-cpp](../../../02-modern-cpp/)
+**Đoạn này: tại mỗi mốc xảy ra copy, move, hay KHÔNG có gì?**
+```cpp
+std::string make_name() {
+    std::string s = "panel-" + std::to_string(1);
+    return s;                       // (1)
+}
+void take(std::string s);           // nhan THEO GIA TRI
+int main() {
+    std::string a = make_name();    // (2)
+    take(a);                        // (3)
+    take(std::move(a));             // (4)
+    std::string b = a;              // (5)  <- sau khi da move
+}
+```
+<details><summary>Đáp án</summary>
+
+| Mốc | Xảy ra gì | Vì sao |
+|---|---|---|
+| **(1)** | **không copy, không move** | `return s;` với `s` là local ⇒ **NRVO**; và kể cả không elide thì chuẩn bắt **implicit move**, không bao giờ copy |
+| **(2)** | **không copy, không move** | ⭐ **C++17 guaranteed copy elision** — `make_name()` là **prvalue**, được dựng **thẳng** vào `a` |
+| **(3)** | **COPY** | `a` là lvalue, `take` nhận theo giá trị |
+| **(4)** | **MOVE** | `std::move(a)` là rvalue |
+| **(5)** | **COPY** — **KHÔNG phải UB** | `a` ở trạng thái *valid but unspecified* |
+
+**Output thật** (`g++ -std=c++17 -O0`, class có in ra mỗi ctor):
+```
+(2) S a = make_it();
+  ctor                 <-- CHI CO CTOR
+(3) take(a);
+  COPY ctor
+(4) take(std::move(a));
+  MOVE ctor
+(5) S b = a;
+  COPY ctor
+```
+
+⭐ **Bằng chứng quyết định cho (1)(2) — dùng để tự kiểm khi phân vân:**
+```cpp
+struct Handle {
+    Handle() = default;
+    Handle(const Handle&) = delete;
+    Handle(Handle&&)      = delete;   // xoa CA HAI
+};
+Handle make() { return Handle{}; }    // (X)
+int main() { Handle h = make(); }     // (Y)
+```
+```
+### C++17 ###   (X) va (Y) COMPILE DUOC
+### C++14 ###   error: use of deleted function 'Handle::Handle(Handle&&)'
+```
+Nếu (1)(2) là copy/move thì đoạn này **phải** lỗi compile. Nó không lỗi ⇒ **C++17 bảo đảm không có copy/move nào cả**.
+
+**Hệ quả thực dụng — đây là chỗ đáng nói ở phỏng vấn:**
+1. **Trả về theo giá trị là MIỄN PHÍ** với prvalue. Đừng "tối ưu" bằng out-param.
+2. **Trả về được cả type không copy/move được** (mutex wrapper, RAII handle, `std::atomic`).
+3. `std::move` trên giá trị trả về (`return std::move(s);`) **làm CHẬM đi** — nó chặn NRVO.
+
+**Trạng thái sau move — nói chính xác:** *valid but unspecified*. Được phép gọi mọi thao tác **không có tiền điều kiện** (`size()`, gán mới, huỷ). **Không** được giả định giá trị. Với `std::string` thực tế thường rỗng, nhưng **không** được dựa vào điều đó.
+
+**Bẫy:** ① gọi (1)(2) là copy — mâu thuẫn với chính việc `Handle` compile được · ② nói (5) là **UB** — sai, chỉ là giá trị không xác định · ③ viết `return std::move(local);`.
+</details>
+
+#### CPP-067 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-09-14 · [→ raii-smart-pointers](../../../02-modern-cpp/raii-smart-pointers.md), [api-design](../../../07-shared-libraries/api-design.md)
+**Class trong shared library của bạn. Với TỪNG member, lựa chọn ownership đúng hay sai — và câu hỏi nào bạn tự đặt để quyết định?**
+```cpp
+class DisplayController {
+    std::shared_ptr<Panel>    panel_;
+    std::unique_ptr<IBackend> backend_;
+    Logger*                   logger_;      // raw
+    std::vector<IObserver*>   observers_;   // raw
+};
+```
+<details><summary>Đáp án</summary>
+
+🔴 **Nhầm lẫn số một, và là nhầm lẫn đắt nhất:** *"chỗ khác cũng **dùng** nó ⇒ phải là `shared_ptr`"*. **SAI.**
+
+⭐ **`shared_ptr` không phải để chia sẻ *quyền truy cập* — nó để chia sẻ *quyền quyết định khi nào huỷ*.**
+
+**Bảng quyết định — hỏi đúng một câu: "AI GIỮ CHO NÓ SỐNG?"**
+
+| Câu hỏi | Trả lời | Dùng |
+|---|---|---|
+| Ai giữ cho nó sống? | Đúng **một** chỗ | `unique_ptr` |
+| | **Nhiều** chỗ, và **không biết ai chết sau cùng** | `shared_ptr` |
+| Chỉ **dùng** trong lúc chủ sở hữu còn sống? | — | ⭐ **raw pointer / reference** (non-owning) |
+| Cần **biết nó còn sống không** trước khi dùng? | — | `weak_ptr` |
+
+**Áp vào đề:**
+
+| Member | Đúng/sai | Lý do |
+|---|---|---|
+| `unique_ptr<IBackend>` | ✅ **đúng** nếu controller là chủ duy nhất và backend chết theo nó | Đây là ca phổ biến nhất của HAL backend |
+| `shared_ptr<Panel>` | 🟡 **chỉ đúng nếu** panel thật sự có nhiều chủ sở hữu với vòng đời không đoán trước. Nếu chỉ "nhiều nơi dùng" thì **sai** | `shared_ptr` thừa che mất bug vòng đời thay vì chặn nó, cộng chi phí atomic refcount |
+| `Logger*` raw | ✅ **đúng** — logger là singleton sống lâu hơn mọi thứ | Điều kiện: **phải sống lâu hơn** controller |
+| `vector<IObserver*>` raw | ✅ **đúng** — observer tự đăng ký, tự sở hữu mình | Điều kiện: **phải `unsubscribe` trước khi chết** |
+
+**Lớp bug mở ra khi điều kiện vỡ:** observer bị huỷ mà quên `unsubscribe` ⇒ vector giữ **dangling pointer** ⇒ lần notify sau là UB. Cách chặn: `weak_ptr<IObserver>` (kiểm còn sống trước khi gọi), hoặc **RAII subscription token** tự gỡ trong destructor.
+
+**Hai ca phải phân biệt được (đây là phần T2):**
+- **(A)** Bên kia chỉ **gọi** trong lúc chủ sở hữu còn sống ⇒ **raw pointer / reference**. Dùng `shared_ptr` ở đây là **sai thiết kế**.
+- **(B)** Bên kia **giữ lại** và dùng **sau khi** chủ sở hữu chết ⇒ **`shared_ptr`** thật sự cần.
+
+**Chốt:** *Đa số chỗ người ta viết `shared_ptr` chỉ cần một con trỏ thô non-owning. Hỏi "ai giữ cho nó sống", đừng hỏi "ai dùng nó".*
+</details>
+
+#### CPP-068 · 🟡 · design · ⭐ · 🎤 2026-09-14 · [→ api-design](../../../07-shared-libraries/api-design.md)
+**API library của bạn có hàm có thể thất bại. Báo lỗi bằng cách nào — exception, mã lỗi, hay `optional`? Và mã lỗi có một điểm yếu chí mạng — nó là gì, C++17 vá thế nào?**
+<details><summary>Đáp án</summary>
+
+**Bốn phương án, chọn theo RÀNG BUỘC chứ không theo sở thích:**
+
+| Cách | Dùng khi | Loại bỏ khi |
+|---|---|---|
+| **Mã lỗi** (`int`/`enum`) | Phải đi qua **biên C ABI** · codebase build `-fno-exceptions` · driver/ioctl | — |
+| **`std::optional<T>`** | *"không có giá trị"* là **kết quả hợp lệ**, không phải lỗi | Cần biết **vì sao** không có |
+| **`std::variant<T, Error>`** | Cần **cả giá trị lẫn lý do lỗi**, không dùng exception | Qua biên C |
+| **Exception** | Lỗi **hiếm** và **không xử lý được tại chỗ** | ⚠️ Qua biên `.so` giữa hai compiler/runtime là **rủi ro ABI thật** · embedded tắt exception |
+
+⚠️ **Phân biệt `optional` với lỗi:** `optional` nói *"không có"*, **không** nói *"tại sao"*. Đọc config mà key vắng mặt ⇒ `optional`. Đọc thanh ghi mà I2C timeout ⇒ **không** phải `optional`, phải là `variant`/mã lỗi.
+
+⭐ **Điểm yếu chí mạng của mã lỗi — KHÔNG phải "thiếu message":**
+```cpp
+readRegister(0x40);      // bo qua HOAN TOAN — compiler khong noi gi
+doSomethingElse();
+```
+**Mã lỗi có thể bị bỏ qua trong im lặng.** Exception thì không — nó tự lan lên. Đây là lý do thật khiến nhiều người chọn exception.
+
+⭐ **C++17 vá đúng chỗ đó:**
+```cpp
+[[nodiscard]] Result<int> readRegister(uint32_t addr);
+```
+Giờ bỏ qua giá trị trả về sinh **warning**. Đây là **feature C++17 hợp API library nhất** — bạn phơi API cho người khác, và `[[nodiscard]]` là cách duy nhất buộc họ kiểm.
+
+**Ba attribute C++17 nên có trong API:**
+| Attribute | Dùng cho |
+|---|---|
+| `[[nodiscard]]` | mọi hàm trả về **mã lỗi** hoặc **tài nguyên** (`unique_ptr`, handle) |
+| `[[maybe_unused]]` | tham số chỉ dùng trong bản debug |
+| `[[deprecated("dùng X thay thế")]]` | API sắp bỏ — **có thông điệp**, hơn hẳn comment |
+
+**Bẫy:** ① trả lời điểm yếu mã lỗi là *"không có message"* — có `strerror`/bảng tra, message không phải vấn đề gốc · ② ném exception xuyên biên `.so` · ③ dùng `optional` cho thứ có nhiều nguyên nhân lỗi khác nhau.
+</details>
+
+---
+
 ## I — Từ *Effective Modern C++* (Scott Meyers) — track `emc`
 
 > Neo theo **Item** của sách; link nguồn tới bản summary [effective-modern-cpp.md](../../../15-book-summaries/effective-modern-cpp.md) để đào sâu.

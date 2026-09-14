@@ -18,8 +18,9 @@
 | **Ngân sách** | ~2h/ngày × 4 buổi ≈ **8h**. Vượt ngân sách = cắt, không kéo dài |
 | **Ngôn ngữ PV** | **50% Việt / 50% Anh** ⇒ mọi câu ruột phải nói được **cả hai thứ tiếng** |
 | **Hình thức coding** | **Trên giấy** — 3 dạng: (1) coding problem · (2) implement DS cơ bản · (3) **đọc code tìm lỗi** |
-| **Buổi gần nhất** | ✅ **B2 — 2026-09-13**, 44/56 = **3.14**, 14 câu ([log](../mock-interview/sessions/2026-09-13--B2--coding.md)) · *trước đó:* B1 12/09, 3.00 ([log](../mock-interview/sessions/2026-09-12--B1--resume.md)) |
-| **Lịch sử điểm sprint** | B1 **3.00** · B2 **3.14** *(rapid 3.80 · implement 2.67 · bug hunt 2.83 — **không so ngang**, [config §4](../mock-interview/config.md))* |
+| **Buổi gần nhất** | ✅ **B3 — 2026-09-14**, 31/60 = **2.58**, 15 câu ([log](../mock-interview/sessions/2026-09-14--B3--cpp17-c-gapjd.md)) |
+| **Lịch sử điểm sprint** | B1 **3.00** (resume) · B2 **3.14** (coding) · **B3 2.58** (lõi kỹ thuật JD) — ⚠️ **không so ngang**, ba buổi đo ba thứ khác nhau |
+| 🔴 **Chặn trước PV** | **Chốt đường A/B cho Yocto** — over-claim đã lặp **lần thứ hai**, xem [weak-register](../mock-interview/weak-register.md) hàng đầu |
 | **Chẩn đoán còn hiệu lực** | **T1 3.67 · T2 2.1** ⇒ nền chắc, hụt ở **vận dụng**. Không đọc thêm tài liệu mới |
 
 ### ▶️ LÀM TIẾP — 4 buổi, chạy đúng thứ tự
@@ -28,10 +29,31 @@
 |---|---|---|---|---|
 | **B1** | 🗣️ **RESUME + dẫn chuyện + process JD** | §3 bản đồ phủ resume · §4 opening 3 móc · §5 behavioral theo JD mới | 120′ | ✅ **3.00** |
 | **B2** | ✍️ **CODING GIẤY** | 3 bài implement viết tay + 6 snippet bug-hunt + DSA rapid (§6) | 120′ | ✅ **3.14** |
-| **B3** | ⚙️ **C++17 + C-kernel + vá gap JD** | §7 C++17 ba tầng · C thuần · **I2C/SPI (cầu nối)** · §8 ba câu trả lời trung thực | 120′ | ⬜ |
+| **B3** | ⚙️ **C++17 + C-kernel + vá gap JD** | §7 C++17 ba tầng · C thuần · **I2C/SPI (cầu nối)** · §8 ba câu trả lời trung thực | 120′ | ✅ **2.58** |
 | **B4** | 🎬 **Giả lập vòng thật** | `comprehensive` cấu hình riêng JD (75′) + coding từ **file trống** (45′) | 120′ | ⬜ |
 
-### ⏭️ Trước khi vào B3 — 4 việc, ~60 phút
+### ⏭️ Trước khi vào B4 — 6 việc, ~2 giờ
+
+| # | Việc | ~ | Vì sao ưu tiên này |
+|---|---|---|---|
+| **1** | 🔴 **Chốt đường A hay B cho Yocto.** ⓐ làm thật `BSP-036` · ⓑ hạ khẳng định về **sstate** (có thật, `BSP-038` ✅). Chọn B thì **nói to 3 lần** | 10′ | Rủi ro duy nhất có thể **một mình** làm mất offer |
+| **2** | 🎙️ Học thuộc [`BEH-017`](../mock-interview/bank/behavioral.md) — bản mẫu Ethernet/scope/Jenkins, 60s | 15′ | Câu chắc chắn gặp; hiện trả lời **3 giây** |
+| **3** | [`CPP-066`](../mock-interview/bank/cpp.md) copy elision · [`CPP-067`](../mock-interview/bank/cpp.md) ownership · [`CPP-068`](../mock-interview/bank/cpp.md) `[[nodiscard]]` | 30′ | Câu *"em dùng C++17 gì"* chắc chắn gặp |
+| **4** | [bus-protocols.md](../../05-drivers-device-tree/bus-protocols.md) + thuộc **4 bước NAK** ([BUS-007](../mock-interview/bank/drivers-embedded.md)) và **CPOL/CPHA** | 25′ | Trụ JD, và là **cầu nối duy nhất** của resume |
+| **5** | [`EMB-037`](../mock-interview/bank/embedded-fundamentals.md) + [`EMB-038`](../mock-interview/bank/embedded-fundamentals.md): sắp field **giảm dần** · ép lại kiểu sau `~`/`<<` · bật `-Wextra` | 15′ | Rẻ, vá đúng ba câu đã rơi |
+| **6** | 🧪 Hai bài lab DBG (`DBG-032` ASan + `DBG-036` valgrind) — **nợ từ B2, vẫn chưa làm** | 40′ | Lỗ hổng *"chọn công cụ"* nay lặp **ba lần** |
+
+### 📉 Lỗ hổng đo được ở B3
+
+1. 🔴 **Câu hỏi về KHOẢNG TRỐNG — hai lỗi ngược nhau trong một buổi.** Câu Yocto **nói quá** (lặp bài học #8); câu Ethernet/scope/Jenkins **nói thiếu** (3 giây). Gốc chung: **không có kịch bản sẵn**.
+2. 🔴 **LỖI TRUY XUẤT — lần thứ hai được ghi nhận.** `BUS-007`: bank đã dạy đủ trình tự kèm bước cắt đôi, trả lời *"không rõ"*; nhưng thu hẹp về **cơ chế** thì đúng ngay. Giống hệt `RES-008` (B1). ⇒ **Đọc thêm không chữa được** — phải luyện **ráp quy trình**.
+3. 🟠 **C++17 — ba thứ cụ thể:** guaranteed copy elision · `[[nodiscard]]` (hỏi 2 lần, cả 2 không có) · **dùng ≠ sở hữu**.
+
+> ✅ **Tin tốt của B3:** câu `volatile`/ISR **1 → 3** và amortized **2 → 3** — hai mục weak-register từ B2 **đóng được sau đúng một ngày ôn**. Cơ chế "đọc lại rồi hỏi lại T1 góc khác" **có tác dụng, đo được**.
+>
+> ⚠️ **Vì sao 2.58 mà không hoảng:** B1 hỏi resume (đã tập), B2 hỏi DSA/code (thế mạnh), **B3 là buổi đầu tiên hỏi đúng lõi kỹ thuật JD**. Con số này nói *"ba buổi trước chưa chạm chỗ yếu nhất"*, không nói năng lực đi xuống.
+
+### ⏭️ Trước khi vào B3 — 4 việc, ~60 phút *(đã xong 13/09)*
 
 | # | Việc | ~ |
 |---|---|---|

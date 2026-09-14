@@ -450,6 +450,13 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 #### RES-012 · 🟠 · concept · ⭐ · 🏗️ · [→ RESUME vs JD: thiếu Yocto, I2C/SPI, PCI/USB]
 **"Anh thấy resume em không nhắc Yocto, cũng không thấy I2C/SPI hay PCI/USB. Bên anh dùng những thứ đó khá nhiều."**
 
+> 🔴 **CẢNH BÁO NÓI QUÁ — sự cố lặp lần thứ hai (14/09).** Trả lời câu Yocto, ứng viên nói *"…và **đã thành công build một minimal image**"*, rồi khi bị đào chỉ đưa được *"image cho BeagleBone, PC x86, ~30 phút, đặt MACHINE là beaglebone"* — **không** tên image, **không** giá trị `MACHINE` đúng (`beaglebone-yocto`), **không** gì trong `local.conf`. Tracking repo ([plan §10](../../study-plans/datalogic-plan.md)) ghi lab BSP **1/8**, `BSP-036` (Yocto) **⬜ chưa làm**. Cùng khẳng định này **đã bị phân xử là sai ngày 06/09** ([bài học #8](../../study-plans/datalogic-plan.md)).
+>
+> ⇒ **Chọn một trước buổi phỏng vấn:** ⓐ **làm thật** `BSP-036` (một buổi tối) rồi mọi thứ nói ra đều thật; hoặc ⓑ **hạ khẳng định**: *"Em chưa vận hành Yocto trong sản phẩm. Phần em thật sự chạm là **sstate** — em đã đo ba phép đo về cache build."* — cái này **có thật** (`BSP-038` ✅) và **vẫn mạnh**, vì `sstate` là chi tiết chỉ người đã chạm mới nói.
+>
+> **Phép thử trước khi khẳng định bất cứ điều gì:** *"nếu họ đào ba câu nữa, mình còn trả lời được không?"* Không ⇒ đừng khẳng định. Khung xử lý khoảng trống đầy đủ: [BEH-017](behavioral.md).
+
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ⚠️ Đây **không** phải câu để loại bạn — đây là câu đo **cách bạn xử lý khoảng trống**. Phản ứng của bạn quan trọng hơn nội dung.
