@@ -127,6 +127,10 @@ App
 | Factory | `DimmingFactory` *(A)* → **`IPlatformFactory`** *(B)* |
 | Trạng thái đa process | `display_shm_info` · `*ForShm` · `lib_sem_lock` |
 | Mã lỗi | `LIB_OK` *(A)* → **`-ENOTSUP`** *(B)* |
+| **Kernel — driver nền (GPL)** | **`drv_panel_core`** |
+| **Kernel — module export + bridge** (1 `.ko`, proprietary) | **`drv_panel_shim`** *(gồm `shim_export` + `shim_bridge`)* |
+| **Kernel — driver thật theo chip** (proprietary, hơn 10 loại) | **`drv_panel_chipA`** · `chipB` · … |
+| **Bảng con trỏ hàm trong bridge** | **`panel_ops`** |
 
 **Khử ở mức nội dung:** bỏ hẳn tên/phiên bản OS nền · số lượng chip làm tròn (*"hơn 10"*) · giữ `~150 virtual` (luận cứ ISP) · giữ loại sản phẩm chung (TV/Signage/Monitor).
 

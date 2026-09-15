@@ -169,6 +169,7 @@ Embedded-Interview/
 │
 ├── 14-prep/                      # Chuẩn bị phỏng vấn thực tế
 │   ├── lab-setup.md              # 🔧 Hạ tầng cho bộ lab phần cứng (BeagleBone Black) — MỘT chỗ duy nhất
+│   ├── whiteboard.md             # 🖊️ 6 sơ đồ vẽ tay khi PV (2 sequence) + chiến lược chọn + kịch bản 🇻🇳/🇬🇧 + nhận định kiến trúc + trang gấp
 │   ├── study-plans/              # ⭐ Plan bám JD đang nhắm (datalogic-plan, có §📍 tracking) + gap-register
 │   └── mock-interview/           # ⭐ Phỏng vấn thử tương tác (/mock) + NGÂN HÀNG CÂU HỎI DUY NHẤT (bank/) + sessions/weak-register/coding-arena(+reviewed/)
 │

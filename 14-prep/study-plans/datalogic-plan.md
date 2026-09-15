@@ -38,6 +38,7 @@
 |---|---|---|---|
 | **1** | 🔴 **Chốt đường A hay B cho Yocto.** ⓐ làm thật `BSP-036` · ⓑ hạ khẳng định về **sstate** (có thật, `BSP-038` ✅). Chọn B thì **nói to 3 lần** | 10′ | Rủi ro duy nhất có thể **một mình** làm mất offer |
 | **2** | 🎙️ Học thuộc [`BEH-017`](../mock-interview/bank/behavioral.md) — bản mẫu Ethernet/scope/Jenkins, 60s | 15′ | Câu chắc chắn gặp; hiện trả lời **3 giây** |
+| **2b** | 🖊️ [**whiteboard.md**](../whiteboard.md) — vẽ được **D1 nhịp 1 trong 20 giây** không nhìn file; thuộc **một câu đánh đổi** cho mỗi sơ đồ | 30′ | 6 sơ đồ (2 **sequence diagram**) + kịch bản 🇻🇳/🇬🇧 + **nhận định kiến trúc D4** (4 câu interviewer sẽ khoan) + **trang gấp** liếc trước giờ G |
 | **3** | [`CPP-066`](../mock-interview/bank/cpp.md) copy elision · [`CPP-067`](../mock-interview/bank/cpp.md) ownership · [`CPP-068`](../mock-interview/bank/cpp.md) `[[nodiscard]]` | 30′ | Câu *"em dùng C++17 gì"* chắc chắn gặp |
 | **4** | [bus-protocols.md](../../05-drivers-device-tree/bus-protocols.md) + thuộc **4 bước NAK** ([BUS-007](../mock-interview/bank/drivers-embedded.md)) và **CPOL/CPHA** | 25′ | Trụ JD, và là **cầu nối duy nhất** của resume |
 | **5** | [`EMB-037`](../mock-interview/bank/embedded-fundamentals.md) + [`EMB-038`](../mock-interview/bank/embedded-fundamentals.md): sắp field **giảm dần** · ép lại kiểu sau `~`/`<<` · bật `-Wextra` | 15′ | Rẻ, vá đúng ba câu đã rơi |
