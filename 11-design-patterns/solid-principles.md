@@ -52,7 +52,7 @@ struct SensorReport  { std::string format(double); };
 
 > 💡 **"Một trách nhiệm" đo bằng LÝ DO THAY ĐỔI, không đo bằng số hàm.** Một class 20 hàm cùng phục vụ một mối quan tâm vẫn đúng SRP; một class 2 hàm mà một hàm đổi vì phần cứng, hàm kia đổi vì yêu cầu UI thì đã sai.
 
-**Áp vào hệ display:** `DisplayImpl` điều phối; thuật toán dimming nằm ở `IDimming`; đường xuống phần cứng nằm ở backend. Đổi thuật toán không đụng đường xuống HW, và ngược lại — đó là SRP ở mức kiến trúc ([in-practice/01](in-practice/B1-redesign-architecture.md)).
+**Áp vào hệ display:** `lib_dimming` chỉ ủy nhiệm; thuật toán nằm ở `IDimmingAlgo` (`GlobalDimming` · `LocalDimming` · `OLEDDimming`); đường xuống phần cứng nằm ở `IDimmingBackend` (`DimmingBackendChipA_Global`…). Đổi thuật toán không đụng đường xuống phần cứng, và ngược lại — đó là SRP ở mức kiến trúc ([in-practice/A1 §5](in-practice/A1-baseline-libdisplay.md)).
 
 ---
 
@@ -114,7 +114,7 @@ void resize(Rectangle& r) { r.setW(5); r.setH(4); /* ky vong dien tich = 20 */ }
 
 ⭐ **Vi phạm LSP nguy hiểm hơn vi phạm các nguyên lý khác** — bốn nguyên lý kia hỏng thì code *khó sửa*; LSP hỏng thì code **chạy ra kết quả sai** qua đúng con đường đa hình mà bạn tin tưởng.
 
-**Áp vào hệ display:** nếu `OledDimming` âm thầm bỏ qua `setTarget()` vì panel OLED không có backlight, đó là vi phạm LSP — lớp trên tưởng đã đặt xong. Đúng cách: trả **mã lỗi tường minh** (`-ENOTSUP`), tức biến "không làm gì" thành **một phần của hợp đồng** — chính là [Null Object](behavioral.md).
+**Áp vào hệ display:** nếu `OLEDDimming` âm thầm bỏ qua `SetZoneBacklight()` vì panel OLED tự phát sáng, không có vùng đèn nền, đó là vi phạm LSP — lớp trên tưởng đã đặt xong. Đúng cách: trả **mã lỗi tường minh** (`-ENOTSUP`), tức biến "không làm gì" thành **một phần của hợp đồng** — chính là [Null Object](behavioral.md).
 
 ---
 
@@ -213,7 +213,7 @@ Phần này quan trọng ngang 5 phần trên — và là câu hỏi 🔴 [DP-01
 2. Chúng khác nhau về **hành vi**, hay chỉ khác **tham số**? *(Chỉ khác tham số ⟹ truyền tham số.)*
 3. Có ai thật sự cần **hoán đổi** chúng không?
 
-> **Ví dụ đối chứng trong chính hệ display:** `dimming` đạt cả ba ⟹ interface + factory. `frc`/`tcon` trượt cả ba ⟹ **để nguyên hàm gọi thẳng**. Nói được chỗ mình *cố tình không* áp SOLID là tín hiệu senior mạnh hơn kể tên năm pattern ([in-practice/B1 §7.1](in-practice/B1-redesign-architecture.md)).
+> **Ví dụ đối chứng trong chính hệ display:** `dimming` đạt cả ba ⟹ interface + factory. **Display Control** (lệnh đơn: nguồn panel, resolution, tần số…) trượt ngay câu 1 — khác biệt giữa các chip đã nằm trong kernel driver ⟹ **để nguyên hàm gọi thẳng**. Nói được chỗ mình *cố tình không* áp SOLID là tín hiệu senior mạnh hơn kể tên năm pattern ([in-practice/B1 §7.1](in-practice/B1-redesign-architecture.md)).
 
 **Riêng embedded, thêm hai lưu ý:** ① virtual trên đường **mỗi khung hình** thì đáng đo, trên đường **cấu hình** thì miễn phí — chi phí nằm ở *tần suất gọi*, không ở việc có dùng abstraction hay không; ② **cấm cấp phát động trên đường nóng** kể cả khi pattern gợi ý làm vậy.
 
@@ -231,7 +231,7 @@ Phần này quan trọng ngang 5 phần trên — và là câu hỏi 🔴 [DP-01
 | [DP-008](../14-prep/mock-interview/bank/design-patterns.md) | Cho ví dụ vi phạm Liskov Substitution Principle. |
 | [DP-011](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Logic đọc mã vạch gọi thẳng driver I2C, phải test được không cần phần cứng — DIP "đảo ngược" cái gì? |
 | [DP-012](../14-prep/mock-interview/bank/design-patterns.md) | Khi nào KHÔNG nên dùng design pattern / áp SOLID? |
-| [DP-024](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | `frc`/`tcon` chỉ một command cố định — vì sao KHÔNG bọc pattern? Nêu cái giá cụ thể. |
+| [DP-024](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Display Control chỉ là lệnh đơn — vì sao KHÔNG bọc pattern? Nêu cái giá cụ thể. |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [creational.md](creational.md)

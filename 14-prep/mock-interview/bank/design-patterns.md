@@ -815,6 +815,227 @@ App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **de
 **Chốt:** *Version check là **hợp đồng về NỘI DUNG**; vtable là **hợp đồng về BỐ CỤC**. Cái thứ hai không tự kiểm tra được lúc chạy — nên nó phải được bảo vệ ở lúc review và lúc build.*
 </details>
 
+#### DP-040 · 🟠 · concept · ⭐ · [→ A1 §3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**App của bạn viết C++, bên trong library cũng là C++ đa hình, nhưng giữa hai bên là một API `extern "C"` thuần. Đồng nghiệp chê "C++ → C → C++ vòng vo, phơi thẳng C++ interface cho gọn". Bảo vệ thiết kế này bằng HAI lý do độc lập — và nêu một ngoại lệ mà chính hệ của bạn có.**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — đồng hồ cát (narrow waist):** hai đầu rộng, dùng đủ C++; chỗ hẹp ở giữa là hợp đồng duy nhất phải giữ vĩnh viễn.
+
+| Ranh giới | Đặc điểm | Hợp đồng |
+|---|---|---|
+| App ↔ `IDisplay` | **Khép** — cùng team, cùng toolchain, build cùng lúc | C++ được phép |
+| `IDisplay` ↔ library | **Mở** — nhiều process, build lệch thời gian, có thể khác toolchain | **Chỉ C** |
+| Bên trong library | Không ai ngoài nhìn thấy | C++ tự do — **không phải ABI** |
+
+**Lý do 1 — ABI (ai cũng nói được):** qua ranh giới mở, C++ mang theo name mangling, **bố cục vtable** và phiên bản STL của bên build. Chèn một virtual vào giữa interface là **ABI break im lặng**: app gọi hàm này mà hàm khác chạy, exit 0 (DP-027, DP-033). Với mặt tiền C, không vtable nào đi qua ranh giới ⟹ miễn nhiễm cả lớp bug đó.
+
+**Lý do 2 — điểm khoá duy nhất (phân biệt ứng viên):** mỗi hàm C gói *kiểm shared memory → khoá semaphore → gọi đa hình → mở khoá*. Phơi thẳng C++ interface thì caller gọi thẳng method và **bypass semaphore** ⟹ mất chống race giữa các process. Chọn C **không chỉ vì ABI**, mà vì nó là chỗ duy nhất **ép** mọi lời gọi đi qua khoá.
+
+**Hệ quả nên nói kèm:** vì mặt tiền là C, interface nội bộ ~150 virtual có thể thêm/bớt/tách thoải mái — mọi đề xuất refactor không đụng caller nào.
+
+**Ngoại lệ (tự nêu là điểm cộng):** vòng vsync chạy **bên trong** library, không đi qua mặt tiền ⟹ không được khoá ở mặt tiền bảo vệ (DP-044). "Duy nhất" đúng cho **caller bên ngoài**, không đúng cho **mọi đường chạm state**.
+
+**Bẫy:** chỉ nói "C ổn định hơn" mà không nói ổn định **cái gì** (bố cục nhị phân) và **với ai** (bên build lệch thời gian). **Chốt:** *Ranh giới mở → C; ranh giới khép → C++ interface được phép. Ở hệ của tôi, mặt tiền C còn là điểm khoá duy nhất cho caller.*
+</details>
+
+#### DP-041 · 🟡 · concept · ⭐ · [→ A1 §7](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**Library của bạn được nạp vào 5 process. Mỗi process có `get_dimming_instance()` trả về một con trỏ toàn cục. Hỏi: có bao nhiêu object dimming? Bao nhiêu bản state thật? Thứ đó là Singleton à? Và vì sao chỗ khởi tạo không có data race?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** dữ liệu của `.so` được map **riêng cho từng process** ⟹ 5 process = **5 con trỏ, 5 object C++**. Nhưng state thật (mức độ sáng, trạng thái thuật toán) nằm trong **POSIX shared memory** ⟹ **một bản cho cả hệ**, bảo vệ bằng **named semaphore**.
+
+| | Object C++ | State thật |
+|---|---|---|
+| Sống ở đâu | Mỗi process một bản | Shared memory |
+| 5 process ⟹ | 5 | **1** |
+| Ai bảo vệ | Không cần | Named semaphore |
+
+⟹ ***"Object là per-process, state là per-system."*** Câu này cũng trả lời DP-020.
+
+**Gọi tên đúng:** `get_*_instance()` trên con trỏ toàn cục là **Service Locator**, không phải Singleton GoF — không gì *ép* tính duy nhất, chỉ có quy ước "chỉ hàm init gán". Còn "một instance" trên toàn hệ thì không có — có 5.
+
+**Vì sao không race:** khởi tạo chạy trong `__attribute__((constructor))`, tức **trước khi process tạo thread nào** ⟹ không có check-then-act cạnh tranh. Đây là cách chữa race khác magic statics: **dời khởi tạo ra khỏi vùng có cạnh tranh**.
+
+**Chốt:** *Object rẻ và lặp lại theo process; state là duy nhất và nằm ở shared memory — nên khoá bảo vệ state, không bảo vệ object.*
+</details>
+
+#### DP-042 · 🔴 · design · ⭐ · 🏗️ · [→ A1 §5.4](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**Bạn kể dimming là Bridge: thuật toán (Global/Local/OLED) × backend theo chip. Interviewer chỉ vào tên lớp `DimmingBackendChipA_Global`, `DimmingBackendChipA_Local`… và nói: "backend của bạn nhân theo chip × thuật toán — vẫn là N×M, đâu phải Bridge". Trả lời thế nào?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — thừa nhận trước, rồi đổi thước đo:**
+1. Đúng, backend nhân theo **chip × thuật toán**, vì cách ghi phần cứng của từng thuật toán khác hẳn nhau: Global ghi **một** giá trị, Local ghi **từng vùng** màn hình.
+2. Nhưng thứ bị nhân là lớp **mỏng** (vài chục dòng ghi thanh ghi). Thứ **đắt** — thuật toán — vẫn được viết **đúng một lần** và mọi chip dùng chung.
+
+| | Gộp logic + phần cứng | Bridge sách | Hệ thật |
+|---|---|---|---|
+| Số lớp | N × M — **đều nặng** | N + M | N **nặng** + N × M **mỏng** |
+| Sửa bug thuật toán | **M chỗ** | 1 | **1** |
+| Thêm 1 chip | +N lớp nặng | +1 | +N backend mỏng |
+
+**"Vì sao" tách tầng:**
+- *Nông:* "vẫn đỡ hơn N×M".
+- *Sâu:* **mục tiêu của Bridge không phải con số N+M, mà là phần đắt không bị nhân bản** và hai nửa đổi được độc lập. Implementor được phép phụ thuộc vào abstraction nó phục vụ khi phần cứng thật sự khác nhau theo thuật toán — giả vờ có một hợp đồng phần cứng chung cho cả Global lẫn Local mới là thiết kế sai.
+
+**Đi thêm một bước (điểm cộng):** chip được chốt **lúc build** (CMake chỉ build thư mục chip đích) ⟹ trong một binary chỉ có N backend, không phải N×M. Và nếu làm lại, tách `IDimmingBackendGlobal`/`IDimmingBackendLocal` thì ghép nhầm thuật toán với backend thành **lỗi compile** (B1 §4).
+
+**Bẫy:** cãi "vẫn là N+M" (sai, bị vặn tiếp là lộ) hoặc gật "vậy không phải Bridge" (bỏ mất luận điểm đúng). **Chốt:** *"Bridge ở đây không phẳng như sách; tôi chấp nhận nhân phần mỏng để phần đắt chỉ viết một lần."*
+</details>
+
+#### DP-043 · 🟠 · concept · ⭐ · [→ A1 §6](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**Trong kernel, driver nền không biết tên chip nào; nó gọi driver chip qua một struct con trỏ hàm `panel_ops` mà driver chip tự điền vào lúc init. So với `virtual` trong C++: giống gì, khác gì — và nó thừa hưởng HAI rủi ro nào của vtable?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** `panel_ops` là **vtable viết tay bằng C**. Driver nền gọi `ops->set_freq(...)` y như C++ gọi `p->setFreq(...)` qua vtable; driver chip là "lớp con" điền slot của mình.
+
+| | `virtual` (dimming, user-space) | `panel_ops` (kernel) |
+|---|---|---|
+| Ai dựng bảng | **Compiler** | **Lập trình viên** |
+| Ai ghép hai nửa | Factory **tạo** cặp (Abstract Factory) | Driver chip **tự đăng ký** (self-registration) |
+| Chip chốt khi | Build — CMake chọn thư mục | Build — chỉ build các `.ko` của chip |
+| Tổ hợp theo model chốt khi | Runtime — factory | Runtime — probe nạp đúng `.ko` |
+| Hàm không hỗ trợ | Base trả mặc định (Null Object) | Slot `NULL` |
+
+⟹ Cùng một quyết định thiết kế ở hai tầng: **phần chung không biết chip, phần theo chip cắm vào sau**. Đó là Bridge, viết bằng hai ngôn ngữ.
+
+**Hai rủi ro thừa hưởng:**
+
+| Rủi ro | Tương ứng C++ | Chữa |
+|---|---|---|
+| Slot `NULL` bị gọi ⟹ **kernel oops** | Gọi pure virtual / thiếu Null Object | Điền sẵn cả bảng bằng stub trả `-ENOTSUP` + log; chip ghi đè cái mình có |
+| **Chèn** một hàm vào giữa struct ⟹ mọi slot sau lệch, gọi nhầm hàm, version khớp vẫn không cứu (DP-033) | Chèn virtual vào giữa interface | Chỉ thêm vào **cuối**; thêm trường `size`/`version` đầu struct để kiểm lúc đăng ký |
+
+**"Vì sao" tách tầng:** *Nông:* "function pointer cho linh hoạt". *Sâu:* kernel viết bằng C nên **phải tự dựng** thứ C++ cho sẵn — và vì tự dựng, mọi bảo đảm (không có slot rỗng, bố cục ổn định) **cũng phải tự giữ**. Kernel đã có khuôn chuẩn cho việc này: `file_operations`, `net_device_ops`.
+
+**Chốt:** *"Bảng ops là vtable viết tay — nên nó thừa hưởng nguyên hai bệnh của vtable: slot rỗng và slot lệch."*
+</details>
+
+#### DP-044 · 🟠 · concept · [→ A1 §5.8](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [B1 §6](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Mọi lời gọi API của library đều đi qua một named semaphore ở mặt tiền C. Ngoài ra library còn một vòng chạy mỗi khung hình (vsync): khởi động khi `.so` được nạp, đi thẳng thuật toán → phần cứng, và khi một process khác nạp `.so` thì vòng này reset, chạy lại trong process mới. Nêu hai vấn đề thiết kế của vòng này và cách sửa.**
+<details><summary>Đáp án</summary>
+
+**Vấn đề 1 — chạm state ngoài khoá:** vòng vsync và đường API cùng đọc/ghi **một** state trong shared memory, nhưng chỉ đường API được khoá (khoá nằm ở mặt tiền). An toàn của state đang phụ thuộc vào **đường gọi**, không phụ thuộc vào **state**. Hôm nay chưa vỡ không có nghĩa là có gì ngăn nó vỡ.
+- **Sửa:** đưa khoá xuống **cạnh state** — chỉ lấy được state qua một RAII guard đã giữ khoá (`ShmGuard`). Giữ **nguyên một** semaphore, chỉ đổi chỗ đặt (DP-047).
+
+**Vấn đề 2 — vòng đời không có chủ cố định:** vòng vsync chạy trong **process nạp `.so` sau cùng**. Một tool test hay process factory mở library là kéo vòng vsync về phía nó; process đó thoát thì vòng đi theo.
+- **Sửa:** biến "ai chạy vsync" từ **hệ quả của thứ tự nạp** thành **quyết định tường minh** — constructor của `.so` không tự khởi động gì; chỉ service sống suốt vòng đời thiết bị gọi `lib_start_vsync()`.
+
+| Cách cho vấn đề 2 | Được | Mất |
+|---|---|---|
+| ✅ Một service chủ cố định | Đơn giản, xác định | Library phải biết mình có phải chủ không |
+| Bầu chủ qua shared memory (PID + kiểm còn sống) | Không phụ thuộc service | Tự viết bầu chủ, xử lý chủ chết giữa chừng — dễ sai |
+
+**Điểm hay nên nói:** vòng vsync đổi process mà thuật toán **không mất trí nhớ**, vì state nằm trong shared memory — đó chính là luận cứ cho việc đặt state ở đó.
+
+**Chốt:** *"Hai vấn đề cùng một gốc: state và vòng vsync đều có nhiều hơn một chủ. Sửa bằng một khoá đi cùng state và một process chủ cho vsync."*
+</details>
+
+#### DP-045 · 🟠 · coding · [→ B1 §3](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Display Control là các hàm tự do. Bạn muốn `dc_write_brightness()` CHỈ backend của Picture Quality gọi được; một `lib_api_*` nào đó gọi thẳng phải là LỖI COMPILE. Ràng buộc: không thêm interface, không virtual, không tốn gì lúc chạy. Viết cơ chế đó. Có bẫy nào riêng của C++17?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — passkey idiom:** hàm đòi một tham số kiểu "chìa khoá" mà **chỉ** lớp được phép mới tạo được. Compiler kiểm quyền gọi; chìa khoá rỗng nên bị tối ưu mất.
+
+```cpp
+class BrightnessKey {
+    BrightnessKey() {}                    // ✅ user-provided
+ // BrightnessKey() = default;            // ❌ C++17: van la aggregate -> ai cung tao duoc
+    friend class DimmingBackendBase;
+};
+int32_t dc_write_brightness(BrightnessKey, int32_t brightness);
+
+class DimmingBackendBase {
+protected:
+    static BrightnessKey key() { return BrightnessKey(); }   // friend KHONG di truyen
+};
+class DimmingBackendChipA_Global : public DimmingBackendBase, public IDimmingBackendGlobal {
+    uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) override {
+        return dc_write_brightness(key(), pInputData->value);              // ✅
+    }
+};
+int32_t lib_api_set_something(int32_t v) {
+    return dc_write_brightness(BrightnessKey{}, v);                      // ❌ loi compile
+}
+```
+
+**Hai chi tiết dễ sai:**
+1. **`friend` không di truyền** — `DimmingBackendChipA_Global` không phải friend dù base là friend ⟹ base cấp chìa khoá qua hàm `protected`.
+2. **Bẫy aggregate C++17** — đã kiểm bằng `g++ -Wall -Wextra`:
+
+| Constructor | `lib_api` gọi `BrightnessKey{}` |
+|---|---|
+| `BrightnessKey() {}` | ❌ `error: 'BrightnessKey::BrightnessKey()' is private within this context` |
+| `= default`, `-std=c++17` | ⚠️ **compile sạch** — chìa khoá bị vượt qua |
+| `= default`, `-std=c++20` | ❌ lỗi |
+
+Ở C++17, class chỉ có constructor `= default` (kể cả `private`) **vẫn là aggregate** ⟹ `{}` đi đường aggregate initialization, **không gọi constructor nào**, nên quyền truy cập không được kiểm. C++20 sửa luật này.
+
+**Vì sao không làm interface cho DC:** vấn đề là **quyền gọi**, không phải **đa hình** — DC không có biến thể nào ở user-space (DP-024). Thêm interface là trả giá cho thứ không cần.
+
+**Chốt:** *"Passkey biến một quy ước thành thứ compiler kiểm, giá bằng không. Nhớ viết constructor `{}` chứ không `= default` nếu còn ở C++17."*
+</details>
+
+#### DP-046 · 🔴 · design · 🏗️ · [→ B1 §1, §9](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Bạn liệt kê 5 điểm yếu của hệ: interface ~150 method; ranh giới "chỉ PQ ghi độ sáng" chỉ là quy ước; logic chọn thuật toán lặp ở mỗi chip; base trả `LIB_OK` cho việc không làm; vòng vsync chạm state ngoài khoá. Interviewer: "năm cái này có chung gốc không? Nếu chỉ được sửa hai cái trong quý này, bạn chọn cái nào?"**
+<details><summary>Đáp án</summary>
+
+**Gom về hai bệnh — đây là phần tính điểm:**
+
+| Bệnh | Phép thử | Điểm yếu |
+|---|---|---|
+| **Một thứ có nhiều hơn một chủ** | *"Có mấy chỗ trong code được phép thay đổi thứ này?"* — lớn hơn 1 là có bug đang chờ | Độ sáng: 2 đường ghi · Chọn thuật toán: M bản · State: 1 đường không khoá · vsync: chủ là process nạp sau cùng |
+| **Hợp đồng không nói thật** | *"Hợp đồng hứa gì, thực tế làm gì?"* | 150 method mà phần lớn là no-op · `LIB_OK` cho "không hỗ trợ" |
+
+⟹ **Luật một câu:** *mỗi quyết định, mỗi tài nguyên, mỗi state chỉ có đúng một chủ.*
+
+**Chọn hai — theo lợi ích / rủi ro, không theo độ "đẹp":**
+
+| Thứ tự | Vá | Vì sao |
+|---|---|---|
+| 1 | Khoá đi cùng state (RAII guard) | Rủi ro **thấp**: không đổi mô hình đồng bộ, chỉ đổi chỗ đặt khoá; đóng đúng đường vsync không khoá |
+| 2 | Passkey cho lệnh ghi độ sáng | Rủi ro **thấp**: thêm một tham số; **compiler tự chỉ ra** mọi chỗ đang vi phạm |
+| sau | Factory theo chip → tách interface | Dời code, không đổi hành vi — làm dần |
+| cuối | Đổi `LIB_OK` → `-ENOTSUP` | Rủi ro **cao**: đổi hành vi của API đang chạy ⟹ phải **đo trước** |
+
+**"Vì sao" tách tầng:**
+- *Nông:* liệt kê lại 5 điểm và nói "sửa hết".
+- *Sâu:* nhận ra **gốc chung**, và xếp thứ tự theo **ai làm phần kiểm tra**: hai bước đầu chuyển việc kiểm từ *kỷ luật con người* sang *compiler/RAII* — đó là loại cải tiến rẻ nhất mà chặn được nguyên một lớp bug.
+
+**Bẫy:** chọn "tách interface 150 method" đầu tiên vì nó "trông tệ nhất" — nó là vấn đề bảo trì, không phải vấn đề đúng/sai. **Chốt:** *"Tôi không làm lại kiến trúc; tôi đổi **ai được làm gì**, theo thứ tự rủi ro tăng dần."*
+</details>
+
+#### DP-047 · 🟠 · design · [→ B1 §6.1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Để vòng vsync không chạm state ngoài khoá, bạn thêm `ShmGuard` (lấy qua `lock_lib_shm()`, thay cho `get_lib_shm()`) — RAII lấy named semaphore ở constructor, nhả ở destructor — và bắt mọi truy cập state đi qua nó. Build sạch, nhưng chạy là treo ngay ở lời gọi API đầu tiên. Vì sao? Và vì sao không chia luôn thành mỗi module một mutex riêng cho "mịn"?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế treo:**
+1. `lib_api_set_backlight()` lấy semaphore ở **mặt tiền** (như cũ).
+2. Bên trong, thuật toán lấy state qua `ShmGuard` ⟹ `sem_wait` **lần hai trong cùng luồng**.
+3. POSIX semaphore **không recursive** — nó chỉ là bộ đếm, không biết "ai đang giữ". Giá trị đang là 0 ⟹ luồng chờ **chính nó** ⟹ treo vĩnh viễn.
+
+```cpp
+int32_t lib_api_set_backlight(int32_t backlight) {
+    int sem_ret = lib_sem_lock(__FUNCTION__);                // lan 1 — o mat tien
+    get_dimming_instance()->SetBacklight(backlight);         //   -> lock_lib_shm() -> lib_sem_lock()  ❌ lan 2: tu deadlock
+    if (sem_ret == 0) lib_sem_unlock(__FUNCTION__);
+}
+```
+
+**Chọn một trong hai, không để cả hai:**
+
+| Cách | Được | Mất |
+|---|---|---|
+| ✅ **Bỏ khoá ở mặt tiền**, guard lo hết | Một chỗ khoá, đi cùng state — đúng mục tiêu | Trình tự nhiều bước ở mặt tiền phải gói trong **một** guard để vẫn nguyên tử |
+| Khoá cho phép lấy lại (recursive, có chủ) | Không phải sửa mặt tiền | Che mất thiết kế khoá lộn xộn; named semaphore không có sẵn bản này |
+
+**Vì sao không mỗi module một mutex:**
+- Mất **tính nhất quán toàn cục**: một thao tác chạm state của hai module (vd độ sáng và tăng cường hình cùng nghe `set_backlight`) không còn nguyên tử.
+- Mở ra bài toán **thứ tự khoá** giữa **nhiều process** ⟹ deadlock khó tái hiện hơn nhiều so với deadlock trong một process.
+- Lợi ích "mịn" gần như không có: các thao tác đều ngắn, tranh chấp thấp.
+
+**Chốt:** *"Đổi **chỗ đặt** khoá, không đổi **số** khoá. Và khi dời khoá xuống, phải gỡ khoá cũ — semaphore không biết ai đang giữ nó."*
+</details>
+
 ---
 
 ⬅️ [Bank index](README.md)

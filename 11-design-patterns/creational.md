@@ -5,16 +5,17 @@
 > - **Factory Method**: tạo **một** loại sản phẩm; client chỉ thấy interface. **Abstract Factory**: tạo **cả một họ** phải khớp nhau — điểm bán hàng của nó là **nhất quán họ được bảo đảm bằng KIỂU, không bằng kỷ luật**.
 > - **Singleton**: bảo đảm một instance. Tiện, và là pattern **bị lạm dụng nhiều nhất** — nó là global state trá hình. Phần đáng học không phải "viết thế nào" mà là *vì sao Meyers thread-safe* và *vì sao "một instance" sai qua ranh giới `.so`*.
 > - **Object Pool**: tái sử dụng object cấp phát sẵn — cấp phát **tất định**, không chạm heap. Đây là creational pattern hợp embedded nhất.
-> - Áp dụng thật: [in-practice/B1 §4](in-practice/B1-redesign-architecture.md) (Abstract Factory theo SoC) · [in-practice/02](in-practice/A2-cpp-interface-hal.md) (Factory Method + Singleton trong HAL của bạn).
+> - Áp dụng thật: [in-practice/A1 §5.6](in-practice/A1-baseline-libdisplay.md) (`DimmingFactory` của hệ thật) · [in-practice/B1 §4](in-practice/B1-redesign-architecture.md) (Abstract Factory theo chip) · [in-practice/A2](in-practice/A2-cpp-interface-hal.md) (Factory Method + Singleton trong HAL của bạn).
+> - Tên lớp/hàm trong file này lấy theo [A1](in-practice/A1-baseline-libdisplay.md) để đọc code liền mạch.
 
 ---
 
 ## 0. Vấn đề gốc: `new` là một phụ thuộc
 
 ```cpp
-void configure() {
-    LocalDimming d;        // ⬅️ dong nay GAN CHAT ham nay voi mot class cu the
-    d.setTarget(300);
+void lib_dimming::Create() {
+    LocalDimming dimming(std::make_unique<DimmingBackendChipA_Local>());  // ⬅️ GAN CHAT voi mot thuat toan + mot chip
+    dimming.SetBacklight(80);
 }
 ```
 
@@ -42,13 +43,12 @@ Dòng `new`/khai báo object cụ thể tạo ra **ba** ràng buộc cùng lúc:
 | **Đừng dùng khi** | Chỉ có một loại và sẽ mãi chỉ một loại |
 
 ```cpp
-struct Sensor { virtual double read() = 0; virtual ~Sensor() = default; };
-
-// Client chi biet enum, khong biet class cu the
-std::unique_ptr<Sensor> createSensor(SensorType t) {
-    switch (t) {
-        case SensorType::Temp: return std::make_unique<TempSensor>();
-        case SensorType::Humi: return std::make_unique<HumiSensor>();
+// dimming/Backend/ChipA — client chi biet DimmingType_k, khong biet class cu the
+std::unique_ptr<IDimmingBackend> CreateDimmingBackend(DimmingType_k type) {
+    switch (type) {
+        case DIMMING_GLOBAL: return std::make_unique<DimmingBackendChipA_Global>();
+        case DIMMING_LOCAL:  return std::make_unique<DimmingBackendChipA_Local>();
+        case DIMMING_OLED:   return std::make_unique<DimmingBackendChipA_OLED>();
     }
     return nullptr;
 }
@@ -71,26 +71,30 @@ std::unique_ptr<Sensor> createSensor(SensorType t) {
 | | |
 |---|---|
 | **Bản chất** | Một object đại diện cho **một biến thể nền tảng**, tạo ra **cả họ** thành phần của nền tảng đó |
-| **Cái biến thiên** | Nền tảng (SoC, OS, backend), kéo theo **nhiều** sản phẩm đổi cùng lúc |
+| **Cái biến thiên** | Nền tảng (chip, OS, backend), kéo theo **nhiều** sản phẩm đổi cùng lúc |
 | **Cô lập ở đâu** | Trong concrete factory — mỗi nền tảng một class |
 | **Nguyên lý** | OCP + DIP, **cộng thêm** một bảo đảm mà Factory Method không có: nhất quán họ |
 | **Đừng dùng khi** | Chỉ có **một** loại sản phẩm cần tạo ⟹ Factory Method là đủ |
 
 ```cpp
-// Hop dong: tao CA HO thanh phan cua mot nen tang
-class ISocFactory {
+// Hop dong: tao CA HO backend cua MOT chip (ten nhu B1 §4)
+class IDimmingBackendFactory {
 public:
-    virtual ~ISocFactory() = default;
-    virtual std::unique_ptr<IVideoEnhancer> createEnhancer() = 0;
-    virtual std::unique_ptr<IDimming>       createDimming()  = 0;
-    virtual std::unique_ptr<IFrc>           createFrc()      = 0;
+    virtual ~IDimmingBackendFactory() = default;
+    virtual std::unique_ptr<IDimmingBackendGlobal> CreateGlobal() = 0;
+    virtual std::unique_ptr<IDimmingBackendLocal>  CreateLocal()  = 0;
+    virtual std::unique_ptr<IDimmingBackendOLED>   CreateOLED()   = 0;
 };
+class DimmingBackendFactoryChipA : public IDimmingBackendFactory { /* ca ho backend chip A */ };
 
-// Chon MOT LAN luc boot -> switch duy nhat cua ca library
-std::unique_ptr<ISocFactory> pickFactory(const BoardConfig& cfg);
+// Chon MOT LAN -> mot cho duy nhat cua ca library
+// (he that: moi thu muc chip dinh nghia ham nay, CMake chi build ban cua chip dich)
+std::unique_ptr<IDimmingBackendFactory> CreateDimmingBackendFactory();
 ```
 
-⭐ **Điểm bán hàng thật, và là chỗ ăn điểm ở phỏng vấn.** Nếu chỉ cần "tạo object theo SoC" thì vài hàm rời `makeEnhancer(soc)`, `makeDimming(soc)` cũng làm được. Cái mà chúng **không** làm được: ngăn việc trộn enhancer của SoC-A với dimming của SoC-B. Lỗi đó **compile sạch, chạy được**, chỉ sai trên đúng một board — lớp bug đắt nhất.
+⭐ **Điểm bán hàng thật, và là chỗ ăn điểm ở phỏng vấn.** Nếu chỉ cần "tạo object theo chip" thì vài hàm rời `CreateGlobalBackend(chip)`, `CreateLocalBackend(chip)` cũng làm được. Cái mà chúng **không** làm được: ngăn việc trộn backend của chip A với backend của chip B. Lỗi đó **compile sạch, chạy được**, chỉ sai trên đúng một board — lớp bug đắt nhất.
+
+> 🔗 Ở hệ của bạn chip đã chốt lúc build nên rủi ro *trộn chip* không còn; rủi ro thật là **ghép nhầm thuật toán với backend** (`GlobalDimming` + backend Local). A1 chặn bằng cách tạo cả cặp trong `DimmingFactory`; B1 chặn bằng **kiểu** — xem [A1 §5.6](in-practice/A1-baseline-libdisplay.md) · [B1 §4](in-practice/B1-redesign-architecture.md).
 
 > **Abstract Factory chuyển ràng buộc "cả họ phải cùng một nền tảng" từ *kỷ luật lập trình viên* sang *hệ thống kiểu*.** Chỉ có một object factory, và nó **là** nền tảng đó — không còn tham số nào để truyền sai.
 
@@ -98,7 +102,7 @@ std::unique_ptr<ISocFactory> pickFactory(const BoardConfig& cfg);
 |---|---|---|
 | Nhất quán họ | Do người viết nhớ | **Do kiểu bảo đảm** |
 | Vị trí `switch` | Lặp trong mỗi hàm | **Một chỗ duy nhất** |
-| Thêm nền tảng mới | Sửa N hàm | Thêm 1 class + 1 `case` |
+| Thêm chip mới | Sửa N hàm | Thêm 1 class + 1 `case` |
 | Thay bằng test double | Hook từng hàm | Thay **một** factory |
 
 Đầy đủ với ví dụ hệ display: [in-practice/B1 §4](in-practice/B1-redesign-architecture.md) · câu [DP-022](../14-prep/mock-interview/bank/design-patterns.md).
@@ -243,7 +247,7 @@ auto req = HttpRequest::Builder("http://api").method(GET).timeout(30).build();
 | [DP-009](../14-prep/mock-interview/bank/design-patterns.md) | Vì sao Singleton bị coi là anti-pattern khi lạm dụng? |
 | [DP-004](../14-prep/mock-interview/bank/design-patterns.md) | Factory pattern giải quyết vấn đề gì? Liên hệ SOLID? |
 | [DP-037](../14-prep/mock-interview/bank/design-patterns.md) | Factory Method và Abstract Factory khác nhau ở đâu? Dấu hiệu cần cái thứ hai? |
-| [DP-022](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Vài hàm `makeX(SocType)` rời có gì sai so với một `ISocFactory`? |
+| [DP-022](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Vài hàm `makeX(ChipType)` rời có gì sai so với một factory object? |
 | [DP-015](../14-prep/mock-interview/bank/design-patterns.md) | Object Pool là gì? Vì sao hợp embedded? Điểm tinh tế khi hiện thực? |
 | [DP-013](../14-prep/mock-interview/bank/design-patterns.md) | Thiết kế hệ thống plugin trong C++ dùng pattern nào? |
 | [DP-026](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Đọc `getInstance()` trong HAL của bạn — bug gì? Vì sao `static` không cứu được? |

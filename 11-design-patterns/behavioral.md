@@ -34,18 +34,20 @@
 | **Đừng dùng khi** | Chỉ có một thuật toán, hoặc loại được quyết định lúc boot và không đổi nữa (⟹ [Template Method](#2--template-method)) |
 
 ```cpp
-struct IDimming {
-    virtual ~IDimming() = default;
-    virtual void onFrame(const FrameStats&) = 0;
-};
-class GlobalDimming : public IDimming { /* 1 gia tri cho ca panel */ };
-class LocalDimming  : public IDimming { /* N zone theo histogram  */ };
-
-class DisplayImpl {                       // CONTEXT — khong doi khi them thuat toan
-    std::unique_ptr<IDimming> dimming_;
+class IDimmingAlgo {                          // ten nhu A1
 public:
-    void onFrame(const FrameStats& s) { dimming_->onFrame(s); }        // uy nhiem
-    void setDimming(std::unique_ptr<IDimming> d) { dimming_ = std::move(d); }
+    virtual ~IDimmingAlgo() = default;
+    virtual uint32_t SetBacklight(int32_t backlight) = 0;
+    virtual void     t_vSyncCallBack()               = 0;   // vong vsync goi moi khung hinh
+};
+class GlobalDimming : public IDimmingAlgo { /* 1 gia tri cho ca panel */ };
+class LocalDimming  : public IDimmingAlgo { /* moi vung mot gia tri  */ };
+
+class lib_dimming {                           // CONTEXT — khong doi khi them thuat toan
+    std::unique_ptr<IDimmingAlgo> m_pDimmingPanel;
+public:
+    uint32_t SetBacklight(int32_t v) { return m_pDimmingPanel->SetBacklight(v); }   // uy nhiem
+    void SetDimmingObject(std::unique_ptr<IDimmingAlgo> p) { m_pDimmingPanel = std::move(p); }
 };
 ```
 
@@ -67,16 +69,17 @@ public:
 | **Đừng dùng khi** | Các biến thể khác nhau về **cả khung**, hoặc cần đổi lúc runtime |
 
 ```cpp
-class DimmingBase {
+class DimmingAlgoBase : public IDimmingAlgo {
 public:
-    void onFrame(const FrameStats& s) {     // <- KHUNG: khong virtual, khong doi
-        auto duty = compute(s);             //    hook: moi loai tu tinh
-        clamp(duty);                        //    buoc chung
-        writeToHw(duty);                    //    buoc chung
+    void t_vSyncCallBack() final {                       // <- KHUNG: final, lop con khong doi duoc
+        int32_t level = ComputeBacklight(m_pDimmingVendor->GetFrameStats());   // hook: moi loai tu tinh
+        level = Clamp(level);                                                   // buoc chung
+        WriteToBackend(level);                                                  // buoc chung -> m_pDimmingBackend
     }
-    virtual ~DimmingBase() = default;
 protected:
-    virtual Duty compute(const FrameStats&) = 0;   // CHO DUY NHAT lop con thay
+    virtual int32_t ComputeBacklight(const FrameStats&) = 0;   // CHO DUY NHAT lop con thay
+    DimmingVendorInterface* m_pDimmingVendor;                   // doc thong ke khung hinh — nhu A1
+    IDimmingBackend*        m_pDimmingBackend;                  // cay cau sang phan cung — nhu A1
 };
 ```
 
@@ -107,13 +110,13 @@ protected:
 
 ```cpp
 class LightSensor {                                   // subject — khong biet ai nghe
-    std::vector<std::weak_ptr<ILightObserver>> obs_;  // weak: khong giu vong doi
+    std::vector<std::weak_ptr<ILightObserver>> m_observers;   // weak: khong giu vong doi
 public:
-    void subscribe(std::shared_ptr<ILightObserver> o) { obs_.push_back(std::move(o)); }
-    void publish(int lux) {
-        for (auto it = obs_.begin(); it != obs_.end(); ) {
-            if (auto p = it->lock()) { p->onLux(lux); ++it; }
-            else                     { it = obs_.erase(it); }   // tu don observer da chet
+    void Subscribe(std::shared_ptr<ILightObserver> o) { m_observers.push_back(std::move(o)); }
+    void Publish(int32_t lux) {
+        for (auto it = m_observers.begin(); it != m_observers.end(); ) {
+            if (auto p = it->lock()) { p->OnLux(lux); ++it; }
+            else                     { it = m_observers.erase(it); }   // tu don observer da chet
         }
     }
 };
@@ -128,7 +131,7 @@ public:
 
 ### 3.1 ⭐ Chỗ Observer KHÔNG giúp được
 
-Nối thẳng `onLux → setBrightness` là **đúng pattern nhưng sai sản phẩm**: ánh sáng dao động liên tục ⟹ độ sáng đuổi theo từng mẫu ⟹ **nhấp nháy**. Đó là **vấn đề miền**, phải giải bằng đường ống sau Observer: **lọc** (EMA) → **hysteresis hai ngưỡng** → **giới hạn tốc độ** (ramp) → **chống lặp**. Chi tiết + cách kể ở phỏng vấn: [in-practice/B2 §1.2](in-practice/B2-redesign-events.md).
+Nối thẳng `OnLux → SetBacklight` là **đúng pattern nhưng sai sản phẩm**: ánh sáng dao động liên tục ⟹ độ sáng đuổi theo từng mẫu ⟹ **nhấp nháy**. Đó là **vấn đề miền**, phải giải bằng đường ống sau Observer: **lọc** (EMA) → **hysteresis hai ngưỡng** → **giới hạn tốc độ** (ramp) → **chống lặp**. Chi tiết + cách kể ở phỏng vấn: [in-practice/B2 §1.2](in-practice/B2-redesign-events.md).
 
 ---
 
@@ -229,6 +232,7 @@ struct BrightnessCmd {
 
 ```cpp
 // Base la Null Object: moi API co cai dat mac dinh co nghia
+// (ten nhu HAL Tang 0 o in-practice/A2 — IDisplay; o A1 cung y tuong la IDimmingAlgo tra LIB_OK)
 int IDisplay::setPower(bool)     { return -ENOTSUP; }
 int IDisplay::setBrightness(int) { return -ENOTSUP; }
 ```

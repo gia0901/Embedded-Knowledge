@@ -31,45 +31,51 @@ Bốn pattern dưới đây có **hình dạng code gần như giống hệt nha
 |---|---|
 | **Bản chất** | Tách **abstraction** (cái client thấy) khỏi **implementation** (cách làm), nối bằng một con trỏ, để hai bên tiến hoá độc lập |
 | **Vấn đề nó giải** | **Bùng nổ lớp con** khi có ≥ 2 chiều biến thiên |
-| **Dấu hiệu cần dùng** | Tên class bắt đầu ghép hai chiều: `LocalDimmingSocA`, `OledDimmingSocB`… |
+| **Dấu hiệu cần dùng** | Tên class bắt đầu ghép hai chiều: `LocalDimmingChipA`, `OLEDDimmingChipB`… |
 | **Cái giá** | Một interface phụ + một lần gián tiếp; object phải được **ghép** lúc dựng |
 | **Đừng dùng khi** | Chỉ có một chiều biến thiên ⟹ kế thừa thường (hoặc Strategy) là đủ |
 
-**Bài toán:** N thuật toán dimming × M SoC (mỗi SoC ghi duty xuống HW một kiểu).
+**Bài toán:** N thuật toán dimming × M chip (mỗi chip ghi độ sáng xuống phần cứng một kiểu). Tên dưới đây giống hệt [in-practice/A1 §5](in-practice/A1-baseline-libdisplay.md).
 
 ```
 Ke thua ca hai truc:
-  GlobalDimmingSocA   LocalDimmingSocA   OledDimmingSocA
-  GlobalDimmingSocB   LocalDimmingSocB   OledDimmingSocB     => N x M lop
+  GlobalDimmingChipA   LocalDimmingChipA   OLEDDimmingChipA
+  GlobalDimmingChipB   LocalDimmingChipB   OLEDDimmingChipB     => N x M lop
 ```
 
 ```cpp
-// IMPLEMENTOR — bien thien theo SoC
+// IMPLEMENTOR — bien thien theo chip
 class IDimmingBackend {
 public:
     virtual ~IDimmingBackend() = default;
-    virtual void writeDuty(int zone, int duty) = 0;   // SocA: ioctl · SocB: sysfs/mailbox
-    virtual int  zoneCount() const             = 0;
+    virtual uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) = 0;   // Global: mot gia tri
+    virtual uint32_t t_SetLdFinalDuty(BackendLdFinalDuty_t* pInputData)  = 0;   // Local: tung vung
 };
+class DimmingBackendChipA : public IDimmingBackend { /* ghi phan cung kieu chip A */ };
+class DimmingBackendChipB : public IDimmingBackend { /* ghi phan cung kieu chip B */ };
 
 // ABSTRACTION — bien thien theo thuat toan
-class DimmingBase : public IDimming {
+class GlobalDimming : public IDimmingAlgo {
 protected:
-    std::unique_ptr<IDimmingBackend> hw_;             // "cay cau" — KHONG ke thua
+    std::unique_ptr<IDimmingBackend> m_pDimmingBackend;      // "cay cau" — KHONG ke thua
 public:
-    explicit DimmingBase(std::unique_ptr<IDimmingBackend> hw) : hw_(std::move(hw)) {}
+    explicit GlobalDimming(std::unique_ptr<IDimmingBackend> pDimmingBackend)
+        : m_pDimmingBackend(std::move(pDimmingBackend)) {}
 };
+// LocalDimming, OLEDDimming: cung khuon
 
 // Ghep luc chay: N + M lop, phu duoc N x M to hop
-auto d = std::make_unique<LocalDimming>(std::make_unique<SocABackend>());
+auto pDimming = std::make_unique<LocalDimming>(std::make_unique<DimmingBackendChipA>());
 ```
 
 | | Kế thừa hai trục | **Bridge** |
 |---|---|---|
 | Số lớp | **N × M** | **N + M** |
-| Thêm 1 SoC | +N lớp | **+1 lớp** |
+| Thêm 1 chip | +N lớp | **+1 lớp** |
 | Thêm 1 thuật toán | +M lớp | **+1 lớp** |
 | Tổ hợp mới | Phải viết lớp mới | **Ghép lúc runtime** |
+
+> ⚠️ **Hệ thật không phẳng như sách:** backend còn tách tiếp theo thuật toán (`DimmingBackendChipA_Global`, `DimmingBackendChipA_Local`…), vì Global và Local ghi phần cứng khác hẳn nhau ⟹ N nặng + N×M mỏng. Vẫn là Bridge, vì phần đắt (thuật toán) chỉ viết một lần — xem [in-practice/A1 §5.4](in-practice/A1-baseline-libdisplay.md).
 
 ### 1.1 ⭐ Bridge vs Strategy — code giống hệt, Ý ĐỊNH khác
 
@@ -135,7 +141,7 @@ public:
 
 ⭐ **Giá trị thật của Adapter là ngăn interface lạ LAN RA.** Không có nó, chữ ký của vendor (kiểu dữ liệu, quy ước mã lỗi, `const char*` thay vì `std::string`) sẽ rò rỉ vào khắp codebase — và khi đổi vendor thì phải sửa mọi nơi. Adapter dồn toàn bộ thiệt hại về **một file**.
 
-**Ví dụ embedded:** SoC vendor cấp API dạng `int vendor_set_bl(uint8_t*, size_t)`; adapter phơi ra `IDimmingBackend::writeDuty(int zone, int duty)` mà phần còn lại của library dùng. Đổi vendor = viết adapter mới.
+**Ví dụ embedded:** vendor chip cấp API dạng `int vendor_set_bl(uint8_t*, size_t)`; `DimmingBackendChipA` là adapter, phơi ra `IDimmingBackend::t_Set2DFinalDuty(...)` mà phần còn lại của library dùng. Đổi vendor = viết adapter mới.
 
 ---
 

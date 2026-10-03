@@ -22,19 +22,25 @@ Sensor (**subject**) không nên biết ai quan tâm tới ánh sáng môi trư�
 class ILightObserver {
 public:
     virtual ~ILightObserver() = default;
-    virtual void onLux(int lux) = 0;
+    virtual void OnLux(int32_t lux) = 0;
 };
 
 class LightSensor {                              // subject — không biết ai nghe
-    std::vector<std::weak_ptr<ILightObserver>> obs_;   // weak: không giữ vòng đời observer
+    std::vector<std::weak_ptr<ILightObserver>> m_observers;   // weak: không giữ vòng đời observer
 public:
-    void subscribe(std::shared_ptr<ILightObserver> o) { obs_.push_back(std::move(o)); }
-    void publish(int lux) {
-        for (auto it = obs_.begin(); it != obs_.end(); ) {
-            if (auto p = it->lock()) { p->onLux(lux); ++it; }
-            else                     { it = obs_.erase(it); }   // tự dọn observer đã chết
+    void Subscribe(std::shared_ptr<ILightObserver> o) { m_observers.push_back(std::move(o)); }
+    void Publish(int32_t lux) {
+        for (auto it = m_observers.begin(); it != m_observers.end(); ) {
+            if (auto p = it->lock()) { p->OnLux(lux); ++it; }
+            else                     { it = m_observers.erase(it); }   // tự dọn observer đã chết
         }
     }
+};
+
+// Observer trong hệ A1: chính module dimming
+class lib_dimming : public lib_dimming_interface, public ILightObserver {
+public:
+    void OnLux(int32_t lux) override { /* loc -> hysteresis -> ramp (§1.2) */ SetBacklight(/*...*/); }
 };
 ```
 
@@ -42,7 +48,7 @@ public:
 
 ### 1.2 ⭐ Chỗ Observer **không** giúp được: nhấp nháy
 
-Nối thẳng `onLux → setBrightness` là **đúng pattern nhưng sai sản phẩm**. Ánh sáng môi trường dao động liên tục (người đi qua, mây, đèn chớp) ⟹ độ sáng đuổi theo từng mẫu ⟹ **nhấp nháy** — đúng thứ dòng resume nói là đã xử lý.
+Nối thẳng `OnLux → SetBacklight` là **đúng pattern nhưng sai sản phẩm**. Ánh sáng môi trường dao động liên tục (người đi qua, mây, đèn chớp) ⟹ độ sáng đuổi theo từng mẫu ⟹ **nhấp nháy** — đúng thứ dòng resume nói là đã xử lý.
 
 Nhấp nháy là **vấn đề miền**, phải giải bằng cơ chế miền, xếp thành một **đường ống** sau Observer:
 
@@ -57,7 +63,7 @@ Nhấp nháy là **vấn đề miền**, phải giải bằng cơ chế miền, 
 
 ✅ **Cách kể ở phỏng vấn** *(đoạn này ăn điểm vì nó cho thấy bạn phân biệt được cấu trúc với miền)*:
 
-> *"Sensor phát sự kiện theo kiểu Observer nên tầng brightness không gắn cứng với driver sensor. Nhưng riêng Observer thì gây nhấp nháy — nối thẳng sự kiện vào setBrightness là đuổi theo từng mẫu. Nên sau Observer tôi đặt một đường ống: lọc trung bình trượt, rồi hysteresis hai ngưỡng để không dao động quanh điểm chuyển, rồi ramp giới hạn tốc độ đổi. Pattern lo phần ai-gọi-ai; chống nhấp nháy là phần thuật toán, pattern không làm hộ."*
+> *"Sensor phát sự kiện theo kiểu Observer nên tầng brightness không gắn cứng với driver sensor. Nhưng riêng Observer thì gây nhấp nháy — nối thẳng sự kiện vào SetBacklight là đuổi theo từng mẫu. Nên sau Observer tôi đặt một đường ống: lọc trung bình trượt, rồi hysteresis hai ngưỡng để không dao động quanh điểm chuyển, rồi ramp giới hạn tốc độ đổi. Pattern lo phần ai-gọi-ai; chống nhấp nháy là phần thuật toán, pattern không làm hộ."*
 
 ---
 
@@ -162,7 +168,7 @@ Memento kinh điển là **trong một process, trong một phiên chạy** (und
 
 | ID | Câu hỏi |
 |----|---------|
-| [DP-030](../../14-prep/mock-interview/bank/design-patterns.md) | Nối `onLux` thẳng vào `setBrightness` — đúng Observer nhưng sản phẩm nhấp nháy. Vì sao pattern không cứu được, và bạn thêm gì? |
+| [DP-030](../../14-prep/mock-interview/bank/design-patterns.md) | Nối `OnLux` thẳng vào `SetBacklight` — đúng Observer nhưng sản phẩm nhấp nháy. Vì sao pattern không cứu được, và bạn thêm gì? |
 | [DP-031](../../14-prep/mock-interview/bank/design-patterns.md) | Message trên POSIX mq là Command — cần thêm gì để nhiều panel đổi độ sáng *cùng lúc*, và vì sao struct đó phải có `version`? |
 | [DP-032](../../14-prep/mock-interview/bank/design-patterns.md) | Preset là Memento — nhưng export sang màn hình khác thì Memento sách vở thiếu ba thứ gì? |
 | [DP-006](../../14-prep/mock-interview/bank/design-patterns.md) | Observer pattern dùng khi nào? Rủi ro cần lưu ý? |

@@ -23,7 +23,7 @@ Hai lý do cụ thể, không phải khẩu hiệu:
 ```mermaid
 flowchart LR
     A["<b>TẦNG 1 — SỞ HỮU</b><br/>5 pattern<br/><i>có mặt trong code/resume<br/>⇒ interviewer CHẮC CHẮN đào</i>"]
-    B["<b>TẦNG 2 — NÓI ĐƯỢC MỘT ĐOẠN</b><br/>4 pattern<br/><i>có mặt trong việc<br/>nhưng không phải trục chính</i>"]
+    B["<b>TẦNG 2 — NÓI ĐƯỢC MỘT ĐOẠN</b><br/>7 pattern<br/><i>có mặt trong việc<br/>nhưng không phải trục chính</i>"]
     C["<b>TẦNG 3 — CẮT</b><br/>phần còn lại<br/><i>nhận ra tên là đủ,<br/>không đầu tư</i>"]
     A --> B --> C
 ```
@@ -34,8 +34,8 @@ Tiêu chí vào tầng này: **đã nằm trong code bạn viết hoặc trong m
 
 | Pattern | Ở đâu trong việc của bạn | Neo trên resume / code | Tài liệu |
 |---|---|---|---|
-| **Abstract Factory** *(+ Factory Method)* | Chọn cả **họ** implementation theo chip / dòng sản phẩm lúc boot | *"the library selects its implementation at boot from board configuration"* | [B1 §4](B1-redesign-architecture.md) |
-| **Strategy** | Dimming **Global / Local / OLED** — cùng hợp đồng, khác thuật toán | *"display enhancement (dimming...)"* | [A1 §5.4](A1-baseline-libdisplay.md) · [behavioral §1](../behavioral.md) |
+| **Abstract Factory** *(+ Factory Method)* | Tạo **cặp khớp nhau** thuật toán + backend theo model; mỗi chip cung cấp **họ** backend của nó | *"the library selects its implementation at boot from board configuration"* | [A1 §5.6](A1-baseline-libdisplay.md) · [B1 §4](B1-redesign-architecture.md) |
+| **Strategy** | Dimming **Global / Local / OLED** — cùng hợp đồng, khác thuật toán | *"display enhancement (dimming...)"* | [A1 §5.5](A1-baseline-libdisplay.md) · [behavioral §1](../behavioral.md) |
 | **Bridge** | Hai trục biến thiên độc lập: *thuật toán dimming* × *chip* — chống bùng nổ lớp con | *"a single C++ interface across chipsets"* | [A1 §5.3](A1-baseline-libdisplay.md) · [structural §1](../structural.md) |
 | **Singleton** | `IDisplay::getInstance()` trong HAL bạn viết | `interface/IDisplay.cpp` | [A2 §3.2](A2-cpp-interface-hal.md) |
 | **Observer** | Ambient light sensor → đổi độ sáng | *"adaptive brightness control driven by an ambient light sensor"* | [B2 §1](B2-redesign-events.md) |
@@ -76,7 +76,7 @@ Lý do cắt — nói thẳng để lần sau không ai lặng lẽ kéo ngượ
 
 Đây là phần đáng mang vào phỏng vấn hơn cả danh sách pattern.
 
-1. **Không phải chỗ nào cũng cần pattern.** `frc` và `tcon` chỉ là *một command cố định xuống chip* — trừu tượng hoá chúng là chi phí thuần tuý. Nói được **chỗ mình cố tình không dùng** là tín hiệu senior rõ hơn kể tên năm pattern. Chi tiết: [B1 §7.1](B1-redesign-architecture.md).
+1. **Không phải chỗ nào cũng cần pattern.** Display Control chỉ là *lệnh đơn xuống kernel* (nguồn panel, resolution, tần số…), và khác biệt giữa các chip đã nằm trong driver — trừu tượng hoá nó là chi phí thuần tuý. Nói được **chỗ mình cố tình không dùng** là tín hiệu senior rõ hơn kể tên năm pattern. Chi tiết: [A1 §4.4](A1-baseline-libdisplay.md) · [B1 §7.1](B1-redesign-architecture.md).
 2. **Pattern trả lời "biến thiên ở đâu".** Trước khi chọn pattern, viết ra **trục biến thiên**: *cái gì thay đổi, cái gì đứng yên*. Dimming biến thiên theo **thuật toán**; video-enhancer biến thiên theo **SoC**. Hai trục khác nhau ⟹ hai pattern khác nhau, dù nhìn qua đều là "kế thừa từ một class gốc".
 3. **Qua ranh giới `.so`, pattern nào cũng phải trả thêm giá ABI.** Virtual interface là **hợp đồng nhị phân**, không chỉ hợp đồng biên dịch. Đã kiểm chứng thật: chèn một virtual vào giữa `IDisplay` ⟹ app gọi hàm này nhưng **destructor chạy**, không crash, exit 0 — **kể cả khi version check của hai bên khớp nhau**. Xem [A2 §3.3](A2-cpp-interface-hal.md).
 
@@ -96,22 +96,26 @@ Lý do cắt — nói thẳng để lần sau không ai lặng lẽ kéo ngượ
 
 | # | File | Nội dung |
 |---|------|----------|
-| 🅰️ | [A1-baseline-libdisplay.md](A1-baseline-libdisplay.md) | **Bắt đầu ở đây.** Kiến trúc `libdisplay`: narrow waist hai tầng · 7 pattern có thật · case study **dimming = Bridge** · **5 điểm yếu tự nhận** |
+| 🅰️ | [A1-baseline-libdisplay.md](A1-baseline-libdisplay.md) | **Bắt đầu ở đây.** Kiến trúc `libdisplay`: narrow waist hai tầng · hai component **Picture Quality / Display Control** · case study **dimming = Bridge** · kernel `panel_ops` = **Bridge viết bằng C** · **5 điểm yếu tự nhận** · bản nói 75 giây |
 | 🅰️ | [A2-cpp-interface-hal.md](A2-cpp-interface-hal.md) | **Tầng 0** của A1 — ranh giới C++ interface/impl: mổ từng mảnh, 3 rủi ro đã đo bằng máy, **pack code chạy được** + **5 bài lab 🧪** |
-| 🅱️ | [B1-redesign-architecture.md](B1-redesign-architecture.md) | Vá 5 điểm yếu: ISP · trục thứ ba · Abstract Factory thật · hợp đồng lỗi · khoá đi cùng state. Kèm **thứ tự ưu tiên theo rủi ro** |
+| 🅱️ | [B1-redesign-architecture.md](B1-redesign-architecture.md) | Vá 5 điểm yếu theo luật **"mỗi thứ một chủ"**: ISP + capability · passkey cho lệnh ghi độ sáng · factory backend theo chip · `-ENOTSUP` · khoá đi cùng state + một process chủ cho vsync. Kèm **thứ tự ưu tiên theo rủi ro** |
 | 🅱️ | [B2-redesign-events.md](B2-redesign-events.md) | Observer + hysteresis · Command + `apply_at` · Memento/Preset |
 
 **Một trục kiến trúc duy nhất nối cả bốn file:**
 
 ```
 App
- └─ IDisplay / DisplayImpl      ← 🅰️ A2 · ranh giới KHÉP · C++
-      └─ lib_api_*              ← chỗ hẹp · ranh giới MỞ · extern "C"
-           └─ libdisplay nội bộ ← 🅰️ A1 (thật) · 🅱️ B1 (làm lại)
+ └─ IDisplay / DisplayImpl            ← 🅰️ A2 · ranh giới KHÉP · C++
+      └─ lib_api_*                    ← chỗ hẹp · ranh giới MỞ · extern "C"
+           ├─ Picture Quality         ← 🅰️ A1 (thật) · 🅱️ B1 (làm lại)
+           └─ Display Control         ← lệnh đơn, cố ý không pattern
+                └─ ioctl → drv_panel_core → panel_ops → drv_panel_chipX   ← 🅰️ A1 §6
 ```
 
 ## 🔤 Bộ từ vựng chuẩn — dùng thống nhất trong cả mục
 
+> 📛 **Luật đặt tên (áp cho mọi file mục 11):** khái niệm **còn tồn tại** thì dùng **đúng tên A1**, kể cả tên hàm (`SetBacklight`, `t_vSyncCallBack`, `t_Set2DFinalDuty`) và kiểu đặt tên (PascalCase cho method, `m_p` cho con trỏ thành viên). Khái niệm **mới** ở phần 🅱️ thì **ghép từ tên A1** (`IDimmingBackend` → `IDimmingBackendGlobal`, `get_lib_shm` → `lock_lib_shm`). Ngoại lệ có chủ đích: code ở A2 giữ nguyên vì đi kèm output thật đã chạy.
+>
 > ⚠️ Mọi định danh dưới đây là **tên tài liệu**, không phải tên thật của hệ. **Kiến trúc giữ nguyên 100%.** Tư liệu nội bộ còn tên thật bị `.gitignore` và **không được link tới từ tài liệu commit** — mọi file phần A/B phải **tự chứa**.
 
 | Khái niệm | Tên chuẩn |
@@ -119,27 +123,28 @@ App
 | Shared library | **`libdisplay`** |
 | Mặt tiền C của library | **`lib_api_*`** (`lib_api.h`) |
 | C++ interface Tầng 0 | **`IDisplay`** / **`DisplayImpl`** |
-| Hợp đồng module trong library | `lib_dimming_interface` · `lib_sensor_interface` · `lib_video_enhancement_interface` · `lib_ambient_interface` |
-| Implementation module | `lib_dimming` · `lib_sensor` · `lib_video_enhancement` · `lib_ambient` |
-| Biến thể dòng sản phẩm | hậu tố `_signage` |
-| Abstraction thuật toán dimming | **`IDimmingAlgo`** *(A)* → **`IDimmingCore` + nhóm khả năng** *(B)* |
-| Implementor theo chip | **`IDimmingBackend`** → `DimmingBackendChipA` · `ChipB` |
-| Factory | `DimmingFactory` *(A)* → **`IPlatformFactory`** *(B)* |
-| Trạng thái đa process | `display_shm_info` · `*ForShm` · `lib_sem_lock` |
+| Hai component sau mặt tiền | **Picture Quality (PQ)** · **Display Control (DC)** |
+| Hợp đồng module PQ | `lib_dimming_interface` · `lib_video_enhancement_interface` · `lib_ambient_interface` |
+| Implementation module PQ | `lib_dimming` · `lib_video_enhancement` · `lib_ambient` · khởi tạo tại `lib_init_modules()` |
+| Display Control | hàm tự do `dc_*` (`display_control.cpp`) · *(B)* lệnh ghi độ sáng đòi **`BrightnessKey`**, chỉ `DimmingBackendBase` tạo được |
+| Abstraction thuật toán dimming | **`IDimmingAlgo`** — `GlobalDimming` · `LocalDimming` · `OLEDDimming` *(A)* → **`IDimmingAlgo` cắt còn lõi** (`SetBacklight` · `t_vSyncCallBack` · `GetCaps`) + `ILocalDimming` · `IOLEDDimming` · `IAmbientMode` *(B)* |
+| Implementor (ghi phần cứng) | **`IDimmingBackend`** → `DimmingBackendChipA_Global` · `ChipA_Local` · … *(A)* → **`IDimmingBackendGlobal` · `IDimmingBackendLocal` · `IDimmingBackendOLED`**, giữ nguyên tên hàm `t_Set2DFinalDuty` · `t_SetLdFinalDuty` *(B)* |
+| Factory | `DimmingFactory` — mỗi chip một bản *(A)* → **`DimmingFactory` một bản chung** (`CreateDimmingObject`) + **`DimmingBackendFactoryChipX`** mỗi chip (`IDimmingBackendFactory`, `CreateDimmingBackendFactory()`) *(B)* |
+| Trạng thái đa process | `display_shm_info` · `*ForShm` · `get_lib_shm()` · `lib_sem_lock` *(A)* → `lock_lib_shm()` trả `ShmGuard` *(B)* |
 | Mã lỗi | `LIB_OK` *(A)* → **`-ENOTSUP`** *(B)* |
 | **Kernel — driver nền (GPL)** | **`drv_panel_core`** |
 | **Kernel — module export + bridge** (1 `.ko`, proprietary) | **`drv_panel_shim`** *(gồm `shim_export` + `shim_bridge`)* |
 | **Kernel — driver thật theo chip** (proprietary, hơn 10 loại) | **`drv_panel_chipA`** · `chipB` · … |
 | **Bảng con trỏ hàm trong bridge** | **`panel_ops`** |
 
-**Khử ở mức nội dung:** bỏ hẳn tên/phiên bản OS nền · số lượng chip làm tròn (*"hơn 10"*) · giữ `~150 virtual` (luận cứ ISP) · giữ loại sản phẩm chung (TV/Signage/Monitor).
+**Khử ở mức nội dung:** bỏ hẳn tên/phiên bản OS nền · số lượng chip làm tròn (*"hơn 10"*) · giữ `~150 virtual` (luận cứ ISP) · giữ loại sản phẩm chung (TV/Signage/Monitor) · không nhắc FRC/TCON và thuật ngữ đo sáng (APL, histogram, PWM duty) — viết *"giá trị độ sáng cuối"*.
 
 ## Liên kết ngoài topic
 
 - ABI của virtual interface qua `.so`: [07/abi-versioning.md](../../07-shared-libraries/abi-versioning.md) · [07/linking-loading.md](../../07-shared-libraries/linking-loading.md)
 - Thiết kế API thư viện, Pimpl: [07/api-design.md](../../07-shared-libraries/api-design.md)
 - Chi phí virtual/heap trên hệ hạn chế: [08/constraints.md](../../08-embedded-systems/constraints.md)
-- Câu hỏi: mục **E** trong [bank/design-patterns.md](../../14-prep/mock-interview/bank/design-patterns.md) (`DP-021` … `DP-030`)
+- Câu hỏi: mục **E** trong [bank/design-patterns.md](../../14-prep/mock-interview/bank/design-patterns.md) — case study `libdisplay` + HAL (`DP-021` trở đi, gồm `DP-040`…`DP-047` cho kiến trúc PQ/DC, kernel `panel_ops` và các bản vá ở B1)
 
 ---
 ⬅️ [Về index topic 11](../README.md) · ➡️ Bắt đầu: [B1-redesign-architecture.md](B1-redesign-architecture.md)
