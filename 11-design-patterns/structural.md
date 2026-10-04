@@ -38,33 +38,33 @@ Bốn pattern dưới đây có **hình dạng code gần như giống hệt nha
 **Bài toán:** N thuật toán dimming × M chip (mỗi chip ghi độ sáng xuống phần cứng một kiểu). Tên dưới đây giống hệt [in-practice/A1 §5](in-practice/A1-baseline-libdisplay.md).
 
 ```
-Ke thua ca hai truc:
+Kế thừa cả hai trục:
   GlobalDimmingChipA   LocalDimmingChipA   OLEDDimmingChipA
-  GlobalDimmingChipB   LocalDimmingChipB   OLEDDimmingChipB     => N x M lop
+  GlobalDimmingChipB   LocalDimmingChipB   OLEDDimmingChipB     => N x M lớp
 ```
 
 ```cpp
-// IMPLEMENTOR — bien thien theo chip
+// IMPLEMENTOR — biến thiên theo chip
 class IDimmingBackend {
 public:
     virtual ~IDimmingBackend() = default;
-    virtual uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) = 0;   // Global: mot gia tri
-    virtual uint32_t t_SetLdFinalDuty(BackendLdFinalDuty_t* pInputData)  = 0;   // Local: tung vung
+    virtual uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) = 0;   // Global: một giá trị
+    virtual uint32_t t_SetLdFinalDuty(BackendLdFinalDuty_t* pInputData)  = 0;   // Local: từng vùng
 };
-class DimmingBackendChipA : public IDimmingBackend { /* ghi phan cung kieu chip A */ };
-class DimmingBackendChipB : public IDimmingBackend { /* ghi phan cung kieu chip B */ };
+class DimmingBackendChipA : public IDimmingBackend { /* ghi phần cứng kiểu chip A */ };
+class DimmingBackendChipB : public IDimmingBackend { /* ghi phần cứng kiểu chip B */ };
 
-// ABSTRACTION — bien thien theo thuat toan
+// ABSTRACTION — biến thiên theo thuật toán
 class GlobalDimming : public IDimmingAlgo {
 protected:
-    std::unique_ptr<IDimmingBackend> m_pDimmingBackend;      // "cay cau" — KHONG ke thua
+    std::unique_ptr<IDimmingBackend> m_pDimmingBackend;      // "cây cầu" — KHÔNG kế thừa
 public:
     explicit GlobalDimming(std::unique_ptr<IDimmingBackend> pDimmingBackend)
         : m_pDimmingBackend(std::move(pDimmingBackend)) {}
 };
-// LocalDimming, OLEDDimming: cung khuon
+// LocalDimming, OLEDDimming: cùng khuôn
 
-// Ghep luc chay: N + M lop, phu duoc N x M to hop
+// Ghép lúc chạy: N + M lớp, phủ được N x M tổ hợp
 auto pDimming = std::make_unique<LocalDimming>(std::make_unique<DimmingBackendChipA>());
 ```
 
@@ -94,14 +94,14 @@ auto pDimming = std::make_unique<LocalDimming>(std::make_unique<DimmingBackendCh
 ### 1.2 Pimpl — cùng ý tưởng, mục tiêu khác
 
 ```cpp
-// widget.h — interface on dinh, KHONG lo data member
+// widget.h — interface ổn định, KHÔNG lộ data member
 class Widget {
 public:
     Widget(); ~Widget();
     void doSomething();
 private:
     struct Impl;
-    std::unique_ptr<Impl> pImpl;   // "cay cau" toi implementation
+    std::unique_ptr<Impl> pImpl;   // "cây cầu" tới implementation
 };
 ```
 
@@ -127,11 +127,11 @@ private:
 | **Đừng dùng khi** | Bạn **sửa được** phía kia ⟹ sửa thẳng, đừng thêm một tầng |
 
 ```cpp
-struct ILogger { virtual void log(const std::string&) = 0; };   // client mong doi
+struct ILogger { virtual void log(const std::string&) = 0; };   // client mong đợi
 
-class ThirdPartyLog { public: void writeMessage(const char*, int level); };  // thu vien cu
+class ThirdPartyLog { public: void writeMessage(const char*, int level); };  // thư viện cũ
 
-class LogAdapter : public ILogger {                             // dau chuyen
+class LogAdapter : public ILogger {                             // đầu chuyển
     ThirdPartyLog& impl_;
 public:
     explicit LogAdapter(ThirdPartyLog& l) : impl_(l) {}
@@ -158,7 +158,7 @@ public:
 class Engine {                      // Facade
     FuelInjector fuel; Ignition ign; Starter starter;
 public:
-    void start() {                  // che TRINH TU, khong che tung class
+    void start() {                  // che TRÌNH TỰ, không che từng class
         fuel.prime();
         ign.on();
         starter.crank();

@@ -136,10 +136,10 @@ sensor@48 {
     reg          = <0x48>;
     interrupt-parent = <&gpio1>;
     interrupts   = <7 IRQ_TYPE_EDGE_FALLING>;
-    clocks       = <&clk_i2c>;          // khong co -> doc thanh ghi ra rac
-    vdd-supply   = <&reg_3v3>;          // khong co -> chip chua duoc cap dien
+    clocks       = <&clk_i2c>;          // không có -> đọc thanh ghi ra rác
+    vdd-supply   = <&reg_3v3>;          // không có -> chip chưa được cấp điện
     pinctrl-names = "default";
-    pinctrl-0    = <&i2c0_pins>;        // khong co -> chan van la GPIO
+    pinctrl-0    = <&i2c0_pins>;        // không có -> chân vẫn là GPIO
     status       = "okay";
 };
 ```
@@ -158,8 +158,8 @@ Thiết bị của bạn cần một clock/regulator/GPIO do **driver khác** cu
 static int my_probe(struct platform_device *pdev) {
     struct clk *c = devm_clk_get(&pdev->dev, "core");
     if (IS_ERR(c))
-        return dev_err_probe(&pdev->dev, PTR_ERR(c), "khong lay duoc clock\n");
-        // ✅ dev_err_probe: im lang neu la -EPROBE_DEFER, chi log khi la loi THAT
+        return dev_err_probe(&pdev->dev, PTR_ERR(c), "không lấy được clock\n");
+        // ✅ dev_err_probe: im lặng nếu là -EPROBE_DEFER, chỉ log khi là lỗi THẬT
     ...
 }
 ```
@@ -168,7 +168,7 @@ static int my_probe(struct platform_device *pdev) {
 
 **Chẩn đoán:** thiết bị treo ở deferred ⇒
 ```bash
-ls /sys/kernel/debug/devices_deferred     # ai dang doi, va doi CAI GI
+ls /sys/kernel/debug/devices_deferred     # ai đang đợi, và đợi CÁI GÌ
 ```
 
 ---
@@ -179,7 +179,7 @@ Overlay (`.dtbo`) là một mảnh DT **áp chồng** lên cây đang chạy: th
 
 ```dts
 /dts-v1/;  /plugin/;
-&{/soc/i2c@40005400} {          // tro toi node co san trong cay
+&{/soc/i2c@40005400} {          // trỏ tới node có sẵn trong cây
     status = "okay";
     mysensor@48 {
         compatible = "vendor,mysensor";
@@ -199,23 +199,23 @@ Overlay (`.dtbo`) là một mảnh DT **áp chồng** lên cây đang chạy: th
 Thứ tự này đi từ *"kernel có nhận DT của tôi không"* xuống *"driver có bind không"* — **đừng nhảy cóc**.
 
 ```bash
-# 1. Kernel dang chay DT nao? Doc lai chinh cay dang chay (khong phai file .dts cua ban)
-ls /proc/device-tree/                       # cay dang chay, moi property la mot file
+# 1. Kernel đang chạy DT nào? Đọc lại chính cây đang chạy (không phải file .dts của bạn)
+ls /proc/device-tree/                       # cây đang chạy, mỗi property là một file
 cat /proc/device-tree/soc/i2c@40005400/status
-dtc -I fs -O dts /proc/device-tree > running.dts   # ⭐ xuat NGUOC ra DTS de doc
+dtc -I fs -O dts /proc/device-tree > running.dts   # ⭐ xuất NGƯỢC ra DTS để đọc
 
-# 2. Node cua toi co duoc tao thanh device khong?
-ls /sys/firmware/devicetree/base/           # tuong duong /proc/device-tree
+# 2. Node của tôi có được tạo thành device không?
+ls /sys/firmware/devicetree/base/           # tương đương /proc/device-tree
 ls /sys/bus/platform/devices/ | grep 40005400
 
-# 3. Device co bind duoc driver khong?
-ls -l /sys/bus/platform/devices/40005400.i2c/driver   # co symlink = da bind
-ls /sys/kernel/debug/devices_deferred                 # dang doi tai nguyen gi
+# 3. Device có bind được driver không?
+ls -l /sys/bus/platform/devices/40005400.i2c/driver   # có symlink = đã bind
+ls /sys/kernel/debug/devices_deferred                 # đang đợi tài nguyên gì
 
-# 4. Log noi gi
+# 4. Log nói gì
 dmesg | grep -i "40005400\|probe\|of_"
 
-# 5. Doi chieu DTB da build voi DTS nguon
+# 5. Đối chiếu DTB đã build với DTS nguồn
 dtc -I dtb -O dts board.dtb | less
 ```
 

@@ -103,13 +103,13 @@ struct Rectangle {
     virtual void setH(int h) { height = h; }
     int width = 0, height = 0;
 };
-struct Square : Rectangle {                              // ke thua PUBLIC — moi thay the duoc
-    void setW(int w) override { width = height = w; }    // pha ky vong "doi W khong doi H"
+struct Square : Rectangle {                              // kế thừa PUBLIC — mới thay thế được
+    void setW(int w) override { width = height = w; }    // phá kỳ vọng "đổi W không đổi H"
     void setH(int h) override { width = height = h; }
 };
 
-// Code viet cho Rectangle, chay dung voi Rectangle, SAI voi Square:
-void resize(Rectangle& r) { r.setW(5); r.setH(4); /* ky vong dien tich = 20 */ }
+// Code viết cho Rectangle, chạy đúng với Rectangle, SAI với Square:
+void resize(Rectangle& r) { r.setW(5); r.setH(4); /* kỳ vọng diện tích = 20 */ }
 ```
 
 ⭐ **Vi phạm LSP nguy hiểm hơn vi phạm các nguyên lý khác** — bốn nguyên lý kia hỏng thì code *khó sửa*; LSP hỏng thì code **chạy ra kết quả sai** qua đúng con đường đa hình mà bạn tin tưởng.

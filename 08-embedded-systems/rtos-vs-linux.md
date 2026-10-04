@@ -119,10 +119,10 @@ Câu *"PREEMPT_RT giúp gì"* chỉ là nửa câu trả lời. Nửa còn lại
 **③ Chỉ là điều kiện CẦN, không đủ.** Bật `PREEMPT_RT` xong mà không tuning thì worst-case vẫn xấu. Còn phải:
 
 ```bash
-isolcpus=2,3 nohz_full=2,3 rcu_nocbs=2,3   # danh rieng CPU cho task RT
-# ghim IRQ khong lien quan sang CPU khac:  /proc/irq/<n>/smp_affinity
-# tat: CPU frequency scaling, C-state sau, SMT/hyperthreading
-chrt -f 80 ./myapp                          # SCHED_FIFO + mlockall() de tranh page fault
+isolcpus=2,3 nohz_full=2,3 rcu_nocbs=2,3   # dành riêng CPU cho task RT
+# ghim IRQ không liên quan sang CPU khác:  /proc/irq/<n>/smp_affinity
+# tắt: CPU frequency scaling, C-state sâu, SMT/hyperthreading
+chrt -f 80 ./myapp                          # SCHED_FIFO + mlockall() để tránh page fault
 ```
 
 **④ Vẫn không phải hard realtime khắt khe.** Worst-case xuống **hàng chục–trăm µs** — đủ cho **soft/firm**, và nhiều ca **hard** ở mức ms. Nhưng nếu deadline là **vài µs** thì vẫn cần MCU/RTOS riêng (§5).

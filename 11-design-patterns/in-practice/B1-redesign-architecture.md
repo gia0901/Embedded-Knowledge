@@ -66,7 +66,7 @@ Năm điểm yếu ở A1 trông rời rạc, nhưng hỏi đúng câu thì chú
 ⚠️ **150 method là triệu chứng, không phải bệnh.** Nguyên nhân gốc: **một interface đang phục vụ ba công nghệ panel khác nhau** (đèn nền toàn phần · đèn nền theo vùng · tự phát sáng). Chúng không có cùng một hợp đồng; ép vào một chỗ thì phần thừa phải trở thành no-op.
 
 ```cpp
-// ---- Kha nang: impl tu khai minh lam duoc gi ----
+// ---- Khả năng: impl tự khai mình làm được gì ----
 enum class DimmingCap { Local, OLED, Ambient };
 class DimmingCaps {
     unsigned bits_ = 0;
@@ -75,16 +75,16 @@ public:
     bool Has(DimmingCap c) const { return bits_ & (1u << static_cast<unsigned>(c)); }
 };
 
-// ---- IDimmingAlgo (giu ten A1) — cat con LOI ma MOI panel deu co ----
+// ---- IDimmingAlgo (giữ tên A1) — cắt còn LÕI mà MỌI panel đều có ----
 class IDimmingAlgo {
 public:
     virtual ~IDimmingAlgo() = default;
-    virtual int32_t     SetBacklight(int32_t backlight) { return -ENOTSUP; }  // than mac dinh = Null Object (va ④)
-    virtual void        t_vSyncCallBack()               {}                    // vong vsync goi
-    virtual DimmingCaps GetCaps() const                 { return {}; }        // ⬅️ tu khai minh lam duoc gi
+    virtual int32_t     SetBacklight(int32_t backlight) { return -ENOTSUP; }  // thân mặc định = Null Object (vá ④)
+    virtual void        t_vSyncCallBack()               {}                    // vòng vsync gọi
+    virtual DimmingCaps GetCaps() const                 { return {}; }        // ⬅️ tự khai mình làm được gì
 };
 
-// ---- Nhom kha nang: chi panel co moi implement (ten ham giu nhu A1 khi da co) ----
+// ---- Nhóm khả năng: chỉ panel có mới implement (tên hàm giữ như A1 khi đã có) ----
 class ILocalDimming {
 public:
     virtual ~ILocalDimming() = default;
@@ -97,7 +97,7 @@ class IAmbientMode { public: virtual ~IAmbientMode() = default; virtual int32_t 
 // LocalDimming : public IDimmingAlgo, public ILocalDimming, public IAmbientMode
 // OLEDDimming  : public IDimmingAlgo, public IOLEDDimming
 
-// ---- IDimmingBackend (A1) tach theo nhom — ten ham giu nguyen nhu A1 ----
+// ---- IDimmingBackend (A1) tách theo nhóm — tên hàm giữ nguyên như A1 ----
 class IDimmingBackendGlobal {
 public:
     virtual ~IDimmingBackendGlobal() = default;
@@ -110,13 +110,13 @@ public:
     virtual uint32_t t_InitLocalDimming() = 0;
     virtual uint32_t t_SetLdFinalDuty(BackendLdFinalDuty_t* pInputData) = 0;
 };
-// IDimmingBackendOLED tuong tu
+// IDimmingBackendOLED tương tự
 ```
 
 **Caller hỏi khả năng trước, không gọi mù:**
 
 ```cpp
-// ✅ Hoi roi moi goi — thay cho "goi dai, no-op thi thoi"
+// ✅ Hỏi rồi mới gọi — thay cho "gọi đại, no-op thì thôi"
 if (m_pDimmingPanel->GetCaps().Has(DimmingCap::Local))
     dynamic_cast<ILocalDimming&>(*m_pDimmingPanel).SetZoneBacklight(zone, level);
 ```
@@ -156,18 +156,18 @@ Trên đường **cấu hình**, `dynamic_cast` thực tế là miễn phí. Tr�
 ```cpp
 // display_control.h
 class BrightnessKey {
-    BrightnessKey() {}                    // ⚠️ KHONG dung "= default" — xem ben duoi
-    friend class DimmingBackendBase;      // CHI lop co so cua backend PQ tao duoc
+    BrightnessKey() {}                    // ⚠️ KHÔNG dùng "= default" — xem bên dưới
+    friend class DimmingBackendBase;      // CHỈ lớp cơ sở của backend PQ tạo được
 };
 
-int32_t dc_set_frequency(int32_t hz);                                // cong khai — khong can khoa
+int32_t dc_set_frequency(int32_t hz);                                // công khai — không cần khoá
 int32_t dc_set_resolution(res_info_t& info);
-int32_t dc_write_brightness(BrightnessKey, int32_t brightness);     // noi bo — phai co khoa
+int32_t dc_write_brightness(BrightnessKey, int32_t brightness);     // nội bộ — phải có khoá
 
 // dimming/Backend/DimmingBackendBase.h
 class DimmingBackendBase {
 protected:
-    static BrightnessKey key() { return BrightnessKey(); }   // friend khong di truyen ⟹ cap qua ham protected
+    static BrightnessKey key() { return BrightnessKey(); }   // friend không di truyền ⟹ cấp qua hàm protected
 };
 
 // dimming/Backend/ChipA/DimmingBackendChipA_Global.h
@@ -180,7 +180,7 @@ public:
 
 // src_com/lib_api.cpp
 int32_t lib_api_set_something(int32_t v) {
-    return dc_write_brightness(BrightnessKey{}, v);   // ❌ loi compile: constructor la private
+    return dc_write_brightness(BrightnessKey{}, v);   // ❌ lỗi compile: constructor là private
 }
 ```
 
@@ -217,37 +217,37 @@ int32_t lib_api_set_something(int32_t v) {
 | *"Model này dùng thuật toán nào?"* | ❌ **Không** | **Runtime** | **Code chung — đúng một chỗ** |
 
 ```cpp
-// ---- Moi chip cung cap MOT factory — ca HO backend cua chip do ----
+// ---- Mỗi chip cung cấp MỘT factory — cả HỌ backend của chip đó ----
 class IDimmingBackendFactory {
 public:
     virtual ~IDimmingBackendFactory() = default;
     virtual std::unique_ptr<IDimmingBackendGlobal> CreateGlobal() = 0;
     virtual std::unique_ptr<IDimmingBackendLocal>  CreateLocal()  = 0;
-    virtual std::unique_ptr<IDimmingBackendOLED>   CreateOLED()   = 0;   // chip khong co OLED ⟹ tra nullptr
+    virtual std::unique_ptr<IDimmingBackendOLED>   CreateOLED()   = 0;   // chip không có OLED ⟹ trả nullptr
 };
 
-// dimming/Backend/ChipA/DimmingBackendFactoryChipA.cpp — CMake CHI build file cua chip dich.
-// Moi thu muc chip dinh nghia cung mot ham ⟹ chon chip bang LINK, khong bang switch.
+// dimming/Backend/ChipA/DimmingBackendFactoryChipA.cpp — CMake CHỈ build file của chip đích.
+// Mỗi thư mục chip định nghĩa cùng một hàm ⟹ chọn chip bằng LINK, không bằng switch.
 std::unique_ptr<IDimmingBackendFactory> CreateDimmingBackendFactory() {
     return std::make_unique<DimmingBackendFactoryChipA>();
 }
 
-// ---- dimming/Common/DimmingFactory.cpp — giu ten A1, nhung gio la code CHUNG, viet mot lan ----
+// ---- dimming/Common/DimmingFactory.cpp — giữ tên A1, nhưng giờ là code CHUNG, viết một lần ----
 std::unique_ptr<IDimmingAlgo> DimmingFactory::CreateDimmingObject(DimmingType_k type,
                                                                  IDimmingBackendFactory& backends) {
-    switch (type) {                                    // ⬅️ CHU DUY NHAT cua quyet dinh nay
+    switch (type) {                                    // ⬅️ CHỦ DUY NHẤT của quyết định này
     case DIMMING_GLOBAL: return std::make_unique<GlobalDimming>(backends.CreateGlobal());
     case DIMMING_LOCAL:  return std::make_unique<LocalDimming>(backends.CreateLocal());
     case DIMMING_OLED:   return std::make_unique<OLEDDimming>(backends.CreateOLED());
     }
-    return std::make_unique<IDimmingAlgo>();           // Null Object — base tra -ENOTSUP
+    return std::make_unique<IDimmingAlgo>();           // Null Object — base trả -ENOTSUP
 }
 ```
 
 ⭐ **Thứ đáng nói nhất — vá ① và vá ③ cộng lại:** vì `GlobalDimming` giờ nhận `std::unique_ptr<IDimmingBackendGlobal>` thay vì `IDimmingBackend*` chung, việc **ghép nhầm** thuật toán với backend (lỗi im lặng ở [A1 §5.6](A1-baseline-libdisplay.md)) trở thành **lỗi compile**:
 
 ```cpp
-case DIMMING_GLOBAL: return std::make_unique<GlobalDimming>(backends.CreateLocal());   // ghep nham
+case DIMMING_GLOBAL: return std::make_unique<GlobalDimming>(backends.CreateLocal());   // ghép nhầm
 // error: no matching function for call to 'GlobalDimming::GlobalDimming(std::unique_ptr<IDimmingBackendLocal>)'
 ```
 
@@ -302,12 +302,12 @@ case DIMMING_GLOBAL: return std::make_unique<GlobalDimming>(backends.CreateLocal
 ✅ **Đúng: giữ NGUYÊN một khoá, nhưng làm cho việc chạm state mà không giữ khoá trở thành *không viết ra được*.**
 
 ```cpp
-// State chi toi duoc qua mot handle RAII da giu khoa.
-// Khong co duong nao lay duoc tham chieu tran toi shared memory.
+// State chỉ tới được qua một handle RAII đã giữ khoá.
+// Không có đường nào lấy được tham chiếu trần tới shared memory.
 template <typename T>
 class ShmGuard {
     T&          ref_;
-    const char* caller_;                  // giu ten ham goi — lib_sem_lock() ghi vao prev_called_proc nhu A1
+    const char* caller_;                  // giữ tên hàm gọi — lib_sem_lock() ghi vào prev_called_proc như A1
 public:
     ShmGuard(T& ref, const char* caller) : ref_(ref), caller_(caller) { lib_sem_lock(caller_); }
     ~ShmGuard()                                                       { lib_sem_unlock(caller_); }
@@ -317,14 +317,14 @@ public:
     T& operator*()  { return ref_; }
 };
 
-// Thay cho get_lib_shm() + member "Shm" cua A1 — cach DUY NHAT lay state,
-// dung chung cho duong API VA vong vsync
+// Thay cho get_lib_shm() + member "Shm" của A1 — cách DUY NHẤT lấy state,
+// dùng chung cho đường API VÀ vòng vsync
 ShmGuard<display_shm_info> lock_lib_shm(const char* caller);
 
-void GlobalDimming::t_vSyncCallBack() {                       // vong vsync
+void GlobalDimming::t_vSyncCallBack() {                       // vòng vsync
     auto shm = lock_lib_shm(__FUNCTION__);                     // khoa
     shm->shmGlobalDimming.m_iBacklight = ComputeBacklight();
-}                                                             // mo khoa — ke ca khi nem exception
+}                                                             // mở khoá — kể cả khi ném exception
 ```
 
 | | Hệ thật | Sau khi vá |

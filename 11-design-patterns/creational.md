@@ -14,7 +14,7 @@
 
 ```cpp
 void lib_dimming::Create() {
-    LocalDimming dimming(std::make_unique<DimmingBackendChipA_Local>());  // ⬅️ GAN CHAT voi mot thuat toan + mot chip
+    LocalDimming dimming(std::make_unique<DimmingBackendChipA_Local>());  // ⬅️ GẮN CHẶT với một thuật toán + một chip
     dimming.SetBacklight(80);
 }
 ```
@@ -43,7 +43,7 @@ Dòng `new`/khai báo object cụ thể tạo ra **ba** ràng buộc cùng lúc:
 | **Đừng dùng khi** | Chỉ có một loại và sẽ mãi chỉ một loại |
 
 ```cpp
-// dimming/Backend/ChipA — client chi biet DimmingType_k, khong biet class cu the
+// dimming/Backend/ChipA — client chỉ biết DimmingType_k, không biết class cụ thể
 std::unique_ptr<IDimmingBackend> CreateDimmingBackend(DimmingType_k type) {
     switch (type) {
         case DIMMING_GLOBAL: return std::make_unique<DimmingBackendChipA_Global>();
@@ -77,7 +77,7 @@ std::unique_ptr<IDimmingBackend> CreateDimmingBackend(DimmingType_k type) {
 | **Đừng dùng khi** | Chỉ có **một** loại sản phẩm cần tạo ⟹ Factory Method là đủ |
 
 ```cpp
-// Hop dong: tao CA HO backend cua MOT chip (ten nhu B1 §4)
+// Hợp đồng: tạo CẢ HỌ backend của MỘT chip (tên như B1 §4)
 class IDimmingBackendFactory {
 public:
     virtual ~IDimmingBackendFactory() = default;
@@ -85,10 +85,10 @@ public:
     virtual std::unique_ptr<IDimmingBackendLocal>  CreateLocal()  = 0;
     virtual std::unique_ptr<IDimmingBackendOLED>   CreateOLED()   = 0;
 };
-class DimmingBackendFactoryChipA : public IDimmingBackendFactory { /* ca ho backend chip A */ };
+class DimmingBackendFactoryChipA : public IDimmingBackendFactory { /* cả họ backend chip A */ };
 
-// Chon MOT LAN -> mot cho duy nhat cua ca library
-// (he that: moi thu muc chip dinh nghia ham nay, CMake chi build ban cua chip dich)
+// Chọn MỘT LẦN -> một chỗ duy nhất của cả library
+// (hệ thật: mỗi thư mục chip định nghĩa hàm này, CMake chỉ build bản của chip đích)
 std::unique_ptr<IDimmingBackendFactory> CreateDimmingBackendFactory();
 ```
 
@@ -121,7 +121,7 @@ std::unique_ptr<IDimmingBackendFactory> CreateDimmingBackendFactory();
 ```cpp
 class Logger {
 public:
-    static Logger& instance() {   // Meyers' Singleton — C++11 bao dam thread-safe
+    static Logger& instance() {   // Meyers' Singleton — C++11 bảo đảm thread-safe
         static Logger inst;
         return inst;
     }
@@ -139,12 +139,12 @@ Mấu chốt ở `static Logger inst;` — một **local static có khởi tạo
 Compiler hiện thực bằng **guard variable** ẩn (Itanium ABI: `__cxa_guard_acquire/release`):
 
 ```cpp
-// Code compiler sinh ra, DAI Y:
+// Code compiler sinh ra, ĐẠI Ý:
 if ((guard.load(acquire) & 1) == 0) {      // fast path: 1 atomic load
-    if (__cxa_guard_acquire(&guard)) {      // luong dau tien gianh quyen
-        new (&inst) Logger();               //   ctor chay dung MOT lan
-        __cxa_guard_release(&guard);        //   set co + release
-    }                                       // luong khac: BLOCK toi khi release
+    if (__cxa_guard_acquire(&guard)) {      // luồng đầu tiên giành quyền
+        new (&inst) Logger();               //   ctor chạy đúng MỘT lần
+        __cxa_guard_release(&guard);        //   set cờ + release
+    }                                       // luồng khác: BLOCK tới khi release
 }
 return inst;
 ```
@@ -156,7 +156,7 @@ return inst;
 **Vì sao double-checked locking tự viết trước C++11 SAI:**
 
 ```cpp
-// ❌ Hong truoc C++11
+// ❌ Hỏng trước C++11
 if (!inst) { lock(mtx); if (!inst) inst = new Logger(); unlock(mtx); }
 ```
 `inst = new Logger()` gồm 3 việc — *cấp phát · chạy ctor · gán con trỏ*. Trước C++11 **không có memory model**, compiler/CPU được phép sắp xếp lại thành 1→3→2: `inst` thành non-null **trước khi** ctor xong ⟹ luồng khác thấy `inst != null` ở check đầu (không khoá) và dùng ngay một object **dựng dở** ⟹ UB. C++11 sửa gốc rễ bằng memory model + `std::atomic`; nhưng đơn giản hơn nhiều là để magic statics lo — **đừng tự viết DCLP nữa**.
@@ -192,7 +192,7 @@ Nếu Singleton nằm ở header mà nhiều `.so` cùng include, số instance 
 ```cpp
 template <typename T, std::size_t N>
 class ObjectPool {
-    alignas(T) unsigned char storage_[N * sizeof(T)];  // vung nho TINH, khong heap
+    alignas(T) unsigned char storage_[N * sizeof(T)];  // vùng nhớ TĨNH, không heap
     std::array<T*, N>  free_;
     std::size_t        freeCount_ = 0;
 public:
@@ -202,13 +202,13 @@ public:
     }
     template <typename... Args>
     T* acquire(Args&&... args) {
-        if (freeCount_ == 0) return nullptr;            // can pool -> TAT DINH, khong throw
+        if (freeCount_ == 0) return nullptr;            // cạn pool -> TẤT ĐỊNH, không throw
         T* slot = free_[--freeCount_];
         return new (slot) T(std::forward<Args>(args)...);   // placement new
     }
     void release(T* p) {
         if (!p) return;
-        p->~T();                                        // PHAI goi dtor tuong minh
+        p->~T();                                        // PHẢI gọi dtor tường minh
         free_[freeCount_++] = p;
     }
 };

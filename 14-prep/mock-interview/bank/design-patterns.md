@@ -790,9 +790,9 @@ Memento cổ điển sống **trong một process, một phiên chạy** (undo/r
 **Cơ chế:** version chỉ nói *"tôi biết bao nhiêu API"*, nó **không mô tả BỐ CỤC** của những API đó. Ở đây `.so` được build từ header có `setBrightness` khai báo **sau** destructor, còn app build từ header có nó **trước** destructor. Cùng gọi là "v2", cùng số lượng API — nhưng **thứ tự slot vtable khác nhau**.
 
 ```
-slot ham   |  .so (v2, dung thu tu)   |  app (v2, chen TRUOC dtor)
+slot hàm   |  .so (v2, đúng thứ tự)   |  app (v2, chèn TRƯỚC dtor)
    0       |  setPower                |  setPower
-   1       |  ~DisplayImpl  (complete)|  setBrightness   <-- app nhay vao day
+   1       |  ~DisplayImpl  (complete)|  setBrightness   <-- app nhảy vào đây
    2       |  ~DisplayImpl  (deleting)|  ~IDisplay (complete)
    3       |  setBrightness           |  ~IDisplay (deleting)
 ```
@@ -939,14 +939,14 @@ App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **de
 ```cpp
 class BrightnessKey {
     BrightnessKey() {}                    // ✅ user-provided
- // BrightnessKey() = default;            // ❌ C++17: van la aggregate -> ai cung tao duoc
+ // BrightnessKey() = default;            // ❌ C++17: vẫn là aggregate -> ai cũng tạo được
     friend class DimmingBackendBase;
 };
 int32_t dc_write_brightness(BrightnessKey, int32_t brightness);
 
 class DimmingBackendBase {
 protected:
-    static BrightnessKey key() { return BrightnessKey(); }   // friend KHONG di truyen
+    static BrightnessKey key() { return BrightnessKey(); }   // friend KHÔNG di truyền
 };
 class DimmingBackendChipA_Global : public DimmingBackendBase, public IDimmingBackendGlobal {
     uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) override {
@@ -954,7 +954,7 @@ class DimmingBackendChipA_Global : public DimmingBackendBase, public IDimmingBac
     }
 };
 int32_t lib_api_set_something(int32_t v) {
-    return dc_write_brightness(BrightnessKey{}, v);                      // ❌ loi compile
+    return dc_write_brightness(BrightnessKey{}, v);                      // ❌ lỗi compile
 }
 ```
 
@@ -1015,8 +1015,8 @@ int32_t lib_api_set_something(int32_t v) {
 
 ```cpp
 int32_t lib_api_set_backlight(int32_t backlight) {
-    int sem_ret = lib_sem_lock(__FUNCTION__);                // lan 1 — o mat tien
-    get_dimming_instance()->SetBacklight(backlight);         //   -> lock_lib_shm() -> lib_sem_lock()  ❌ lan 2: tu deadlock
+    int sem_ret = lib_sem_lock(__FUNCTION__);                // lần 1 — ở mặt tiền
+    get_dimming_instance()->SetBacklight(backlight);         //   -> lock_lib_shm() -> lib_sem_lock()  ❌ lần 2: tự deadlock
     if (sem_ret == 0) lib_sem_unlock(__FUNCTION__);
 }
 ```

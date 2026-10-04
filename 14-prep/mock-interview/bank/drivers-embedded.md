@@ -660,13 +660,13 @@ while (*STATUS & BUSY) { }                  // compiler: "không ai đổi *STAT
 ### 🐧 Trong KERNEL thì viết thế nào — khác MCU ở chỗ có **MMU**
 
 ```c
-// MCU (KHONG MMU): dia chi vat ly dung thang duoc
+// MCU (KHÔNG MMU): địa chỉ vật lý dùng thẳng được
 volatile uint32_t *reg = (uint32_t *)0x40021000;
 *reg |= (1 << 3);
 
-// KERNEL (CO MMU): dia chi vat ly KHONG deref thang duoc
+// KERNEL (CÓ MMU): địa chỉ vật lý KHÔNG deref thẳng được
 void __iomem *base;
-base = devm_platform_ioremap_resource(pdev, 0);   // lay tu 'reg' trong DT, map vao KHONG GIAN AO kernel
+base = devm_platform_ioremap_resource(pdev, 0);   // lấy từ 'reg' trong DT, map vào KHÔNG GIAN ẢO kernel
 if (IS_ERR(base)) return PTR_ERR(base);
 writel(readl(base + OFFSET) | BIT(3), base + OFFSET);
 ```
@@ -791,12 +791,12 @@ request_irq(irq, my_isr, 0, "mydrv", priv);      // ✅ MSI/MSI-X: KHÔNG cần 
 **Cơ chế:** PCI device là **bus master** — nó **tự phát giao dịch đọc/ghi RAM**, không cần CPU chép. `pci_set_master()` bật bit Bus Master Enable trong config space; **không gọi thì thiết bị bị chặn ở tầng bus**.
 
 ```c
-pci_set_master(pdev);                                    // (1) cho phep lam bus master
-dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)); // (2) khai do rong dia chi
+pci_set_master(pdev);                                    // (1) cho phép làm bus master
+dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64)); // (2) khai độ rộng địa chỉ
 ring = dma_alloc_coherent(&pdev->dev, sz, &ring_dma, GFP_KERNEL);  // descriptor ring
 dma = dma_map_single(&pdev->dev, buf, len, DMA_FROM_DEVICE);       // payload streaming
-//  ... KHONG duoc dung `buf` trong khoang nay ...
-dma_unmap_single(&pdev->dev, dma, len, DMA_FROM_DEVICE);           // moi duoc dung lai
+//  ... KHÔNG được dùng `buf` trong khoảng này ...
+dma_unmap_single(&pdev->dev, dma, len, DMA_FROM_DEVICE);           // mới được dùng lại
 ```
 
 | API | Dùng cho | Vì sao |
@@ -1156,16 +1156,16 @@ CS còn đánh dấu **ranh giới một giao dịch**: nhiều chip yêu cầu 
 ```
               Vdd (3.3V)
                  |
-                [R] 4.7k        <-- MOT cap cho CA BUS (1 cho SDA, 1 cho SCL),
-                 |                  KHONG phai moi thiet bi mot cap
+                [R] 4.7k        <-- MỘT cặp cho CẢ BUS (1 cho SDA, 1 cho SCL),
+                 |                  KHÔNG phải mỗi thiết bị một cặp
    SDA  ---------+---------+---------------+---------
                  |         |               |
-              [transistor] |            [transistor]      moi thiet bi chi co
-                 |         |               |              transistor KEO XUONG
-                GND       ...             GND             (khong co ve day len)
+              [transistor] |            [transistor]      mỗi thiết bị chỉ có
+                 |         |               |              transistor KÉO XUỐNG
+                GND       ...             GND             (không có vế đẩy lên)
 
-   Khong ai keo  -> R keo len  -> muc 1
-   Mot ai do keo -> noi dat    -> muc 0      (wired-AND)
+   Không ai kéo  -> R kéo lên  -> mức 1
+   Một ai đó kéo -> nối đất    -> mức 0      (wired-AND)
 ```
 
 **⚡ "Kéo xuống 0 thì dòng có lớn không?" — không, và đây chính là lý do tồn tại của open-drain**:
@@ -1237,8 +1237,8 @@ Ràng buộc vật lý: thời gian sườn lên ≈ **R × C**, với C là **�
 
 ⚡ **Nếu có shell Linux trên target — làm bước này TRƯỚC cả bảng dưới:**
 ```bash
-i2cdetect -y <bus>          # thiet bi co HIEN tren bus khong?
-i2cget -y <bus> <addr> <reg>  # doc tay, bo qua driver cua minh
+i2cdetect -y <bus>          # thiết bị có HIỆN trên bus không?
+i2cget -y <bus> <addr> <reg>  # đọc tay, bỏ qua driver của mình
 ```
 `i2cdetect` là **phép cắt đôi rẻ nhất**: **hiện** ⇒ điện + pull-up + địa chỉ đều ổn, lỗi nằm ở **phần mềm/driver**; **không hiện** ⇒ lỗi ở **điện hoặc địa chỉ**, khỏi mở code ra đọc. Nếu `i2cdetect` thấy mà `i2cget` cũng đọc được ⇒ lỗi nằm trong **driver của chính mình**.
 

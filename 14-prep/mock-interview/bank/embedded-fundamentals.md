@@ -66,7 +66,7 @@ if (~status == 0x70) { handle(); }
 
 /* (B) */
 uint32_t timeout_ms = 100;
-int      elapsed_ms = -5;          /* dong ho nhay lui */
+int      elapsed_ms = -5;          /* đồng hồ nhảy lùi */
 if (elapsed_ms < timeout_ms) { keep_waiting(); }
 ```
 <details><summary>Đáp án</summary>
@@ -76,7 +76,7 @@ if (elapsed_ms < timeout_ms) { keep_waiting(); }
 **Output thật** (gcc 11.4.0, x86-64):
 ```
 status          = 0x8F
-~status (int)   = 0xFFFFFF70   <-- da PROMOTE len int
+~status (int)   = 0xFFFFFF70   <-- đã PROMOTE lên int
 ~status == 0x70 ?           SAI
 (uint8_t)~status == 0x70 ?  dung
 

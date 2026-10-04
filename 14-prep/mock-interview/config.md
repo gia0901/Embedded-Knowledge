@@ -137,8 +137,8 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
   ⚠️ **BẮT BUỘC lấy ID bằng LỆNH, không bằng mắt** — và kiểm trùng sau khi thêm:
   ```bash
   cd 14-prep/mock-interview/bank
-  grep -oh "^#### LNX-[0-9]*" linux-sysprog.md | sed 's/.*-//' | sort -n | tail -1   # ID lon nhat
-  grep -oh "^#### [A-Z]*-[0-9]*" *.md | sed 's/#### //' | sort | uniq -d            # PHAI rong
+  grep -oh "^#### LNX-[0-9]*" linux-sysprog.md | sed 's/.*-//' | sort -n | tail -1   # ID lớn nhất
+  grep -oh "^#### [A-Z]*-[0-9]*" *.md | sed 's/#### //' | sort | uniq -d            # PHẢI rỗng
   ```
   > **Vì sao (2026-08-17):** rà soát phát hiện **3 ID trùng** — `DP-016`, `DSA-013`, `DSA-014` mỗi cái bị gán cho **hai câu khác nhau**, tồn tại lặng lẽ 4 ngày. Cả ba đều sinh từ đợt di trú 13/08: người thêm câu **nhìn bằng mắt** ID cuối file thay vì đếm, mà file đó có câu chèn giữa. Hậu quả: link `[DSA-014]` trỏ tới **hai đích khác nhau**, log phiên cũ tham chiếu sai câu. Đã đánh số lại thành `DP-019`, `DSA-015`, `DSA-016` (giữ ID cũ cho câu **có trước**, vì log lịch sử đã trỏ vào đó).
 
@@ -365,10 +365,10 @@ Khi ứng viên phản hồi *"câu này quá sâu"*: **phân định từng ý*
 **Lệnh đo:**
 ```bash
 cd 14-prep/mock-interview
-# So cau DA TUNG HOI (rut tu log phien)
+# Số câu ĐÃ TỪNG HỎI (rút từ log phiên)
 grep -oh "\b\(C\|CPP\|OS\|LNX\|DRV\|BUS\|BSP\|SD\|BEH\|BLD\|EMB\|DBG\|DP\|DSA\|NET\|COD\|RES\)-[0-9]\{3\}" \
   sessions/*.md | sort -u | sed 's/-[0-9]*//' | sort | uniq -c
-# So cau CO trong bank
+# Số câu CÓ trong bank
 grep -c "^#### " bank/*.md
 ```
 

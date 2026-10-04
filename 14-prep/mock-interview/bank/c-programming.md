@@ -47,16 +47,18 @@ x = *++p;
 ```
 <details><summary>Đáp án</summary>
 
-**Cơ chế:** `++` **hậu tố** ưu tiên cao hơn `*`; `++` **tiền tố** và `*` cùng mức, gắn từ phải sang trái. Hậu tố trả giá trị **cũ**, tiền tố trả giá trị **mới**.
+**Cơ chế — trả lời hai câu hỏi riêng:**
+1. **`++` tăng cái gì (con trỏ hay giá trị)?** Do **độ ưu tiên** quyết định — tức compiler tự đặt ngoặc ở đâu. `++` hậu tố ưu tiên cao hơn `*` ⟹ `*p++` là `*(p++)`. `++` tiền tố và `*` cùng mức, kết hợp phải sang trái ⟹ toán tử sát biến hơn gom trước: `++*p` là `++(*p)`, `*++p` là `*(++p)`.
+2. **Dùng giá trị cũ hay mới?** Do **vị trí của `++`**: hậu tố (`x++`) cho giá trị **cũ** rồi mới tăng; tiền tố (`++x`) tăng rồi cho giá trị **mới**.
 
-| Biểu thức | Tăng cái gì | Khi nào | Output thật |
-|---|---|---|---|
-| `*p++` | **con trỏ** | sau khi đọc | `x=10, *p=20, a[0]=10` |
-| `(*p)++` | **giá trị** | sau khi đọc | `x=10, *p=11, a[0]=11` |
-| `++*p` | **giá trị** | trước khi đọc | `x=11, *p=11, a[0]=11` |
-| `*++p` | **con trỏ** | trước khi đọc | `x=20, *p=20, a[0]=10` |
+| Biểu thức | Compiler hiểu là | Tăng cái gì | Dùng giá trị | Output thật |
+|---|---|---|---|---|
+| `*p++` | `*(p++)` | **con trỏ** | `p` cũ ⟹ đọc `a[0]` | `x=10, *p=20, a[0]=10` |
+| `(*p)++` | `(*p)++` | **giá trị** | `a[0]` cũ | `x=10, *p=11, a[0]=11` |
+| `++*p` | `++(*p)` | **giá trị** | `a[0]` mới | `x=11, *p=11, a[0]=11` |
+| `*++p` | `*(++p)` | **con trỏ** | `p` mới ⟹ đọc `a[1]` | `x=20, *p=20, a[0]=10` |
 
-**Bẫy:** tưởng `*p++` tăng giá trị. **Chốt:** *"`*p++` đọc rồi dời con trỏ — đó là lõi của `while (*d++ = *s++);`."*
+**Bẫy:** tưởng *"ưu tiên cao hơn"* nghĩa là *"chạy trước"* — độ ưu tiên chỉ quyết định gom nhóm, không quyết định thời điểm tăng. **Chốt:** *"`*p++` đọc rồi dời con trỏ — đó là lõi của `while (*d++ = *s++);`."*
 </details>
 
 #### C-003 · 🟢 · concept · [→ memory-model §6](../../../01-cpp-fundamentals/memory-model.md)
@@ -94,7 +96,7 @@ warning: 'sizeof' on array function parameter 'a' will return size of 'int *' [-
 **Sửa:** truyền số phần tử kèm theo — đây là lý do mọi API C có cặp `(buf, len)`:
 ```c
 void print_len(const int *a, size_t n);              // ✅
-print_len(arr, sizeof arr / sizeof arr[0]);          // tinh o NOI MANG con nguyen
+print_len(arr, sizeof arr / sizeof arr[0]);          // tính ở NƠI MẢNG còn nguyên
 ```
 
 **Bẫy:** viết macro `#define LEN(a) (sizeof(a)/sizeof((a)[0]))` rồi dùng **trong hàm** — vẫn ra 2, im lặng. **Chốt:** *"Truyền mảng là truyền con trỏ; kích thước phải đi kèm như một tham số riêng."*
@@ -154,7 +156,7 @@ Output thật: `sizeof(ap) = 24` (3 con trỏ) · `sizeof(pa) = 8` (1 con trỏ)
 **Chốt:** *"Ngoặc quanh `*a` biến 'mảng các con trỏ' thành 'con trỏ tới mảng'."*
 </details>
 
-#### C-008 · 🟠 · concept · [→ c-pointers-arrays §3.1](../../../01-cpp-fundamentals/c-pointers-arrays.md)
+#### C-008 · 🟠 · concept · [→ c-pointers-arrays §3.1–3.2](../../../01-cpp-fundamentals/c-pointers-arrays.md)
 **Đọc khai báo sau, nói nó là gì, rồi viết lại cho dễ đọc:**
 ```c
 void (*signal(int sig, void (*h)(int)))(int);
@@ -171,7 +173,7 @@ void (*signal(int sig, void (*h)(int)))(int);
 **Viết lại bằng `typedef`** — đặt tên cho kiểu lặp lại:
 ```c
 typedef void (*sighandler_t)(int);
-sighandler_t signal(int sig, sighandler_t h);   // cung kieu voi ban tho
+sighandler_t signal(int sig, sighandler_t h);   // cùng kiểu với bản thô
 ```
 Đã kiểm bằng gcc: gán hàm khai báo kiểu thô vào biến kiểu `sighandler_t (*)(int, sighandler_t)` không cảnh báo gì, so sánh hai con trỏ cho `1` — cùng một kiểu.
 
@@ -199,17 +201,17 @@ alloc_buf(buf, 16);
 **Cơ chế:** C truyền **theo giá trị** — `p` là **bản sao** của `buf`. Gán `p = malloc(n)` chỉ sửa bản sao; hàm return thì bản sao mất ⟹ `buf` vẫn `NULL`, và **16 byte bị rò** vì không ai giữ địa chỉ.
 
 ```
-buf [NULL]          p [0x5000] ---> 16 byte   (p chet khi return => leak)
+buf [NULL]          p [0x5000] ---> 16 byte   (p chết khi return => leak)
 ```
 
 Output thật: `sau alloc_bad: buf = (nil)` · valgrind: `definitely lost: 16 bytes in 1 blocks`. gcc cũng nhắc: `parameter 'p' set but not used`.
 
 **Sửa — muốn hàm sửa một `T` thì truyền `T *`; ở đây `T` là `char *`:**
 ```c
-void alloc_buf(char **pp, size_t n) { *pp = malloc(n); }   // ✅ ghi thang vao buf
+void alloc_buf(char **pp, size_t n) { *pp = malloc(n); }   // ✅ ghi thẳng vào buf
 alloc_buf(&buf, 16);
 
-char *alloc_buf2(size_t n) { return malloc(n); }           // ✅ hoac tra ve
+char *alloc_buf2(size_t n) { return malloc(n); }           // ✅ hoặc trả về
 ```
 Trong C++: `void alloc_buf(char *&p, size_t n)` — tham chiếu tới con trỏ.
 
@@ -228,10 +230,10 @@ typedef struct Node { int val; struct Node *next; } Node;
 void remove_val(Node **head, int v) {
     Node **pp = head;
     while (*pp && (*pp)->val != v)
-        pp = &(*pp)->next;               // tro vao o "next" cua node hien tai
+        pp = &(*pp)->next;               // trỏ vào ô "next" của node hiện tại
     if (*pp) {
         Node *dead = *pp;
-        *pp = dead->next;                // noi tat qua node bi xoa
+        *pp = dead->next;                // nối tắt qua node bị xoá
         free(dead);
     }
 }
@@ -269,15 +271,15 @@ Output thật trên danh sách `4 3 2 1`: xoá `4` (node đầu) ⟹ `3 2 1`; xo
 ```
 [ a00 a01 a02 a03 | a10 a11 a12 a13 | a20 a21 a22 a23 ]
 ```
-Output thật: `sizeof(a)=48 sizeof(a[0])=16` · `&a[1][0] - &a[0][0] = 4 phan tu`.
+Output thật: `sizeof(a)=48 sizeof(a[0])=16` · `&a[1][0] - &a[0][0] = 4 phần tử (liền khối, row-major)`.
 
 **Công thức:** `địa chỉ a[i][j] = địa chỉ a + (i * C + j) * sizeof(int)`. Công thức **cần `C`** (số cột) nhưng **không cần `R`**.
 
 **Vì vậy:** `a` decay thành con trỏ tới **hàng đầu**, kiểu `int (*)[4]`. Ba chữ ký hợp lệ:
 ```c
 void f(int rows, int m[][4]);
-void f(int rows, int (*m)[4]);                       // y het dong tren
-void f(int rows, int cols, int m[rows][cols]);       // C99 VLA — so cot luc chay
+void f(int rows, int (*m)[4]);                       // y hệt dòng trên
+void f(int rows, int cols, int m[rows][cols]);       // C99 VLA — số cột lúc chạy
 ```
 
 **Chốt:** *"Mảng 2 chiều là mảng của các mảng; decay chỉ bóc **một** tầng, nên kiểu còn lại `int (*)[C]` phải mang theo số cột."*
@@ -306,9 +308,9 @@ Segmentation fault (core dumped)              <- exit 139
 4. `m[1][3]` dereference địa chỉ rác đó ⟹ segfault.
 
 ```
-a thuc te:   [ 0 ][ 1 ][ 2 ][ 3 ][10]...      (so nguyen)
-m nghi rang: [ ptr0    ][ ptr1    ]...        (con tro 8 byte)
-                         ^ = byte cua 2 va 3 => dia chi rac
+a thực tế:   [ 0 ][ 1 ][ 2 ][ 3 ][10]...      (số nguyên)
+m nghĩ rằng: [ ptr0    ][ ptr1    ]...        (con trỏ 8 byte)
+                         ^ = byte của 2 và 3 => địa chỉ rác
 ```
 
 **Sửa — chọn theo việc:**
@@ -337,7 +339,7 @@ int **alloc_rows(int R, int C) {
     if (!m) return NULL;
     for (int i = 0; i < R; i++) {
         m[i] = malloc(C * sizeof **m);
-        if (!m[i]) {                        // ✅ don phan da cap, khong leak
+        if (!m[i]) {                        // ✅ dọn phần đã cấp, không leak
             while (i--) free(m[i]);
             free(m);
             return NULL;
@@ -346,8 +348,8 @@ int **alloc_rows(int R, int C) {
     return m;
 }
 void free_rows(int **m, int R) {
-    for (int i = 0; i < R; i++) free(m[i]); // hang truoc
-    free(m);                                // mang con tro sau
+    for (int i = 0; i < R; i++) free(m[i]); // hàng trước
+    free(m);                                // mảng con trỏ sau
 }
 ```
 
@@ -355,7 +357,7 @@ void free_rows(int **m, int R) {
 ```c
 int (*m)[C] = malloc(R * sizeof *m);        // sizeof *m = C * sizeof(int)
 m[i][j] = 0;
-free(m);                                    // MOT lan
+free(m);                                    // MỘT lần
 ```
 *(Hoặc phẳng hoàn toàn: `int *m = malloc(R * C * sizeof *m);` và `m[i*C + j]`.)*
 
@@ -458,7 +460,7 @@ char *fmt_id(int id) {
 ```c
 int cmp_int(const void *a, const void *b) {
     int x = *(const int *)a, y = *(const int *)b;
-    return (x > y) - (x < y);                 // ✅ -1, 0, 1 — khong tran so
+    return (x > y) - (x < y);                 // ✅ -1, 0, 1 — không tràn số
 }
 qsort(v, n, sizeof v[0], cmp_int);
 ```
@@ -486,7 +488,7 @@ static const handler_t handlers[OPCODE_MAX] = {
     [OP_READ]  = handle_read,
     [OP_WRITE] = handle_write,
 };
-if (op < OPCODE_MAX && handlers[op]) handlers[op](p, n);   // ✅ kiem bien + kiem NULL
+if (op < OPCODE_MAX && handlers[op]) handlers[op](p, n);   // ✅ kiểm biên + kiểm NULL
 ```
 
 **Nên dùng khi:** nhiều mã lệnh, mỗi mã một hàm độc lập · cần **đăng ký/thay** hàm lúc chạy (driver điền bảng của nó) · muốn thêm lệnh mà không sửa hàm dispatch.
@@ -539,7 +541,7 @@ if (op < OPCODE_MAX && handlers[op]) handlers[op](p, n);   // ✅ kiem bien + ki
 
 **Sửa — hai lớp ngoặc, mỗi lớp chữa một lỗi:**
 ```c
-#define SQ(x) ((x) * (x))   // ngoac quanh TUNG tham so (loi 1) + quanh CA bieu thuc (loi 2)
+#define SQ(x) ((x) * (x))   // ngoặc quanh TỪNG tham số (lỗi 1) + quanh CẢ biểu thức (lỗi 2)
 ```
 Output thật sau khi sửa: `SQ(a+1) = 9`, `10/SQ(2) = 2`.
 
@@ -632,7 +634,7 @@ Output thật: `STR(FW_VERSION) = FW_VERSION` · `XSTR(FW_VERSION) = 3` · `reg_
 
 typedef enum { ERROR_LIST(AS_ENUM) ERR_COUNT } err_t;
 static const char *const err_text[] = { ERROR_LIST(AS_TEXT) };
-_Static_assert(sizeof err_text / sizeof err_text[0] == ERR_COUNT, "bang ten lech enum");
+_Static_assert(sizeof err_text / sizeof err_text[0] == ERR_COUNT, "bảng tên lệch enum");
 ```
 Output thật: `0 -> ok`, `1 -> timeout`, `2 -> i2c nack`.
 
@@ -666,7 +668,7 @@ Output thật: `0 -> ok`, `1 -> timeout`, `2 -> i2c nack`.
 uint8_t reverse8(uint8_t b) {
     uint8_t r = 0;
     for (int i = 0; i < 8; i++) {
-        r = (uint8_t)((r << 1) | (b & 1u));   // day bit thap nhat cua b vao ben phai r
+        r = (uint8_t)((r << 1) | (b & 1u));   // đẩy bit thấp nhất của b vào bên phải r
         b >>= 1;
     }
     return r;
@@ -684,9 +686,9 @@ Output thật: `reverse8(0x01)=0x80`, `reverse8(0xB0)=0x0D`.
 | Lệnh phần cứng | 1 lệnh | ARM có `RBIT` (qua `__RBIT()` của CMSIS) |
 
 ```c
-b = (uint8_t)((b >> 4) | (b << 4));                       // doi 2 nibble
-b = (uint8_t)(((b & 0xCC) >> 2) | ((b & 0x33) << 2));     // doi tung cap bit
-b = (uint8_t)(((b & 0xAA) >> 1) | ((b & 0x55) << 1));     // doi tung bit ke nhau
+b = (uint8_t)((b >> 4) | (b << 4));                       // đổi 2 nibble
+b = (uint8_t)(((b & 0xCC) >> 2) | ((b & 0x33) << 2));     // đổi từng cặp bit
+b = (uint8_t)(((b & 0xAA) >> 1) | ((b & 0x55) << 1));     // đổi từng bit kề nhau
 ```
 Output thật: `0x01 -> 0x80`, `0xB0 -> 0x0D` — khớp bản vòng lặp.
 
@@ -729,7 +731,7 @@ Output thật, `reg = 0xFFFF00FF`:
 ```
 FIELD_GET(reg, 4, 4)           = 0xF
 FIELD_SET(reg, 8, 4, 0xA)  ->  0xFFFF0AFF
-FIELD_SET(reg, 8, 4, 0x1F) ->  0xFFFF0FFF     <- 0x1F qua rong: bi cat, khong lan sang truong khac
+FIELD_SET(reg, 8, 4, 0x1F) ->  0xFFFF0FFF     <- 0x1F quá rộng: bị cắt, không lấn sang trường khác
 ```
 
 **Những gì có thể sai — đây là phần tính điểm:**
@@ -761,11 +763,11 @@ bool my_atoi(const char *s, int *out) {
     while (isspace((unsigned char)*s)) s++;
     int sign = 1;
     if (*s == '+' || *s == '-') { if (*s == '-') sign = -1; s++; }
-    if (!isdigit((unsigned char)*s)) return false;              // khong co chu so nao
+    if (!isdigit((unsigned char)*s)) return false;              // không có chữ số nào
     long long acc = 0;
     while (isdigit((unsigned char)*s)) {
         acc = acc * 10 + (*s - '0');
-        if (sign * acc > INT_MAX || sign * acc < INT_MIN) return false;   // tran — dung NGAY
+        if (sign * acc > INT_MAX || sign * acc < INT_MIN) return false;   // tràn — dừng NGAY
         s++;
     }
     *out = (int)(sign * acc);
@@ -799,11 +801,11 @@ char *my_itoa(int v, char *buf, size_t n) {
     char tmp[12];                       // "-2147483648" + '\0'
     int  i = 0;
     bool neg = v < 0;
-    if (!neg) v = -v;                   // dua ve AM — luon an toan
-    do { tmp[i++] = (char)('0' - v % 10); v /= 10; } while (v);   // do-while: v = 0 van ra "0"
+    if (!neg) v = -v;                   // đưa về ÂM — luôn an toàn
+    do { tmp[i++] = (char)('0' - v % 10); v /= 10; } while (v);   // do-while: v = 0 vẫn ra "0"
     if (neg) tmp[i++] = '-';
-    if ((size_t)i + 1 > n) return NULL; // khong du cho
-    for (int k = 0; k < i; k++) buf[k] = tmp[i - 1 - k];          // chu so sinh nguoc — dao lai
+    if ((size_t)i + 1 > n) return NULL; // không đủ chỗ
+    for (int k = 0; k < i; k++) buf[k] = tmp[i - 1 - k];          // chữ số sinh ngược — đảo lại
     buf[i] = '\0';
     return buf;
 }
@@ -824,13 +826,13 @@ Output thật: `0 -305 -2147483648`.
 Output thật với `char dst[4]` và nguồn `"abcdef"`:
 ```
 warning: 'strncpy' output truncated copying 4 bytes from a string of length 6 [-Wstringop-truncation]
-strncpy: dst[3]='d' (khong phai '\0')
+strncpy: dst[3]='d' (không phải '\0')
 ```
 Thêm một bất lợi: nguồn ngắn thì nó **đệm `'\0'` tới hết `n`** — tốn công với buffer lớn. `strncpy` vốn sinh ra cho trường **cố định độ dài** (tên file trong cấu trúc thư mục cũ), không phải cho chuỗi.
 
 **Thay bằng:**
 ```c
-snprintf(dst, sizeof dst, "%s", src);   // luon co '\0', cat bot neu thieu cho
+snprintf(dst, sizeof dst, "%s", src);   // luôn có '\0', cắt bớt nếu thiếu chỗ
 ```
 Output thật: `"abc"`. `snprintf` còn **trả về độ dài lẽ ra cần** ⟹ so với `sizeof dst` để biết đã bị cắt. (`strlcpy` làm cùng việc, có trên BSD và glibc ≥ 2.38, nhưng không phải chuẩn C.)
 
@@ -852,7 +854,7 @@ Output thật: `"abc"`. `snprintf` còn **trả về độ dài lẽ ra cần** 
 | **C** | ✅ Hợp lệ — byte được diễn giải lại theo kiểu mới |
 | **C++** | ❌ **UB** — dùng `memcpy` hoặc `std::bit_cast` (C++20) |
 
-`memcpy` hợp lệ ở cả hai: output thật `bit cua 1.0f = 0x3F800000`.
+`memcpy` hợp lệ ở cả hai: output thật `bit của 1.0f = 0x3F800000`.
 
 **Công dụng chính đáng của `union`:** *tagged union* — một trường `type` cho biết đang dùng thành viên nào (gói tin nhiều loại, giá trị cấu hình nhiều kiểu), tiết kiệm bộ nhớ. **Không** nên dùng `union`/bitfield để map thanh ghi ([EMB-003](embedded-fundamentals.md)).
 
@@ -927,8 +929,8 @@ Output thật (gcc 11.4): `multiple definition of 'g_count'`; thêm `-fcommon` t
 
 **Sửa đúng — không phải thêm `-fcommon`:**
 ```c
-/* counter.h */  extern int g_count;     // KHAI BAO, khong cap bo nho
-/* a.c */        int g_count = 0;        // DINH NGHIA — dung MOT file
+/* counter.h */  extern int g_count;     // KHAI BÁO, không cấp bộ nhớ
+/* a.c */        int g_count = 0;        // ĐỊNH NGHĨA — đúng MỘT file
 ```
 
 **`const int LIMIT = 10;` ở hai file:**
@@ -965,10 +967,10 @@ int dev_init(void **out_a, void **out_b, void **out_c) {
     if (!c) goto err_c;
 
     *out_a = a; *out_b = b; *out_c = c;
-    return 0;                 // thanh cong: KHONG roi xuong cac nhan
+    return 0;                 // thành công: KHÔNG rơi xuống các nhãn
 
 err_c:
-    free(b);                  // don theo thu tu NGUOC
+    free(b);                  // dọn theo thứ tự NGƯỢC
 err_b:
     free(a);
 err_a:
@@ -1035,12 +1037,12 @@ a:  [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ]
 #### C-040 · 🟡 · coding · [→ c-language-idioms §6.2](../../../01-cpp-fundamentals/c-language-idioms.md)
 **In ra gì?**
 ```c
-if (sizeof(int) > -1) printf("lon hon\n");
-else                  printf("KHONG lon hon\n");
+if (sizeof(int) > -1) printf("lớn hơn\n");
+else                  printf("KHÔNG lớn hơn\n");
 ```
 <details><summary>Đáp án</summary>
 
-**Output thật: `KHONG lon hon`.**
+**Output thật: `KHÔNG lớn hơn`.**
 
 **Cơ chế:** `sizeof` có kiểu `size_t` — **không dấu**. So sánh không dấu với `int` ⟹ `-1` bị đổi sang không dấu = `SIZE_MAX` (số lớn nhất). `4 > SIZE_MAX` là sai.
 
@@ -1054,7 +1056,7 @@ gcc bắt: `comparison of integer expressions of different signedness: 'long uns
 #### C-041 · 🟠 · coding · ⭐ · [→ c-language-idioms §6.2](../../../01-cpp-fundamentals/c-language-idioms.md)
 **Driver đọc một byte trạng thái từ UART rồi kiểm tra. Trên PC test chạy một kiểu, trên board ARM chạy kiểu khác. In ra gì trên mỗi nơi, và vì sao?**
 ```c
-char c = 200;               /* byte doc tu UART */
+char c = 200;               /* byte đọc từ UART */
 if (c > 100) printf("c > 100, c = %d\n", c);
 else         printf("c <= 100, c = %d\n", c);
 ```
@@ -1062,8 +1064,8 @@ else         printf("c <= 100, c = %d\n", c);
 
 **Output thật:**
 ```
-x86 (gcc mac dinh):            c <= 100, c = -56
--funsigned-char (mo phong ARM): c > 100, c = 200
+x86 (gcc mặc định):            c <= 100, c = -56
+-funsigned-char (mô phỏng ARM): c > 100, c = 200
 ```
 *(Bản thứ hai mô phỏng bằng cờ `-funsigned-char` trên x86 — máy không có toolchain ARM. ABI của ARM quy định `char` không dấu.)*
 
@@ -1098,12 +1100,12 @@ for (unsigned int i = 3; i >= 0; i--)
 **`status = 0x01` — bit READY (`0x04`) đang tắt. Đoạn này in ra gì?**
 ```c
 #define READY 0x04u
-if (status & READY == 0) printf("chua san sang\n");
-else                     printf("san sang -> gui lenh\n");
+if (status & READY == 0) printf("chưa sẵn sàng\n");
+else                     printf("sẵn sàng -> gửi lệnh\n");
 ```
 <details><summary>Đáp án</summary>
 
-**Output thật: `san sang -> gui lenh`** — sai, thiết bị chưa sẵn sàng mà vẫn gửi lệnh.
+**Output thật: `sẵn sàng -> gửi lệnh`** — sai, thiết bị chưa sẵn sàng mà vẫn gửi lệnh.
 
 **Cơ chế:** `==` có độ ưu tiên **cao hơn** `&`. Biểu thức thật là `status & (READY == 0)` = `status & 0` = **0** ⟹ điều kiện luôn sai, bất kể `status`.
 
@@ -1143,7 +1145,7 @@ if (link_up) {
 
 gcc bắt: `suggest explicit braces to avoid ambiguous 'else' [-Wdangling-else]`.
 
-**Cùng họ:** `if (x = 0)` — **gán** chứ không so sánh, luôn sai và đổi `x` thành 0 (output thật: `nhanh else, x = 0`); gcc: `suggest parentheses around assignment used as truth value`.
+**Cùng họ:** `if (x = 0)` — **gán** chứ không so sánh, luôn sai và đổi `x` thành 0 (output thật: `nhánh else, x = 0`); gcc: `suggest parentheses around assignment used as truth value`.
 
 **Chốt:** *"`else` theo `if` gần nhất, không theo thụt lề — luôn dùng ngoặc nhọn."* (MISRA bắt buộc ngoặc cho mọi thân `if`.)
 </details>
@@ -1191,15 +1193,15 @@ gcc 11.4 in `x=7 y=12` ở cả `-O0` lẫn `-O2` — trông **ổn định**, n
 **Hai đoạn này in ra gì? Sửa phép so sánh thế nào?**
 ```c
 float f = 0.1f;
-if (f == 0.1) printf("bang\n"); else printf("KHONG bang\n");
+if (f == 0.1) printf("bằng\n"); else printf("KHÔNG bằng: f=%.10f\n", f);
 
 float sum = 0.0f;
 for (int i = 0; i < 10; i++) sum += 0.1f;
-printf("%d\n", sum == 1.0f);
+printf("sum == 1.0f ? %d   sum=%.8f\n", sum == 1.0f, sum);
 ```
 <details><summary>Đáp án</summary>
 
-**Output thật:** `KHONG bang: f=0.1000000015` và `0` (`sum = 1.00000012`).
+**Output thật:** `KHÔNG bằng: f=0.1000000015` và `0` (`sum = 1.00000012`).
 
 **Cơ chế:**
 1. `0.1` không biểu diễn chính xác trong nhị phân. `0.1f` làm tròn ở độ chính xác `float`, còn `0.1` (không hậu tố) là `double` làm tròn ở độ chính xác cao hơn ⟹ khi so sánh, `f` được nâng lên `double` và **khác** `0.1`.
@@ -1226,7 +1228,7 @@ if (!buf) return -ENOMEM;
 
 Output thật (cố ý xin `SIZE_MAX / 2` byte để `realloc` thất bại):
 ```
-buf truoc = hop le
+buf trước = hợp lệ
 buf sau   = (nil)
 definitely lost: 64 bytes in 1 blocks          <- valgrind
 ```
@@ -1234,7 +1236,7 @@ definitely lost: 64 bytes in 1 blocks          <- valgrind
 **Sửa:**
 ```c
 char *tmp = realloc(buf, new_size);
-if (!tmp) return -ENOMEM;     // ✅ buf van hop le — caller con free duoc / dung tiep
+if (!tmp) return -ENOMEM;     // ✅ buf vẫn hợp lệ — caller còn free được / dùng tiếp
 buf = tmp;
 ```
 
@@ -1258,8 +1260,8 @@ bool cfg_changed(const struct cfg *a, const struct cfg *b) {
 Output thật (hai struct được `memset` khác nhau trước, rồi gán field giống hệt):
 ```
 sizeof(struct cfg) = 8
-memcmp = KHAC
-so tung field = bang
+memcmp = KHÁC
+so từng field = bằng
 ```
 
 **Hậu quả thật:** ghi flash thừa mỗi lần kiểm tra ⟹ **mòn flash** nhanh; hoặc ngược lại, checksum/CRC tính trên cả struct ra khác nhau với cùng dữ liệu.
@@ -1328,7 +1330,7 @@ printf("%zu %d %d %s\n", offsetof(struct sensor, node), back == &s, back->id, ba
 **Nó làm gì:** có con trỏ tới **một thành viên** (`node`), tính ngược ra địa chỉ của **struct chứa nó**: lùi lại đúng `offsetof(type, member)` byte.
 
 ```
-dia chi:  s+0        s+4             s+12   s+16
+địa chỉ:  s+0        s+4             s+12   s+16
           [ id  ][ name[8]          ][pad][ node ]
           ^                                 ^
           back = n - 16                     n

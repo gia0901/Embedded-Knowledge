@@ -20,7 +20,7 @@ Preprocessor chạy **trước** compiler, và chỉ làm việc với **chữ**
 
 ```c
 #define SQ_BAD(x)     x * x
-#define SQ(x)         ((x) * (x))       /* ngoac quanh TUNG tham so + ca bieu thuc */
+#define SQ(x)         ((x) * (x))       /* ngoặc quanh TỪNG tham số + cả biểu thức */
 #define DOUBLE_BAD(x) (x) + (x)
 #define MAX(a, b)     ((a) > (b) ? (a) : (b))
 ```
@@ -66,22 +66,22 @@ else
 | V2 | `error: 'else' without a previous 'if'` | `{ … }` cộng với dấu `;` người dùng gõ thêm thành `{ … };` — dấu `;` đó là một câu lệnh rỗng chen giữa `if` và `else` |
 | **V3** | ✅ in `ok` | `do { … } while (0)` là **một câu lệnh** và **cần đúng một** dấu `;` — dùng y như một lời gọi hàm |
 
-**Bản tệ nhất là V1 khi không có `else`:** vẫn compile, và `log_evt()` **luôn chạy** dù `fault = 0`. Output thật: `fault=0 nhung: n_reset=0 n_log=1`. gcc có bắt: `warning: macro expands to multiple statements [-Wmultistatement-macros]` — thêm một lý do để đọc warning.
+**Bản tệ nhất là V1 khi không có `else`:** vẫn compile, và `log_evt()` **luôn chạy** dù `fault = 0`. Output thật: `fault=0 nhưng: n_reset=0 n_log=1`. gcc có bắt: `warning: macro expands to multiple statements [-Wmultistatement-macros]` — thêm một lý do để đọc warning.
 
 ### 1.3 `#` và `##`
 
 ```c
-#define STR(x)    #x             /* bien token thanh chuoi */
-#define XSTR(x)   STR(x)         /* mo rong x TRUOC, roi moi bien thanh chuoi */
-#define CAT(a, b) a##b           /* dan hai token thanh mot */
+#define STR(x)    #x             /* biến token thành chuỗi */
+#define XSTR(x)   STR(x)         /* mở rộng x TRƯỚC, rồi mới biến thành chuỗi */
+#define CAT(a, b) a##b           /* dán hai token thành một */
 #define FW_VERSION 3
 ```
 
 Output thật:
 
 ```
-STR(FW_VERSION)  = FW_VERSION      <- # dung tham so NGUYEN VAN, khong mo rong
-XSTR(FW_VERSION) = 3               <- qua mot tang trung gian thi FW_VERSION duoc mo rong truoc
+STR(FW_VERSION)  = FW_VERSION      <- # dùng tham số NGUYÊN VĂN, không mở rộng
+XSTR(FW_VERSION) = 3               <- qua một tầng trung gian thì FW_VERSION được mở rộng trước
 reg_7 = 42                         <- int CAT(reg_, 7) = 42;  ==>  int reg_7 = 42;
 ```
 
@@ -103,7 +103,7 @@ Bài toán: một `enum` mã lỗi và một bảng chuỗi mô tả phải **lu
 typedef enum { ERROR_LIST(AS_ENUM) ERR_COUNT } err_t;
 static const char *const err_text[] = { ERROR_LIST(AS_TEXT) };
 
-_Static_assert(sizeof err_text / sizeof err_text[0] == ERR_COUNT, "bang ten lech enum");
+_Static_assert(sizeof err_text / sizeof err_text[0] == ERR_COUNT, "bảng tên lệch enum");
 ```
 
 ```
@@ -117,7 +117,7 @@ Thêm một mã lỗi = thêm **một dòng** trong `ERROR_LIST`; `enum`, bảng
 ### 1.5 Biên dịch có điều kiện & include guard
 
 ```c
-#ifndef COUNTER_H          /* include guard: header bi include nhieu lan van chi co hieu luc mot lan */
+#ifndef COUNTER_H          /* include guard: header bị include nhiều lần vẫn chỉ có hiệu lực một lần */
 #define COUNTER_H
 /* ... */
 #endif
@@ -127,7 +127,7 @@ Thêm một mã lỗi = thêm **một dòng** trong `ERROR_LIST`; `enum`, bảng
 #elif defined(CONFIG_CHIP_B)
 #  include "chip_b_regs.h"
 #else
-#  error "Chua chon chip"   /* that bai NGAY luc build, khong de lot toi runtime */
+#  error "Chưa chọn chip"   /* thất bại NGAY lúc build, không để lọt tới runtime */
 #endif
 ```
 
@@ -152,7 +152,7 @@ Thêm một mã lỗi = thêm **một dòng** trong `ERROR_LIST`; `enum`, bảng
 
 ```c
 int next_id(void) {
-    static int id = 100;     /* khoi tao MOT lan, luc chuong trinh bat dau */
+    static int id = 100;     /* khởi tạo MỘT lần, lúc chương trình bắt đầu */
     return id++;
 }
 ```
@@ -165,18 +165,18 @@ Gọi ba lần ở ba câu lệnh riêng: `next_id: 100 101 102`.
 
 ```c
 /* counter.h */
-extern int g_count;            /* KHAI BAO: "co mot bien ten nay o dau do" — khong cap bo nho */
-int next_id(void);             /* khai bao ham */
+extern int g_count;            /* KHAI BÁO: "có một biến tên này ở đâu đó" — không cấp bộ nhớ */
+int next_id(void);             /* khai báo hàm */
 
-/* a.c — DUNG MOT file */
-int g_count = 0;               /* DINH NGHIA: cap bo nho */
+/* a.c — ĐÚNG MỘT file */
+int g_count = 0;               /* ĐỊNH NGHĨA: cấp bộ nhớ */
 ```
 
 **Hai file cùng viết `int g_count;` ở phạm vi file** (không `extern`, không khởi tạo — gọi là *tentative definition*):
 
 ```
-gcc 11.4:            multiple definition of `g_count'      <- loi link
-gcc 11.4 -fcommon:   link OK                               <- hanh vi cu
+gcc 11.4:            multiple definition of `g_count'      <- lỗi link
+gcc 11.4 -fcommon:   link OK                               <- hành vi cũ
 ```
 
 Từ **gcc 10**, mặc định là `-fno-common`: mỗi tentative definition là một định nghĩa thật, hai cái thì đụng nhau. Code cũ "chạy bao năm" có thể **không link được** khi nâng toolchain. Sửa đúng: một định nghĩa trong `.c`, `extern` trong header — không phải thêm `-fcommon`.
@@ -207,7 +207,7 @@ Cả hai dòng đều đã build thật bằng gcc/g++ 11.4. Đây là chỗ cod
 ### 3.1 Ghép byte bằng phép dịch — cách duy nhất không phụ thuộc CPU
 
 ```c
-static void put_be32(uint8_t *p, uint32_t v) {          /* big-endian tren day */
+static void put_be32(uint8_t *p, uint32_t v) {          /* big-endian trên dây */
     p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16);
     p[2] = (uint8_t)(v >>  8); p[3] = (uint8_t)(v);
 }
@@ -222,8 +222,8 @@ Output thật trên x86 (little-endian):
 ```
 wire = 11 22 33 44
 get_be32 = 0x11223344
-union b[0..3] = 44 33 22 11            <- thu tu trong bo nho cua CPU nay
-memcpy wire -> uint32 = 0x44332211     <- copy thang: SAI tren little-endian
+union b[0..3] = 44 33 22 11   (thứ tự trong bộ nhớ của CPU này)
+memcpy wire -> uint32 = 0x44332211   (sai trên little-endian)
 ```
 
 | Cách đọc 4 byte từ buffer | Endianness | Alignment | Hợp lệ |
@@ -243,7 +243,7 @@ memcpy wire -> uint32 = 0x44332211     <- copy thang: SAI tren little-endian
 | **C** (C99 TC3 trở đi) | ✅ Được phép — byte được diễn giải lại theo kiểu mới |
 | **C++** | ❌ **UB** — dùng `memcpy`, hoặc `std::bit_cast` (C++20) |
 
-Cách xem bit của `float` hợp lệ ở **cả hai** ngôn ngữ là `memcpy`: `bit cua 1.0f = 0x3F800000`.
+Cách xem bit của `float` hợp lệ ở **cả hai** ngôn ngữ là `memcpy`: `bit của 1.0f = 0x3F800000`.
 
 > ⚠️ Map **thanh ghi** bằng `union`/bitfield là chuyện khác và bị nhiều coding standard cấm: chuẩn không quy định thứ tự bit trong bitfield — [EMB-003](../14-prep/mock-interview/bank/embedded-fundamentals.md).
 
@@ -264,10 +264,10 @@ int dev_init(void **out_a, void **out_b, void **out_c) {
     if (!c) goto err_c;
 
     *out_a = a; *out_b = b; *out_c = c;
-    return 0;                 /* thanh cong: KHONG roi xuong cac nhan ben duoi */
+    return 0;                 /* thành công: KHÔNG rơi xuống các nhãn bên dưới */
 
 err_c:
-    free(b);                  /* nhan sau don cai gianh truoc — thu tu NGUOC */
+    free(b);                  /* nhãn sau dọn cái giành trước — thứ tự NGƯỢC */
 err_b:
     free(a);
 err_a:
@@ -278,11 +278,11 @@ err_a:
 Chạy với lỗi giả lập ở từng bước:
 
 ```
-loi o buoc 0 -> dev_init = 0
-loi o buoc 1 -> dev_init = -12          <- -ENOMEM
-loi o buoc 2 -> dev_init = -12
-loi o buoc 3 -> dev_init = -12
-All heap blocks were freed -- no leaks are possible       <- valgrind, ca 4 kich ban
+lỗi ở bước 0 -> dev_init = 0
+lỗi ở bước 1 -> dev_init = -12          <- -ENOMEM
+lỗi ở bước 2 -> dev_init = -12
+lỗi ở bước 3 -> dev_init = -12
+All heap blocks were freed -- no leaks are possible       <- valgrind, cả 4 kịch bản
 ```
 
 | Cách | Vấn đề |
@@ -305,17 +305,17 @@ Interviewer không cần bạn thuộc thư viện. Họ xem bạn **tự hỏi 
 
 ```c
 bool my_atoi(const char *s, int *out) {
-    while (isspace((unsigned char)*s)) s++;                 /* 1. bo khoang trang dau */
+    while (isspace((unsigned char)*s)) s++;                 /* 1. bỏ khoảng trắng đầu */
     int sign = 1;
-    if (*s == '+' || *s == '-') { if (*s == '-') sign = -1; s++; }   /* 2. dau */
-    if (!isdigit((unsigned char)*s)) return false;          /* 3. khong co chu so nao */
+    if (*s == '+' || *s == '-') { if (*s == '-') sign = -1; s++; }   /* 2. dấu */
+    if (!isdigit((unsigned char)*s)) return false;          /* 3. không có chữ số nào */
     long long acc = 0;
     while (isdigit((unsigned char)*s)) {
         acc = acc * 10 + (*s - '0');
-        if (sign * acc > INT_MAX || sign * acc < INT_MIN) return false;   /* 4. tran so */
+        if (sign * acc > INT_MAX || sign * acc < INT_MIN) return false;   /* 4. tràn số */
         s++;
     }
-    *out = (int)(sign * acc);                                /* 5. dung o ky tu khong phai so */
+    *out = (int)(sign * acc);                                /* 5. dừng ở ký tự không phải số */
     return true;
 }
 ```
@@ -340,11 +340,11 @@ char *my_itoa(int v, char *buf, size_t n) {
     char tmp[12];                 /* "-2147483648" + '\0' */
     int  i = 0;
     bool neg = v < 0;
-    if (!neg) v = -v;             /* dua ve SO AM: -INT_MAX bieu dien duoc, -INT_MIN thi KHONG */
-    do { tmp[i++] = (char)('0' - v % 10); v /= 10; } while (v);   /* do-while: v = 0 van in "0" */
+    if (!neg) v = -v;             /* đưa về SỐ ÂM: -INT_MAX biểu diễn được, -INT_MIN thì KHÔNG */
+    do { tmp[i++] = (char)('0' - v % 10); v /= 10; } while (v);   /* do-while: v = 0 vẫn in "0" */
     if (neg) tmp[i++] = '-';
     if ((size_t)i + 1 > n) return NULL;
-    for (int k = 0; k < i; k++) buf[k] = tmp[i - 1 - k];          /* chu so sinh nguoc — dao lai */
+    for (int k = 0; k < i; k++) buf[k] = tmp[i - 1 - k];          /* chữ số sinh ngược — đảo lại */
     buf[i] = '\0';
     return buf;
 }
@@ -356,12 +356,12 @@ Output thật: `0 -305 -2147483648`. Cách "đổi sang dương rồi xử lý" 
 
 ```c
 char dst[4];
-strncpy(dst, "abcdef", sizeof dst);    /* nguon dai hon -> KHONG co '\0' */
+strncpy(dst, "abcdef", sizeof dst);    /* nguồn dài hơn -> KHÔNG có '\0' */
 ```
 
 ```
 warning: 'strncpy' output truncated copying 4 bytes from a string of length 6 [-Wstringop-truncation]
-strncpy: dst[3]='d' (khong phai '\0')
+strncpy: dst[3]='d' (không phải '\0')
 ```
 
 `strncpy` chép **tối đa n byte** và chỉ thêm `'\0'` nếu nguồn **ngắn hơn** n. Nguồn dài hơn ⟹ `dst` không còn là chuỗi, `printf("%s")` đọc tràn. (Nó còn **đệm `'\0'` tới hết n** khi nguồn ngắn — tốn công nếu buffer lớn.)
@@ -376,10 +376,12 @@ Dạng câu hỏi đọc code trên giấy kiểm tra một việc: bạn đọc
 
 ### 6.1 Thứ tự ưu tiên & cú pháp "im lặng"
 
+*Ưu tiên cao hơn* = khi không có ngoặc, compiler tự đặt ngoặc quanh toán tử đó trước (như `2 + 3 * 4` là `2 + (3 * 4)`). Nó quyết định **gom nhóm**, không quyết định thứ tự chạy — xem [c-pointers-arrays §1.1](c-pointers-arrays.md).
+
 | Code | Đọc theo ý định | Đọc theo luật — output thật | gcc bắt bằng |
 |---|---|---|---|
-| `if (status & READY == 0)` | Bit READY tắt? | `==` **mạnh hơn** `&` ⟹ `status & (READY == 0)` = `status & 0` = 0 ⟹ luôn vào `else`: in `san sang -> gui lenh` khi bit đang **tắt** | `-Wparentheses` |
-| `1 << 2 + 1` | 5 | `+` mạnh hơn `<<` ⟹ `1 << 3` = **8** | `-Wparentheses` |
+| `if (status & READY == 0)` | Bit READY tắt? | `==` **ưu tiên cao hơn** `&` (được gom trước) ⟹ `status & (READY == 0)` = `status & 0` = 0 ⟹ luôn vào `else`: in `sẵn sàng -> gửi lệnh` khi bit đang **tắt** | `-Wparentheses` |
+| `1 << 2 + 1` | 5 | `+` ưu tiên cao hơn `<<` ⟹ `1 << (2 + 1)` = `1 << 3` = **8** | `-Wparentheses` |
 | `if (x = 0)` | So sánh | **Gán** 0 rồi xét ⟹ luôn sai, và `x` bị đổi thành 0 | `-Wparentheses` |
 | `if (a) if (b) f(); else g();` (thụt lề như `else` của `if (a)`) | `else` của `if (a)` | `else` gắn với `if` **gần nhất** ⟹ `a = 0` thì **không in gì** | `-Wdangling-else` |
 | `case` không có `break` | Chỉ chạy một nhánh | **Rơi xuống** các `case` sau: `mode = 1` cho `power = 100` thay vì 50 | `-Wimplicit-fallthrough` |
@@ -391,16 +393,16 @@ Cố ý rơi xuống `case` sau thì ghi rõ bằng comment `/* fall through */`
 
 | Code | Output thật | Vì sao |
 |---|---|---|
-| `if (sizeof(int) > -1)` | `KHONG lon hon` | `sizeof` là `size_t` (không dấu) ⟹ `-1` đổi sang không dấu = số cực lớn. `-Wsign-compare` |
+| `if (sizeof(int) > -1)` | `KHÔNG lớn hơn` | `sizeof` là `size_t` (không dấu) ⟹ `-1` đổi sang không dấu = số cực lớn. `-Wsign-compare` |
 | `char c = 200; if (c > 100)` | x86: `c <= 100, c = -56` · `-funsigned-char`: `c > 100, c = 200` | `char` **có dấu hay không là do nền tảng quyết định**: x86 có dấu, ARM (theo ABI) không dấu. gcc **không cảnh báo** dòng gán. Byte đọc từ thiết bị thì dùng `uint8_t` |
-| `float f = 0.1f; if (f == 0.1)` | `KHONG bang: f=0.1000000015` | `0.1` là `double`; `0.1f` làm tròn ở độ chính xác thấp hơn ⟹ hai giá trị khác nhau |
+| `float f = 0.1f; if (f == 0.1)` | `KHÔNG bằng: f=0.1000000015` | `0.1` là `double`; `0.1f` làm tròn ở độ chính xác thấp hơn ⟹ hai giá trị khác nhau |
 | Cộng `0.1f` mười lần rồi `== 1.0f` | `0` (sum = `1.00000012`) | Sai số làm tròn tích luỹ. So sánh bằng ngưỡng: `fabsf(a - b) < eps`. `-Wfloat-equal` (không có trong `-Wall -Wextra`) |
 
 ### 6.3 UB trông như có output
 
 ```c
 int x = 5;
-int y = x++ + ++x;          /* "x va y bang bao nhieu?" */
+int y = x++ + ++x;          /* "x và y bằng bao nhiêu?" */
 ```
 
 gcc in `x=7 y=12` ở cả `-O0` lẫn `-O2` — trông **ổn định**, nhưng đây là **UB**: `x` bị sửa hai lần không có điểm tuần tự xen giữa. gcc cảnh báo đúng chỗ: `operation on 'x' may be undefined [-Wsequence-point]`. Câu trả lời đúng ở phỏng vấn **không phải là một con số**: *"Đây là UB, compiler nào in gì cũng đúng; sửa bằng cách tách thành nhiều câu lệnh."*
@@ -409,8 +411,8 @@ gcc in `x=7 y=12` ở cả `-O0` lẫn `-O2` — trông **ổn định**, nhưng
 
 | Code | Chuyện gì xảy ra — output thật |
 |---|---|
-| `buf = realloc(buf, n);` | `realloc` thất bại trả `NULL` **và vùng cũ vẫn còn** ⟹ gán thẳng làm mất con trỏ duy nhất. Đã chạy: `buf sau = (nil)` · valgrind: `definitely lost: 64 bytes`. Đúng: `tmp = realloc(buf, n); if (!tmp) { /* xu ly, buf van hop le */ } else buf = tmp;` |
-| `memcmp(&a, &b, sizeof a)` với struct có padding | Hai struct có **mọi field bằng nhau** vẫn ra `KHAC` — padding chứa byte rác khác nhau (`sizeof(struct { uint8_t; uint32_t; })` = 8). So sánh **từng field**, hoặc `memset` cả struct về 0 trước khi điền |
+| `buf = realloc(buf, n);` | `realloc` thất bại trả `NULL` **và vùng cũ vẫn còn** ⟹ gán thẳng làm mất con trỏ duy nhất. Đã chạy: `buf sau   = (nil)` · valgrind: `definitely lost: 64 bytes`. Đúng: `tmp = realloc(buf, n); if (!tmp) { /* xử lý, buf vẫn hợp lệ */ } else buf = tmp;` |
+| `memcmp(&a, &b, sizeof a)` với struct có padding | Hai struct có **mọi field bằng nhau** vẫn ra `KHÁC` — padding chứa byte rác khác nhau (`sizeof(struct { uint8_t; uint32_t; })` = 8). So sánh **từng field**, hoặc `memset` cả struct về 0 trước khi điền |
 | `char name[5]; strcpy(name, "hello");` | Ghi 6 byte vào 5. Build thường **chạy như không có gì** (in `name = hello`, exit 0); gcc có cảnh báo `-Wstringop-overflow`; **ASan** bắt tại chỗ: `stack-buffer-overflow … WRITE of size 6` · `'name' (line 4) <== Memory access at offset 37 overflows this variable` ([09/memory-bugs](../09-debugging/memory-bugs.md)) |
 
 ### 6.5 `container_of` — từ con trỏ tới thành viên, lấy lại cả struct
@@ -423,8 +425,8 @@ Kernel không dùng danh sách liên kết chứa dữ liệu; nó **nhúng** m�
 
 struct sensor { int id; char name[8]; struct list_node node; };
 
-struct list_node *n = &s.node;                              /* danh sach chi giu node */
-struct sensor *back = container_of(n, struct sensor, node); /* lui lai offsetof byte */
+struct list_node *n = &s.node;                              /* danh sách chỉ giữ node */
+struct sensor *back = container_of(n, struct sensor, node); /* lùi lại offsetof byte */
 ```
 
 ```
@@ -443,7 +445,7 @@ back == &s ? 1   id=7 name=temp
 | Từ khoá / kỹ thuật | Là gì | Một câu để nói |
 |---|---|---|
 | `restrict` (C99) | Hứa với compiler: vùng nhớ con trỏ này trỏ tới **không bị con trỏ khác truy cập** trong phạm vi đó | Cho phép tối ưu mạnh hơn; vi phạm lời hứa là UB. Chữ ký `memcpy(void *restrict, const void *restrict, size_t)` ghi thẳng điều kiện "hai vùng không chồng lấn" vào kiểu — chồng lấn thì dùng `memmove` |
-| Flexible array member | `struct packet { uint16_t len; uint8_t data[]; };` — mảng không kích thước, **phải ở cuối** struct | Cấp **một lần** cho header + payload: `malloc(sizeof *p + n)`. Đã chạy: `sizeof(struct packet)=2` — `data[]` không tính. Kernel dùng khắp nơi |
+| Flexible array member | `struct packet { uint16_t len; uint8_t data[]; };` — mảng không kích thước, **phải ở cuối** struct | Cấp **một lần** cho header + payload: `malloc(sizeof *p + n)`. Đã chạy: `sizeof(struct packet)=2 (data[] không tính)`. Kernel dùng khắp nơi |
 | `inline` theo C99 | Khác C++: `inline` không kèm `static` ở C đòi một định nghĩa ngoài ở đâu đó | Trong header C, viết **`static inline`** để khỏi bận tâm |
 | `setjmp` / `longjmp` | Nhảy ngược về một điểm đã lưu, xuyên qua nhiều tầng hàm | "Exception" của C; bỏ qua mọi dọn dẹp ở giữa, cấm dùng trong code C++ có destructor |
 | `_Static_assert` (C11) | Kiểm điều kiện **lúc biên dịch** | Kiểm `sizeof` struct giao thức, kiểm bảng khớp `enum` (§1.4) |

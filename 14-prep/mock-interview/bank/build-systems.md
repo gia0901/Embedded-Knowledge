@@ -328,14 +328,14 @@ Công thức build **một package**:
 # sensord_1.2.bb
 SUMMARY  = "Ambient light sensor daemon"
 LICENSE  = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=0835ade..."   # doi noi dung license -> BUILD FAIL
+LIC_FILES_CHKSUM = "file://LICENSE;md5=0835ade..."   # đổi nội dung license -> BUILD FAIL
 SRC_URI  = "git://git.example.com/sensord.git;branch=main;protocol=https \
             file://0001-fix-i2c-timeout.patch"
-SRCREV   = "a1b2c3d4"        # ⭐ ghim commit; ${AUTOREV} lam MAT tai lap
+SRCREV   = "a1b2c3d4"        # ⭐ ghim commit; ${AUTOREV} làm MẤT tái lập
 S        = "${WORKDIR}/git"
-DEPENDS  = "libgpiod"        # luc BUILD
-RDEPENDS:${PN} = "i2c-tools" # luc CHAY
-inherit cmake systemd        # muon hanh vi build chuan
+DEPENDS  = "libgpiod"        # lúc BUILD
+RDEPENDS:${PN} = "i2c-tools" # lúc CHẠY
+inherit cmake systemd        # mượn hành vi build chuẩn
 ```
 
 **Task chạy theo thứ tự** — biết task nào hỏng là biết nghi gì:
@@ -402,11 +402,11 @@ Nó thay **vòng lặp phát triển**, không chỉ là một lệnh tiện tay
 
 **Vòng lặp với `devtool`:**
 ```bash
-devtool modify sensord                  # keo source ra workspace/, thanh git repo THAT
-#   ... sua code, commit tung buoc nhu binh thuong ...
-devtool build sensord                   # build lai, chi phan doi
-devtool deploy-target sensord root@192.168.1.10   # ⭐ day thang len board dang chay
-devtool finish sensord ../meta-myproduct          # goi thanh patch + bbappend trong layer
+devtool modify sensord                  # kéo source ra workspace/, thành git repo THẬT
+#   ... sửa code, commit từng bước như bình thường ...
+devtool build sensord                   # build lại, chỉ phần đổi
+devtool deploy-target sensord root@192.168.1.10   # ⭐ đẩy thẳng lên board đang chạy
+devtool finish sensord ../meta-myproduct          # gói thành patch + bbappend trong layer
 ```
 
 ⭐ **`deploy-target` là thứ đổi hẳn nhịp làm việc**: sửa code → thấy trên board trong **vài giây**, không dựng lại image, không flash thẻ.
@@ -438,10 +438,10 @@ Còn có `devtool add <url>` (sinh recipe mới từ source) và `devtool upgrad
 | Ai đọc | Bước dựng rootfs | Package manager, khi giải dependency |
 
 ```bitbake
-# image recipe — "toi muon image nay co sensord va i2c-tools"
+# image recipe — "tôi muốn image này có sensord và i2c-tools"
 IMAGE_INSTALL:append = " sensord i2c-tools"
 
-# recipe cua sensord — "sensord KHONG CHAY DUOC neu thieu libfoo"
+# recipe của sensord — "sensord KHÔNG CHẠY ĐƯỢC nếu thiếu libfoo"
 RDEPENDS:${PN} += "libfoo"
 ```
 
@@ -459,14 +459,14 @@ Vì `IMAGE_INSTALL` **không mang theo tri thức**. Khi bạn khai `RDEPENDS:${
 **Ba cách thêm gói, theo mức độ bền vững:**
 
 ```bitbake
-# 1. local.conf  -> CHI DE THU. Khong tai lap duoc tren CI/may dong nghiep
+# 1. local.conf  -> CHỈ ĐỂ THỬ. Không tái lập được trên CI/máy đồng nghiệp
 IMAGE_INSTALL:append = " strace"
 
-# 2. image recipe rieng cua ban  -> ✅ cach dung cho san pham
+# 2. image recipe riêng của bạn  -> ✅ cách đúng cho sản phẩm
 require recipes-core/images/core-image-minimal.bb
 IMAGE_INSTALL:append = " sensord i2c-tools"
 
-# 3. packagegroup  -> ✅ khi nhieu image dung chung mot bo goi
+# 3. packagegroup  -> ✅ khi nhiều image dùng chung một bộ gói
 IMAGE_INSTALL:append = " packagegroup-myproduct-tools"
 ```
 
@@ -507,10 +507,10 @@ Build lần sau: BitBake tính lại hash từng task → hash trùng thì **l�
 **Ba mức dọn — đừng dùng nhầm:**
 
 ```bash
-bitbake -c clean <recipe>        # xoa tmp/work cua recipe, GIU sstate -> thuong khong du
-bitbake -c cleansstate <recipe>  # xoa ca sstate cua recipe   -> dung khi nghi cache cu
-rm -rf tmp/                      # xoa thu muc lam viec, GIU sstate-cache/ -> sach ma van nhanh
-bitbake -S printdiff <target>    # ⭐ CHAN DOAN: hash nao doi so voi lan truoc
+bitbake -c clean <recipe>        # xoá tmp/work của recipe, GIỮ sstate -> thường không đủ
+bitbake -c cleansstate <recipe>  # xoá cả sstate của recipe   -> dùng khi nghi cache cũ
+rm -rf tmp/                      # xoá thư mục làm việc, GIỮ sstate-cache/ -> sạch mà vẫn nhanh
+bitbake -S printdiff <target>    # ⭐ CHẨN ĐOÁN: hash nào đổi so với lần trước
 ```
 
 **⚠️ Bẫy:** (1) `cleansstate` **toàn bộ** cho chắc — vứt hàng giờ build mà thường chỉ cần một recipe; (2) để `SSTATE_DIR`/`DL_DIR` **bên trong** `build/` ⇒ `rm -rf tmp/` an toàn nhưng lỡ tay xoá `build/` là mất sạch — tách ra ngoài; (3) tưởng sstate làm build **đầu tiên** nhanh — không, nó chỉ giúp từ lần **thứ hai** hoặc khi tải cache dùng chung của CI.

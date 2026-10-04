@@ -31,8 +31,8 @@
 ## 2. Chuỗi tin cậy — và vì sao gốc phải **bất biến**
 
 ```
-┌─ BootROM ──────────┐  bat bien (mask ROM, khong ghi lai duoc)
-│  hash(pubkey) o eFuse│  ← GOC TIN CAY (root of trust)
+┌─ BootROM ──────────┐  bất biến (mask ROM, không ghi lại được)
+│  hash(pubkey) ở eFuse│  ← GỐC TIN CẬY (root of trust)
 └─────────┬──────────┘
           │ verify chu ky
 ┌─────────▼──────────┐
@@ -52,8 +52,8 @@
 └─────────┬──────────┘
           │ IMA/EVM
 ┌─────────▼──────────┐
-│  tung file, tung   │
-│  lan execve()      │
+│  từng file, từng   │
+│  lần execve()      │
 └────────────────────┘
 ```
 
@@ -87,13 +87,13 @@ Nếu kẻ tấn công **sửa được** tầng kiểm tra đầu tiên, họ c
 ## 3. Ký thế nào — hash + chữ ký bất đối xứng
 
 ```
-LUC BUILD (tren may co khoa RIENG)               LUC BOOT (tren thiet bi)
+LÚC BUILD (trên máy có khoá RIÊNG)               LÚC BOOT (trên thiết bị)
   image ──hash──> H                                image ──hash──> H'
                   │                                                │
-       khoa RIENG ─┴─> sign ──> chu ky S            chu ky S ──┐    │
-                                                    khoa CONG ─┴──> verify(S) => H
-  goi kem:  [ image | S | pubkey ]                                  │
-                                                          H == H' ?  ──> boot / tu choi
+       khoá RIÊNG ─┴─> sign ──> chữ ký S            chữ ký S ──┐    │
+                                                    khoá CÔNG ─┴──> verify(S) => H
+  gói kèm:  [ image | S | pubkey ]                                  │
+                                                          H == H' ?  ──> boot / từ chối
 ```
 
 **Vì sao hash trước rồi mới ký, không ký thẳng cả image:** ký bất đối xứng (RSA/ECDSA) **rất chậm** và chỉ làm việc trên khối dữ liệu nhỏ. Hash nén image nhiều MB thành 32 byte ⇒ ký một lần trên 32 byte đó.
@@ -166,10 +166,10 @@ Boot xong thì rootfs mới bắt đầu chạy — nếu không ai kiểm rootf
 
 **Chẩn đoán khi gặp:**
 ```bash
-getfattr -m . -d /usr/bin/myapp        # co security.ima chua?
-dmesg | grep -i "ima\|appraise"        # kernel tu choi vi sao
-cat /sys/kernel/security/ima/policy    # chinh sach dang ap
-rpm -K mypackage.rpm                   # chu ky GPG cua goi co hop le khong
+getfattr -m . -d /usr/bin/myapp        # có security.ima chưa?
+dmesg | grep -i "ima\|appraise"        # kernel từ chối vì sao
+cat /sys/kernel/security/ima/policy    # chính sách đang áp
+rpm -K mypackage.rpm                   # chữ ký GPG của gói có hợp lệ không
 ```
 
 ---

@@ -273,15 +273,15 @@ static int read_full(int fd, void* buf, size_t len) {
 ### `SIGBUS` đến từ đâu — hai kịch bản thật
 
 ```
-1. FILE CO LAI DUOI CHAN MAPPING
-   process A: mmap(file, 300MB) ... dang doc o offset 200MB
+1. FILE CO LẠI DƯỚI CHÂN MAPPING
+   process A: mmap(file, 300MB) ... đang đọc ở offset 200MB
    process B: ftruncate(file, 50MB)
-   process A: cham trang 200MB  -> khong con ung voi du lieu nao -> SIGBUS
+   process A: chạm trang 200MB  -> không còn ứng với dữ liệu nào -> SIGBUS
 
-2. LOI DOC THIET BI (flash mon, the SD hong)
-   cham trang -> kernel doc block -> I/O error
-   -> mmap KHONG CO gia tri tra ve o moi lan cham
-   -> khong con duong nao bao loi  -> SIGBUS
+2. LỖI ĐỌC THIẾT BỊ (flash mòn, thẻ SD hỏng)
+   chạm trang -> kernel đọc block -> I/O error
+   -> mmap KHÔNG CÓ giá trị trả về ở mỗi lần chạm
+   -> không còn đường nào báo lỗi  -> SIGBUS
 ```
 
 **Đây là khác biệt bản chất đáng nhớ nhất:** đổi mô hình truy cập là **đổi luôn mô hình báo lỗi**. Với `read()` bạn kiểm `errno` rồi xử lý; với `mmap` bạn phải bắt signal hoặc chấp nhận chết. Cũng giải thích vì sao lớp bug này **chỉ nổ ở hiện trường**: flash mòn và tiến trình cập nhật chạy song song đều không có ở bàn làm việc.
@@ -732,7 +732,7 @@ if (events[i].events & EPOLLOUT) do_write(fd);     // không có gì gửi thì 
 **Chạy thật** (socketpair, đăng ký `EPOLLOUT`, không ghi gì, `epoll_wait` 5 vòng):
 ```
 LT  (EPOLLOUT):              epoll_wait bao san sang 5/5 vong   <- busy-loop
-ET  (EPOLLOUT|EPOLLET):      epoll_wait bao san sang 1/5 vong   <- chi canh dau tien
+ET  (EPOLLOUT|EPOLLET):      epoll_wait bao san sang 1/5 vong   <- chỉ cạnh đầu tiên
 ```
 
 ### Hai cách sửa
@@ -781,17 +781,17 @@ void on_writable(int uplink_fd) {
 TCP **có** flow control và nó **vẫn đang chạy hoàn hảo**. Vấn đề là **chính bạn đã vô hiệu hoá nó**:
 
 ```
-read() vo dieu kien:
-  kernel recv buffer  --read()-->  queue cua ban (khong tran)
+read() vô điều kiện:
+  kernel recv buffer  --read()-->  queue của bạn (không tràn)
          ^                                ^
-    LUON TRONG                       PHINH MAI
+    LUÔN TRỐNG                       PHÌNH MÃI
          |
-  => kernel quang cao cua so DAY => ben gui cu gui het toc luc
+  => kernel quảng cáo cửa sổ ĐẦY => bên gửi cứ gửi hết tốc lực
 
-khong goi read():
+không gọi read():
   kernel recv buffer  ---X
          ^
-     DAY DAN => cua so co ve 0 => ben gui TU DUNG   <- backpressure MIEN PHI
+     ĐẦY DẦN => cửa sổ co về 0 => bên gửi TỰ DỪNG   <- backpressure MIỄN PHÍ
 ```
 
 > **Bạn không mất backpressure — bạn dời chỗ tắc từ kernel (có trần cứng, có kiểm soát) sang heap của mình (không trần).**
@@ -968,13 +968,13 @@ if (write(fd, buf, n) < 0 && errno == EPIPE) { /* peer đã đóng */ }
 **Vậy cờ đó đổi cái gì?** Nó không tạo/không nhân bản gì — nó **cấm thư viện dùng các tối ưu chỉ đúng trong một process**:
 
 ```
-PROCESS_PRIVATE (mac dinh):  futex "private"
-     -> khoa duoc danh theo KHONG GIAN DIA CHI cua process
-     -> process A ngu tren khoa K_A, process B danh thuc khoa K_B
-     -> HAI KHOA KHAC NHAU cho cung mot dia chi vat ly  => MAT WAKEUP
+PROCESS_PRIVATE (mặc định):  futex "private"
+     -> khoá được đánh theo KHÔNG GIAN ĐỊA CHỈ của process
+     -> process A ngủ trên khoá K_A, process B đánh thức khoá K_B
+     -> HAI KHOÁ KHÁC NHAU cho cùng một địa chỉ vật lý  => MẤT WAKEUP
 
 PROCESS_SHARED:              futex "shared"
-     -> khoa danh theo TRANG VAT LY  => hai ben khop nhau
+     -> khoá đánh theo TRANG VẬT LÝ  => hai bên khớp nhau
 ```
 
 **Mặc định là `PTHREAD_PROCESS_PRIVATE`** — tức **mặc định là cái sai** khi đặt mutex vào shm.
@@ -1056,8 +1056,8 @@ Các fd-based primitives: `signalfd` (nhận signal qua fd, tránh handler async
 
 Pipe/socket được kernel dọn hộ (bên kia nhận EOF/EPIPE). Shared memory thì **không** — mutex nằm **trong vùng nhớ**, kernel không biết nó là gì ⇒ chủ khoá chết là **khoá kẹt vĩnh viễn**. Đo thật:
 ```
-mutex thuong    lock() -> ETIMEDOUT    <-- dung lock() thuong la TREO VINH VIEN
-ROBUST          lock() -> EOWNERDEAD   <-- cuu duoc, goi mutex_consistent()
+mutex thuong    lock() -> ETIMEDOUT    <-- dùng lock() thường là TREO VĨNH VIỄN
+ROBUST          lock() -> EOWNERDEAD   <-- cứu được, gọi mutex_consistent()
 ```
 
 ```c
@@ -1275,12 +1275,12 @@ Thiết bị chạy daemon của bạn + app đối tác. App đối tác rò b�
 
 ```ini
 [Service]
-MemoryMax=64M                      # cgroup memory -> OOM cuc bo
+MemoryMax=64M                      # cgroup memory -> OOM cục bộ
 CPUQuota=20%                       # cgroup cpu
 TasksMax=32                        # cgroup pids   -> chong fork bomb
-PrivateTmp=yes                     # mount namespace -> /tmp rieng
+PrivateTmp=yes                     # mount namespace -> /tmp riêng
 ProtectSystem=strict               # mount namespace -> rootfs read-only
-RestrictAddressFamilies=AF_UNIX    # han che mang
+RestrictAddressFamilies=AF_UNIX    # hạn chế mạng
 ```
 
 **Bẫy:** (1) tưởng namespace giới hạn được tài nguyên — **không**, cô lập tầm nhìn không ngăn app ăn hết RAM; (2) tưởng cgroup cô lập được — **không**, cùng cgroup vẫn thấy và giết nhau được; (3) tưởng container an toàn như VM — chung kernel, một lỗ hổng kernel là chung số phận; (4) đặt `MemoryMax` rồi tưởng xong — process bị OOM trong cgroup vẫn **chết**, phải kèm `Restart=on-failure` thì dịch vụ mới tự hồi.

@@ -99,9 +99,9 @@ cmake --build build
 ### ⭐ 5.2 `not found` khi file rõ ràng tồn tại — cơ chế
 
 ```
-# tren target
+# trên target
 $ ls -l /usr/bin/myapp
--rwxr-xr-x 1 root root 21384 myapp        <- FILE CO THAT
+-rwxr-xr-x 1 root root 21384 myapp        <- FILE CÓ THẬT
 $ ./myapp
 -sh: ./myapp: No such file or directory   <- ??? 
 ```
@@ -111,11 +111,11 @@ $ ./myapp
 Binary động link luôn có trường **`PT_INTERP`** trỏ tới **dynamic loader** (vd `/lib/ld-linux-armhf.so.3`). Kernel đọc trường đó **trước khi** chạy binary; loader không tồn tại ⇒ `execve()` trả **`ENOENT`** ⇒ shell in *"No such file or directory"* — **về file loader, không phải về binary của bạn**.
 
 ```bash
-readelf -l myapp | grep -A1 INTERP        # target can loader NAO
+readelf -l myapp | grep -A1 INTERP        # target cần loader NÀO
 #   [Requesting program interpreter: /lib/ld-linux-armhf.so.3]
-ls -l /lib/ld-linux-armhf.so.3            # tren TARGET: co that khong?
-file myapp                                # kien truc + dong/tinh
-ldd myapp                                 # (chay tren target) lib nao thieu
+ls -l /lib/ld-linux-armhf.so.3            # trên TARGET: có thật không?
+file myapp                                # kiến trúc + động/tĩnh
+ldd myapp                                 # (chạy trên target) lib nào thiếu
 ```
 
 **Ba nguyên nhân, theo thứ tự hay gặp:**

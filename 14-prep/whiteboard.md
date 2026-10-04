@@ -30,15 +30,15 @@
 **Ý tưởng cốt lõi: đừng kể ba tính năng — kể BA NÚM VẶN trên cùng một tấm panel.**
 
 ```
-                    Anh dang xem mot tam panel
+                    Anh đang xem một tấm panel
                               |
         +---------------------+---------------------+
         |                     |                     |
-   SANG BAO NHIEU?       MUOT KHONG?          DIEU KHIEN THE NAO?
+   SÁNG BAO NHIÊU?       MƯỢT KHÔNG?          ĐIỀU KHIỂN THẾ NÀO?
      (dimming)              (FRC)                  (TCON)
         |                     |                     |
-   chinh den nen        chen frame o giua      phat tin hieu timing
-   phia sau panel       24/30fps -> 60Hz        cho hang/cot cua panel
+   chỉnh đèn nền        chèn frame ở giữa      phát tín hiệu timing
+   phía sau panel       24/30fps -> 60Hz        cho hàng/cột của panel
 ```
 
 **Một câu cho mỗi núm — dùng phép so sánh, đừng dùng định nghĩa:**
@@ -90,7 +90,7 @@
         \          |          /
          \         |         /
           +--------+--------+
-          |      C API      |        <-- CHO HEP
+          |      C API      |        <-- CHỖ HẸP
           +--------+--------+
          /         |         \
         /          |          \
@@ -133,13 +133,13 @@
         Dimming
            |
        +---+---+
-       |Factory|  <-- doc board + panel config LUC CHAY
+       |Factory|  <-- đọc board + panel config LÚC CHẠY
        +---+---+
            |
       +----+----+
       |         |
    +--+--+  +---+----+
-   |Algo |  |Backend |   doi chip: chi thay o nay
+   |Algo |  |Backend |   đổi chip: chỉ thay ô này
    +-----+  +--------+
 ```
 
@@ -195,7 +195,7 @@
     |<- - - LIB_OK - - |                   |                   |
     v                  v                   v                   v
 
-   ---->  goi          - - ->  tra ve         +--+  tu xu ly (khong roi lifeline)
+   ---->  gọi          - - ->  trả về         +--+  tự xử lý (không rời lifeline)
 ```
 
 **Bốn bước, nói khi chỉ tay vào từng số:**
@@ -235,24 +235,24 @@
 ```
 vsync   ||||||||||||||||||||||||||||||||||||||||||||   60 Hz  -> 16.7 ms
         <------------------ 400 ms ------------------>
-step    ^                       ^                       ^        moi 400 ms
+step    ^                       ^                       ^        mỗi 400 ms
         |                       |                       |        = 24 vsync
-        do sang nhich MOT NAC ve phia target
+        độ sáng nhích MỘT NẤC về phía target
 
         <-------------------- 4 s (10 step) -------------------->
 target  ^                                                ^
-        DOC sensor, TINH target moi
+        ĐỌC sensor, TÍNH target mới
 ```
 
 **Và cái mắt người thật sự thấy:**
 
 ```
-do sang
+độ sáng
   ^
-  |        target moi
+  |        target mới
   |            .- - - - - - - - - -
   |         _-'
-  |      _-'          <-- 10 nac, moi nac 400 ms
+  |      _-'          <-- 10 nấc, mỗi nấc 400 ms
   |   _-'
   |_-'
   +-------------------------------------> t
@@ -285,22 +285,22 @@ do sang
             +------------------------------+
             |        drv_panel_shim        |      1 .ko
             |  +------------------------+  |      proprietary
-            |  |      shim_export       |  |      insmod TRUOC TIEN
+            |  |      shim_export       |  |      insmod TRƯỚC TIÊN
             |  +------------------------+  |
             |  |      shim_bridge       |  |
             |  |    panel_ops [][][]    |  |
             |  +------------------------+  |
             +----^--------------------^----+
                  |                    |
-            (a) extern           (b) dang ky
+            (a) extern           (b) đăng ký
                  |                    |
        +---------+--------+  +--------+---------+
        | drv_panel_core   |  | drv_panel_chipA  |
        +------------------+  +------------------+
             GPL                 proprietary
-                                hon 10 loai
+                                hơn 10 loại
 
-   (c) duong goi:  core  ->  shim_export  ->  panel_ops  ->  chipA
+   (c) đường gọi:  core  ->  shim_export  ->  panel_ops  ->  chipA
 ```
 
 **Ba quan hệ — nói khi chỉ tay, đừng viết vào ô:**
@@ -324,7 +324,7 @@ Sơ đồ khối ở trên cho thấy **ai nối với ai**. Sơ đồ này cho 
            +----+                   |                     |
            |init|                   |                     |
            +----+                   |                     |
-              | panel_ops RONG      |                     |
+              | panel_ops RỖNG      |                     |
               | EXPORT_SYMBOL       |                     |
               |                     |                     |
  (2) insmod --|-------------------->|                     |
@@ -333,14 +333,14 @@ Sơ đồ khối ở trên cho thấy **ai nối với ai**. Sơ đồ này cho 
               |                  +----+                   |
               |     extern ptr      |                     |
               |< - - - - - - - - - -|                     |
-+---          |                     | doc board config    |
++---          |                     | đọc board config    |
 |             |                     |                     |
 |             |                     | (3) modprobe chipA  |
 |             |                     |-------------------->|
-| CUA SO      |                     |                  +----+
-| NGUY HIEM   |                     |                  |init|
+| CỬA SỔ      |                     |                  +----+
+| NGUY HIỂM   |                     |                  |init|
 |             |                     |                  +----+
-|             |        (4) dang ky vao panel_ops          |
+|             |        (4) đăng ký vào panel_ops          |
 +---          |<------------------------------------------|
               |                     |                     |
               |  (5) ops->blank()   |                     |
@@ -349,7 +349,7 @@ Sơ đồ khối ở trên cho thấy **ai nối với ai**. Sơ đồ này cho 
               |------------------------------------------>|
               v                     v                     v
 
-  [init] module init chay   ---->  goi   <- - -  tra ve / dang ky
+  [init] module init chạy   ---->  gọi   <- - -  trả về / đăng ký
 ```
 
 **Năm bước — nói khi chỉ tay:**
@@ -443,18 +443,18 @@ Câu này **khó**, và nó là câu thật.
 **Mọi câu đều bắt đầu từ một chỗ:**
 
 ```
-     Ho hoi bat ky cau nao ve he thong
+     Họ hỏi bất kỳ câu nào về hệ thống
                     |
                     v
           +-------------------+
-          |   D1  nhip 1      |  chong tang, 20 giay
-          |   (chong tang)    |  roi DUNG LAI, nhin mat ho
+          |   D1  nhịp 1      |  chồng tầng, 20 giây
+          |   (chồng tầng)    |  rồi DỪNG LẠI, nhìn mặt họ
           +---------+---------+
                     |
-              ho hoi tiep gi?
+              họ hỏi tiếp gì?
                     |
                     v
-             (tra bang duoi)
+             (tra bảng dưới)
 ```
 
 ⚠️ **Đừng bỏ qua bước này kể cả khi câu hỏi rất hẹp.** *"Để em vẽ nhanh bức tranh chung rồi đi vào chỗ anh hỏi"* — chưa ai từ chối câu đó, và nó làm mọi câu sau ngắn đi một nửa.
@@ -604,14 +604,14 @@ Câu này **khó**, và nó là câu thật.
 > Bản thu nhỏ của cả sáu sơ đồ. Không đọc để học — **liếc để nhớ hình dạng**.
 
 ```
- D0  ba num van          D1.1 chong tang       D1.2 cai pheu
+ D0  ba núm vặn          D1.1 chồng tầng       D1.2 cái phễu
      |                        App                 \  |  /
- sang? muot? dieu khien?      -- C API --          C API
-     den  frame   timing      libdisplay          /  |  \
+ sáng? mượt? điều khiển?      -- C API --          C API
+     đèn  frame   timing      libdisplay          /  |  \
                               -- ioctl --        chipA B C
                               driver / SoC
 
- D1.3 hai nhanh          D1.4 factory          D2  sequence set_power
+ D1.3 hai nhánh          D1.4 factory          D2  sequence set_power
         C API                 Factory          App  lib  core  chip
        /     \               /      \           |----->|
   Dimming   FRC/TCON      Algo    Backend       | 1 ramp
@@ -619,12 +619,12 @@ Câu này **khó**, và nó là câu thật.
        \     /                                  |   3 blank -->|
          SoC                                    |   4 power_off->|
 
- D3  hai hang so thoi gian        D4  ba module            D4b nap
- vsync |||||||||| 16.7ms              shim                 1 shim (RONG)
+ D3  hai hằng số thời gian        D4  ba module            D4b nạp
+ vsync |||||||||| 16.7ms              shim                 1 shim (RỖNG)
  step  ^      ^      ^  400ms      (export+bridge)         2 core extern
  target^             4s          core(GPL)  chipA(prop)    3 core->chipA
-       doc sensor, tinh lai        (a)extern  (b)dang ky   4 chipA dang ky
-                                                           ^ CUA SO RONG
+       đọc sensor, tính lại        (a)extern  (b)đăng ký   4 chipA đăng ký
+                                                           ^ CỬA SỔ RỖNG
 ```
 
 **Một câu đánh đổi cho mỗi sơ đồ — thuộc đúng sáu câu này:**

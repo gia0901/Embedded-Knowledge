@@ -201,9 +201,9 @@ class MockTempSensor : public ITempSensor { … };   // ⭐ test không cần ph
 ```c
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
-    ret = kernel_read(f, buf, len, &pos);        // cach moi
+    ret = kernel_read(f, buf, len, &pos);        // cách mới
 #else
-    mm_segment_t old = get_fs(); set_fs(KERNEL_DS);   // cach cu
+    mm_segment_t old = get_fs(); set_fs(KERNEL_DS);   // cách cũ
     ret = vfs_read(f, buf, len, &pos);
     set_fs(old);
 #endif
@@ -416,7 +416,7 @@ meta-mybsp/
 
 ```
 $ ls -l /usr/bin/myapp
--rwxr-xr-x 1 root root 21384 myapp        <- FILE CO THAT
+-rwxr-xr-x 1 root root 21384 myapp        <- FILE CÓ THẬT
 $ ./myapp
 -sh: ./myapp: No such file or directory   <- ???
 ```
@@ -424,11 +424,11 @@ $ ./myapp
 **Cơ chế:** binary link động có trường **`PT_INTERP`** trong header ELF, trỏ tới **dynamic loader** (vd `/lib/ld-linux-armhf.so.3`). Kernel đọc trường đó **trước khi** chạy binary. Loader không tồn tại trên rootfs ⇒ `execve()` trả **`ENOENT`** ⇒ shell in *"No such file or directory"* — **về file loader, không phải về binary của bạn**.
 
 ```bash
-readelf -l myapp | grep -A1 INTERP    # target doi loader NAO
+readelf -l myapp | grep -A1 INTERP    # target đòi loader NÀO
 #   [Requesting program interpreter: /lib/ld-linux-armhf.so.3]
-ls -l /lib/ld-linux-armhf.so.3        # tren TARGET co that khong?
-file myapp                            # kien truc + dong hay tinh
-ldd myapp                             # (chay tren target) lib nao thieu
+ls -l /lib/ld-linux-armhf.so.3        # trên TARGET có thật không?
+file myapp                            # kiến trúc + động hay tĩnh
+ldd myapp                             # (chạy trên target) lib nào thiếu
 ```
 
 **Ba nguyên nhân, theo thứ tự hay gặp:**
@@ -576,10 +576,10 @@ ldd myapp                             # (chay tren target) lib nao thieu
 
 **Chẩn đoán:**
 ```bash
-getfattr -m . -d /usr/bin/myapp        # co security.ima chua?
-dmesg | grep -i "ima\|appraise"        # kernel tu choi vi sao
-cat /sys/kernel/security/ima/policy    # chinh sach dang ap
-rpm -K mypackage.rpm                   # chu ky GPG cua goi
+getfattr -m . -d /usr/bin/myapp        # có security.ima chưa?
+dmesg | grep -i "ima\|appraise"        # kernel từ chối vì sao
+cat /sys/kernel/security/ima/policy    # chính sách đang áp
+rpm -K mypackage.rpm                   # chữ ký GPG của gói
 ```
 
 **⚠️ Bẫy:** (1) 🔴 tưởng `Permission denied` là **lỗi quyền file** — thực ra là **IMA từ chối**; (2) nhầm chữ ký RPM với chữ ký IMA — hai tầng, hai người kiểm, hai thời điểm; (3) `scp` binary lên máy rồi `chmod +x` và mong nó chạy — thiếu xattr thì không chạy; (4) test trên máy **dev** (IMA/verity **tắt**) rồi tưởng xong — đúng lớp lỗi này **chỉ lộ ra trên máy production**; (5) dùng **khoá production** trên máy dev để cho tiện — phá đúng lý do secure boot tồn tại.
@@ -594,10 +594,10 @@ rpm -K mypackage.rpm                   # chu ky GPG cua goi
 **Cơ chế — chuỗi tin cậy, mỗi tầng verify tầng kế:**
 
 ```
-BootROM (bat bien) ─verify─> SPL/BL2 ─verify─> U-Boot/BL33 ─verify─> kernel
-   hash(pubkey) o eFuse                                                │
-   ← GOC TIN CAY                                              dm-verity│ rootfs
-                                                              IMA/EVM  │ tung file
+BootROM (bất biến) ─verify─> SPL/BL2 ─verify─> U-Boot/BL33 ─verify─> kernel
+   hash(pubkey) ở eFuse                                                │
+   ← GỐC TIN CẬY                                              dm-verity│ rootfs
+                                                              IMA/EVM  │ từng file
 ```
 
 Ký = **hash nội dung** rồi **ký hash bằng khoá riêng**; thiết bị giữ **khoá công khai** để kiểm. Hash trước vì ký bất đối xứng rất chậm và chỉ làm việc trên khối nhỏ.
@@ -666,9 +666,9 @@ Ký = **hash nội dung** rồi **ký hash bằng khoá riêng**; thiết bị g
 ### ② QUAN SÁT — sản phẩm quan trọng nhất của cả bài
 Boot thẻ A (đang chạy được), bắt **toàn bộ** log từ lúc cấp nguồn:
 ```bash
-# tren may host
+# trên máy host
 picocom -b 115200 /dev/ttyUSB0 --logfile boot-ok.log
-#  hoac:  screen /dev/ttyUSB0 115200      (Ctrl-A H de bat log)
+#  hoặc:  screen /dev/ttyUSB0 115200      (Ctrl-A H để bật log)
 ```
 Rồi **tự đánh dấu bốn ranh giới**:
 
@@ -682,29 +682,29 @@ Rồi **tự đánh dấu bốn ranh giới**:
 
 📋 **LOG CÓ CHÚ THÍCH — ĐÃ CHẠY 2026-09-06** *(BeagleBoard.org Debian Bookworm Base Image 2026-05-19, cài bằng app của hãng)*
 ```
-① ROM -> SPL chay trong SRAM (DRAM chua co), viec duy nhat: init DRAM
+① ROM -> SPL chạy trong SRAM (DRAM chưa có), việc duy nhất: init DRAM
    U-Boot SPL 2019.04-00002-g31a8ae0206 (May 13 2020 - 09:26:17 -0500)
 
-② U-Boot proper (da o trong DRAM), xac dinh cho de boot
+② U-Boot proper (đã ở trong DRAM), xác định chỗ để boot
    Trying to boot from MMC2
    Loading Environment from EXT4...
-   ** Unable to use mmc 0:1 for loading the env **        <-- LOI MA KHONG HONG (xem duoi)
+   ** Unable to use mmc 0:1 for loading the env **        <-- LỖI MÀ KHÔNG HỎNG (xem dưới)
    U-Boot 2019.04-00002-g31a8ae0206 (May 13 2020 - 09:26:17 -0500)
 
-③ TRAO TAY - het phan bootloader
+③ TRAO TAY - hết phần bootloader
    Starting kernel ...
    [    0.000000] Booting Linux on physical CPU 0x0
    [    0.000000] Linux version 5.10.168-ti-r84 ... #1bookworm SMP PREEMPT Thu May 7 17:32:50 UTC 2026
    [    0.000000] CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c5387d
 
-④ Userspace - init da chay
-   [    6.985955] Run /init as init process               <-- /init = INITRAMFS, chua phai rootfs that
-   Loading, please wait...                                <-- thong diep kinh dien cua initramfs-tools
+④ Userspace - init đã chạy
+   [    6.985955] Run /init as init process               <-- /init = INITRAMFS, chưa phải rootfs thật
+   Loading, please wait...                                <-- thông điệp kinh điển của initramfs-tools
    [    7.054454] mmc0: new high speed SDHC card at address aaaa
    [    7.072008] mmcblk0: mmc0:aaaa SE32G 29.7 GiB
    [    7.084819]  mmcblk0: p1 p2 p3
    Starting systemd-udevd version 254.16-1~bpo12+1bbbio0~bookworm+20240807
-   [   14.823169] systemd[1]: Hostname set to <BeagleBone>.   <-- rootfs that da mount, ban giao
+   [   14.823169] systemd[1]: Hostname set to <BeagleBone>.   <-- rootfs thật đã mount, bàn giao
 
 ⑤ Login
    Debian GNU/Linux 12 BeagleBone ttyS0
@@ -767,7 +767,7 @@ Nhấn phím bất kỳ để dừng autoboot, rồi:
 ```
 📋 **DÁN OUTPUT THẬT** *(chưa chạy)*
 ```
-(chua chay)
+(chưa chạy)
 ```
 **Câu phải trả lời được sau bước này:** `bootz ${loadaddr} - ${fdtaddr}` — **dấu `-` ở giữa nghĩa là gì?** *(gợi ý: vị trí đó dành cho initramfs)*
 
@@ -801,14 +801,14 @@ Và: **vì sao thiết bị nhúng thường thoát được bài toán đó?** 
 > 🔴 **ĐỪNG grep theo tên config đoán trước.** Ví dụ thật: grep `CONFIG_MMC_OMAP_HS` trên kernel **TI 5.10** ra `is not set` — vì AM335x đã chuyển sang driver **`sdhci-omap`**; kết luận rút ra sẽ **ngược hoàn toàn**. Tên config đổi giữa các đời kernel ⇒ **hỏi hệ thống đang chạy** thì không bao giờ sai.
 
 ```bash
-# ① driver nao dang THAT SU lai mmc0
+# ① driver nào đang THẬT SỰ lái mmc0
 basename $(readlink /sys/class/mmc_host/mmc0/device/driver)
 
-# ② MODULE hay BUILT-IN?   (rong = built-in)   <-- CAU QUYET DINH
+# ② MODULE hay BUILT-IN?   (rỗng = built-in)   <-- CÂU QUYẾT ĐỊNH
 lsmod | grep -iE 'mmc|sdhci'
 
 cat /proc/cmdline
-ls -la /boot/ /boot/firmware/ 2>/dev/null      # co initramfs khong? co MLO/u-boot.img khong?
+ls -la /boot/ /boot/firmware/ 2>/dev/null      # có initramfs không? có MLO/u-boot.img không?
 ```
 
 **Đọc kết quả ②:**
@@ -819,7 +819,7 @@ ls -la /boot/ /boot/firmware/ 2>/dev/null      # co initramfs khong? co MLO/u-bo
 | có `sdhci_omap` / `omap_hsmmc` | driver là **module** | 🔴 phải có ai nạp module trước khi mount ⇒ **initramfs bắt buộc** — đúng bài toán con-gà-quả-trứng |
 📋 **DÁN OUTPUT THẬT** *(chưa chạy)*
 ```
-(chua chay)
+(chưa chạy)
 ```
 
 ### ③ PHÁ
@@ -848,16 +848,16 @@ Ba tầng đo, mỗi tầng một công cụ: **U-Boot** (`bootstage`) · **kern
 
 ### ② QUAN SÁT — đo TRƯỚC khi sửa bất cứ gì
 ```bash
-# kernel: them vao bootargs
+# kernel: thêm vào bootargs
 initcall_debug ignore_loglevel
 # sau khi boot:
-dmesg | sort -k1 -n | tail -30            # initcall lau nhat
-systemd-analyze                            # neu co systemd
+dmesg | sort -k1 -n | tail -30            # initcall lâu nhất
+systemd-analyze                            # nếu có systemd
 systemd-analyze blame | head -20
 ```
 📋 **DÁN OUTPUT THẬT + tổng thời gian boot** *(chưa chạy)*
 ```
-(chua chay)
+(chưa chạy)
 ```
 
 ### ③ PHÁ / THỬ
@@ -894,19 +894,19 @@ Câu phải trả lời: **SHA và RSA làm hai việc KHÁC nhau — việc gì
 Viết `.its` mô tả kernel + dtb + configuration, rồi:
 ```bash
 mkimage -f board.its board.itb
-mkimage -l board.itb            # xem lai cau truc
+mkimage -l board.itb            # xem lại cấu trúc
 ```
 📋 **DÁN `.its` + output `mkimage -l`** *(chưa chạy)*
 ```
-(chua chay)
+(chưa chạy)
 ```
 
 ### ③ KÝ, RỒI PHÁ
 ```bash
 openssl genpkey -algorithm RSA -out keys/dev.key -pkeyopt rsa_keygen_bits:2048
 openssl req -batch -new -x509 -key keys/dev.key -out keys/dev.crt
-mkimage -f board.its -k keys -K u-boot.dtb -r board.itb     # ky + nhung pubkey vao dtb
-# build lai U-Boot voi CONFIG_FIT_SIGNATURE=y va dtb da co khoa
+mkimage -f board.its -k keys -K u-boot.dtb -r board.itb     # ký + nhúng pubkey vào dtb
+# build lại U-Boot với CONFIG_FIT_SIGNATURE=y và dtb đã có khoá
 ```
 | Thử gì | Dự đoán | Thực tế |
 |---|---|---|
@@ -916,7 +916,7 @@ mkimage -f board.its -k keys -K u-boot.dtb -r board.itb     # ky + nhung pubkey 
 
 📋 **DÁN nguyên văn dòng U-Boot từ chối** *(chưa chạy)* — đây là output đắt nhất cả bộ
 ```
-(chua chay)
+(chưa chạy)
 ```
 
 ### ④ ĐỐI CHIẾU
@@ -948,7 +948,7 @@ ls tmp/deploy/images/beaglebone-yocto/
 ```
 📋 **DÁN: thời gian build lần đầu + danh sách artifacts** *(chưa chạy)*
 ```
-(chua chay)
+(chưa chạy)
 ```
 
 ⭐ **Bảng so sánh — đây mới là bài học, không phải phụ phẩm:**
@@ -992,11 +992,11 @@ Viết một `.bbappend` đổi **một** thứ trong U-Boot (ví dụ `bootdela
 bitbake-layers create-layer ../meta-mylab
 bitbake-layers add-layer ../meta-mylab
 # meta-mylab/recipes-bsp/u-boot/u-boot_%.bbappend
-devtool modify u-boot           # cach de sua + xem diff
+devtool modify u-boot           # cách để sửa + xem diff
 ```
 📋 **DÁN `.bbappend` + xác nhận thay đổi xuất hiện trên board** *(chưa chạy)*
 ```
-(chua chay)
+(chưa chạy)
 ```
 
 ### ③ PHÁ — ⭐ phần đắt nhất bài này
@@ -1026,9 +1026,9 @@ Trả lời lại [BSP-018](#) kèm **ca cụ thể vừa dựng**. Câu chốt:
 
 ### ② QUAN SÁT — ba phép đo
 ```bash
-time bitbake core-image-minimal                      # (1) da build roi -> gan nhu tuc thi?
-bitbake -c cleansstate u-boot && time bitbake core-image-minimal   # (2) build lai rieng u-boot
-rm -rf tmp/ && time bitbake core-image-minimal       # (3) xoa tmp, GIU sstate
+time bitbake core-image-minimal                      # (1) đã build rồi -> gần như tức thì?
+bitbake -c cleansstate u-boot && time bitbake core-image-minimal   # (2) build lại riêng u-boot
+rm -rf tmp/ && time bitbake core-image-minimal       # (3) xoá tmp, GIỮ sstate
 ```
 📋 **ĐÃ CHẠY 2026-09-06** *(Ubuntu 22.04, 24 threads, poky scarthgap, `MACHINE=beaglebone-yocto`)*
 
@@ -1045,7 +1045,7 @@ Ban đầu (2) bị nghi *"quá nhanh để là một lần build U-Boot thật"
 
 ```
 $ bitbake -e core-image-minimal | grep ^IMAGE_FSTYPES=
-IMAGE_FSTYPES=" tar.bz2 jffs2 wic wic.bmap"          <-- wic CO ⇒ image THAT SU phu thuoc u-boot
+IMAGE_FSTYPES=" tar.bz2 jffs2 wic wic.bmap"          <-- wic CÓ ⇒ image THẬT SỰ phụ thuộc u-boot
 
 $ bitbake -c cleansstate u-boot && time bitbake u-boot
 Sstate summary: Wanted 163 Local 150 Mirrors 0 Missed 13 Current 200 (92% match, 96% complete)

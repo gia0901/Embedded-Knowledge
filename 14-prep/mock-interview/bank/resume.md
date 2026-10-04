@@ -29,8 +29,8 @@
 **Nền kỹ thuật phải nắm:** kiến trúc tầng của chính bạn — vẽ được lên whiteboard trong 30 giây:
 ```
 App / Middleware
-      | C++ API (interface thong nhat)
-System SW  (shared library)   <-- ban o day
+      | C++ API (interface thống nhất)
+System SW  (shared library)   <-- bạn ở đây
       | ioctl / sysfs
 Kernel driver (HAL)
       | register / I2C
@@ -153,7 +153,7 @@ SoC (Dimming, FRC, TCON)
 
 **Câu trả lời tốt gồm — vẽ được cái này ra là đạt:**
 ```c
-struct panel_ops {                      // "lop truu tuong"
+struct panel_ops {                      // "lớp trừu tượng"
     int  (*init)(struct panel *p);
     int  (*set_brightness)(struct panel *p, int level);
     void (*release)(struct panel *p);
@@ -162,12 +162,12 @@ struct panel_ops {                      // "lop truu tuong"
 static const struct panel_ops chipA_ops = { .init = a_init, .set_brightness = a_set, ... };
 static const struct panel_ops chipB_ops = { .init = b_init, .set_brightness = b_set, ... };
 
-struct panel {                          // "doi tuong"
-    const struct panel_ops *ops;        // <-- vtable thu cong
-    void *priv;                         // <-- du lieu rieng cua tung chipset
+struct panel {                          // "đối tượng"
+    const struct panel_ops *ops;        // <-- vtable thủ công
+    void *priv;                         // <-- dữ liệu riêng của từng chipset
 };
 
-p->ops->set_brightness(p, 50);          // <-- goi ao
+p->ops->set_brightness(p, 50);          // <-- gọi ảo
 ```
 - **Kế thừa** = struct lồng struct (struct con chứa struct cha ở đầu) + `container_of()` để đi ngược từ con về cha.
 - **Đa hình** = bảng con trỏ hàm — đúng thứ C++ sinh tự động dưới tên **vtable**.
@@ -260,8 +260,8 @@ Chốt sẵn ba câu này trước khi đi phỏng vấn:
 
 **Câu trả lời tốt gồm — vẽ chuỗi:**
 ```
-ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
-          -> anh xa lux -> muc sang -> ghi xuong panel
+ALS (I2C) -> driver đọc định kỳ / interrupt -> lọc & làm mượt
+          -> ánh xạ lux -> mức sáng -> ghi xuống panel
 ```
 
 **Phần chống nhấp nháy — nêu được ít nhất hai cơ chế:**
@@ -848,7 +848,7 @@ Với công ty đang tuyển **kỹ sư C++ nhúng**, dòng đó có thể đọ
 ```
 [unit MASTER]  lib --mq--> app  --Ethernet-->  app [unit SLAVE] --> lib
                     ^                                ^
-              IPC trong 1 may                  giua cac may
+              IPC trong 1 máy                  giữa các máy
 ```
 mq là **đường ra một chiều từ library lên app trong cùng máy**; giữa các unit là **Ethernet**.
 

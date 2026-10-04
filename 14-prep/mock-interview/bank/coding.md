@@ -67,8 +67,8 @@ bool hasCycle(Node* head) {
 ```cpp
 // sau khi slow == fast:
 slow = head;
-while (slow != fast) { slow = slow->next; fast = fast->next; }  // CA HAI di 1 buoc
-return slow;   // diem gap = dau vong
+while (slow != fast) { slow = slow->next; fast = fast->next; }  // CẢ HAI đi 1 bước
+return slow;   // điểm gặp = đầu vòng
 ```
 **Chứng minh.** Gọi `m` = quãng head → đầu vòng, `L` = chu vi, `k` = quãng đầu vòng → điểm gặp.
 Lúc gặp: `slow` đi `m+k`, `fast` đi `2(m+k)`, và `fast` hơn `slow` đúng một số nguyên lần chu vi ⇒ `m + k = i·L` ⇒ **`m = i·L − k`** = đúng quãng từ **điểm gặp** đi tiếp tới **đầu vòng**. Nên đặt một con trỏ về `head`, cả hai đi **1 bước**, chúng gặp nhau tại đầu vòng.
@@ -437,7 +437,7 @@ void log_line(const char *tag, int code) {
     sprintf(buf, "[%s] code=%d", tag, code);
     puts(buf);
 }
-log_line("DISPLAY_DIMMING", 12345);   // goi nhu the nay
+log_line("DISPLAY_DIMMING", 12345);   // gọi như thế này
 ```
 <details><summary>Đáp án</summary>
 
@@ -459,7 +459,7 @@ Chương trình bị `abort` bởi cơ chế `-fstack-protector` (bật mặc đ
 #### COD-016 · 🟠 · coding · ⭐ · [→ memory-bugs](../../../09-debugging/memory-bugs.md)
 **Muốn dịch nội dung buffer sang phải để chèn header. Đoạn này sai chỗ nào — và vì sao test lại pass?**
 ```c
-memcpy(buf + 1, buf, 256);   /* dich phai 1 byte */
+memcpy(buf + 1, buf, 256);   /* dịch phải 1 byte */
 ```
 <details><summary>Đáp án</summary>
 
@@ -521,7 +521,7 @@ warning: reference to local variable 's' returned [-Wreturn-local-addr]
 **Vòng chờ cờ do interrupt handler bật. Chạy debug build thì đúng, release build thì treo. Vì sao?**
 ```c
 static int stop = 0;
-static void on_alarm(int sig) { stop = 1; }     /* dong vai ISR */
+static void on_alarm(int sig) { stop = 1; }     /* đóng vai ISR */
 
 int main(void) {
     signal(SIGALRM, on_alarm);
@@ -539,7 +539,7 @@ int main(void) {
 ③ ⭐ **Cùng một file, khác nhau đúng ở mức tối ưu** — chạy thật với `timeout 4`:
 ```
 ### -O0 ###   thoat vong lap        [exit=0]
-### -O2 ###   (khong in gi)         [exit=124  <- bi timeout giet, tuc TREO]
+### -O2 ###   (khong in gi)         [exit=124  <- bị timeout giết, tức TREO]
 ```
 `-Wall -Wextra`: **không một warning**. Đây là nguyên mẫu của lớp bug *"chỉ có ở release"* — và trên embedded nó xuất hiện với **cờ do ISR bật** hoặc **thanh ghi memory-mapped**.
 
@@ -630,7 +630,7 @@ static uint32_t mask_upto(int bits) { return (1u << bits) - 1; }
 ```
 bits=30 -> mask=0x3FFFFFFF
 bits=31 -> mask=0x7FFFFFFF
-bits=32 -> mask=0x00000000     <-- ky vong 0xFFFFFFFF
+bits=32 -> mask=0x00000000     <-- kỳ vọng 0xFFFFFFFF
 ```
 `-Wall -Wextra`: **không warning** (vì `bits` là biến runtime; nếu viết thẳng `1u << 32` thì gcc mới báo).
 
@@ -662,7 +662,7 @@ case MODE_SYNC:
 ```
 mode=0
   init_local()
-  init_mq()        <-- khong duoc goi o che do standalone
+  init_mq()        <-- không được gọi ở chế độ standalone
 ```
 
 ④ Sửa: thêm `break;`. Nếu **cố ý** muốn rơi xuyên thì đánh dấu rõ ràng — C++17 có sẵn thuộc tính cho việc này: `[[fallthrough]];` (C thì dùng `__attribute__((fallthrough))` hoặc comment `/* fallthrough */`).
@@ -704,7 +704,7 @@ int main() { Buffer a(4); a[0] = 42; consume(a); printf("a[0]=%d\n", a[0]); }
 ③ Chạy thật — thấy được **cả hai** hậu quả, theo thứ tự:
 ```
 consume: size=4
-sau consume: a[0]=1624025173      <-- use-after-free: 42 da bien mat
+sau consume: a[0]=1624025173      <-- use-after-free: 42 đã biến mất
 free(): double free detected in tcache 2
 Aborted (core dumped)             [exit=134]
 ```
@@ -732,7 +732,7 @@ static int regs[4];
 
 static int read_reg(int idx) {
     m.lock();
-    if (idx < 0 || idx >= 4) return -1;    // duong thoat som
+    if (idx < 0 || idx >= 4) return -1;    // đường thoát sớm
     int v = regs[idx];
     m.unlock();
     return v;
@@ -748,7 +748,7 @@ static int read_reg(int idx) {
 ```
 regs[2] = 30
 regs[9] = -1
-                        <-- dung o day, khong in gi them
+                        <-- dừng ở đây, không in gì thêm
 [exit=124]  (bi timeout 4s giet -> TREO)
 ```
 `-Wall -Wextra`: **không warning.** Triệu chứng ngoài đời là *"app treo, không crash, không log"* — đúng lớp bug khó nhất, phải soi bằng `gdb thread apply all bt` hoặc `/proc/<pid>/task/*/stack`.
@@ -756,8 +756,8 @@ regs[9] = -1
 ④ Sửa — **dùng RAII, đừng khoá tay**:
 ```cpp
 static int read_reg(int idx) {
-    std::lock_guard<std::mutex> lk(m);       // hoac std::scoped_lock lk(m); (C++17)
-    if (idx < 0 || idx >= 4) return -1;      // unlock tu dong o MOI duong ra
+    std::lock_guard<std::mutex> lk(m);       // hoặc std::scoped_lock lk(m); (C++17)
+    if (idx < 0 || idx >= 4) return -1;      // unlock tự động ở MỌI đường ra
     return regs[idx];
 }
 ```
@@ -801,8 +801,8 @@ Và nó chỉ xuất hiện vì `wire` là mảng local có kích thước nhìn
 ④ Sửa — **đừng ép kiểu, hãy giải mã từng field**:
 ```c
 uint8_t  type =  wire[1];
-uint32_t len; memcpy(&len, wire + 2, 4);        /* memcpy: khong misaligned, khong aliasing */
-len = le32toh(len);                              /* va PHAI xu ly endianness */
+uint32_t len; memcpy(&len, wire + 2, 4);        /* memcpy: không misaligned, không aliasing */
+len = le32toh(len);                              /* và PHẢI xử lý endianness */
 uint16_t crc; memcpy(&crc, wire + 6, 2); crc = le16toh(crc);
 ```
 ⭐ `memcpy` ở đây **không tốn gì** — compiler thường sinh đúng một lệnh load. Đây là cách chuẩn để đọc dữ liệu wire-format trong C.
@@ -818,7 +818,7 @@ static int take() { int v = q.top(); q.pop(); return v; }
 
 int main() {
     q.push(3); q.push(2); q.push(1);      // top = 1
-    printf("%d %d\n", take(), take());    // ky vong "1 2"
+    printf("%d %d\n", take(), take());    // kỳ vọng "1 2"
 }
 ```
 <details><summary>Đáp án</summary>

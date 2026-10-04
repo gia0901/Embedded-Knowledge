@@ -103,7 +103,7 @@ Interviewer lọc câu theo **track** ([../tracks.md](../tracks.md) → domain) 
 
 Lấy ID kế tiếp cho một domain:
 ```bash
-# ID lon nhat hien co cua mot domain (vd LNX)
+# ID lớn nhất hiện có của một domain (vd LNX)
 grep -oh "^#### LNX-[0-9]*" linux-sysprog.md | sed 's/.*-//' | sort -n | tail -1
 ```
 
@@ -111,7 +111,7 @@ Toàn cảnh mọi domain + tổng số câu:
 ```bash
 for f in *.md; do [ "$f" = README.md ] && continue
   grep -oh "^#### [A-Z]*-[0-9]*" "$f" | sed 's/#### //' | awk -F- '{print $1}' | sort -u | while read d; do
-    printf "%-4s max=%s  (so cau: %s)\n" "$d" \
+    printf "%-4s max=%s  (số câu: %s)\n" "$d" \
       "$(grep -oh "^#### $d-[0-9]*" "$f" | sed 's/.*-//' | sort -n | tail -1)" \
       "$(grep -c "^#### $d-" "$f")"
   done

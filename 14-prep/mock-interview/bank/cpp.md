@@ -1419,12 +1419,12 @@ std::string make_name() {
     std::string s = "panel-" + std::to_string(1);
     return s;                       // (1)
 }
-void take(std::string s);           // nhan THEO GIA TRI
+void take(std::string s);           // nhận THEO GIÁ TRỊ
 int main() {
     std::string a = make_name();    // (2)
     take(a);                        // (3)
     take(std::move(a));             // (4)
-    std::string b = a;              // (5)  <- sau khi da move
+    std::string b = a;              // (5)  <- sau khi đã move
 }
 ```
 <details><summary>Đáp án</summary>
@@ -1440,7 +1440,7 @@ int main() {
 **Output thật** (`g++ -std=c++17 -O0`, class có in ra mỗi ctor):
 ```
 (2) S a = make_it();
-  ctor                 <-- CHI CO CTOR
+  ctor                 <-- CHỈ CÓ CTOR
 (3) take(a);
   COPY ctor
 (4) take(std::move(a));
@@ -1454,7 +1454,7 @@ int main() {
 struct Handle {
     Handle() = default;
     Handle(const Handle&) = delete;
-    Handle(Handle&&)      = delete;   // xoa CA HAI
+    Handle(Handle&&)      = delete;   // xoá CẢ HAI
 };
 Handle make() { return Handle{}; }    // (X)
 int main() { Handle h = make(); }     // (Y)
@@ -1535,7 +1535,7 @@ class DisplayController {
 
 ⭐ **Điểm yếu chí mạng của mã lỗi — KHÔNG phải "thiếu message":**
 ```cpp
-readRegister(0x40);      // bo qua HOAN TOAN — compiler khong noi gi
+readRegister(0x40);      // bỏ qua HOÀN TOÀN — compiler không nói gì
 doSomethingElse();
 ```
 **Mã lỗi có thể bị bỏ qua trong im lặng.** Exception thì không — nó tự lan lên. Đây là lý do thật khiến nhiều người chọn exception.

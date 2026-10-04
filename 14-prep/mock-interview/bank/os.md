@@ -361,7 +361,7 @@ Scheduler cổ điển (Linux O(1)) phải **đoán** tiến trình nào là I/O
 ⭐ **Câu chốt:** hạ `nice` **không** cho bạn **quyền ưu tiên**, nó chỉ cho bạn **phần bánh to hơn**. Bất kỳ task `SCHED_FIFO` nào cũng **preempt sạch mọi** task `SCHED_OTHER`, bất kể `nice` bao nhiêu. Đó là **hai thế giới**, không phải một thang liên tục.
 
 ```
-prio (thang noi bo kernel, THAP hon = uu tien CAO hon)
+prio (thang nội bộ kernel, THẤP hơn = ưu tiên CAO hơn)
   0 ....................... 99 | 100 ......... 120 ......... 139
   |<---- REALTIME ---------->| |<-------- CFS / EEVDF ------>|
     SCHED_FIFO / SCHED_RR         SCHED_OTHER (nice -20..+19)

@@ -221,13 +221,13 @@ Video enhancement và ambient **cùng khung với dimming**: hợp đồng modul
 // src_com/lib_api.cpp
 int32_t lib_api_set_backlight(int backlight) {
     int32_t ret = LIB_OK;
-    if (get_check_shm() == -1) return -1;                 // shared memory san sang?
-    int sem_ret = lib_sem_lock(__FUNCTION__);             // KHOA (lien process)
+    if (get_check_shm() == -1) return -1;                 // shared memory sẵn sàng?
+    int sem_ret = lib_sem_lock(__FUNCTION__);             // KHOÁ (liên process)
 
     if (get_dimming_instance() != NULL)
-        ret = get_dimming_instance()->SetBacklight(backlight);            // PQ: da hinh
+        ret = get_dimming_instance()->SetBacklight(backlight);            // PQ: đa hình
     if (get_video_enhancement_instance() != NULL)
-        ret = get_video_enhancement_instance()->SetBacklight(backlight);  // module thu hai cung nghe
+        ret = get_video_enhancement_instance()->SetBacklight(backlight);  // module thứ hai cũng nghe
 
     if (sem_ret == 0) lib_sem_unlock(__FUNCTION__);       // MO KHOA
     return ret;
@@ -241,7 +241,7 @@ int32_t lib_api_set_backlight(int backlight) {
 int32_t lib_api_set_frequency(int hz) {
     if (get_check_shm() == -1) return -1;
     int sem_ret = lib_sem_lock(__FUNCTION__);
-    int32_t ret = dc_set_frequency(hz);                   // DC thang — khong qua module nao
+    int32_t ret = dc_set_frequency(hz);                   // DC thẳng — không qua module nào
     if (sem_ret == 0) lib_sem_unlock(__FUNCTION__);
     return ret;
 }
@@ -328,7 +328,7 @@ public:
     virtual ~IDimmingAlgo();
     virtual uint32_t SetBacklight(int32_t backlight);
     // ... ~150 methods ...
-    virtual void t_vSyncCallBack();          // vong vsync goi moi khung hinh
+    virtual void t_vSyncCallBack();          // vòng vsync gọi mỗi khung hình
 };
 
 // dimming/Common/GlobalDimming.h
@@ -337,14 +337,14 @@ public:
     GlobalDimming(IDimmingBackend* pDimmingBackend, DimmingType_k eDetectedDimming);
 protected:
     GlobalDimmingForShm&    Shm;                 // state trong shared memory
-    DimmingVendorInterface* m_pDimmingVendor;    // doc thong ke do sang khung hinh
-    IDimmingBackend*        m_pDimmingBackend;   // ⬅️ CAY CAU sang phan cung
+    DimmingVendorInterface* m_pDimmingVendor;    // đọc thống kê độ sáng khung hình
+    IDimmingBackend*        m_pDimmingBackend;   // ⬅️ CÂY CẦU sang phần cứng
 };
 
 GlobalDimming::GlobalDimming(IDimmingBackend* pDimmingBackend,
                              DimmingType_k eDetectedDimming)
     : Shm(get_lib_shm()->shmGlobalDimming) {
-    m_pDimmingBackend = pDimmingBackend;         // GHEP luc runtime
+    m_pDimmingBackend = pDimmingBackend;         // GHÉP lúc runtime
     m_pDimmingVendor  = DimmingVendor::GetInstance();
 }
 ```
@@ -356,19 +356,19 @@ GlobalDimming::GlobalDimming(IDimmingBackend* pDimmingBackend,
 class IDimmingBackend {
 public:
     virtual ~IDimmingBackend();
-    // nhom Local
+    // nhóm Local
     virtual uint32_t t_InitLocalDimming();
     virtual uint32_t t_SetLdFinalDuty(BackendLdFinalDuty_t* pInputData);
-    // nhom Global
+    // nhóm Global
     virtual uint32_t t_InitGlobalDimming();
     virtual uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData);
 };
 
-// dimming/Backend/ChipA/DimmingBackendChipA_Global.h — chi build khi CMake chon ChipA
+// dimming/Backend/ChipA/DimmingBackendChipA_Global.h — chỉ build khi CMake chọn ChipA
 class DimmingBackendChipA_Global : public IDimmingBackend {
 public:
     uint32_t t_InitGlobalDimming() override;
-    uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) override;  // -> goi DC
+    uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) override;  // -> gọi DC
 };
 ```
 
@@ -405,7 +405,7 @@ Mỗi thư mục chip `Backend/ChipX/` có **một `DimmingFactory` riêng** ch�
 - **Runtime:** factory chọn **cặp** khớp nhau theo model, rồi sở hữu cặp ấy.
 
 ```cpp
-// dimming/Backend/ChipA/DimmingFactory.cpp   (rut gon — ten ham/hang minh hoa)
+// dimming/Backend/ChipA/DimmingFactory.cpp   (rút gọn — tên hàm/hằng minh hoạ)
 DimmingFactory::DimmingFactory() {
     DimmingType_k type = detect_dimming_type();       // theo model — runtime
     switch (type) {
@@ -425,7 +425,7 @@ DimmingFactory::DimmingFactory() {
 }
 
 IDimmingAlgo* DimmingFactory::GetDimmingInstance() {
-    static DimmingFactory instance;   // Meyers singleton — thread-safe tu C++11
+    static DimmingFactory instance;   // Meyers singleton — thread-safe từ C++11
     return instance.GetDimmingObject();
 }
 ```
@@ -451,7 +451,7 @@ lib_dimming::lib_dimming() : Shm(get_lib_shm()->shmDimming) {
 
 uint32_t lib_dimming::SetAmbientMode(int32_t mode) {
     CHECK_DIMMING_FLAG_CREATE(m_bFlagCreate);
-    return m_pDimmingPanel->SetAmbientMode(mode);                // chi uy nhiem
+    return m_pDimmingPanel->SetAmbientMode(mode);                // chỉ uỷ nhiệm
 }
 ```
 
@@ -550,7 +550,7 @@ lib_dimming_interface* get_dimming_instance() {
     return dimming;
 }
 
-void lib_init_modules() {             // chay mot lan, trong constructor cua .so
+void lib_init_modules() {             // chạy một lần, trong constructor của .so
     dimming           = new lib_dimming();
     video_enhancement = new lib_video_enhancement();
     ambient           = new lib_ambient();
@@ -570,17 +570,17 @@ void lib_init_modules() {             // chay mot lan, trong constructor cua .so
 // src_algo/display/lib_base.h
 struct display_shm_info {
     int    init;
-    int    ref_count;                       // dem process toan cuc
-    sem_t  sem_lib;                         // named semaphore dung o MOI API
-    DimmingForShm           shmDimming;          // state tung module
-    GlobalDimmingForShm     shmGlobalDimming;    // state tung thuat toan
+    int    ref_count;                       // đếm process toàn cục
+    sem_t  sem_lib;                         // named semaphore dùng ở MỌI API
+    DimmingForShm           shmDimming;          // state từng module
+    GlobalDimmingForShm     shmGlobalDimming;    // state từng thuật toán
     VideoEnhancementForShm  shm_video_enhancement;
-    char   prev_called_proc[20][255];       // lich su goi — de debug deadlock
+    char   prev_called_proc[20][255];       // lịch sử gọi — để debug deadlock
     // ...
 };
 
-// tu chay khi process nap library — caller khong goi init
-void __attribute__((constructor)) lib_init()       { lib_init_device(); }  // + vong vsync
+// tự chạy khi process nạp library — caller không gọi init
+void __attribute__((constructor)) lib_init()       { lib_init_device(); }  // + vòng vsync
 void __attribute__((destructor))  lib_base_final() { /* teardown */ }
 ```
 

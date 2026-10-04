@@ -200,8 +200,8 @@ if (rc == EOWNERDEAD) {                    // chủ cũ chết khi đang giữ k
 
 Chạy thật — cho process con `lock()` rồi **chết ngay khi đang giữ khoá**, sau đó cha thử lấy khoá:
 ```
-mutex thuong    lock() -> ETIMEDOUT    <-- dung lock() thuong la TREO VINH VIEN
-ROBUST          lock() -> EOWNERDEAD   <-- cuu duoc, goi mutex_consistent()
+mutex thuong    lock() -> ETIMEDOUT    <-- dùng lock() thường là TREO VĨNH VIỄN
+ROBUST          lock() -> EOWNERDEAD   <-- cứu được, gọi mutex_consistent()
                 -> da khoi phuc, data = 42
 ```
 *(Đo bằng `pthread_mutex_timedlock` để thí nghiệm không treo thật; trong code thật `pthread_mutex_lock` sẽ không bao giờ trả về.)* Lưu ý dòng cuối: dữ liệu **vẫn còn đó** — nhưng bạn **không biết nó đã hoàn chỉnh hay đang dở dang**, nên `repair_shared_state()` không phải thủ tục cho có.

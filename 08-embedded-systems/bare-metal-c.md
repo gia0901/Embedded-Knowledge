@@ -54,15 +54,15 @@ Lưu ý: dùng `1u` (unsigned) — `1 << 31` trên int là **UB** (tràn dấu).
 > Output thật (gcc 11.4, `-std=c11 -Wall -Wextra`). Đếm số bit 1 và kiểm endianness đã có ở [COD-009](../14-prep/mock-interview/bank/coding.md), [COD-010](../14-prep/mock-interview/bank/coding.md); tạo mask `n` bit ở [COD-021](../14-prep/mock-interview/bank/coding.md).
 
 ```c
-bool     is_pow2(uint32_t x)        { return x && !(x & (x - 1)); }   /* x & (x-1) xoa bit 1 thap nhat */
-uint32_t lowest_set(uint32_t x)     { return x & (~x + 1); }          /* = x & -x voi unsigned */
+bool     is_pow2(uint32_t x)        { return x && !(x & (x - 1)); }   /* x & (x-1) xoá bit 1 thấp nhất */
+uint32_t lowest_set(uint32_t x)     { return x & (~x + 1); }          /* = x & -x với unsigned */
 uint8_t  swap_nibbles(uint8_t b)    { return (uint8_t)((b << 4) | (b >> 4)); }
 uint8_t  reverse8(uint8_t b) {
     uint8_t r = 0;
-    for (int i = 0; i < 8; i++) { r = (uint8_t)((r << 1) | (b & 1u)); b >>= 1; }   /* lay bit thap cua b, day vao r */
+    for (int i = 0; i < 8; i++) { r = (uint8_t)((r << 1) | (b & 1u)); b >>= 1; }   /* lấy bit thấp của b, đẩy vào r */
     return r;
 }
-uint32_t bswap32(uint32_t x) {      /* dao thu tu BYTE — doi endianness */
+uint32_t bswap32(uint32_t x) {      /* đảo thứ tự BYTE — đổi endianness */
     return  (x >> 24) | ((x >> 8) & 0x0000FF00u) | ((x << 8) & 0x00FF0000u) | (x << 24);
 }
 ```
@@ -87,7 +87,7 @@ bswap32(0x11223344)=0x44332211  __builtin_bswap32=0x44332211
 ```
 FIELD_GET(0xFFFF00FF, 4, 4) = 0xF
 sau FIELD_SET(reg, 8, 4, 0xA):  0xFFFF0AFF
-sau FIELD_SET(reg, 8, 4, 0x1F): 0xFFFF0FFF     <- gia tri qua rong bi CAT, khong lan sang truong ben canh
+sau FIELD_SET(reg, 8, 4, 0x1F): 0xFFFF0FFF     <- giá trị quá rộng bị CẮT, không lấn sang trường bên cạnh
 ```
 
 Ba chi tiết phân biệt người làm thật: ① **xoá trường cũ trước** rồi mới OR giá trị mới (chỉ OR thì bit 1 cũ còn nguyên) · ② **AND giá trị với mask** để giá trị quá rộng không phá trường bên cạnh · ③ `width = 32` làm `1u << 32` — **UB** ([COD-021](../14-prep/mock-interview/bank/coding.md)). Kernel có sẵn `GENMASK`, `FIELD_GET`/`FIELD_PREP` cho đúng việc này. Macro này đánh giá `reg` hai lần — đừng truyền biểu thức có tác dụng phụ ([C-022](../14-prep/mock-interview/bank/c-programming.md)).

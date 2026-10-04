@@ -22,8 +22,8 @@
 BBB có header **J1, 6 chân**, cạnh jack nguồn. **Chân 1 có dấu chấm trắng trên board.**
 
 ```
-J1 (BBB)          Cap FTDI 3.3V
- 1  GND    <-----  GND   (day den)
+J1 (BBB)          Cáp FTDI 3.3V
+ 1  GND    <-----  GND   (dây đen)
  4  RX     <-----  TX
  5  TX     ----->  RX
 ```
@@ -41,14 +41,14 @@ J1 (BBB)          Cap FTDI 3.3V
 ### 2.1 Serial console
 
 ```bash
-sudo apt install picocom      # hoac: minicom, screen
+sudo apt install picocom      # hoặc: minicom, screen
 ```
 
 🔴 **Bẫy gần như ai cũng dính lần đầu — `Permission denied` trên `/dev/ttyUSB0`:**
 ```bash
 sudo usermod -aG dialout $USER
-# BAT BUOC dang xuat/dang nhap lai (hoac reboot) thi nhom moi co hieu luc
-groups | grep dialout          # kiem tra
+# BẮT BUỘC đăng xuất/đăng nhập lại (hoặc reboot) thì nhóm mới có hiệu lực
+groups | grep dialout          # kiểm tra
 ```
 
 Mở console + ghi log (bước ② của mọi lab đều cần log thật):
@@ -103,7 +103,7 @@ sudo locale-gen en_US.UTF-8
 ### Đường ① — image dựng sẵn
 Tải image BBB từ [beagleboard.org/latest-images](https://www.beagleboard.org/distros), rồi:
 ```bash
-lsblk                                    # XAC DINH DUNG THIET BI THE SD
+lsblk                                    # XÁC ĐỊNH ĐÚNG THIẾT BỊ THẺ SD
 sudo dd if=<image>.img of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 🔴 **`dd` nhầm ổ là xoá sạch ổ cứng.** Kiểm `lsblk` **hai lần**, và dùng `/dev/sdX` (cả thẻ), không phải `/dev/sdX1`.
@@ -114,7 +114,7 @@ git clone https://source.denx.de/u-boot/u-boot.git && cd u-boot
 export CROSS_COMPILE=arm-linux-gnueabihf-
 make am335x_evm_defconfig
 make -j$(nproc)
-# san pham: MLO  va  u-boot.img
+# sản phẩm: MLO  và  u-boot.img
 ```
 
 **Bố cục thẻ:** phân vùng 1 **FAT16/32, cờ `boot`**, chứa `MLO` **rồi mới** `u-boot.img`; phân vùng 2 ext4 chứa rootfs.
@@ -124,17 +124,17 @@ make -j$(nproc)
 ## 4. Thẻ B — Yocto
 
 ```bash
-git clone -b scarthgap git://git.yoctoproject.org/poky      # doi sang nhanh LTS hien hanh
+git clone -b scarthgap git://git.yoctoproject.org/poky      # đổi sang nhánh LTS hiện hành
 cd poky && source oe-init-build-env
 ```
 Sửa `conf/local.conf`:
 ```
 MACHINE = "beaglebone-yocto"
-DL_DIR    = "${TOPDIR}/../downloads"      # dung chung giua cac build
-SSTATE_DIR = "${TOPDIR}/../sstate-cache"  # bai 038 do chinh cai nay
+DL_DIR    = "${TOPDIR}/../downloads"      # dùng chung giữa các build
+SSTATE_DIR = "${TOPDIR}/../sstate-cache"  # bài 038 đo chính cái này
 ```
 ```bash
-time bitbake core-image-minimal      # 1-2h lan dau
+time bitbake core-image-minimal      # 1-2h lần đầu
 ls tmp/deploy/images/beaglebone-yocto/
 ```
 
@@ -172,7 +172,7 @@ ls tmp/deploy/images/beaglebone-yocto/
 
 **⑦ 🔴 `git://` bị chặn — cổng 9418.** *(gặp thật 2026-09-06)* Clone poky bằng `git://git.yoctoproject.org/poky` ra `Connection refused` / timeout. Giao thức `git` chạy trên **cổng 9418**, bị chặn ở hầu hết mạng công ty và VM; **GitHub đã bỏ hẳn** giao thức này từ 2022.
 ```bash
-git clone -b scarthgap https://git.yoctoproject.org/poky      # dung https, KHONG dung git://
+git clone -b scarthgap https://git.yoctoproject.org/poky      # dùng https, KHÔNG dùng git://
 ```
 ⚠️ **Cùng nguyên nhân sẽ quay lại trong `do_fetch`:** nhiều recipe có `SRC_URI = "git://..."`. Build chết ở `do_fetch` với đúng lỗi này ⇒ không phải recipe hỏng, mà là **cổng bị chặn**. *(Gương GitHub `https://github.com/yoctoproject/poky.git` cho **cùng một SHA** — dùng thay thế được.)*
 
@@ -203,7 +203,7 @@ Làm được — và **đúng là thứ interview hỏi** — là **U-Boot veri
 
 | Nơi | Cập nhật |
 |---|---|
-| [bank/bsp.md](mock-interview/bank/bsp.md) | Dán **output thật** vào ô `(chua chay)` của bài vừa làm — luật bank: *cấm viết tay, cấm phỏng đoán* |
+| [bank/bsp.md](mock-interview/bank/bsp.md) | Dán **output thật** vào ô `(chưa chạy)` của bài vừa làm — luật bank: *cấm viết tay, cấm phỏng đoán* |
 | Câu lab trong [bank/bsp.md](mock-interview/bank/bsp.md) | Thêm `· ✅ <ngày>` vào cuối dòng metadata (không có plan đang chạy — [config §3](mock-interview/config.md)) |
 | **File này** | Lệnh nào không khớp máy bạn thì **sửa lại tại đây**, đừng sửa trong lab |
 | [gap-register](study-plans/gap-register.md) | Bài 035 xong ⇒ cập nhật ô *Secure boot* |

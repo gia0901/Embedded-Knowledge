@@ -34,19 +34,19 @@
 | **Đừng dùng khi** | Chỉ có một thuật toán, hoặc loại được quyết định lúc boot và không đổi nữa (⟹ [Template Method](#2--template-method)) |
 
 ```cpp
-class IDimmingAlgo {                          // ten nhu A1
+class IDimmingAlgo {                          // tên như A1
 public:
     virtual ~IDimmingAlgo() = default;
     virtual uint32_t SetBacklight(int32_t backlight) = 0;
-    virtual void     t_vSyncCallBack()               = 0;   // vong vsync goi moi khung hinh
+    virtual void     t_vSyncCallBack()               = 0;   // vòng vsync gọi mỗi khung hình
 };
-class GlobalDimming : public IDimmingAlgo { /* 1 gia tri cho ca panel */ };
-class LocalDimming  : public IDimmingAlgo { /* moi vung mot gia tri  */ };
+class GlobalDimming : public IDimmingAlgo { /* 1 giá trị cho cả panel */ };
+class LocalDimming  : public IDimmingAlgo { /* mỗi vùng một giá trị  */ };
 
-class lib_dimming {                           // CONTEXT — khong doi khi them thuat toan
+class lib_dimming {                           // CONTEXT — không đổi khi thêm thuật toán
     std::unique_ptr<IDimmingAlgo> m_pDimmingPanel;
 public:
-    uint32_t SetBacklight(int32_t v) { return m_pDimmingPanel->SetBacklight(v); }   // uy nhiem
+    uint32_t SetBacklight(int32_t v) { return m_pDimmingPanel->SetBacklight(v); }   // uỷ nhiệm
     void SetDimmingObject(std::unique_ptr<IDimmingAlgo> p) { m_pDimmingPanel = std::move(p); }
 };
 ```
@@ -71,15 +71,15 @@ public:
 ```cpp
 class DimmingAlgoBase : public IDimmingAlgo {
 public:
-    void t_vSyncCallBack() final {                       // <- KHUNG: final, lop con khong doi duoc
-        int32_t level = ComputeBacklight(m_pDimmingVendor->GetFrameStats());   // hook: moi loai tu tinh
-        level = Clamp(level);                                                   // buoc chung
-        WriteToBackend(level);                                                  // buoc chung -> m_pDimmingBackend
+    void t_vSyncCallBack() final {                       // <- KHUNG: final, lớp con không đổi được
+        int32_t level = ComputeBacklight(m_pDimmingVendor->GetFrameStats());   // hook: mỗi loại tự tính
+        level = Clamp(level);                                                   // bước chung
+        WriteToBackend(level);                                                  // bước chung -> m_pDimmingBackend
     }
 protected:
-    virtual int32_t ComputeBacklight(const FrameStats&) = 0;   // CHO DUY NHAT lop con thay
-    DimmingVendorInterface* m_pDimmingVendor;                   // doc thong ke khung hinh — nhu A1
-    IDimmingBackend*        m_pDimmingBackend;                  // cay cau sang phan cung — nhu A1
+    virtual int32_t ComputeBacklight(const FrameStats&) = 0;   // CHỖ DUY NHẤT lớp con thay
+    DimmingVendorInterface* m_pDimmingVendor;                   // đọc thống kê khung hình — như A1
+    IDimmingBackend*        m_pDimmingBackend;                  // cây cầu sang phần cứng — như A1
 };
 ```
 
@@ -109,14 +109,14 @@ protected:
 | **Đừng dùng khi** | Chỉ có đúng một người nghe và sẽ mãi như vậy ⟹ callback thẳng |
 
 ```cpp
-class LightSensor {                                   // subject — khong biet ai nghe
-    std::vector<std::weak_ptr<ILightObserver>> m_observers;   // weak: khong giu vong doi
+class LightSensor {                                   // subject — không biết ai nghe
+    std::vector<std::weak_ptr<ILightObserver>> m_observers;   // weak: không giữ vòng đời
 public:
     void Subscribe(std::shared_ptr<ILightObserver> o) { m_observers.push_back(std::move(o)); }
     void Publish(int32_t lux) {
         for (auto it = m_observers.begin(); it != m_observers.end(); ) {
             if (auto p = it->lock()) { p->OnLux(lux); ++it; }
-            else                     { it = m_observers.erase(it); }   // tu don observer da chet
+            else                     { it = m_observers.erase(it); }   // tự dọn observer đã chết
         }
     }
 };
@@ -145,7 +145,7 @@ Nối thẳng `OnLux → SetBacklight` là **đúng pattern nhưng sai sản ph�
 | **Đừng dùng bản OOP khi** | Mỗi state chỉ vài dòng ⟹ enum + `switch`/bảng gọn hơn nhiều |
 
 ```cpp
-// Ban nhe (hop embedded): tat dinh, khong heap, khong virtual
+// Bản nhẹ (hợp embedded): tất định, không heap, không virtual
 enum class State { Idle, Running, Error };
 class Machine {
     State state_ = State::Idle;
@@ -190,13 +190,13 @@ public:
 | **Đừng dùng khi** | Lệnh chạy ngay, tại chỗ, không cần lưu ⟹ gọi hàm là đủ |
 
 ```cpp
-// Command "da tuan tu hoa" — cai di tren message queue. POD, khong con tro, khong vtable.
+// Command "đã tuần tự hoá" — cái đi trên message queue. POD, không con trỏ, không vtable.
 struct BrightnessCmd {
-    uint16_t version;      // hop dong nhi phan — BAT BUOC
+    uint16_t version;      // hợp đồng nhị phân — BẮT BUỘC
     uint16_t opcode;
-    uint32_t seq;          // chong lap + phat hien mat goi
+    uint32_t seq;          // chống lặp + phát hiện mất gói
     int32_t  value;
-    uint64_t apply_at_ms;  // <- thi hanh tai moc T, khong phai "ngay khi nhan"
+    uint64_t apply_at_ms;  // <- thi hành tại mốc T, không phải "ngay khi nhận"
 };
 ```
 
@@ -231,8 +231,8 @@ struct BrightnessCmd {
 | **Đừng dùng khi** | Bỏ qua âm thầm là nguy hiểm ⟹ *fail loud* mới đúng |
 
 ```cpp
-// Base la Null Object: moi API co cai dat mac dinh co nghia
-// (ten nhu HAL Tang 0 o in-practice/A2 — IDisplay; o A1 cung y tuong la IDimmingAlgo tra LIB_OK)
+// Base là Null Object: mọi API có cài đặt mặc định có nghĩa
+// (tên như HAL Tầng 0 ở in-practice/A2 — IDisplay; ở A1 cùng ý tưởng là IDimmingAlgo trả LIB_OK)
 int IDisplay::setPower(bool)     { return -ENOTSUP; }
 int IDisplay::setBrightness(int) { return -ENOTSUP; }
 ```

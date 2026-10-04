@@ -3,7 +3,7 @@
 > **TL;DR**
 > - Con trỏ = **địa chỉ + kiểu**. Kiểu quyết định `p + 1` nhảy bao nhiêu byte và `*p` đọc bao nhiêu byte. `a[i]` chỉ là cách viết khác của `*(a + i)`.
 > - **Mảng không phải con trỏ.** Tên mảng *tự đổi* (**decay**) thành con trỏ tới phần tử đầu trong hầu hết biểu thức — **trừ** `sizeof`, `&` và khi khởi tạo mảng `char` bằng chuỗi. Truyền mảng vào hàm là truyền **một con trỏ**, nên `sizeof` trong hàm cho ra 8, không phải kích thước mảng.
-> - Đọc khai báo theo **luật phải–trái**: `int *a[3]` là *mảng 3 con trỏ*; `int (*a)[3]` là *một con trỏ tới mảng 3 int*. Dấu ngoặc đổi hẳn nghĩa.
+> - Đọc khai báo theo **luật phải–trái**: bắt đầu từ tên, đọc `[]`/`()` bên phải **trước** `*` bên trái (vì chúng ưu tiên cao hơn), ngoặc nhóm ép đổi thứ tự. `int *a[3]` là *mảng 3 con trỏ*; `int (*a)[3]` là *một con trỏ tới mảng 3 int*.
 > - **`T **`** dùng cho ba việc: hàm sửa con trỏ của caller · mảng con trỏ (`argv`) · ma trận cấp phát từng hàng. **`int a[R][C]` KHÔNG phải `int **`** — truyền nhầm là crash.
 > - `char s[] = "abc"` là **mảng sửa được**; `char *s = "abc"` là **con trỏ tới chuỗi chỉ đọc** — ghi vào là segfault.
 > - Mọi output trong file này là **output thật** (gcc 11.4, x86-64, `-std=c11 -Wall -Wextra`).
@@ -22,18 +22,18 @@ Driver, BSP, firmware và rất nhiều thư viện hệ thống vẫn là **C t
 
 ```c
 int  arr[5] = {10, 20, 30, 40, 50};
-int  *p = arr;            /* p tro vao arr[0] */
-char *c = (char *)arr;    /* cung dia chi, KHAC kieu */
+int  *p = arr;            /* p trỏ vào arr[0] */
+char *c = (char *)arr;    /* cùng địa chỉ, KHÁC kiểu */
 ```
 
 ```
-dia chi   0x1000  0x1004  0x1008  0x100C  0x1010
+địa chỉ   0x1000  0x1004  0x1008  0x100C  0x1010
           +-------+-------+-------+-------+-------+
 arr       |  10   |  20   |  30   |  40   |  50   |      int = 4 byte
           +-------+-------+-------+-------+-------+
             ^       ^
-            p       p+1    (nhay 4 byte vi *p la int)
-            c  c+1         (nhay 1 byte vi *c la char)
+            p       p+1    (nhảy 4 byte vì *p là int)
+            c  c+1         (nhảy 1 byte vì *c là char)
 ```
 
 Output thật:
@@ -50,19 +50,32 @@ arr[2]=30  *(arr+2)=30  2[arr]=30
 
 ### 1.1 Thứ tự toán tử — `*p++` và họ hàng
 
-`*` và `++` hậu tố khác độ ưu tiên: **`++` hậu tố mạnh hơn `*`**, còn `++` tiền tố và `*` cùng mức, đọc từ phải sang trái.
+Một biểu thức như `*p++` đặt ra **hai câu hỏi khác nhau**, hay bị trộn vào nhau:
+
+| Câu hỏi | Ai trả lời | Với `*p++` |
+|---|---|---|
+| ① **Gom nhóm**: `*` và `++` áp vào **cái gì**? | **Độ ưu tiên** (precedence) | `*(p++)` — `++` áp vào `p`, rồi `*` áp vào kết quả của `p++` |
+| ② **Thời điểm**: giá trị nào được dùng, khi nào tăng? | **Ngữ nghĩa của `++`** | `p++` trả về **giá trị cũ** của `p`, việc tăng `p` là tác dụng phụ |
+
+**"Ưu tiên cao hơn" (hay "mạnh hơn") nghĩa là: khi không có ngoặc, compiler tự đặt ngoặc quanh toán tử đó trước.** Giống `2 + 3 * 4` được hiểu là `2 + (3 * 4)` vì `*` ưu tiên cao hơn `+`. Ở đây `++` hậu tố ưu tiên cao hơn `*`, nên `*p++` được hiểu là `*(p++)`, **không phải** `(*p)++`. Độ ưu tiên chỉ quyết định `++` tăng **con trỏ `p`** hay tăng **giá trị `*p`**; nó không nói gì về chuyện tăng trước hay sau.
+
+Chuyện *"đọc xong rồi mới tăng"* đến từ câu hỏi ②: `p++` là một biểu thức có **giá trị bằng `p` cũ**. Nên `*(p++)` = `*(p cũ)` = đọc `a[0]`; sau đó `p` đã trỏ sang `a[1]`.
+
+Còn `++` **tiền tố** và `*` **cùng mức ưu tiên**. Khi cùng mức thì xét **chiều kết hợp**: hai toán tử này kết hợp **từ phải sang trái**, tức là toán tử nằm **sát biến hơn** được gom trước. `++*p` thành `++(*p)`, `*++p` thành `*(++p)`.
 
 ```c
 int a[] = {10, 20, 30};
 int *p = a;
 ```
 
-| Biểu thức | Nghĩa | Output thật (mỗi dòng bắt đầu lại từ `p = a`, `a[0] = 10`) |
-|---|---|---|
-| `x = *p++` | Đọc `*p`, **rồi** tăng **con trỏ** | `x=10, *p=20, a[0]=10` |
-| `x = (*p)++` | Đọc `*p`, rồi tăng **giá trị** | `x=10, *p=11, a[0]=11` |
-| `x = ++*p` | Tăng **giá trị** trước, rồi đọc | `x=11, *p=11, a[0]=11` |
-| `x = *++p` | Tăng **con trỏ** trước, rồi đọc | `x=20, *p=20, a[0]=10` |
+| Biểu thức | Compiler hiểu là | ++ tăng cái gì | Giá trị được dùng | Output thật (mỗi dòng bắt đầu lại từ `p = a`, `a[0] = 10`) |
+|---|---|---|---|---|
+| `x = *p++` | `*(p++)` | **con trỏ** `p` | `*` của `p` **cũ** ⟹ 10 | `x=10, *p=20, a[0]=10` |
+| `x = (*p)++` | `(*p)++` — ngoặc ép | **giá trị** `a[0]` | `a[0]` **cũ** ⟹ 10 | `x=10, *p=11, a[0]=11` |
+| `x = ++*p` | `++(*p)` | **giá trị** `a[0]` | `a[0]` **mới** ⟹ 11 | `x=11, *p=11, a[0]=11` |
+| `x = *++p` | `*(++p)` | **con trỏ** `p` | `*` của `p` **mới** ⟹ 20 | `x=20, *p=20, a[0]=10` |
+
+Mẹo đọc: **bước 1** đặt ngoặc theo độ ưu tiên để biết `++` tăng cái gì; **bước 2** nhìn `++` đứng trước (dùng giá trị mới) hay đứng sau (dùng giá trị cũ).
 
 > 💡 `*p++` là thành ngữ của C: `while (*dst++ = *src++);` là `strcpy` một dòng.
 
@@ -76,23 +89,23 @@ int *p = arr;
 ```
 
 ```
-arr:  +----+----+----+----+----+      arr LA 20 byte du lieu (khong co o nao chua dia chi)
+arr:  +----+----+----+----+----+      arr LÀ 20 byte dữ liệu (không có ô nào chứa địa chỉ)
       |    |    |    |    |    |
       +----+----+----+----+----+
         ^
         |
-p:    +------+                         p LA 8 byte chua mot dia chi
+p:    +------+                         p LÀ 8 byte chứa một địa chỉ
       |0x1000|
       +------+
 ```
 
-**Decay:** trong hầu hết biểu thức, tên mảng `arr` được tự đổi thành `&arr[0]` (kiểu `int *`). Đổi nhưng **không** có ô nhớ nào chứa con trỏ đó. Ba chỗ **không** decay:
+**Decay:** trong hầu hết biểu thức, tên mảng `arr` được tự đổi thành `&arr[0]` (kiểu `int *`). Đây là một **giá trị được tính ra** tại chỗ dùng (giống kết quả của `1 + 2`), **không** phải một biến nằm đâu đó trong bộ nhớ — sơ đồ trên không có ô nào chứa `0x1000` ngoài `p`. Ba chỗ **không** decay:
 
 | Chỗ | Ví dụ | Kết quả |
 |---|---|---|
 | `sizeof` | `sizeof(arr)` | **20** — cả mảng |
 | `&` | `&arr` | Con trỏ tới **cả mảng**, kiểu `int (*)[5]` |
-| Khởi tạo mảng `char` bằng chuỗi | `char s[] = "abc";` | Copy 4 byte vào mảng |
+| Chuỗi literal dùng để khởi tạo mảng `char` | `char s[] = "abc";` | Bản thân `"abc"` cũng là một mảng (`char[4]`). Ở chỗ này nó **không** decay thành con trỏ, mà 4 byte của nó được **copy** vào `s` |
 
 ### 2.1 `arr`, `&arr[0]`, `&arr` — cùng địa chỉ, khác kiểu
 
@@ -101,6 +114,8 @@ p:    +------+                         p LA 8 byte chua mot dia chi
 | `arr` (sau decay) | `int *` | 4 byte |
 | `&arr[0]` | `int *` | 4 byte |
 | `&arr` | `int (*)[5]` | **20 byte** — qua hết mảng |
+
+Vì sao `&arr + 1` nhảy 20 byte: áp đúng quy tắc §1 — `p + 1` nhảy `sizeof(*p)` byte. Với `&arr`, thứ được trỏ tới là **cả mảng** `int[5]`, nên `sizeof` của nó là 20.
 
 Output thật:
 
@@ -112,8 +127,8 @@ arr == &arr[0] ? 1   (void*)arr == (void*)&arr ? 1
 ### 2.2 Truyền mảng vào hàm = truyền một con trỏ
 
 ```c
-void print_len(int a[]) {              /* "int a[]" o tham so CHINH LA "int *a" */
-    printf("trong ham: sizeof(a) = %zu\n", sizeof(a));
+void print_len(int a[]) {              /* "int a[]" ở tham số CHÍNH LÀ "int *a" */
+    printf("trong hàm: sizeof(a) = %zu\n", sizeof(a));
 }
 ```
 
@@ -125,7 +140,7 @@ warning: 'sizeof' on array function parameter 'a' will return size of 'int *' [-
 
 ```
 sizeof(arr) = 20, sizeof(p) = 8
-trong ham: sizeof(a) = 8
+trong hàm: sizeof(a) = 8
 ```
 
 ⟹ Hàm nhận mảng **luôn** phải nhận thêm **số phần tử**: `void f(const int *a, size_t n)`. Đó là lý do mọi API C đều có cặp `(buf, len)`.
@@ -138,22 +153,89 @@ trong ham: sizeof(a) = 8
 
 ## 3. Đọc khai báo — luật phải–trái
 
-**Luật:** bắt đầu từ **tên biến**, đọc sang **phải** tới khi gặp `)` hoặc hết; rồi đọc sang **trái**; gặp ngoặc thì nhảy ra ngoài và lặp lại. `[]` đọc là *"mảng của"*, `()` là *"hàm trả về"*, `*` là *"con trỏ tới"*.
+### 3.0 Vì sao phải đọc sang phải trước
 
-| Khai báo | Đọc | Là |
-|---|---|---|
-| `int *a[3]` | a → `[3]` → `*` → int | **mảng 3** phần tử, mỗi phần tử là **con trỏ** tới int |
-| `int (*a)[3]` | a → `)` → `*` → `[3]` → int | **một con trỏ**, trỏ tới **mảng 3 int** |
-| `int *f(void)` | f → `()` → `*` → int | **hàm** trả về con trỏ tới int |
-| `int (*f)(void)` | f → `)` → `*` → `()` → int | **con trỏ tới hàm** trả về int |
-| `int (*ops[2])(int, int)` | ops → `[2]` → `*` → `()` → int | **mảng 2 con trỏ hàm** |
-| `char **argv` | argv → `*` → `*` → char | con trỏ tới con trỏ tới char |
+Khai báo trong C được thiết kế để **giống cách dùng**: `int *a[3];` nghĩa là *"biểu thức `*a[i]` cho ra một `int`"*. Mà trong biểu thức, `[]` và `()` đứng **sau** tên có độ ưu tiên **cao hơn** `*` đứng **trước** tên (cùng lý do như `*p++` ở §1.1). Nên khi gặp `*a[3]`, compiler gom `a[3]` trước:
+
+```
+int *a[3]      ==   int *(a[3])      a là MẢNG trước, rồi mới tới "con trỏ"
+int (*a)[3]    ==   ngoặc ép *a      a là CON TRỎ trước, rồi mới tới "mảng"
+```
+
+⟹ Thứ đứng **bên phải** tên (`[]`, `()`) luôn được đọc **trước** thứ đứng **bên trái** (`*`) — trừ khi có ngoặc ép thứ tự khác. Đó là toàn bộ lý do của luật phải–trái.
+
+### 3.1 Thuật toán đọc — từng bước
+
+Có **hai loại ngoặc tròn**, phải phân biệt:
+- **Ngoặc hàm** — đứng **ngay sau** một tên hoặc sau `)`, chứa danh sách tham số: `f(void)`, `(int, int)`. Đọc là *"hàm nhận … trả về"*.
+- **Ngoặc nhóm** — **bao quanh** tên cùng dấu `*`: `(*f)`, `(*a)`. Không mang nghĩa gì, chỉ để ép thứ tự đọc.
+
+Các bước:
+
+1. Tìm **tên** đang được khai báo. Bắt đầu từ đó.
+2. **Nhìn sang phải**, đọc lần lượt:
+   - `[N]` ⟹ *"mảng N phần tử, mỗi phần tử là…"*
+   - `( … )` (ngoặc hàm) ⟹ *"hàm nhận …, trả về…"*
+
+   Dừng lại khi gặp **dấu `)` đóng ngoặc nhóm** hoặc **hết khai báo**.
+3. **Nhìn sang trái**, đọc lần lượt:
+   - `*` ⟹ *"con trỏ tới…"*
+
+   Dừng lại khi gặp **dấu `(` mở ngoặc nhóm** hoặc **hết**.
+4. Nếu vừa dừng ở một cặp ngoặc nhóm: coi cả cặp ngoặc như đã đọc xong, **đứng ở ngoài nó**, quay lại bước 2.
+5. Cuối cùng đọc **kiểu cơ sở** ở tận cùng bên trái (`int`, `char`…).
+
+**Áp vào từng ví dụ:**
+
+`int *f(void)` — không có ngoặc nhóm:
+```
+bước 1:  f
+bước 2:  phải của f là (void)  -> "f là hàm không nhận tham số, trả về..."   ; tiếp sang phải: hết
+bước 3:  trái là *             -> "...con trỏ tới..."                        ; tiếp sang trái: chỉ còn kiểu
+bước 5:  int                   -> "...int"
+=> f là HÀM trả về con trỏ tới int
+```
+
+`int (*f)(void)` — có ngoặc nhóm quanh `*f`:
+```
+bước 1:  f
+bước 2:  phải của f là )  -> đóng ngoặc nhóm, CHƯA đọc được gì, dừng
+bước 3:  trái là *        -> "f là con trỏ tới..."  ; tiếp sang trái là (  -> mở ngoặc nhóm, dừng
+bước 4:  đứng ngoài (*f), quay lại bước 2
+bước 2:  phải là (void)   -> "...hàm không nhận tham số, trả về..."
+bước 5:  int              -> "...int"
+=> f là CON TRỎ tới hàm trả về int
+```
+
+`int *a[3]` và `int (*a)[3]` — cùng cách đó:
+```
+int *a[3]:    a -> phải [3] "mảng 3 phần tử, mỗi phần tử là" -> trái * "con trỏ tới" -> int
+int (*a)[3]:  a -> phải ) dừng -> trái * "con trỏ tới" -> ( dừng -> ra ngoài -> phải [3] "mảng 3" -> int
+```
+
+`int (*ops[2])(int, int)`:
+```
+ops -> phải [2]   "mảng 2 phần tử, mỗi phần tử là"   -> gặp ) dừng
+    -> trái *     "con trỏ tới"                       -> gặp ( dừng -> ra ngoài
+    -> phải (int, int)  "hàm nhận (int, int), trả về"
+    -> int
+=> ops là MẢNG 2 CON TRỎ tới hàm nhận (int, int) trả về int
+```
+
+| Khai báo | Là |
+|---|---|
+| `int *a[3]` | **mảng 3** phần tử, mỗi phần tử là **con trỏ** tới int |
+| `int (*a)[3]` | **một con trỏ**, trỏ tới **mảng 3 int** |
+| `int *f(void)` | **hàm** trả về con trỏ tới int |
+| `int (*f)(void)` | **con trỏ tới hàm** trả về int |
+| `int (*ops[2])(int, int)` | **mảng 2 con trỏ hàm** |
+| `char **argv` | con trỏ tới con trỏ tới char (bên phải `argv` không có gì ⟹ đọc thẳng sang trái) |
 
 ```c
 int x = 1, y = 2, z = 3;
 int row[3] = {7, 8, 9};
-int *ap[3]   = {&x, &y, &z};   /* mang 3 con tro */
-int (*pa)[3] = &row;           /* 1 con tro toi ca mang */
+int *ap[3]   = {&x, &y, &z};   /* mảng 3 con trỏ */
+int (*pa)[3] = &row;           /* 1 con trỏ tới cả mảng */
 ```
 
 ```
@@ -168,22 +250,43 @@ ap: +------+------+------+          pa: +------+        row: +---+---+---+
 Output thật:
 
 ```
-sizeof(ap) = 24  (3 con tro)
-sizeof(pa) = 8  (1 con tro)
+sizeof(ap) = 24  (3 con trỏ)
+sizeof(pa) = 8  (1 con trỏ)
 *ap[1] = 2    (*pa)[1] = 8
-pa+1 nhay 12 byte
+pa+1 nhảy 12 byte
 ```
 
-### 3.1 Khai báo khó đọc thì dùng `typedef`
+`pa + 1` nhảy 12 byte cùng lý do với `&arr + 1` ở §2.1: thứ được trỏ tới là cả mảng `int[3]`.
+
+### 3.2 Khai báo khó đọc thì dùng `typedef`
 
 Ví dụ kinh điển là `signal()` của POSIX: *hàm nhận một số int và một con trỏ hàm, trả về một con trỏ hàm*.
 
 ```c
-void (*signal(int sig, void (*h)(int)))(int);      /* dang tho */
+void (*signal(int sig, void (*h)(int)))(int);      /* dạng thô */
 
-typedef void (*sighandler_t)(int);                  /* dat ten cho "con tro ham nhan int" */
-sighandler_t signal(int sig, sighandler_t h);        /* cung kieu, doc duoc */
+typedef void (*sighandler_t)(int);                  /* đặt tên cho "con trỏ hàm nhận int" */
+sighandler_t signal(int sig, sighandler_t h);        /* cùng kiểu, đọc được */
 ```
+
+Đọc bản thô theo thuật toán §3.1:
+
+```
+void (*signal(int sig, void (*h)(int)))(int);
+
+1. tên: signal
+2. phải: (int sig, void (*h)(int))  -> "signal là hàm nhận một int và một h, trả về..."
+         (h tự đọc riêng: h -> phải ) dừng -> trái * "con trỏ tới" -> ra ngoài -> phải (int)
+          "hàm nhận int" -> void  =>  h là con trỏ tới hàm nhận int, trả về void)
+   tiếp sang phải: gặp ) đóng ngoặc nhóm, dừng
+3. trái: *                           -> "...con trỏ tới..."   ; gặp ( dừng
+4. ra ngoài cặp ngoặc nhóm (* signal(...))
+2. phải: (int)                       -> "...hàm nhận int, trả về..."
+5. void                              -> "...void"
+=> signal là HÀM nhận (int, con trỏ hàm), trả về CON TRỎ tới hàm nhận int trả về void
+```
+
+Kiểu trả về là một con trỏ hàm, nên nó buộc phải **bọc quanh** tên `signal` — đó là lý do khai báo trông "lộn trong ra ngoài". `typedef` đặt tên cho kiểu *"con trỏ tới hàm nhận int trả void"*, nên khai báo quay về dạng quen thuộc `KiểuTrảVề tên(tham số)`.
 
 Cả hai là **cùng một kiểu** (gcc so sánh hai con trỏ hàm khai báo theo hai cách: bằng nhau). Ở phỏng vấn, viết được bản `typedef` và giải thích vì sao nó tương đương là đủ; không cần thuộc bản thô.
 
@@ -196,17 +299,17 @@ Cả hai là **cùng một kiểu** (gcc so sánh hai con trỏ hàm khai báo t
 C truyền **theo giá trị**: hàm nhận **bản sao** của mọi tham số, kể cả con trỏ. Muốn hàm đổi *con trỏ* của caller thì phải đưa **địa chỉ của con trỏ đó**.
 
 ```c
-void alloc_bad(char *p, size_t n)   { p   = malloc(n); }   /* sua BAN SAO */
-void alloc_ok (char **pp, size_t n) { *pp = malloc(n); }   /* sua con tro CUA CALLER */
+void alloc_bad(char *p, size_t n)   { p   = malloc(n); }   /* sửa BẢN SAO */
+void alloc_ok (char **pp, size_t n) { *pp = malloc(n); }   /* sửa con trỏ CỦA CALLER */
 
 char *buf = NULL;
-alloc_bad(buf, 16);     /* buf van NULL, 16 byte bi mat */
-alloc_ok(&buf, 16);     /* buf tro toi vung moi */
+alloc_bad(buf, 16);     /* buf vẫn NULL, 16 byte bị mất */
+alloc_ok(&buf, 16);     /* buf trỏ tới vùng mới */
 ```
 
 ```
-alloc_bad:  buf [NULL]        p [0x5000] ---> (16 byte, khong ai giu)  => LEAK
-alloc_ok:   buf [0x6000] <--- pp [&buf]       *pp = malloc(...) ghi THANG vao buf
+alloc_bad:  buf [NULL]        p [0x5000] ---> (16 byte, không ai giữ)  => LEAK
+alloc_ok:   buf [0x6000] <--- pp [&buf]       *pp = malloc(...) ghi THẲNG vào buf
 ```
 
 Output thật (gcc đã cảnh báo `parameter 'p' set but not used` ở `alloc_bad`; valgrind xác nhận leak):
@@ -227,11 +330,11 @@ typedef struct Node { int val; struct Node *next; } Node;
 void push_front(Node **head, int v) {
     Node *n = malloc(sizeof *n);
     n->val = v; n->next = *head;
-    *head = n;                                 /* sua head CUA CALLER */
+    *head = n;                                 /* sửa head CỦA CALLER */
 }
 
 void remove_val(Node **head, int v) {
-    Node **pp = head;                          /* pp tro vao O CHUA con tro (head, roi cac ->next) */
+    Node **pp = head;                          /* pp trỏ vào Ô CHỨA con trỏ (head, rồi các ->next) */
     while (*pp && (*pp)->val != v)
         pp = &(*pp)->next;
     if (*pp) { Node *dead = *pp; *pp = dead->next; free(dead); }
@@ -244,17 +347,19 @@ head          n1               n2
 | o--+----> | 4  | o--+----> | 3  | o--+----> ...
 +----+      +----+----+      +----+----+
   ^                  ^
-  pp (lan 1)         pp (lan 2) = &n1->next
+  pp (lần 1)         pp (lần 2) = &n1->next
 ```
 
 `pp` không trỏ vào **node**, mà trỏ vào **ô đang chứa mũi tên tới node**: lúc đầu là `head`, sau đó là `->next` của node trước. Xoá node chỉ là ghi đè ô đó, nên node đầu và node giữa đi chung **một** đường code.
+
+> **Vì sao có ngoặc ở `(*pp)->val` và không cần ở `&(*pp)->next`:** `->` (cũng như `[]`, `()`, `++` hậu tố) có độ ưu tiên **cao hơn** `*` và `&` đứng trước. Bỏ ngoặc thì `*pp->val` bị hiểu là `*(pp->val)` — lấy `->val` trên `pp` (kiểu `Node **`, không phải con trỏ tới struct) — và gcc báo: `error: '*pp' is a pointer; did you mean to use '->'?`. Còn `&(*pp)->next` được hiểu là `&((*pp)->next)` — đúng ý *"địa chỉ của ô `next`"* — nên không cần thêm ngoặc.
 
 Output thật (valgrind: `All heap blocks were freed`):
 
 ```
 4 3 2 1
-3 2 1        <- xoa 4 (node dau), khong can if rieng
-3 1          <- xoa 2 (node giua)
+3 2 1        <- xoá 4 (node đầu), không cần if riêng
+3 1          <- xoá 2 (node giữa)
 ```
 
 ### 4.3 Mảng con trỏ — `argv`
@@ -265,7 +370,7 @@ argv ---> +-------+
           +-------+
           |   o---+---> "-v\0"
           +-------+
-          | NULL  |     <- argv[argc] luon la NULL (chuan bao dam)
+          | NULL  |     <- argv[argc] luôn là NULL (chuẩn bảo đảm)
           +-------+
 ```
 
@@ -284,28 +389,38 @@ int a[3][4] = { {0,1,2,3}, {10,11,12,13}, {20,21,22,23} };
 ```
           a[0]                a[1]                    a[2]
 +----+----+----+----+-----+-----+-----+-----+-----+-----+-----+-----+
-|  0 |  1 |  2 |  3 | 10  | 11  | 12  | 13  | 20  | 21  | 22  | 23  |   48 byte LIEN KHOI
+|  0 |  1 |  2 |  3 | 10  | 11  | 12  | 13  | 20  | 21  | 22  | 23  |   48 byte LIỀN KHỐI
 +----+----+----+----+-----+-----+-----+-----+-----+-----+-----+-----+
-dia chi cua a[i][j] = dia chi a + (i * C + j) * sizeof(int)
+địa chỉ của a[i][j] = địa chỉ a + (i * C + j) * sizeof(int)
 ```
 
 Output thật:
 
 ```
 sizeof(a)=48 sizeof(a[0])=16
-&a[1][0] - &a[0][0] = 4 phan tu (lien khoi, row-major)
+&a[1][0] - &a[0][0] = 4 phần tử (liền khối, row-major)
 a[1][3] = 13 = *(*(a+1)+3) = 13
 ```
 
-- `a` decay thành con trỏ tới **hàng đầu**, kiểu **`int (*)[4]`**, chứ không phải `int **`.
-- Để tính địa chỉ `a[i][j]`, compiler **phải biết `C`** (số cột). Vì thế khi truyền vào hàm, **chỉ chiều đầu được bỏ trống**.
+- `a` là mảng của **3 phần tử**, mỗi phần tử là một **hàng** `int[4]`. Nên `a` decay thành con trỏ tới **hàng đầu**, kiểu **`int (*)[4]`**, chứ không phải `int **`.
+- `*(*(a+1)+3)` tính ra `a[1][3]` theo từng bước:
+
+| Bước | Biểu thức | Kiểu | Ý nghĩa |
+|---|---|---|---|
+| 1 | `a` | `int (*)[4]` | trỏ tới hàng 0 |
+| 2 | `a + 1` | `int (*)[4]` | nhảy **một hàng** = 16 byte ⟹ trỏ tới hàng 1 |
+| 3 | `*(a + 1)` | `int[4]` → decay thành `int *` | chính là hàng 1; decay thành con trỏ tới `a[1][0]` |
+| 4 | `*(a + 1) + 3` | `int *` | nhảy **3 phần tử** = 12 byte ⟹ trỏ tới `a[1][3]` |
+| 5 | `*(*(a + 1) + 3)` | `int` | giá trị **13** |
+
+- Ở bước 2, compiler cần biết **một hàng rộng bao nhiêu** — tức `C` (số cột). Nó **không** cần biết có bao nhiêu hàng. Vì thế khi truyền mảng 2 chiều vào hàm, **chỉ chiều đầu được bỏ trống**.
 
 **Ba chữ ký hợp lệ cho hàm nhận `int a[3][4]`:**
 
 ```c
-void f(int rows, int m[][4]);         /* so cot co dinh luc compile */
-void f(int rows, int (*m)[4]);        /* y het dong tren — viet ro rang */
-void f(int rows, int cols, int m[rows][cols]);   /* C99 VLA: so cot luc chay */
+void f(int rows, int m[][4]);         /* số cột cố định lúc compile */
+void f(int rows, int (*m)[4]);        /* y hệt dòng trên — viết rõ ràng */
+void f(int rows, int cols, int m[rows][cols]);   /* C99 VLA: số cột lúc chạy */
 ```
 
 ### 5.2 ⚠️ Lỗi kinh điển: truyền `int a[3][4]` vào hàm nhận `int **`
@@ -321,7 +436,7 @@ note: expected 'int **' but argument is of type 'int (*)[4]'
 Segmentation fault (core dumped)          <- exit 139
 ```
 
-**Vì sao crash:** `m[1]` với `m` kiểu `int **` nghĩa là *"đọc ô thứ 1 trong một mảng các **con trỏ**, lấy giá trị đó làm địa chỉ"*. Nhưng `a` không chứa con trỏ nào, chỉ chứa số. Các số nguyên (`2`, `3`…) bị đọc như **địa chỉ** ⟹ dereference rác. Đây là chỗ gcc chỉ **cảnh báo** (C cho phép đổi kiểu con trỏ ngầm), nên **luôn build với `-Wall -Werror`** hoặc ít nhất đọc warning.
+**Vì sao crash:** với `m` kiểu `int **`, `m[1]` = `*(m + 1)` nghĩa là *"bỏ qua 1 con trỏ (8 byte), đọc 8 byte tiếp theo, coi đó là một **địa chỉ**"*. Nhưng vùng nhớ của `a` chỉ chứa **số `int` 4 byte**, không có con trỏ nào. 8 byte ở offset 8 chính là `a[0][2]` (= 2) và `a[0][3]` (= 3) ghép lại ⟹ một "địa chỉ" rác `0x0000000300000002`. `m[1][3]` dereference địa chỉ đó ⟹ segfault. Đây là chỗ gcc chỉ **cảnh báo** (C cho phép đổi kiểu con trỏ ngầm), nên **luôn build với `-Wall -Werror`** hoặc ít nhất đọc warning.
 
 ### 5.3 Cấp phát động — hai cách
 
@@ -329,11 +444,11 @@ Segmentation fault (core dumped)          <- exit 139
 
 ```c
 int **alloc_rows(int R, int C) {
-    int **m = malloc(R * sizeof *m);           /* mang R con tro */
+    int **m = malloc(R * sizeof *m);           /* mảng R con trỏ */
     if (!m) return NULL;
     for (int i = 0; i < R; i++) {
-        m[i] = malloc(C * sizeof **m);         /* moi hang mot vung rieng */
-        if (!m[i]) {                           /* that bai giua chung: don phan da cap */
+        m[i] = malloc(C * sizeof **m);         /* mỗi hàng một vùng riêng */
+        if (!m[i]) {                           /* thất bại giữa chừng: dọn phần đã cấp */
             while (i--) free(m[i]);
             free(m);
             return NULL;
@@ -342,8 +457,8 @@ int **alloc_rows(int R, int C) {
     return m;
 }
 void free_rows(int **m, int R) {
-    for (int i = 0; i < R; i++) free(m[i]);    /* hang truoc... */
-    free(m);                                    /* ...mang con tro sau */
+    for (int i = 0; i < R; i++) free(m[i]);    /* hàng trước... */
+    free(m);                                    /* ...mảng con trỏ sau */
 }
 ```
 
@@ -352,14 +467,14 @@ void free_rows(int **m, int R) {
 ```c
 int (*m)[C] = malloc(R * sizeof *m);    /* sizeof *m = C * sizeof(int) */
 m[2][3] = 23;
-free(m);                                /* MOT lan free */
+free(m);                                /* MỘT lần free */
 ```
 
 Output thật (cùng `R=3, C=4`):
 
 ```
-cach 1: m1[2][3]=23, hang 1 cach hang 0: 32 byte     <- KHONG lien khoi (16 byte du lieu + metadata cua malloc)
-cach 2: m2[2][3]=23, hang 1 cach hang 0: 16 byte, sizeof *m2=16
+cách 1: m1[2][3]=23, hàng 1 cách hàng 0: 32 byte     <- KHÔNG liền khối (16 byte dữ liệu + metadata của malloc)
+cách 2: m2[2][3]=23, hàng 1 cách hàng 0: 16 byte, sizeof *m2=16
 All heap blocks were freed -- no leaks are possible
 ```
 
@@ -381,14 +496,14 @@ All heap blocks were freed -- no leaks are possible
 ### 6.1 `char s[]` vs `char *s`
 
 ```c
-char  s1[] = "abc";     /* MANG 4 byte (gom '\0') tren stack, COPY tu literal */
-char *s2   = "abc";     /* CON TRO toi literal nam o vung CHI DOC (.rodata) */
+char  s1[] = "abc";     /* MẢNG 4 byte (gồm '\0') trên stack, COPY từ literal */
+char *s2   = "abc";     /* CON TRỎ tới literal nằm ở vùng CHỈ ĐỌC (.rodata) */
 ```
 
 ```
 stack:   s1 [a][b][c][\0]          s2 [0x4010]--+
                                                 |
-.rodata:                       0x4010 [a][b][c][\0]   <- chi doc
+.rodata:                       0x4010 [a][b][c][\0]   <- chỉ đọc
 ```
 
 Output thật:
@@ -396,7 +511,7 @@ Output thật:
 ```
 sizeof(s1)=4 sizeof(s2)=8
 s1 = Xbc                                    <- s1[0] = 'X' OK
-Segmentation fault (core dumped)            <- s2[0] = 'X' ghi vao vung chi doc, exit 139
+Segmentation fault (core dumped)            <- s2[0] = 'X' ghi vào vùng chỉ đọc, exit 139
 ```
 
 > Kiểu đúng của con trỏ tới literal là **`const char *`**. Viết `const` thì `s2[0] = 'X'` thành **lỗi compile** thay vì crash lúc chạy. (Trong C++ literal có kiểu `const char[4]` và chuẩn C++11 **cấm** gán vào `char *`, nhưng g++ 11 vẫn chỉ cảnh báo: `ISO C++ forbids converting a string constant to 'char*' [-Wwrite-strings]`.)
@@ -404,8 +519,8 @@ Segmentation fault (core dumped)            <- s2[0] = 'X' ghi vao vung chi doc,
 ### 6.2 Mảng con trỏ chuỗi vs mảng 2 chiều `char`
 
 ```c
-char *names[]   = {"go", "rust", "c"};   /* 3 con tro, chuoi nam o .rodata */
-char  grid[][10] = {"go", "rust", "c"};  /* 3 x 10 byte lien khoi, sua duoc */
+char *names[]   = {"go", "rust", "c"};   /* 3 con trỏ, chuỗi nằm ở .rodata */
+char  grid[][10] = {"go", "rust", "c"};  /* 3 x 10 byte liền khối, sửa được */
 ```
 
 ```
@@ -432,7 +547,7 @@ sizeof(names)=24 sizeof(grid)=30
 char *fmt_id(int id) {
     char buf[16];
     snprintf(buf, sizeof buf, "ID-%04d", id);
-    return buf;                 /* buf chet khi ham return */
+    return buf;                 /* buf chết khi hàm return */
 }
 ```
 
@@ -440,7 +555,7 @@ char *fmt_id(int id) {
 warning: function returns address of local variable [-Wreturn-local-addr]
 ```
 
-Trên máy này, **gcc 11.4 cố ý trả về `NULL`** thay cho địa chỉ đó (đã in thử: `con tro tra ve = (nil)` ở cả `-O0` lẫn `-O2`), nên `printf("%s")` segfault ngay. Compiler khác, hoặc khi gcc không chứng minh được, sẽ trả về địa chỉ stack thật: đọc ra **rác**, hoặc tệ hơn là *"chạy đúng"* lúc test (xem [CPP-060](../14-prep/mock-interview/bank/cpp.md)). Đây là **UB** ở mọi trường hợp.
+Trên máy này, **gcc 11.4 cố ý trả về `NULL`** thay cho địa chỉ đó (đã in thử: `con trỏ trả về = (nil)` ở cả `-O0` lẫn `-O2`), nên `printf("%s")` segfault ngay. Compiler khác, hoặc khi gcc không chứng minh được, sẽ trả về địa chỉ stack thật: đọc ra **rác**, hoặc tệ hơn là *"chạy đúng"* lúc test (xem [CPP-060](../14-prep/mock-interview/bank/cpp.md)). Đây là **UB** ở mọi trường hợp.
 
 **Ba cách sửa, ba đánh đổi:**
 
@@ -465,7 +580,7 @@ Trên máy này, **gcc 11.4 cố ý trả về `NULL`** thay cho địa chỉ đ
 ```c
 static int op_add(int a, int b) { return a + b; }
 static int op_sub(int a, int b) { return a - b; }
-static int (*ops[])(int, int) = { op_add, op_sub };   /* mang con tro ham */
+static int (*ops[])(int, int) = { op_add, op_sub };   /* mảng con trỏ hàm */
 
 ops[1](5, 3);    /* = 2 */
 ```
@@ -482,18 +597,20 @@ Mảng / struct con trỏ hàm là cách C làm **đa hình**: `file_operations`
 int cmp_bad(const void *a, const void *b) { return *(const int *)a - *(const int *)b; }
 int cmp_ok (const void *a, const void *b) {
     int x = *(const int *)a, y = *(const int *)b;
-    return (x > y) - (x < y);                 /* -1, 0, 1 — khong tran so */
+    return (x > y) - (x < y);                 /* -1, 0, 1 — không tràn số */
 }
 ```
 
 Sắp `{INT_MIN, 1, INT_MAX, 0, -5}`, output thật:
 
 ```
-cmp_bad: 1 2147483647 -2147483648 -5 0         <- SAI thu tu
+cmp_bad: 1 2147483647 -2147483648 -5 0         <- SAI thứ tự
 cmp_ok : -2147483648 -5 0 1 2147483647
 ```
 
-`a - b` **tràn số** khi hai giá trị trái dấu và xa nhau (`1 - INT_MIN`). Tràn số có dấu là **UB**; thực tế nó quấn vòng thành số âm, comparator nói ngược, và `qsort` cho kết quả sai mà không báo gì.
+`(x > y) - (x < y)`: mỗi phép so sánh cho ra `1` (đúng) hoặc `0` (sai), nên hiệu của chúng chỉ có thể là `1`, `0` hoặc `-1` — không bao giờ tràn. Output thật với `x = 3, y = 7`: `(x>y)=0 (x<y)=1 -> -1`.
+
+Còn `a - b` **tràn số** khi hai giá trị trái dấu và xa nhau (`1 - INT_MIN`). Tràn số có dấu là **UB**; thực tế nó quấn vòng thành số âm, comparator nói ngược, và `qsort` cho kết quả sai mà không báo gì.
 
 ### 7.3 `void *` — con trỏ "không kiểu"
 

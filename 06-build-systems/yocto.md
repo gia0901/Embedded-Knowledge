@@ -76,14 +76,14 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=0835ade698e0bcf8506ecda2f7b4f302"
 SRC_URI  = "git://git.example.com/sensord.git;branch=main;protocol=https \
             file://0001-fix-i2c-timeout.patch \
             file://sensord.service"
-SRCREV   = "a1b2c3d4e5f6"          # ⭐ ghim commit — KHONG dung ${AUTOREV} cho san pham
+SRCREV   = "a1b2c3d4e5f6"          # ⭐ ghim commit — KHÔNG dùng ${AUTOREV} cho sản phẩm
 
 S = "${WORKDIR}/git"
 
-DEPENDS  = "libgpiod"              # can luc BUILD (header + lib de compile)
-RDEPENDS:${PN} = "i2c-tools"       # can luc CHAY  (phai co trong image)
+DEPENDS  = "libgpiod"              # cần lúc BUILD (header + lib để compile)
+RDEPENDS:${PN} = "i2c-tools"       # cần lúc CHẠY  (phải có trong image)
 
-inherit cmake systemd              # muon hanh vi build chuan, khong viet tay
+inherit cmake systemd              # mượn hành vi build chuẩn, không viết tay
 SYSTEMD_SERVICE:${PN} = "sensord.service"
 ```
 
@@ -105,10 +105,10 @@ SYSTEMD_SERVICE:${PN} = "sensord.service"
 
 ```
 meta-myproduct/
-├── conf/layer.conf              # BBFILE_PRIORITY, pattern nhan dien
-├── recipes-apps/sensord/...     # recipe cua BAN
+├── conf/layer.conf              # BBFILE_PRIORITY, pattern nhận diện
+├── recipes-apps/sensord/...     # recipe của BẠN
 ├── recipes-kernel/linux/
-│   ├── linux-ti_%.bbappend      # mo rong recipe kernel CUA VENDOR
+│   ├── linux-ti_%.bbappend      # mở rộng recipe kernel CỦA VENDOR
 │   └── linux-ti/
 │       ├── 0001-add-my-driver.patch
 │       └── my-feature.cfg       # config fragment
@@ -123,12 +123,12 @@ Bật trong `conf/bblayers.conf`. **Priority** (`BBFILE_PRIORITY` trong `layer.c
 
 ```bitbake
 # meta-myproduct/recipes-kernel/linux/linux-ti_%.bbappend
-FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"     # de tim thay file cua minh
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"     # để tìm thấy file của mình
 SRC_URI += "file://0001-add-my-driver.patch \
             file://my-feature.cfg"
 ```
 ```
-# my-feature.cfg  --  config fragment, KHONG phai defconfig day du
+# my-feature.cfg  --  config fragment, KHÔNG phải defconfig đầy đủ
 CONFIG_GPIO_SYSFS=y
 CONFIG_I2C_CHARDEV=y
 ```
@@ -146,8 +146,8 @@ Hành vi build dùng chung. `inherit cmake` ⇒ recipe không cần viết `do_c
 ### 5.1 `+=` khác `:append` thế nào — **không phải chuyện thẩm mỹ**
 
 ```bitbake
-FOO += "b"          # gan NGAY luc parse dong nay
-FOO:append = " b"   # HOAN LAI, gan sau khi parse xong toan bo
+FOO += "b"          # gán NGAY lúc parse dòng này
+FOO:append = " b"   # HOÃN LẠI, gán sau khi parse xong toàn bộ
 ```
 
 Khác biệt lộ ra khi nhiều file cùng đụng một biến:
@@ -156,9 +156,9 @@ Khác biệt lộ ra khi nhiều file cùng đụng một biến:
 # recipe goc
 FOO = "a"
 
-# bbappend cua ban
-FOO += "b"           # neu bbappend parse TRUOC dong `FOO = "a"` -> BI GHI DE, mat "b"
-FOO:append = " b"    # ✅ luon an toan: ap sau cung
+# bbappend của bạn
+FOO += "b"           # nếu bbappend parse TRƯỚC dòng `FOO = "a"` -> BỊ GHI ĐÈ, mất "b"
+FOO:append = " b"    # ✅ luôn an toàn: áp sau cùng
 ```
 
 > **Luật thực dụng: trong `.bbappend` hầu như luôn dùng `:append`/`:prepend`/`:remove`, không dùng `+=`.**
@@ -169,9 +169,9 @@ FOO:append = " b"    # ✅ luon an toan: ap sau cung
 ### 5.2 Override theo điều kiện
 
 ```bitbake
-IMAGE_INSTALL:append                  = " sensord"       # moi machine
-IMAGE_INSTALL:append:beaglebone-yocto = " i2c-tools"     # chi machine nay
-RDEPENDS:${PN}:remove                 = "some-heavy-lib" # go khoi danh sach
+IMAGE_INSTALL:append                  = " sensord"       # mọi machine
+IMAGE_INSTALL:append:beaglebone-yocto = " i2c-tools"     # chỉ machine này
+RDEPENDS:${PN}:remove                 = "some-heavy-lib" # gỡ khỏi danh sách
 ```
 
 ### 5.3 ⚠️ Cú pháp cũ dùng `_` — sẽ gặp khi tra Google
@@ -252,14 +252,14 @@ Yocto **tự sinh phần lớn `RDEPENDS`** nhờ **shlibs scan**: sau `do_packa
 | Plugin nạp động | Như `dlopen` |
 
 ```bitbake
-RDEPENDS:${PN} += "libfoo curl"     # phai khai TAY
+RDEPENDS:${PN} += "libfoo curl"     # phải khai TAY
 ```
 
 **Kiểm chứng:**
 ```bash
-readelf -d myapp | grep NEEDED                    # linker ghi gi vao ELF
-oe-pkgdata-util list-pkg-files -p sensord         # goi nay chua file gi
-oe-pkgdata-util find-path /usr/lib/libfoo.so.1    # file nay thuoc goi nao
+readelf -d myapp | grep NEEDED                    # linker ghi gì vào ELF
+oe-pkgdata-util list-pkg-files -p sensord         # gói này chứa file gì
+oe-pkgdata-util find-path /usr/lib/libfoo.so.1    # file này thuộc gói nào
 ```
 
 🧪 Nhìn thấy nó hỏng một lần: [BSP-037](../14-prep/mock-interview/bank/bsp.md).
@@ -306,11 +306,11 @@ meta-mybsp/
 Vòng lặp cũ *(chậm, dễ sai)*: sửa recipe → `cleansstate` → `bitbake` → đợi → lặp.
 
 ```bash
-devtool modify sensord        # keo source ra workspace/, thanh git repo that
-#   ... sua code binh thuong, commit tung buoc ...
-devtool build sensord         # build lai nhanh, chi phan doi
-devtool deploy-target sensord root@192.168.1.10   # ⭐ day thang len board
-devtool finish sensord ../meta-myproduct          # goi thanh patch + bbappend
+devtool modify sensord        # kéo source ra workspace/, thành git repo thật
+#   ... sửa code bình thường, commit từng bước ...
+devtool build sensord         # build lại nhanh, chỉ phần đổi
+devtool deploy-target sensord root@192.168.1.10   # ⭐ đẩy thẳng lên board
+devtool finish sensord ../meta-myproduct          # gói thành patch + bbappend
 ```
 
 ⭐ `devtool deploy-target` đổi hẳn nhịp làm việc: sửa code → thấy trên board trong **vài giây**, không cần dựng lại image.
@@ -368,17 +368,17 @@ bitbake core-image-minimal -c populate_sdk_ext    # eSDK: kem devtool
 ## 13. 🔧 Lệnh gỡ rối — bốn lệnh cứu phần lớn tình huống
 
 ```bash
-# 1. Bien nay THUC SU mang gia tri gi, va AI da gan no?   <- lenh huu ich nhat
+# 1. Biến này THỰC SỰ mang giá trị gì, và AI đã gán nó?   <- lệnh hữu ích nhất
 bitbake -e core-image-minimal | grep -B4 "^IMAGE_INSTALL="
 
-# 2. Vi sao thay doi cua toi khong lam gi ca? -> so hash truoc/sau
+# 2. Vì sao thay đổi của tôi không làm gì cả? -> so hash trước/sau
 bitbake -S printdiff core-image-minimal
 
-# 3. bbappend cua toi co duoc ap khong?
+# 3. bbappend của tôi có được áp không?
 bitbake-layers show-appends
-bitbake-layers show-recipes linux-ti      # layer nao dang cung cap, version nao thang
+bitbake-layers show-recipes linux-ti      # layer nào đang cung cấp, version nào thắng
 
-# 4. File nay thuoc goi nao / goi nay chua gi?
+# 4. File này thuộc gói nào / gói này chứa gì?
 oe-pkgdata-util find-path /usr/lib/libfoo.so.1
 oe-pkgdata-util list-pkg-files -p sensord
 ```

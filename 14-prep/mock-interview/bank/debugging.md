@@ -582,9 +582,9 @@ TSan dựng quan hệ **happens-before** giữa các truy cập: nó ghi nhận 
 
 ⚠️ **Ô hay bị trả lời sai nhất là TSan × vượt biên.** Nhiều người nghĩ "sanitizer nào cũng bắt lỗi bộ nhớ". Đo thật (gcc 11.4.0):
 ```
-TSan / vuot bien      : sum=15, exit=0                 <- KHONG bao gi
-TSan / use-after-free : WARNING: heap-use-after-free   <- bat duoc
-ASan / vuot bien      : ERROR: heap-buffer-overflow    <- bat duoc
+TSan / vuot bien      : sum=15, exit=0                 <- KHÔNG bao giờ
+TSan / use-after-free : WARNING: heap-use-after-free   <- bắt được
+ASan / vuot bien      : ERROR: heap-buffer-overflow    <- bắt được
 ```
 TSan **có** allocator riêng nên theo dõi được vòng đời heap ⇒ bắt UAF; nhưng nó **không** đặt redzone quanh mảng ⇒ mù với vượt biên.
 
@@ -806,7 +806,7 @@ $ echo $?
 **② `strace` — nguyên tắc: NHÌN SYSCALL CUỐI CÙNG TRƯỚC KHI CHẾT.**
 ```
 $ strace ./scannerd 2>&1 | wc -l
-41                                     <- chi 41 dong, dung so
+41                                     <- chỉ 41 dòng, đúng số
 $ strace ./scannerd 2>&1 | tail -6
 brk(0x5a2ffeefa000)                     = 0x5a2ffeefa000
 openat(AT_FDCWD, "/etc/scannerd/scannerd.conf", O_RDONLY) = -1 ENOENT (No such file or directory)
@@ -819,10 +819,10 @@ exit_group(1)                           = ?
 **Lọc hẹp khi output dài** (chương trình thật ra hàng nghìn dòng):
 ```
 $ strace -e trace=openat,access ./scannerd
-access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)    <- BINH THUONG
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)    <- BÌNH THƯỜNG
 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
-openat(AT_FDCWD, "/etc/scannerd/scannerd.conf", O_RDONLY) = -1 ENOENT              <- THU PHAM
+openat(AT_FDCWD, "/etc/scannerd/scannerd.conf", O_RDONLY) = -1 ENOENT              <- THỦ PHẠM
 +++ exited with 1 +++
 ```
 
@@ -843,8 +843,8 @@ Ba dấu hiệu phân biệt `ENOENT` thật:
 **Ba lệnh đáng thuộc cho ca này:**
 ```
 strace ./prog 2>&1 | tail -20            # 90% ca giải quyết ở đây
-strace -e trace=openat,access ./prog     # loc theo nhom syscall
-strace -f -o /tmp/t.log ./prog           # -f: theo ca process con; ghi ra file
+strace -e trace=openat,access ./prog     # lọc theo nhóm syscall
+strace -f -o /tmp/t.log ./prog           # -f: theo cả process con; ghi ra file
 ```
 
 **Chuyển sang việc thật:** cùng cách này áp cho `EACCES` (sai quyền), `ECONNREFUSED` (service chưa lên), `ENODEV` (thiếu device node) — ba lỗi khởi động hay gặp nhất trên thiết bị.
@@ -889,7 +889,7 @@ gwd pid=4936
 $ ls /proc/4936/fd | wc -l
 99                     <- t = 1s
 $ sleep 2; ls /proc/4936/fd | wc -l
-293                    <- t = 3s   => TANG DON DIEU, khong he tra ve
+293                    <- t = 3s   => TĂNG ĐƠN ĐIỆU, không hề trả về
 ```
 
 **② Rò loại gì — đây là chỗ `/proc/<pid>/fd` hơn hẳn con số đếm:**
@@ -932,7 +932,7 @@ Một server 5.000 kết nối **đúng ra phải** có ~5.000 fd. Con số tuy�
 **Hai file cùng họ đáng nhớ:**
 ```
 /proc/<pid>/status     # VmRSS (rò RAM), Threads, State
-/proc/<pid>/wchan      # process dang ket o syscall nao (state D)
+/proc/<pid>/wchan      # process đang kẹt ở syscall nào (state D)
 ```
 
 **Chốt:** *"Rò fd chứng minh bằng **xu hướng**, khoanh vùng bằng **đích của symlink**. `/proc/<pid>/fd` cho cả hai, trên mọi thiết bị, không cần cài gì."*
@@ -942,7 +942,7 @@ Một server 5.000 kết nối **đúng ra phải** có ~5.000 fd. Con số tuy�
 **🧪 NGỒI MÁY LÀM. Chương trình chạy ra kết quả ĐÚNG, không crash, không warning. Chứng minh nó vẫn hỏng — và đọc được report của ASan.**
 
 ```c
-// parse.c  —  gcc -Wall -Wextra -g -o parse parse.c   (KHONG warning nao)
+// parse.c  —  gcc -Wall -Wextra -g -o parse parse.c   (KHÔNG warning nào)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -969,9 +969,9 @@ int main(void) {
 
 **① Build thường — không có một dấu hiệu nào:**
 ```
-$ gcc -Wall -Wextra -g -o parse parse.c        # KHONG warning
+$ gcc -Wall -Wextra -g -o parse parse.c        # KHÔNG warning
 $ ./parse
-ma vach: 8935001234567                          # dung ket qua
+ma vach: 8935001234567                          # đúng kết quả
 $ echo $?
 0                                               # thoat sach
 ```
@@ -987,14 +987,14 @@ $ ./parse_asan
 ```
 ==5029==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x50200000001d ...
 WRITE of size 1 at 0x50200000001d thread T0                                    <-- (1) GHI 1 byte
-    #0 ... in copy_barcode /tmp/lab/parse.c:10                                 <-- (2) TAI DAY
+    #0 ... in copy_barcode /tmp/lab/parse.c:10                                 <-- (2) TẠI ĐÂY
     #1 ... in main /tmp/lab/parse.c:15
 
 0x50200000001d is located 0 bytes to the right of 13-byte region [0x502000000010,0x50200000001d)
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 <-- (3) NGAY SAT SAU vung 13 byte
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 <-- (3) NGAY SÁT SAU vùng 13 byte
 allocated by thread T0 here:
     #0 ... in __interceptor_malloc
-    #1 ... in copy_barcode /tmp/lab/parse.c:8                                  <-- (4) VUNG DO CAP O DAY
+    #1 ... in copy_barcode /tmp/lab/parse.c:8                                  <-- (4) VÙNG ĐÓ CẤP Ở ĐÂY
 
 SUMMARY: AddressSanitizer: heap-buffer-overflow /tmp/lab/parse.c:10 in copy_barcode
 ```
@@ -1033,7 +1033,7 @@ Bật trong **build debug + CI**, không bật ở bản release (ASan làm ch�
 **🧪 NGỒI MÁY LÀM. Chương trình segfault. Shell báo `(core dumped)` — nhưng KHÔNG có file core nào. Tìm cho ra thủ phạm.**
 
 ```c
-// crashd.c  —  gcc -Wall -Wextra -g -O0 -o crashd crashd.c   (KHONG warning)
+// crashd.c  —  gcc -Wall -Wextra -g -O0 -o crashd crashd.c   (KHÔNG warning)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1058,9 +1058,9 @@ $ ulimit -c unlimited
 $ ./crashd
 /bin/bash: line 27:  6067 Segmentation fault      (core dumped) ./crashd
 $ ls -la core*
-KHONG co core trong thu muc hien tai            <-- shell noi "core dumped" ma khong co file
+KHONG co core trong thu muc hien tai            <-- shell nói "core dumped" mà không có file
 $ ulimit -c
-unlimited                                        <-- gioi han DA mo
+unlimited                                        <-- giới hạn ĐÃ mở
 ```
 
 Vì sao? **`ulimit -c unlimited` chỉ là điều kiện CẦN.** Nơi core đi tới do kernel quyết định:
@@ -1071,13 +1071,13 @@ $ cat /proc/sys/kernel/core_pattern
 Dấu `|` ở đầu = **không ghi ra file, mà bơm vào một chương trình**. Ở đây là `apport` (Ubuntu), và apport **bỏ qua binary tự build** (nó chỉ xử lý gói của distro):
 ```
 $ ls /var/crash/*crashd*
-apport KHONG luu binary tu build                 <-- core bi vut di hoan toan
+apport KHONG luu binary tu build                 <-- core bị vứt đi hoàn toàn
 ```
 
 **Cách sửa (cần root):**
 ```
 echo 'core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern   # ghi ra file trong cwd
-# hoac dung systemd-coredump:  coredumpctl list ; coredumpctl gdb <pid>
+# hoặc dùng systemd-coredump:  coredumpctl list ; coredumpctl gdb <pid>
 ```
 ⚠️ Trên **thiết bị embedded** thì ngược lại — thường *chưa* có ai đặt `core_pattern`, nên phải chủ động đặt trong init script, kèm giới hạn dung lượng (core của process 200 MB là file 200 MB trên flash).
 
@@ -1105,9 +1105,9 @@ __strcpy_evex () at ../sysdeps/x86_64/multiarch/strcpy-evex.S:614
 
 **Lệnh đi tiếp khi đã ở frame đúng:**
 ```
-(gdb) frame 1        # nhay toi frame cua minh
-(gdb) list           # xem code quanh do
-(gdb) print c        # => $1 = (struct Cfg *) 0x0   <-- bang chung
+(gdb) frame 1        # nhảy tới frame của mình
+(gdb) list           # xem code quanh đó
+(gdb) print c        # => $1 = (struct Cfg *) 0x0   <-- bằng chứng
 (gdb) info locals
 ```
 
@@ -1178,9 +1178,9 @@ $ cat /proc/sys/kernel/yama/ptrace_scope
 ```
 `ptrace_scope = 1` (mặc định trên Ubuntu và nhiều distro desktop) = **chỉ được ptrace tiến trình con của chính mình**. Ba cách gỡ:
 ```
-sudo gdb -p <pid>                                        # nhanh nhat
-echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope      # tam thoi, ca may
-gdb ./hangd  ->  run                                      # chay TU TRONG gdb, khong can quyen
+sudo gdb -p <pid>                                        # nhanh nhất
+echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope      # tạm thời, cả máy
+gdb ./hangd  ->  run                                      # chạy TỪ TRONG gdb, không cần quyền
 ```
 
 **④ Vì sao `/proc` thắng gdb ở ca này — bài học chính:**
@@ -1197,8 +1197,8 @@ gdb ./hangd  ->  run                                      # chay TU TRONG gdb, k
 **Bộ ba đáng thuộc cho ca treo:**
 ```
 cat /proc/<pid>/status | grep State     # ngu hay quay CPU
-cat /proc/<pid>/wchan                   # ket o ham kernel nao
-ls -l /proc/<pid>/fd                    # dang cam nhung gi (va thieu gi)
+cat /proc/<pid>/wchan                   # kẹt ở hàm kernel nào
+ls -l /proc/<pid>/fd                    # đang cầm những gì (và thiếu gì)
 ```
 
 **Chốt:** *"Treo thì hỏi `/proc` trước, không hỏi debugger. `State` cho biết loại bệnh, `wchan` cho biết chỗ kẹt — miễn phí, không quyền, không làm process dừng."*
@@ -1230,7 +1230,7 @@ int main() {
 ```
 $ for i in 1 2 3 4 5; do ./race; done
 counter = 385630 (dung ra phai 400000)
-counter = 400000 (dung ra phai 400000)      <-- DUNG! va no chung minh dung SO KHONG
+counter = 400000 (dung ra phai 400000)      <-- ĐÚNG! và nó chứng minh đúng SỐ KHÔNG
 counter = 322237 (dung ra phai 400000)
 counter = 375613 (dung ra phai 400000)
 counter = 172556 (dung ra phai 400000)
@@ -1266,8 +1266,8 @@ WARNING: ThreadSanitizer: data race (pid=6292)
 
 **Cách sửa, theo thứ tự ưu tiên:**
 ```cpp
-static std::atomic<long> counter{0};   // ✅ dung nhat cho bo dem: khong khoa, khong race
-// hoac: std::mutex + std::lock_guard   khi can bao ve NHIEU bien cung luc
+static std::atomic<long> counter{0};   // ✅ đúng nhất cho bộ đếm: không khoá, không race
+// hoặc: std::mutex + std::lock_guard   khi cần bảo vệ NHIỀU biến cùng lúc
 ```
 
 **Giá phải trả của TSan:** chậm ~5–15×, RAM ~5–10× ⇒ chạy ở **CI và unit test**, không bật trên thiết bị. Và TSan chỉ thấy race **trên đường code thực sự chạy** — nên nó cần test có độ phủ đa luồng tốt, không phải phép màu.
@@ -1279,7 +1279,7 @@ static std::atomic<long> counter{0};   // ✅ dung nhat cho bo dem: khong khoa, 
 **🧪 NGỒI MÁY LÀM. Một bug mà `-Wall -Wextra` KHÔNG thấy và **ASan cũng KHÔNG báo** — nhưng nó vẫn là bug thật. Tìm công cụ bắt được nó.**
 
 ```c
-// cfg.c  —  gcc -Wall -Wextra -g -O0 -o cfg cfg.c   (KHONG warning)
+// cfg.c  —  gcc -Wall -Wextra -g -O0 -o cfg cfg.c   (KHÔNG warning)
 #include <stdio.h>
 #include <stdlib.h>
 struct Cfg { int timeout_ms; int retries; };
@@ -1307,20 +1307,20 @@ int main(void) {
 
 **① Bản thường — trông hoàn toàn bình thường, còn ổn định nữa:**
 ```
-$ gcc -Wall -Wextra -g -O0 -o cfg cfg.c        # KHONG warning
+$ gcc -Wall -Wextra -g -O0 -o cfg cfg.c        # KHÔNG warning
 $ for i in 1 2 3; do ./cfg; done
 retry it: 0
 retry it: 0
-retry it: 0                                     <- deu tam tap, nhu the la dung
+retry it: 0                                     <- đều tăm tắp, như thể là đúng
 ```
 
 **② Bản ASan — đây là chỗ bất ngờ, đọc kỹ hai dòng:**
 ```
 $ gcc -Wall -Wextra -g -O0 -fsanitize=address -o cfg_asan cfg.c
 $ ./cfg_asan
-retry it: -1094795586        <-- GIA TRI RAC hien ra
+retry it: -1094795586        <-- GIÁ TRỊ RÁC hiện ra
 $ echo $?
-0                            <-- nhung ASan KHONG BAO GI CA, thoat sach
+0                            <-- nhưng ASan KHÔNG BÁO GÌ CẢ, thoát sạch
 ```
 
 ⭐ **ASan làm bug LỘ RA mà không PHÁT HIỆN ra nó.** Con số `-1094795586` chính là `0xbebebebe` — ASan tô vùng nhớ vừa `malloc` bằng mẫu `0xbe` để lỗi dễ lộ. Nhưng nó **không theo dõi** việc bạn *đọc* một byte chưa được ghi ⇒ không có report, mã thoát 0, CI xanh.
@@ -1329,10 +1329,10 @@ $ echo $?
 ```
 $ valgrind -q --track-origins=yes ./cfg
 ==6755== Conditional jump or move depends on uninitialised value(s)
-==6755==    at 0x1091D9: main (cfg.c:13)                    <-- NOI DOC:   if (c->retries > 3)
+==6755==    at 0x1091D9: main (cfg.c:13)                    <-- NƠI ĐỌC:   if (c->retries > 3)
 ==6755==  Uninitialised value was created by a heap allocation
 ==6755==    at 0x4848899: malloc
-==6755==    by 0x1091A1: make_cfg (cfg.c:6)                 <-- NOI SINH RA: malloc o day
+==6755==    by 0x1091A1: make_cfg (cfg.c:6)                 <-- NƠI SINH RA: malloc ở đây
 ==6755==    by 0x1091CA: main (cfg.c:12)
 ```
 Hai nửa của report là hai câu hỏi khác nhau: **đọc ở đâu** (`cfg.c:13`) và **giá trị rác đó sinh ra từ đâu** (`cfg.c:6`). Nửa sau chỉ có khi bật `--track-origins=yes` — chậm hơn nhưng gần như luôn đáng.
@@ -1425,7 +1425,7 @@ Num  Type        Disp Enb Address   What
 (gdb) condition 1 i > 100     # them dieu kien cho breakpoint da co
 ```
 ```c
-if (i == 4096) raise(SIGTRAP);   // nhung dieu kien vao CODE: CPU kiem tra, khong phai gdb
+if (i == 4096) raise(SIGTRAP);   // nhúng điều kiện vào CODE: CPU kiểm tra, không phải gdb
 ```
 Cách thứ ba là cách duy nhất giữ được tốc độ gần như nguyên vẹn — đổi lại phải build lại.
 
@@ -1438,7 +1438,7 @@ Cách thứ ba là cách duy nhất giữ được tốc độ gần như nguyê
 **🧪 NGỒI MÁY LÀM. Cùng một file, build `-O0` thì debug bình thường; build `-O2` thì gdb gần như mù. Tự dựng lại cả hai triệu chứng.**
 
 ```c
-// opt.c  —  build HAI lan: -O0 va -O2
+// opt.c  —  build HAI lần: -O0 và -O2
 #include <stdio.h>
 static int scale(int v, int k) { int tmp = v * k; int adj = tmp + 7; return adj; }
 
@@ -1497,10 +1497,10 @@ Biến cục bộ sống trong **thanh ghi** rồi bị ghi đè; DWARF không m
 
 **Bộ cờ để debug bản tối ưu — nguyên tắc: đổi càng ÍT càng tốt:**
 ```
--Og                        # toi uu nhung GIU debuggability - nac giua -O0 va -O2
--O2 -fno-inline            # tat rieng inline, giu cac toi uu khac
--g3                        # giu ca macro
--fno-omit-frame-pointer    # de bt khong gay
+-Og                        # tối ưu nhưng GIỮ debuggability - nấc giữa -O0 và -O2
+-O2 -fno-inline            # tắt riêng inline, giữ các tối ưu khác
+-g3                        # giữ cả macro
+-fno-omit-frame-pointer    # để bt không gãy
 ```
 Nhảy thẳng `-O2` → `-O0` là đổi hàng chục biến đổi cùng lúc; bug biến mất thì **không học được gì**.
 
@@ -1520,16 +1520,16 @@ Nhảy thẳng `-O2` → `-O0` là đổi hàng chục biến đổi cùng lúc;
 
 **①②  Quy trình chuẩn — ba lệnh `objcopy`:**
 ```
-objcopy --only-keep-debug   app.full  app.debug     # rut symbol ra file rieng
-objcopy --strip-debug       app                     # binary gui ra thiet bi
-objcopy --add-gnu-debuglink=app.debug  app          # gan "ten file symbol" vao binary
+objcopy --only-keep-debug   app.full  app.debug     # rút symbol ra file riêng
+objcopy --strip-debug       app                     # binary gửi ra thiết bị
+objcopy --add-gnu-debuglink=app.debug  app          # gắn "tên file symbol" vào binary
 ```
 
 Kích thước đo thật:
 ```
-15968  app.full      <-- ban co symbol
- 6304  app           <-- ban gui ra thiet bi (nho hon ~60%)
-17672  app.debug     <-- giu o build server
+15968  app.full      <-- bản có symbol
+ 6304  app           <-- bản gửi ra thiết bị (nhỏ hơn ~60%)
+17672  app.debug     <-- giữ ở build server
 ```
 
 **③ Chỉ có binary đã strip:**

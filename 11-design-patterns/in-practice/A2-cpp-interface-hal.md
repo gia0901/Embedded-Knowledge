@@ -398,18 +398,18 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra)
 
-# ---- Tuy chon cho cac bai lab -----------------------------------------------
+# ---- Tuỳ chọn cho các bài lab -----------------------------------------------
 option(HAL_TSAN "Build voi ThreadSanitizer (Lab 1)" OFF)
 if(HAL_TSAN)
   add_compile_options(-fsanitize=thread -g -O1)
   add_link_options(-fsanitize=thread)
 endif()
 
-# .so va app nam canh nhau de $ORIGIN tim thay
+# .so và app nằm cạnh nhau để $ORIGIN tìm thấy
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# ---- plugin: implementation, nap bang dlopen (app KHONG link toi no) --------
+# ---- plugin: implementation, nạp bằng dlopen (app KHÔNG link tới nó) --------
 add_library(display SHARED
     impl/DisplayImpl.cpp
     impl/DisplayBuilderImpl.cpp)
@@ -423,10 +423,10 @@ target_include_directories(hal_demo PRIVATE interface)
 target_link_libraries(hal_demo PRIVATE ${CMAKE_DL_LIBS} pthread)
 
 set_target_properties(hal_demo PROPERTIES
-    ENABLE_EXPORTS ON          # = -rdynamic: .so phai resolve duoc IDisplay::injectBuilder
+    ENABLE_EXPORTS ON          # = -rdynamic: .so phải resolve được IDisplay::injectBuilder
     BUILD_RPATH "$ORIGIN")
 
-add_dependencies(hal_demo display)   # app khong link .so nen phai ep thu tu build
+add_dependencies(hal_demo display)   # app không link .so nên phải ép thứ tự build
 ```
 
 **`interface/IDisplayBuilder.hpp`**
@@ -518,7 +518,7 @@ protected:
 #include "IDisplay.hpp"
 #include "IDisplayBuilder.hpp"
 
-#define LIB_PATH "$ORIGIN/libdisplay.so"   // $ORIGIN = thu muc chua executable; dlopen tu bung ra
+#define LIB_PATH "$ORIGIN/libdisplay.so"   // $ORIGIN = thư mục chứa executable; dlopen tự bung ra
 
 namespace {
 void* g_handle = nullptr;      // static: internal linkage, không xuất ra ngoài
@@ -714,7 +714,7 @@ static void demo(bool forceV2) {
     }
 }
 
-// Dung cho Lab 1: ep nhieu luong cung goi getInstance() lan dau.
+// Dùng cho Lab 1: ép nhiều luồng cùng gọi getInstance() lần đầu.
 static void race(int n) {
     std::vector<std::thread> ts;
     ts.reserve(static_cast<size_t>(n));
@@ -790,7 +790,7 @@ BO QUA: impl ABI v0 < v2, .so cu KHONG co slot nay.
 **Phá:** trong `interface/IDisplay.cpp`, thay thân `getInstance()` bằng dạng gốc:
 ```cpp
 IDisplay* IDisplay::getInstance() {
-    static IDisplay* p_instance = nullptr;          // <-- khoi tao HANG: khong sinh guard
+    static IDisplay* p_instance = nullptr;          // <-- khởi tạo HẰNG: không sinh guard
     if (p_instance == nullptr) {                    // <-- check-then-act
         if (loadlib(libPath()) && builder) {
             p_instance = builder->buildNewDisplayHandle();
@@ -821,8 +821,8 @@ Một lần chạy hỏng điển hình:
 loadlib OK: libdisplay.so
 DisplayImpl ctor  (fd=-1, ...)
   [impl] setPower -> ON
-loadlib OK: libdisplay.so        ⬅️ dlopen LAN HAI
-DisplayImpl ctor  (fd=-1, ...)   ⬅️ DUNG OBJECT THU HAI -> RO 1 fd
+loadlib OK: libdisplay.so        ⬅️ dlopen LẦN HAI
+DisplayImpl ctor  (fd=-1, ...)   ⬅️ DỰNG OBJECT THỨ HAI -> RÒ 1 fd
   [impl] setPower -> ON
 ```
 
@@ -889,17 +889,17 @@ setPower(true)      -> -95
 **Phá:** trong `interface/IDisplay.hpp`, chuyển `setBrightness` lên **trước** destructor:
 ```cpp
     virtual int setPower(bool onoff);
-    virtual int setBrightness(int nits);       // <-- PHA: chen TRUOC destructor
+    virtual int setBrightness(int nits);       // <-- PHÁ: chèn TRƯỚC destructor
     virtual ~IDisplay();
 ```
 
 **⚠️ Thao tác bắt buộc đúng thứ tự** — `add_dependencies(hal_demo display)` khiến `.so` cũng bị build lại, phải giữ bản cũ:
 ```bash
-cmake --build build -j4                        # 1. build sach o trang thai DUNG
-cp build/bin/libdisplay.so /tmp/so_cu.so       # 2. GIU .so cu lai
-#    3. sua header nhu tren
-cmake --build build -j4                        # 4. build lai (ca app lan .so)
-cp /tmp/so_cu.so build/bin/libdisplay.so       # 5. TRA .so CU ve -> lech phien ban
+cmake --build build -j4                        # 1. build sạch ở trạng thái ĐÚNG
+cp build/bin/libdisplay.so /tmp/so_cu.so       # 2. GIỮ .so cũ lại
+#    3. sửa header như trên
+cmake --build build -j4                        # 4. build lại (cả app lẫn .so)
+cp /tmp/so_cu.so build/bin/libdisplay.so       # 5. TRẢ .so CŨ về -> lệch phiên bản
 cd build/bin && ./hal_demo
 ```
 
@@ -914,12 +914,12 @@ impl ABI version = 2 (interface = 2)      ⬅️ VERSION KHOP! check PASS
 DisplayImpl ctor  (fd=-1, ...)
 
 -- API v1 (luon goi duoc) --
-  [impl] setPower -> ON                   ⬅️ (1) VAN DUNG (slot 0 khong doi)
+  [impl] setPower -> ON                   ⬅️ (1) VẪN ĐÚNG (slot 0 không đổi)
 setPower(true)      -> 0
 
 -- API v2 (PHAI kiem version truoc) --
-DisplayImpl dtor                          ⬅️ (2) goi setBrightness ma DESTRUCTOR chay
-setBrightness(200)  -> -1172642352        ⬅️ gia tri RAC
+DisplayImpl dtor                          ⬅️ (2) gọi setBrightness mà DESTRUCTOR chạy
+setBrightness(200)  -> -1172642352        ⬅️ giá trị RÁC
 (exit=0)
 ```
 
@@ -945,18 +945,18 @@ Bản đồ slot (xác nhận bằng `g++ -fdump-lang-class`):
 
 **Phá:** build `.so` ở **v1** (chưa có `setBrightness`), app ở **v2**.
 ```bash
-cmake --build build -j4                                # trang thai dung
-#  ha cap TAM THOI ve v1:
-#   - IDisplay.hpp : HAL_DISPLAY_ABI_VERSION -> 1u, xoa dong khai bao setBrightness
-#   - IDisplay.cpp : xoa dinh nghia IDisplay::setBrightness
-#   - DisplayImpl.hpp/.cpp : xoa override + dinh nghia setBrightness
+cmake --build build -j4                                # trạng thái đúng
+#  hạ cấp TẠM THỜI về v1:
+#   - IDisplay.hpp : HAL_DISPLAY_ABI_VERSION -> 1u, xoá dòng khai báo setBrightness
+#   - IDisplay.cpp : xoá định nghĩa IDisplay::setBrightness
+#   - DisplayImpl.hpp/.cpp : xoá override + định nghĩa setBrightness
 cmake --build build --target display -j4
-cp build/bin/libdisplay.so /tmp/so_v1.so               # giu .so v1
-#  khoi phuc TOAN BO ve v2, build lai app:
+cp build/bin/libdisplay.so /tmp/so_v1.so               # giữ .so v1
+#  khôi phục TOÀN BỘ về v2, build lại app:
 cmake --build build -j4
 cp /tmp/so_v1.so build/bin/libdisplay.so               # app v2 + .so v1
-cd build/bin && ./hal_demo                             # co kiem tra version
-cd build/bin && ./hal_demo --force-v2                  # BO QUA kiem tra version
+cd build/bin && ./hal_demo                             # có kiểm tra version
+cd build/bin && ./hal_demo --force-v2                  # BỎ QUA kiểm tra version
 ```
 
 **Dự đoán trước:** ① bản có version check in ra gì? ② bản `--force-v2` — trả `-ENOTSUP`, hay chuyện khác?
@@ -965,7 +965,7 @@ cd build/bin && ./hal_demo --force-v2                  # BO QUA kiem tra version
 
 **① Có version check — an toàn:**
 ```
-impl ABI version = 1 (interface = 2)      ⬅️ phat hien lech
+impl ABI version = 1 (interface = 2)      ⬅️ phát hiện lệch
   [impl] setPower -> ON
 setPower(true)      -> 0
 
