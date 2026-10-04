@@ -3,7 +3,7 @@
 - **Level:** mid-level · **Số câu:** 6 · **Trần độ sâu:** T2
 - **Điểm trung bình:** **18/24 = 3.0 / 4**
 - **Bối cảnh:** phiên **trả nợ retention** — 4 câu `CPP-009`/`DP-002`/`OS-003`/`OS-007` đến hạn **17–23/08**, đã bỏ qua ở 16, 17, 18, 19, 20/08. Chạy trước hạn chót 2 ngày.
-- **⚠️ Cơ cấu lệch chuẩn CÓ CHỦ ĐÍCH:** `daily` mặc định có **1** slot revisit ([interview-types.md](../interview-types.md)); phiên này chạy **4 retention + 2 câu weak**, theo chỉ thị §📍 của [datalogic-plan](../../study-plans/datalogic-plan.md). Hợp lệ theo [config §⚖️](../config.md): plan quyết định *hỏi cái gì*, config quyết định *hỏi thế nào* — trần vẫn giữ **T2**.
+- **⚠️ Cơ cấu lệch chuẩn CÓ CHỦ ĐÍCH:** `daily` mặc định có **1** slot revisit ([interview-types.md](../interview-types.md)); phiên này chạy **4 retention + 2 câu weak**, theo chỉ thị §📍 của [datalogic-plan](../../study-plans/archive/datalogic-plan.md). Hợp lệ theo [config §⚖️](../config.md): plan quyết định *hỏi cái gì*, config quyết định *hỏi thế nào* — trần vẫn giữ **T2**.
 
 ## Kết quả từng câu (nhìn nhanh)
 
@@ -517,4 +517,4 @@ note:   initializing argument 1 of ‘void shutdown(Device)’    ← ✅ chặn
 - ✅ `bank/design-patterns.md`: **thêm [DP-020](../bank/design-patterns.md)** (🟠 ⭐, khung 5 phần, output chạy thật) + cross-link từ `DP-002`
 - ✅ `11-design-patterns/creational.md`: thêm cảnh báo `.so` vào §1 + dòng `DP-020` vào bảng câu hỏi
 - ✅ `coding-arena/reviewed/2026-08-21--OS-003--balance-fix.cpp`
-- ✅ `study-plans/datalogic-plan.md` §📍
+- ✅ `study-plans/archive/datalogic-plan.md` §📍

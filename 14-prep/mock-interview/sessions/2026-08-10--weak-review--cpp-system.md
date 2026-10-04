@@ -2,7 +2,7 @@
 
 - **Level:** mid-level · **Số câu:** 4 (toàn bộ weak-register) · **Thời lượng:** ~30 phút
 - **Điểm trung bình:** **3.0 / 4**
-- **Bối cảnh:** Buổi CN Tuần 1 theo [datalogic-plan](../../study-plans/datalogic-plan.md) (trễ 2 ngày). Cả 4 câu đều đang ở **1/2 lần ≥3** → phiên này để dọn sổ trước khi sang Tuần 2.
+- **Bối cảnh:** Buổi CN Tuần 1 theo [datalogic-plan](../../study-plans/archive/datalogic-plan.md) (trễ 2 ngày). Cả 4 câu đều đang ở **1/2 lần ≥3** → phiên này để dọn sổ trước khi sang Tuần 2.
 - **Cách hỏi:** không hỏi lại mức cơ bản (đã đạt 4 ở phiên 07/08). Hỏi thẳng **tầng sâu hơn** đúng theo ghi chú "lần sau hỏi mức nào" trong sổ yếu.
 - **Kết quả tổng: sổ yếu 4 → 2 câu** — gỡ 3 (CPP-019/024/045), giữ 1 (CPP-032, tụt 4→2), **thêm 1 câu mới phát sinh** (CPP-054).
 
@@ -51,7 +51,7 @@ int n = a;  -> 1       // ❗ gán Buffer vào int
 
 ⟹ **4/5 ca lọt qua mọi compiler không một tiếng động.** Không công cụ nào cứu — chỉ `explicit` mới chặn được. Đó là lý do câu này đáng nằm trong sổ yếu.
 
-⭐ **Ứng viên tự viết trúng một ca ngay trong file của mình** — [explicit_issue.cpp:28](../coding-arena/explicit_issue.cpp#L28): `std::cout << "sent: " << buf << std::endl;` — dòng này lẽ ra phải lỗi compile, nó chạy được vì `buf` ngầm hoá thành `bool` → in `1`. Viết ra hoàn toàn tự nhiên mà không nhận ra → đúng cách bug này lọt vào codebase thật.
+⭐ **Ứng viên tự viết trúng một ca ngay trong file của mình** — `explicit_issue.cpp:28` *(bản nháp trong coding-arena, đã dọn 2026-10-03 — dòng code được trích nguyên văn ngay sau)*: `std::cout << "sent: " << buf << std::endl;` — dòng này lẽ ra phải lỗi compile, nó chạy được vì `buf` ngầm hoá thành `bool` → in `1`. Viết ra hoàn toàn tự nhiên mà không nhận ra → đúng cách bug này lọt vào codebase thật.
 
 **Cách sửa — `explicit operator bool() const`, và `if (buf)` VẪN chạy.**
 Vì C++11 định nghĩa **contextual conversion to bool**: ở vị trí ngôn ngữ đằng nào cũng cần bool, conversion operator `explicit` vẫn được gọi tự động. Danh sách: `if` · `while` · `for(;;)` · `!x` · `x && y` · `x || y` · `x ? a : b` · `static_assert` · điều kiện `do-while`.

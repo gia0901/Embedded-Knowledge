@@ -2,7 +2,7 @@
 
 - **Level:** mid-level · **Số câu:** 8 (toàn bộ weak-register) · **Thời lượng:** ~25 phút
 - **Điểm trung bình:** **3.88 / 4** — cao nhất từ đầu plan
-- **Bối cảnh:** chèn trước Tuần 1 Buổi 5 theo cờ ⚠️ của [datalogic-plan](../../study-plans/datalogic-plan.md). Có ôn trước theo danh sách phân nhóm A/B.
+- **Bối cảnh:** chèn trước Tuần 1 Buổi 5 theo cờ ⚠️ của [datalogic-plan](../../study-plans/archive/datalogic-plan.md). Có ôn trước theo danh sách phân nhóm A/B.
 - **Kết quả tổng: sổ yếu co từ 8 → 4 câu.** Toàn bộ Nhóm A (4 câu đang chờ lần ≥3 thứ hai) đều tốt nghiệp.
 
 ## Kết quả từng câu

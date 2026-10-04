@@ -1,5 +1,8 @@
 # 🎯 Datalogic — Software Engineer (C/C++17, Embedded Linux) · SPRINT 3–4 NGÀY
 
+> 📦 **LƯU TRỮ — ĐÃ KẾT THÚC.** Buổi phỏng vấn Datalogic đã diễn ra (kết thúc sprint 2026-10-03). File này **không còn là nguồn tracking**; mọi chỗ ghi *"LÀM TIẾP"*, *"đóng băng tới sau PV"* bên dưới là trạng thái tại thời điểm đó.
+> Giữ lại vì hai lý do: các **"bài học #N"** được nhiều file trong repo trích dẫn, và lịch sử điểm B1–B3 là dữ liệu tham chiếu cho plan JD sau.
+
 > ♻️ **Viết lại hoàn toàn 2026-09-11.** Plan cũ (28 ngày, tối ưu **độ phủ bank**, kèm 3 bộ lab phần cứng) đã **bỏ** — nó nhắm sai mục tiêu cho một buổi phỏng vấn sau 3–4 ngày. Bản cũ còn trong git (`git show a254388:14-prep/study-plans/datalogic-plan.md`).
 > Nguyên tắc mới, thay cho "phủ bank": **xác suất bị hỏi × mức độ sẽ ú ớ**. Không mở rộng kiến thức mới; chỉ chuyển thứ đã biết thành **câu nói ra được** và **dòng code viết tay được**.
 
@@ -8,7 +11,7 @@
 ## 📍 Tiến độ hiện tại — **RESUME Ở ĐÂY** (nguồn tracking DUY NHẤT)
 
 > ⚠️ **TRẠNG THÁI, không phải nhật ký.** Sau mỗi buổi: **SỬA** ô `Xong?` + dòng *Buổi gần nhất* + *▶️ LÀM TIẾP*. **Không thêm dòng mới.**
-> Diễn biến từng phiên → [`sessions/`](../mock-interview/sessions/) · câu yếu → [weak-register](../mock-interview/weak-register.md) · lỗ hổng tài liệu → [gap-register](gap-register.md).
+> Diễn biến từng phiên → [`sessions/`](../../mock-interview/sessions/) · câu yếu → [weak-register](../../mock-interview/weak-register.md) · lỗ hổng tài liệu → [gap-register](../gap-register.md).
 
 ### Trạng thái
 
@@ -18,9 +21,9 @@
 | **Ngân sách** | ~2h/ngày × 4 buổi ≈ **8h**. Vượt ngân sách = cắt, không kéo dài |
 | **Ngôn ngữ PV** | **50% Việt / 50% Anh** ⇒ mọi câu ruột phải nói được **cả hai thứ tiếng** |
 | **Hình thức coding** | **Trên giấy** — 3 dạng: (1) coding problem · (2) implement DS cơ bản · (3) **đọc code tìm lỗi** |
-| **Buổi gần nhất** | ✅ **B3 — 2026-09-14**, 31/60 = **2.58**, 15 câu ([log](../mock-interview/sessions/2026-09-14--B3--cpp17-c-gapjd.md)) |
+| **Buổi gần nhất** | ✅ **B3 — 2026-09-14**, 31/60 = **2.58**, 15 câu ([log](../../mock-interview/sessions/2026-09-14--B3--cpp17-c-gapjd.md)) |
 | **Lịch sử điểm sprint** | B1 **3.00** (resume) · B2 **3.14** (coding) · **B3 2.58** (lõi kỹ thuật JD) — ⚠️ **không so ngang**, ba buổi đo ba thứ khác nhau |
-| 🔴 **Chặn trước PV** | **Chốt đường A/B cho Yocto** — over-claim đã lặp **lần thứ hai**, xem [weak-register](../mock-interview/weak-register.md) hàng đầu |
+| 🔴 **Chặn trước PV** | **Chốt đường A/B cho Yocto** — over-claim đã lặp **lần thứ hai**, xem [weak-register](../../mock-interview/weak-register.md) hàng đầu |
 | **Chẩn đoán còn hiệu lực** | **T1 3.67 · T2 2.1** ⇒ nền chắc, hụt ở **vận dụng**. Không đọc thêm tài liệu mới |
 
 ### ▶️ LÀM TIẾP — 4 buổi, chạy đúng thứ tự
@@ -37,11 +40,11 @@
 | # | Việc | ~ | Vì sao ưu tiên này |
 |---|---|---|---|
 | **1** | 🔴 **Chốt đường A hay B cho Yocto.** ⓐ làm thật `BSP-036` · ⓑ hạ khẳng định về **sstate** (có thật, `BSP-038` ✅). Chọn B thì **nói to 3 lần** | 10′ | Rủi ro duy nhất có thể **một mình** làm mất offer |
-| **2** | 🎙️ Học thuộc [`BEH-017`](../mock-interview/bank/behavioral.md) — bản mẫu Ethernet/scope/Jenkins, 60s | 15′ | Câu chắc chắn gặp; hiện trả lời **3 giây** |
-| **2b** | 🖊️ [**whiteboard.md**](../whiteboard.md) — vẽ được **D1 nhịp 1 trong 20 giây** không nhìn file; thuộc **một câu đánh đổi** cho mỗi sơ đồ | 30′ | 6 sơ đồ (2 **sequence diagram**) + kịch bản 🇻🇳/🇬🇧 + **nhận định kiến trúc D4** (4 câu interviewer sẽ khoan) + **trang gấp** liếc trước giờ G |
-| **3** | [`CPP-066`](../mock-interview/bank/cpp.md) copy elision · [`CPP-067`](../mock-interview/bank/cpp.md) ownership · [`CPP-068`](../mock-interview/bank/cpp.md) `[[nodiscard]]` | 30′ | Câu *"em dùng C++17 gì"* chắc chắn gặp |
-| **4** | [bus-protocols.md](../../05-drivers-device-tree/bus-protocols.md) + thuộc **4 bước NAK** ([BUS-007](../mock-interview/bank/drivers-embedded.md)) và **CPOL/CPHA** | 25′ | Trụ JD, và là **cầu nối duy nhất** của resume |
-| **5** | [`EMB-037`](../mock-interview/bank/embedded-fundamentals.md) + [`EMB-038`](../mock-interview/bank/embedded-fundamentals.md): sắp field **giảm dần** · ép lại kiểu sau `~`/`<<` · bật `-Wextra` | 15′ | Rẻ, vá đúng ba câu đã rơi |
+| **2** | 🎙️ Học thuộc [`BEH-017`](../../mock-interview/bank/behavioral.md) — bản mẫu Ethernet/scope/Jenkins, 60s | 15′ | Câu chắc chắn gặp; hiện trả lời **3 giây** |
+| **2b** | 🖊️ [**whiteboard.md**](../../whiteboard.md) — vẽ được **D1 nhịp 1 trong 20 giây** không nhìn file; thuộc **một câu đánh đổi** cho mỗi sơ đồ | 30′ | 6 sơ đồ (2 **sequence diagram**) + kịch bản 🇻🇳/🇬🇧 + **nhận định kiến trúc D4** (4 câu interviewer sẽ khoan) + **trang gấp** liếc trước giờ G |
+| **3** | [`CPP-066`](../../mock-interview/bank/cpp.md) copy elision · [`CPP-067`](../../mock-interview/bank/cpp.md) ownership · [`CPP-068`](../../mock-interview/bank/cpp.md) `[[nodiscard]]` | 30′ | Câu *"em dùng C++17 gì"* chắc chắn gặp |
+| **4** | [bus-protocols.md](../../../05-drivers-device-tree/bus-protocols.md) + thuộc **4 bước NAK** ([BUS-007](../../mock-interview/bank/drivers-embedded.md)) và **CPOL/CPHA** | 25′ | Trụ JD, và là **cầu nối duy nhất** của resume |
+| **5** | [`EMB-037`](../../mock-interview/bank/embedded-fundamentals.md) + [`EMB-038`](../../mock-interview/bank/embedded-fundamentals.md): sắp field **giảm dần** · ép lại kiểu sau `~`/`<<` · bật `-Wextra` | 15′ | Rẻ, vá đúng ba câu đã rơi |
 | **6** | 🧪 Hai bài lab DBG (`DBG-032` ASan + `DBG-036` valgrind) — **nợ từ B2, vẫn chưa làm** | 40′ | Lỗ hổng *"chọn công cụ"* nay lặp **ba lần** |
 
 ### 📉 Lỗ hổng đo được ở B3
@@ -58,9 +61,9 @@
 
 | # | Việc | ~ |
 |---|---|---|
-| 1 | Đọc [12-dsa/complexity-and-structures.md](../../12-dsa/complexity-and-structures.md) mục **amortized**; nói to được *"mỗi phần tử chuyển đúng 1 lần ⇒ n thao tác tốn O(n)"* | 15′ |
-| 2 | 🧪 Làm **2 bài** lab DBG — [`DBG-032`](../mock-interview/bank/debugging.md) (ASan) + [`DBG-036`](../mock-interview/bank/debugging.md) (valgrind, ASan mù). **Ngoại lệ có chủ đích với lệnh đóng băng lab ở §10** — vì lỗ hổng "chọn công cụ" đã lặp **lần thứ hai** | 40′ |
-| 3 | Thuộc bảng [`DBG-042`](../mock-interview/bank/debugging.md) ASan/TSan/UBSan/valgrind | 5′ |
+| 1 | Đọc [12-dsa/complexity-and-structures.md](../../../12-dsa/complexity-and-structures.md) mục **amortized**; nói to được *"mỗi phần tử chuyển đúng 1 lần ⇒ n thao tác tốn O(n)"* | 15′ |
+| 2 | 🧪 Làm **2 bài** lab DBG — [`DBG-032`](../../mock-interview/bank/debugging.md) (ASan) + [`DBG-036`](../../mock-interview/bank/debugging.md) (valgrind, ASan mù). **Ngoại lệ có chủ đích với lệnh đóng băng lab ở §10** — vì lỗ hổng "chọn công cụ" đã lặp **lần thứ hai** | 40′ |
+| 3 | Thuộc bảng [`DBG-042`](../../mock-interview/bank/debugging.md) ASan/TSan/UBSan/valgrind | 5′ |
 | 4 | Thuộc: *"`-O0` chạy, `-O2` hỏng ⇒ nghi **thiếu `volatile`** hoặc **UB**"* | 2′ |
 
 ### 📉 Lỗ hổng đo được ở B2 — mang sang B3/B4
@@ -75,11 +78,11 @@
 
 | # | Việc | ~ |
 |---|---|---|
-| 1 | 🎙️ Đọc to **[RES-001 Bản C](../mock-interview/bank/resume.md) bản Việt** 5 lần, bấm giờ, tới khi ổn định **≤ 90s** | 15′ |
-| 2 | 🎙️ Đọc to **[RES-032](../mock-interview/bank/resume.md) bản English** 5 lần, ≤ 90s | 15′ |
-| 3 | 🎙️ Đọc to **[BEH-016](../mock-interview/bank/behavioral.md)** (vì sao ứng tuyển — 3 nhịp) 3 lần | 10′ |
-| 4 | Đọc **[OS-029](../mock-interview/bank/os.md)**, nhớ đúng 3 thứ: **`nice` ≠ ưu tiên** · **FIFO preempt sạch OTHER** · **`sched_rt_runtime_us` chừa 5%** | 20′ |
-| 5 | Thuộc **quy tắc số ba** ([RES-029](../mock-interview/bank/resume.md)): 0 lỗi / n lần ⟹ tỉ lệ < 3/n ở 95% ⇒ **100 lần ⟹ < 3%** | 2′ |
+| 1 | 🎙️ Đọc to **[RES-001 Bản C](../../mock-interview/bank/resume.md) bản Việt** 5 lần, bấm giờ, tới khi ổn định **≤ 90s** | 15′ |
+| 2 | 🎙️ Đọc to **[RES-032](../../mock-interview/bank/resume.md) bản English** 5 lần, ≤ 90s | 15′ |
+| 3 | 🎙️ Đọc to **[BEH-016](../../mock-interview/bank/behavioral.md)** (vì sao ứng tuyển — 3 nhịp) 3 lần | 10′ |
+| 4 | Đọc **[OS-029](../../mock-interview/bank/os.md)**, nhớ đúng 3 thứ: **`nice` ≠ ưu tiên** · **FIFO preempt sạch OTHER** · **`sched_rt_runtime_us` chừa 5%** | 20′ |
+| 5 | Thuộc **quy tắc số ba** ([RES-029](../../mock-interview/bank/resume.md)): 0 lỗi / n lần ⟹ tỉ lệ < 3/n ở 95% ⇒ **100 lần ⟹ < 3%** | 2′ |
 
 ### 📉 Ba lỗ hổng đo được ở B1 — mang sang các buổi sau
 
@@ -115,9 +118,9 @@
 
 | Dạng | Bank hiện có | Trạng thái |
 |---|---|---|
-| Coding problem | [`COD-001…010`](../mock-interview/bank/coding.md) — 10 bài cỡ nhỏ | ✅ đủ, đúng cỡ |
-| Implement DS cơ bản | + [`COD-011/012/013`](../mock-interview/bank/coding.md) — dynamic array · hash map chaining · queue bằng 2 stack | ✅ **đã soạn 11/09**, bản mẫu compile + chạy sạch |
-| **Đọc code tìm lỗi** | [`COD-014…026`](../mock-interview/bank/coding.md) — **13 snippet**, mục mới `## B` | ✅ **đã soạn 11/09**, mỗi bài có **output thật đã chạy** |
+| Coding problem | [`COD-001…010`](../../mock-interview/bank/coding.md) — 10 bài cỡ nhỏ | ✅ đủ, đúng cỡ |
+| Implement DS cơ bản | + [`COD-011/012/013`](../../mock-interview/bank/coding.md) — dynamic array · hash map chaining · queue bằng 2 stack | ✅ **đã soạn 11/09**, bản mẫu compile + chạy sạch |
+| **Đọc code tìm lỗi** | [`COD-014…026`](../../mock-interview/bank/coding.md) — **13 snippet**, mục mới `## B` | ✅ **đã soạn 11/09**, mỗi bài có **output thật đã chạy** |
 
 **"Trên giấy" đổi QUY TRÌNH, không đổi nội dung** — không compiler, không autocomplete, không chạy test. Luyện và chấm đúng **5 nhịp**:
 
@@ -137,7 +140,7 @@
 
 ## 3. Bản đồ phủ RESUME — không được bỏ sót dòng nào (buổi B1)
 
-> Bank [`RES`](../mock-interview/bank/resume.md) có **22 câu** nhưng neo vào `RESUME_embedded_linux.tex` (bản cũ). Cột **Việc** = phải làm gì cho `RESUME_current.tex`.
+> Bank [`RES`](../../mock-interview/bank/resume.md) có **22 câu** nhưng neo vào `RESUME_embedded_linux.tex` (bản cũ). Cột **Việc** = phải làm gì cho `RESUME_current.tex`.
 
 | Dòng resume | Câu | Việc |
 |---|---|---|
@@ -229,7 +232,7 @@ Họ không đo bạn thuộc feature. Họ đo: **code có an toàn tài nguyê
 
 ### Tầng 1 — NỀN (~70% điểm, bị hỏi dưới nhãn "C++17")
 RAII & ownership (`unique_ptr`/`shared_ptr`/`weak_ptr`; **khi nào raw pointer vẫn đúng** — non-owning observer) · rule of 0/3/5 · move semantics và **khi nào move KHÔNG xảy ra** · const-correctness & lifetime/dangling · virtual destructor + chi phí vtable · exception vs codebase tắt exception (câu đánh đổi rất hợp embedded).
-→ Chỗ bạn **mạnh nhất** vì bạn viết shared-library interface. **Đừng ôn ít phần này để dành giờ cho feature mới.** [02-modern-cpp](../../02-modern-cpp/) · bank `CPP-A/C/D`.
+→ Chỗ bạn **mạnh nhất** vì bạn viết shared-library interface. **Đừng ôn ít phần này để dành giờ cho feature mới.** [02-modern-cpp](../../../02-modern-cpp/) · bank `CPP-A/C/D`.
 
 ### Tầng 2 — C++17 ESSENTIAL (mỗi cái phải kèm *"tôi dùng ở đâu"*, không phải định nghĩa)
 
@@ -274,20 +277,20 @@ Resume ghi *"Modern C++ (11/14/17)"*. Ghi nhận 07/09: app SDM build tới C++2
 
 **Phải chốt trước buổi PV:** sensor đó nói chuyện qua bus gì · ai viết driver cho nó (bạn / vendor / có sẵn trong kernel) · bạn chạm tới tầng nào (đọc register qua sysfs? gọi API? sửa device tree node cho nó?). Có câu trả lời cụ thể ⇒ **một gap JD biến thành một điểm mạnh**.
 
-**Nền lý thuyết cần chắc** ([bus-protocols.md](../../05-drivers-device-tree/bus-protocols.md), bank `BUS-*`): I2C 2 dây/địa chỉ/ACK/**clock stretching** · SPI 4 dây/CPOL-CPHA/full-duplex/chip-select · **khi nào chọn cái nào** (số dây, tốc độ, số slave, khoảng cách) · driver model Linux: `i2c_driver`/`spi_driver` + `probe()` + match qua **device tree compatible** · vì sao không được ngủ/`msleep` trong ngữ cảnh atomic.
+**Nền lý thuyết cần chắc** ([bus-protocols.md](../../../05-drivers-device-tree/bus-protocols.md), bank `BUS-*`): I2C 2 dây/địa chỉ/ACK/**clock stretching** · SPI 4 dây/CPOL-CPHA/full-duplex/chip-select · **khi nào chọn cái nào** (số dây, tốc độ, số slave, khoảng cách) · driver model Linux: `i2c_driver`/`spi_driver` + `probe()` + match qua **device tree compatible** · vì sao không được ngủ/`msleep` trong ngữ cảnh atomic.
 
 ### 🅑 Ethernet driver — chưa làm
 *"Sản phẩm tôi làm không có driver Ethernet — phần mạng ở tầng userspace, S-Box sync qua POSIX message queue. Về driver mạng tôi nắm khung: netdev đăng ký qua `net_device_ops`, `ndo_start_xmit` đẩy `sk_buff` xuống, **NAPI** để chuyển từ interrupt-per-packet sang polling khi tải cao tránh interrupt storm, DMA ring cho TX/RX. Mô hình đó gần với thứ tôi đã làm ở driver display: đăng ký, probe theo device tree, xử lý interrupt và bottom half."*
-→ Nền: [driver-basics.md](../../05-drivers-device-tree/driver-basics.md) · [lkd/02-interrupts-bottomhalves](../../15-book-summaries/lkd/02-interrupts-bottomhalves.md).
+→ Nền: [driver-basics.md](../../../05-drivers-device-tree/driver-basics.md) · [lkd/02-interrupts-bottomhalves](../../../15-book-summaries/lkd/02-interrupts-bottomhalves.md).
 
 ### 🅒 Yocto — gap lớn nhất, trả lời bằng MENTAL MODEL
 *"Tôi chưa dùng Yocto trong sản phẩm — build ở chỗ tôi là CMake/Makefile cộng hệ nội bộ. Mô hình thì tôi nắm: BitBake đọc **recipe** mô tả fetch/configure/compile/install một package; **layer** tách phần BSP của vendor khỏi distro và khỏi ứng dụng để nâng cấp độc lập; **bbappend** sửa recipe của layer khác mà không phải fork nó; **sstate-cache** cache kết quả từng task nên build lại chỉ chạy phần đổi; **SDK** sinh toolchain + sysroot cho người viết app. Việc tương đương tôi đã làm là cross-compilation và quản lý sysroot bằng tay, cộng port driver qua nhiều chipset — cùng bài toán 'một source, nhiều board', khác công cụ."*
-→ Nền: [yocto.md](../../06-build-systems/yocto.md) · [cross-compilation.md](../../06-build-systems/cross-compilation.md) · bank `BLD-*`.
+→ Nền: [yocto.md](../../../06-build-systems/yocto.md) · [cross-compilation.md](../../../06-build-systems/cross-compilation.md) · bank `BLD-*`.
 ⚠️ **Học TƯ DUY, không cú pháp.** Họ hỏi *"layer để làm gì", "sstate giải quyết gì", "DEPENDS vs RDEPENDS"* — không bắt viết recipe.
 
 ### 🅓 Oscilloscope / logic analyzer + Jenkins — gộp một câu ngắn
 Scope: *"tôi debug ở tầng phần mềm — GDB, dmesg/printk, cross-layer. Chưa tự cầm scope; khi cần đo tín hiệu tôi làm việc với đội hardware. Tôi hiểu dùng nó để làm gì: xác nhận tín hiệu bus có thật sự ra chân không, đo timing, tách bạch lỗi phần mềm với lỗi phần cứng — đúng lúc log không kết luận được."*
-Jenkins: nói bằng khái niệm CI đã có ([ci-and-test-farm.md](../../06-build-systems/ci-and-test-farm.md)) — gated check-in, build matrix, smoke test, test farm — và nối về việc thật: **verify qua 100 boot cycles** chính là tư duy automated regression.
+Jenkins: nói bằng khái niệm CI đã có ([ci-and-test-farm.md](../../../06-build-systems/ci-and-test-farm.md)) — gated check-in, build matrix, smoke test, test farm — và nối về việc thật: **verify qua 100 boot cycles** chính là tư duy automated regression.
 
 ---
 
@@ -307,8 +310,8 @@ Jenkins: nói bằng khái niệm CI đã có ([ci-and-test-farm.md](../../06-bu
 
 Ba bộ lab của plan cũ **hoãn tới sau buổi PV** (không kịp và không sinh giá trị cho 3–4 ngày tới). Ghi lại trạng thái để không biến mất trong im lặng:
 
-- 🧪 **Lab BSP phần cứng (BeagleBone)** — `BSP-031…038`: **1/8 xong** (`BSP-038` sstate ✅ 06/09) · `BSP-031` 🟡 bước ② xong. Setup: [lab-setup.md](../lab-setup.md).
+- 🧪 **Lab BSP phần cứng (BeagleBone)** — `BSP-031…038`: **1/8 xong** (`BSP-038` sstate ✅ 06/09) · `BSP-031` 🟡 bước ② xong. Setup: [lab-setup.md](../../lab-setup.md).
 - 🧪 **Lab DBG** — `DBG-030…041`: **0/12**.
-- 🧪 **Lab DP** — 5 bài ở [A2 §7](../../11-design-patterns/in-practice/A2-cpp-interface-hal.md): **0/5**.
-- 📚 **Nợ chất lượng bank** — ~68 câu 🟠🔴 đáp án < 700 ký tự; tự co theo [config §1 Bước 4](../mock-interview/config.md).
+- 🧪 **Lab DP** — 5 bài ở [A2 §7](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md): **0/5**.
+- 📚 **Nợ chất lượng bank** — ~68 câu 🟠🔴 đáp án < 700 ký tự; tự co theo [config §1 Bước 4](../../mock-interview/config.md).
 - 📉 **Độ phủ bank** — lần đo 06/09: `178/457 = 38%`. **Không phải mục tiêu của sprint này**; đừng để nó lái quyết định.

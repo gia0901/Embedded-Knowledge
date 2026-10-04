@@ -66,7 +66,7 @@ Log [18/08](2026-08-18--rapid--resume.md) kê đơn **nguyên văn** cho `RES-00
 
 Câu 1 hôm nay: *"…em phát triển tính năng Adaptive Brightness, tự động điều khiển độ sáng theo điều kiện ánh sáng môi trường."* → probe → *"người xem cảm thấy dễ chịu, ví dụ ngoài trời, phòng họp."*
 
-**Phần hay nhất — đồng bộ nhiều màn, một binary hai chế độ — không xuất hiện.** [§📍 plan](../../study-plans/datalogic-plan.md) đã ghi đây là *"🗣️ bài tự luyện còn nợ"* suốt **5 ngày**.
+**Phần hay nhất — đồng bộ nhiều màn, một binary hai chế độ — không xuất hiện.** [§📍 plan](../../study-plans/archive/datalogic-plan.md) đã ghi đây là *"🗣️ bài tự luyện còn nợ"* suốt **5 ngày**.
 
 ### ⭐ Bằng chứng ngược — vấn đề KHÔNG phải năng lực diễn đạt
 
@@ -437,4 +437,4 @@ Hỏi câu về **cross-layer debug infrastructure** là phát tín hiệu *"tô
 - ✅ `bank/behavioral.md`: **9 → 12 câu** — thêm `BEH-010` (làm hỏng việc) · `BEH-011` (học nhanh, ⭐ luật chọn chất liệu) · `BEH-012` (lương kỳ vọng, ⭐ cách giữ giá)
 - ✅ `weak-register.md`: thêm **7 câu ≤2đ**, mỗi dòng chỉ ghi **phần riêng** + trỏ về khối *"NGUYÊN NHÂN GỐC"* ở trên
 - ❌ `coding-arena/reviewed/` — không áp dụng (phiên behavioral, không có code)
-- ✅ `study-plans/datalogic-plan.md` §📍 — **BEH 0% → 100%**, đổi ▶️ LÀM TIẾP
+- ✅ `study-plans/archive/datalogic-plan.md` §📍 — **BEH 0% → 100%**, đổi ▶️ LÀM TIẾP

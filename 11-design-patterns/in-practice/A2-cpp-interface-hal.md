@@ -128,7 +128,7 @@ public:
 
 ⟹ **Đúng tên GoF là Factory Method.**
 
-🔴 **Vì sao đây là rủi ro phỏng vấn thật, không phải chuyện chữ nghĩa:** repo đã ghi nhận đúng cơ chế này ở [bài học #4](../../14-prep/study-plans/datalogic-plan.md) — *"nói ra một thuật ngữ là mời interviewer hỏi vào đúng nó"*. Nói *"em dùng Builder pattern"* ⟹ câu tiếp theo gần như chắc chắn là *"Builder khác Factory thế nào?"* ⟹ mô tả không khớp code vừa kể.
+🔴 **Vì sao đây là rủi ro phỏng vấn thật, không phải chuyện chữ nghĩa:** repo đã ghi nhận đúng cơ chế này ở [bài học #4](../../14-prep/study-plans/archive/datalogic-plan.md) — *"nói ra một thuật ngữ là mời interviewer hỏi vào đúng nó"*. Nói *"em dùng Builder pattern"* ⟹ câu tiếp theo gần như chắc chắn là *"Builder khác Factory thế nào?"* ⟹ mô tả không khớp code vừa kể.
 
 ✅ **Cách nói an toàn và ghi điểm** *(biến điểm yếu thành điểm mạnh)*:
 
@@ -295,7 +295,7 @@ App biên dịch lời gọi `setPower` thành *"nhảy tới **slot 1**"*. Obje
 
 ## 5. 🗣️ Bản nói 60 giây
 
-> Phần này phục vụ [bài học #3](../../14-prep/study-plans/datalogic-plan.md) của plan: *lỗi **đóng gói** ≠ lỗ hổng kiến thức* — cùng kiến thức, đổi khung câu hỏi thì không truy xuất được. Chữa bằng **nói to, bấm giờ**, không phải đọc thêm.
+> Phần này phục vụ [bài học #3](../../14-prep/study-plans/archive/datalogic-plan.md) của plan: *lỗi **đóng gói** ≠ lỗ hổng kiến thức* — cùng kiến thức, đổi khung câu hỏi thì không truy xuất được. Chữa bằng **nói to, bấm giờ**, không phải đọc thêm.
 
 **Câu hỏi:** *"Kể về kiến trúc phần C++ interface bạn làm."*
 
@@ -740,7 +740,7 @@ int main(int argc, char** argv) {
 
 ## 7. 🧪 Năm bài lab — NGỒI MÁY LÀM
 
-> **Cấu trúc bốn bước, giống bộ lab BSP** ([plan §🧪](../../14-prep/study-plans/datalogic-plan.md)): ① **ĐỌC** cơ chế → ② **QUAN SÁT** nó chạy đúng → ③ **PHÁ có chủ đích** (⚠️ **viết dự đoán ra giấy TRƯỚC khi chạy**) → ④ **ĐỐI CHIẾU** với output thật bên dưới.
+> **Cấu trúc bốn bước, giống bộ lab BSP** ([plan §🧪](../../14-prep/study-plans/archive/datalogic-plan.md)): ① **ĐỌC** cơ chế → ② **QUAN SÁT** nó chạy đúng → ③ **PHÁ có chủ đích** (⚠️ **viết dự đoán ra giấy TRƯỚC khi chạy**) → ④ **ĐỐI CHIẾU** với output thật bên dưới.
 >
 > Chỗ **dự đoán sai** chính là chỗ mô hình còn hổng — đó là toàn bộ giá trị của bài lab, không phải việc chạy được lệnh.
 >

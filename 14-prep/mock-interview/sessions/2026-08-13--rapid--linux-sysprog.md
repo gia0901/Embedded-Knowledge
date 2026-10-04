@@ -314,4 +314,4 @@ Cả **ba** câu đều là **cùng một lớp bug**: đúng ở môi trường
 ⇒ **Bài học chung: "test không lỗi" không chứng minh được gì về code có race. Phải suy luận theo cơ chế, không theo kết quả chạy.** Đây cũng đúng là điều tôi phải tự áp dụng khi đo `PIPE_BUF` — hai lần đầu ra 0 không có nghĩa là không có bug.
 
 ---
-⬅️ [Sessions index](README.md) · [weak-register](../weak-register.md) · [datalogic-plan §📍](../../study-plans/datalogic-plan.md)
+⬅️ [Sessions index](README.md) · [weak-register](../weak-register.md) · [datalogic-plan §📍](../../study-plans/archive/datalogic-plan.md)

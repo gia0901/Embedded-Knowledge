@@ -1,7 +1,7 @@
 # Phiên mock — 2026-08-03 · by-level 🟡 · track modern-cpp
 
 - **Điểm trung bình:** 3.3 / 4
-- **Bối cảnh:** Tuần 1 Buổi 2 của [datalogic-plan](../../study-plans/datalogic-plan.md) (C++17 — EMC items nền). 10 câu mức 🟡.
+- **Bối cảnh:** Tuần 1 Buổi 2 của [datalogic-plan](../../study-plans/archive/datalogic-plan.md) (C++17 — EMC items nền). 10 câu mức 🟡.
 
 | ID | Câu (tóm tắt) | Tự đánh giá | Điểm | Ghi chú (thiếu gì / lỗ hổng) |
 |----|---------------|-------------|------|------------------------------|

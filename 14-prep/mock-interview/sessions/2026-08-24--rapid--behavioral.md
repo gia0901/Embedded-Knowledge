@@ -364,4 +364,4 @@ Bạn dừng ở **⑤**. Bước ⑥ mới là bước ngăn tái diễn.
 - ✅ `bank/behavioral.md`: **12 → 13 câu** — thêm **`BEH-013`** (counter-offer, 🟠⭐)
 - ✅ `weak-register.md`: 7 dòng `BEH` cập nhật điểm lần 2 (đều **1/2 lần ≥3**), ghi **góc đã dùng** + **góc mới** cho lần sau
 - ❌ `coding-arena/reviewed/` — không áp dụng (phiên behavioral)
-- ✅ `study-plans/datalogic-plan.md` §📍
+- ✅ `study-plans/archive/datalogic-plan.md` §📍

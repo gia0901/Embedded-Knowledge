@@ -23,7 +23,7 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 
 | # | Topic | Nội dung chính | Trạng thái |
 |---|-------|----------------|-----------|
-| 01 | [C/C++ Fundamentals](01-cpp-fundamentals/) | memory model, OOP, vtable, templates | ✅ |
+| 01 | [C/C++ Fundamentals](01-cpp-fundamentals/) | memory model, **C thuần** (con trỏ/mảng/chuỗi, macro, linkage), OOP, vtable, templates | ✅ |
 | 02 | [Modern C++](02-modern-cpp/) | RAII, smart pointer, move semantics, concurrency | ✅ |
 | 03 | [Operating System](03-operating-system/) | process/thread, scheduling, virtual memory, IPC, sync | ✅ |
 | 04 | [Linux System Programming](04-linux-system-programming/) | file I/O, signal, fork/exec, epoll | ✅ |
@@ -36,7 +36,7 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 | 11 | [Design Patterns](11-design-patterns/) | SOLID, creational/structural/behavioral | ✅ |
 | 12 | [DSA](12-dsa/) | Big-O, cấu trúc dữ liệu, pattern giải thuật, **ring buffer** | ✅ |
 | 13 | [Networking](13-networking/) | TCP/IP, socket, HTTP/TLS/MQTT | ✅ |
-| 14 | [Prep](14-prep/) | study-plans (plan JD đang chạy, có §📍 tracking) + **[mock-interview](14-prep/mock-interview/)** (phỏng vấn thử `/mock` + ngân hàng câu hỏi **duy nhất**) | 🟡 |
+| 14 | [Prep](14-prep/) | study-plans (plan theo JD, có §📍 tracking — hiện không có plan chạy; plan cũ ở `archive/`) + **[mock-interview](14-prep/mock-interview/)** (phỏng vấn thử `/mock` + ngân hàng câu hỏi **duy nhất**) | 🟡 |
 | 15 | [Book Summaries](15-book-summaries/) | tóm tắt sách chuyên ngành (quy ước riêng trong README topic) | 🟡 |
 | 00 | [Glossary](00-glossary.md) | tra cứu nhanh thuật ngữ EN | ✅ |
 
@@ -46,7 +46,7 @@ Bộ tài liệu ôn luyện phỏng vấn **Embedded Linux / C++**, định hư
 
 Kế hoạch ôn bám **JD đang nhắm**, đặt tại **[14-prep/study-plans/](14-prep/study-plans/)** — đây là **nguồn chiến lược duy nhất**:
 
-- 🎯 **[Embedded Linux Engineer @ Datalogic](14-prep/study-plans/datalogic-plan.md)** — plan 4 tuần đang chạy. **Mở §📍 Tiến độ ở đầu file** để biết đang ở buổi nào và lệnh làm tiếp.
+- 📦 **[Embedded Linux Engineer @ Datalogic](14-prep/study-plans/archive/datalogic-plan.md)** — sprint **đã kết thúc** (PV xong 03/10), lưu trữ để tham chiếu *bài học #N*. Hiện không có plan JD nào đang chạy — ôn tự do bằng `/mock`.
 
 Plan ánh xạ thẳng sang topic + book summary + question bank, mỗi buổi có phần *Đọc/Hiểu* và phần *Test 🎤*. Backlog "thiếu gì" nằm ở **[gap-register.md](14-prep/study-plans/gap-register.md)**.
 

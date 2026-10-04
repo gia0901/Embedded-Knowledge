@@ -2,7 +2,7 @@
 
 - **Level:** mid-level · **Số câu:** 6 · **Thời lượng:** ~20 phút
 - **Điểm trung bình:** 2.83 / 4
-- **Bối cảnh:** Tuần 1 **Buổi 3** của [datalogic-plan](../../study-plans/datalogic-plan.md) — concurrency (02-modern-cpp) + OS sync-primitives.
+- **Bối cảnh:** Tuần 1 **Buổi 3** của [datalogic-plan](../../study-plans/archive/datalogic-plan.md) — concurrency (02-modern-cpp) + OS sync-primitives.
 
 ## Kết quả từng câu (nhìn nhanh)
 | ID | Câu (tóm tắt) | Điểm | Ghi chú ngắn |

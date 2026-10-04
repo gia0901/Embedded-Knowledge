@@ -9,8 +9,8 @@
 
 | Track | Domain rút câu | Ghi chú |
 |---|---|---|
-| **`bsp`** ⭐ | `BSP`, `DRV`(gồm PCI/USB), `BUS`, `EMB`, `BLD`, `OS`(mem/sched/sync), `LNX`(ipc/signal/io), `DBG`, `SD`(embedded) | Embedded Linux / BSP Engineer — **ưu tiên 1**. Nghiêng kernel/phần cứng/bring-up + Yocto (kèm nền embedded chung). |
-| **`cpp-system`** | `CPP`, `OS`(concurrency/sync), `DP`, `DBG`, `SD`(abi/lib), `DSA`, `LNX`(basics), `BLD`(CMake) | System Software / C++ Engineer. Nghiêng ngôn ngữ/ABI/concurrency. |
+| **`bsp`** ⭐ | `BSP`, `DRV`(gồm PCI/USB), `BUS`, `EMB`, `C`, `BLD`, `OS`(mem/sched/sync), `LNX`(ipc/signal/io), `DBG`, `SD`(embedded) | Embedded Linux / BSP Engineer — **ưu tiên 1**. Nghiêng kernel/phần cứng/bring-up + Yocto (kèm nền embedded chung). |
+| **`cpp-system`** | `CPP`, `C`, `OS`(concurrency/sync), `DP`, `DBG`, `SD`(abi/lib), `DSA`, `LNX`(basics), `BLD`(CMake) | System Software / C++ Engineer. Nghiêng ngôn ngữ/ABI/concurrency. |
 
 > Hai track dùng chung nhiều nền (OS, debug, DSA). Ứng tuyển cả hai → chạy track sắp phỏng vấn trước; phần chung tự khớp.
 
@@ -18,6 +18,7 @@
 
 | Track | Domain | Topic gốc |
 |---|---|---|
+| **`c`** | `C` (+ `EMB` mục A, các câu C trong `COD` — danh sách ở đầu [bank/c-programming.md](bank/c-programming.md)) | **C thuần trên giấy** — con trỏ, mảng, chuỗi, macro, bit, linkage — [01/c-pointers-arrays](../../01-cpp-fundamentals/c-pointers-arrays.md), [01/c-language-idioms](../../01-cpp-fundamentals/c-language-idioms.md). Thêm 2026-10 sau phản hồi buổi PV thật |
 | `modern-cpp` | `CPP` | [01](../../01-cpp-fundamentals/), [02](../../02-modern-cpp/) |
 | `os` | `OS` | [03](../../03-operating-system/) |
 | `linux-sysprog` | `LNX` | [04](../../04-linux-system-programming/) |
@@ -49,7 +50,7 @@ Track sách rút câu **2 nguồn**: (1) câu trong bank có **link nguồn tớ
 
 ## Mix / all
 
-> 🗑️ *Bỏ 2026-08-18: track `datalogic` (domain của JD đã sống trong [datalogic-plan](../study-plans/datalogic-plan.md) — hai chỗ cùng một danh sách) và cú pháp trộn `track a+b` (chưa dùng lần nào).*
+> 🗑️ *Bỏ 2026-08-18: track `datalogic` (domain của JD đã sống trong [datalogic-plan](../study-plans/archive/datalogic-plan.md) — hai chỗ cùng một danh sách) và cú pháp trộn `track a+b` (chưa dùng lần nào).*
 
 - `track all` — rút câu toàn bank (cho `comprehensive` giả lập vòng thật đa dạng, hoặc `daily`).
 - Không nêu track → mặc định `bsp` (theo [config.md](config.md)).

@@ -1,6 +1,6 @@
 # 🎤 Phiên mock · 2026-08-15 · `by-level` 🟠 · track `linux-sysprog`
 
-- **Tham số:** `by-level` 🟠 · 10 câu · **trần T2** · Tuần 2 Buổi 2 của [datalogic-plan](../../study-plans/datalogic-plan.md)
+- **Tham số:** `by-level` 🟠 · 10 câu · **trần T2** · Tuần 2 Buổi 2 của [datalogic-plan](../../study-plans/archive/datalogic-plan.md)
 - **Điểm tổng: 2.1/4** *(bỏ Q10 — câu repo không có tài liệu: 2.33 · bỏ cả Q8+Q10: 2.63)*
 - **Bối cảnh:** trước phiên, trong cùng conversation đã giải thích **ET/vét cạn `EAGAIN` phía đọc** và **`SIGPIPE`/`SIG_IGN`** ⇒ hai góc đó **bị cấm hỏi lại**, phải hỏi ở mặt khác (Q3 hỏi phía **ghi**, Q10 hỏi ca **không có RST**).
 

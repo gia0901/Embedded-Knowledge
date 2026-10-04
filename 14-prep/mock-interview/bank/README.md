@@ -26,6 +26,7 @@
 
 | Domain | File | Nội dung | Topic gốc |
 |---|---|---|---|
+| **`C`** | [c-programming.md](c-programming.md) | **C thuần**: con trỏ 1–2 chiều, mảng vs con trỏ (decay), đọc khai báo, mảng 2 chiều, chuỗi, con trỏ hàm, `void *` · macro, bit viết tay, `atoi`/`itoa`, tuần tự hoá byte, linkage, `goto cleanup` | [01/c-pointers-arrays](../../../01-cpp-fundamentals/c-pointers-arrays.md), [01/c-language-idioms](../../../01-cpp-fundamentals/c-language-idioms.md), [08/bare-metal-c](../../../08-embedded-systems/bare-metal-c.md) |
 | `CPP` | [cpp.md](cpp.md) | C/C++ & Modern C++ | [01](../../../01-cpp-fundamentals/), [02](../../../02-modern-cpp/) |
 | `OS` | [os.md](os.md) | Hệ điều hành (process/thread/sched/mem/sync) | [03](../../../03-operating-system/) |
 | `LNX` | [linux-sysprog.md](linux-sysprog.md) | Linux system programming (fd/syscall/IPC/epoll/signal) | [04](../../../04-linux-system-programming/) |

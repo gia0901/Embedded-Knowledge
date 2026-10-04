@@ -323,7 +323,7 @@ ALS (I2C) -> driver doc dinh ky / interrupt -> loc & lam muot
 > 🔴 **BẰNG CHỨNG 2026-09-12 — đọc kỹ trước khi ôn tiếp.** Phần "cắt đôi" dưới đây **đã nằm sẵn trong bank từ trước phiên B1**. Trong phiên đó, ứng viên vẫn trả lời bằng **quét tuần tự từ trên xuống**, và **giữ nguyên câu trả lời sau HAI lần được làm rõ rằng câu hỏi muốn một phép cắt đôi** ⇒ **2 điểm**.
 >
 > ⇒ Đây **không phải lỗ hổng nội dung, mà là lỗi TRUY XUẤT.** Đọc lại mục này lần nữa **sẽ không chữa được** — cùng một cách đã thất bại. Cách chữa: **luyện phản xạ** — mỗi khi nghe một triệu chứng, câu đầu tiên bật ra phải là *"phép đo nào chia đôi được?"*, trước cả khi nghĩ tới log.
-> 🧪 Bộ lab `DBG-030…041` tồn tại đúng cho việc này (đang ❄️ đóng băng tới sau buổi PV — **mở lại 2 bài ngay sau đó**).
+> 🧪 Bộ lab `DBG-030…041` tồn tại đúng cho việc này (hết đóng băng từ 2026-10-03 — làm `DBG-032` ASan + `DBG-036` valgrind trước).
 
 **⭐ Câu này hỏi CẮT ĐÔI, không hỏi quy trình:**
 
@@ -450,7 +450,7 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 #### RES-012 · 🟠 · concept · ⭐ · 🏗️ · [→ RESUME vs JD: thiếu Yocto, I2C/SPI, PCI/USB]
 **"Anh thấy resume em không nhắc Yocto, cũng không thấy I2C/SPI hay PCI/USB. Bên anh dùng những thứ đó khá nhiều."**
 
-> 🔴 **CẢNH BÁO NÓI QUÁ — sự cố lặp lần thứ hai (14/09).** Trả lời câu Yocto, ứng viên nói *"…và **đã thành công build một minimal image**"*, rồi khi bị đào chỉ đưa được *"image cho BeagleBone, PC x86, ~30 phút, đặt MACHINE là beaglebone"* — **không** tên image, **không** giá trị `MACHINE` đúng (`beaglebone-yocto`), **không** gì trong `local.conf`. Tracking repo ([plan §10](../../study-plans/datalogic-plan.md)) ghi lab BSP **1/8**, `BSP-036` (Yocto) **⬜ chưa làm**. Cùng khẳng định này **đã bị phân xử là sai ngày 06/09** ([bài học #8](../../study-plans/datalogic-plan.md)).
+> 🔴 **CẢNH BÁO NÓI QUÁ — sự cố lặp lần thứ hai (14/09).** Trả lời câu Yocto, ứng viên nói *"…và **đã thành công build một minimal image**"*, rồi khi bị đào chỉ đưa được *"image cho BeagleBone, PC x86, ~30 phút, đặt MACHINE là beaglebone"* — **không** tên image, **không** giá trị `MACHINE` đúng (`beaglebone-yocto`), **không** gì trong `local.conf`. Tracking repo ([plan §10](../../study-plans/archive/datalogic-plan.md)) ghi lab BSP **1/8**, `BSP-036` (Yocto) **⬜ chưa làm**. Cùng khẳng định này **đã bị phân xử là sai ngày 06/09** ([bài học #8](../../study-plans/archive/datalogic-plan.md)).
 >
 > ⇒ **Chọn một trước buổi phỏng vấn:** ⓐ **làm thật** `BSP-036` (một buổi tối) rồi mọi thứ nói ra đều thật; hoặc ⓑ **hạ khẳng định**: *"Em chưa vận hành Yocto trong sản phẩm. Phần em thật sự chạm là **sstate** — em đã đo ba phép đo về cache build."* — cái này **có thật** (`BSP-038` ✅) và **vẫn mạnh**, vì `sstate` là chi tiết chỉ người đã chạm mới nói.
 >
@@ -470,7 +470,7 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
    - **PCI/USB** ← trung thực là chưa; nêu bạn nắm nguyên lý chung (device enumeration, driver model) và học nhanh vì nền driver đã có.
 3. **Nói cụ thể mình đang làm gì để lấp** — *"em đang đọc về layer/recipe/sstate của Yocto"* — cụ thể, không hứa suông.
 
-**Nền kỹ thuật nên có trước khi đi phỏng vấn:** [yocto.md](../../../06-build-systems/yocto.md) ở mức **tư duy** (layer/bbappend để làm gì · sstate giải quyết gì · DEPENDS vs RDEPENDS) — [plan nguyên tắc ①](../../study-plans/datalogic-plan.md) ghi rõ **không cần thuộc cú pháp recipe** · [bus-protocols](../../../05-drivers-device-tree/bus-protocols.md) · [pci-usb-drivers](../../../05-drivers-device-tree/pci-usb-drivers.md).
+**Nền kỹ thuật nên có trước khi đi phỏng vấn:** [yocto.md](../../../06-build-systems/yocto.md) ở mức **tư duy** (layer/bbappend để làm gì · sstate giải quyết gì · DEPENDS vs RDEPENDS) — [plan nguyên tắc ①](../../study-plans/archive/datalogic-plan.md) ghi rõ **không cần thuộc cú pháp recipe** · [bus-protocols](../../../05-drivers-device-tree/bus-protocols.md) · [pci-usb-drivers](../../../05-drivers-device-tree/pci-usb-drivers.md).
 
 **Bẫy:** ① nói *"em có biết Yocto"* khi chỉ đọc qua — hỏi hai câu là lộ, và **mất niềm tin cho cả buổi** · ② xin lỗi dài dòng, hạ thấp bản thân · ③ chỉ nói *"em học nhanh lắm"* mà không có bằng chứng — trong khi bạn **có** bằng chứng thật: đã port driver qua nhiều chipset và migrate kernel hai đời.
 </details>
@@ -494,7 +494,7 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 4. ⭐ **Nêu cái giá mình đã nhận** — phần phân biệt ứng viên: *"đổi lại, trạng thái cần khôi phục giờ nằm **trên phần cứng**, nên **mọi đường thoát** khỏi chế độ edit đều phải được kiểm soát"* — Cancel, đóng app, rút cáp, chuyển màn hình khác…
 5. ⭐⭐ **Nói thẳng lời giải tốt hơn:** *"em xử lý bằng **cờ trong mode** — không sai, nhưng **dễ quên ở chỗ gọi mới**. Team sau này làm bằng **state machine**, và đó là lời giải đúng hơn."*
 
-**Vì sao (5) là câu ăn điểm chứ không phải câu tự hạ mình:** nó chứng minh bạn phân biệt được *"giải pháp chạy được"* và *"giải pháp không thể dùng sai"*. Đó đúng là khoảng cách **mid → senior** mà [plan §📍](../../study-plans/datalogic-plan.md) đã ghi (*"dừng ở sửa xong, chưa tới ngăn tái diễn"*) — ở câu này bạn **đi tới vế thứ hai**.
+**Vì sao (5) là câu ăn điểm chứ không phải câu tự hạ mình:** nó chứng minh bạn phân biệt được *"giải pháp chạy được"* và *"giải pháp không thể dùng sai"*. Đó đúng là khoảng cách **mid → senior** mà [plan §📍](../../study-plans/archive/datalogic-plan.md) đã ghi (*"dừng ở sửa xong, chưa tới ngăn tái diễn"*) — ở câu này bạn **đi tới vế thứ hai**.
 
 **Nền kỹ thuật nên nắm:** state machine vs cờ boolean rải rác ([behavioral.md — State](../../../11-design-patterns/behavioral.md)) · vì sao *"số trạng thái tăng thì số tổ hợp cờ tăng theo cấp số nhân"* · rollback/snapshot là mẫu chung: `currentPresetSettings` ở đây ≡ **bản cũ trong OTA A/B** ([BSP-015](bsp.md)) ≡ **transaction rollback**.
 
@@ -807,7 +807,7 @@ Với công ty đang tuyển **kỹ sư C++ nhúng**, dòng đó có thể đọ
 2. **Ai lo:** library sẵn có (monitor sensor theo tần số riêng, xử lý số liệu, cache).
 3. **Mình chạm gì:** request giá trị đã xử lý; phần thuật toán và chính sách độ sáng là của mình.
 
-⚠️ **Đừng gộp nhầm thành "em làm driver I2C".** [Bài học #8](../../study-plans/datalogic-plan.md): interviewer không phân biệt được "gộp nhầm" với "bịa".
+⚠️ **Đừng gộp nhầm thành "em làm driver I2C".** [Bài học #8](../../study-plans/archive/datalogic-plan.md): interviewer không phân biệt được "gộp nhầm" với "bịa".
 
 ⭐ **Cách nâng câu này thành điểm cộng** — nối sang cái mình **thật sự** quyết định: *"Phần I2C thì library lo. Cái em quyết là **chính sách phía trên**: chu kỳ tính target, bước chuyển, và đánh đổi giữa độ trễ với khả năng lọc nhiễu."* ([RES-025](resume.md))
 </details>

@@ -1,6 +1,6 @@
 # 🎤 Phiên mock · 2026-08-17 · `rapid` · track `drivers-dt`
 
-- **Tham số:** `rapid` · 12 câu · trần T2 (thực tế chỉ chạm **T1**) · Ngày **D1** của [lịch 14 ngày](../../study-plans/datalogic-plan.md)
+- **Tham số:** `rapid` · 12 câu · trần T2 (thực tế chỉ chạm **T1**) · Ngày **D1** của [lịch 14 ngày](../../study-plans/archive/datalogic-plan.md)
 - **Điểm tổng: 3.92/4** — **cao nhất từ trước tới nay**. 11/12 câu đạt 4.
 - **Bối cảnh:** phiên **đầu tiên** chạm domain `DRV` (42 câu, phủ **0%** trước phiên).
 

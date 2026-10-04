@@ -11,7 +11,7 @@
 ```
 /mock
 ```
-Claude đọc config, rồi mở **§📍 Tiến độ** của [datalogic-plan](../study-plans/datalogic-plan.md) và **đề xuất thẳng buổi kế tiếp** (track + type + lệnh chính xác đã ghi sẵn ở đó). Chỉ khi plan đã chạy hết — hoặc bạn nói rõ là ôn tự do — Claude mới hỏi bạn chọn track/type.
+Claude đọc config. Nếu có **plan JD đang chạy** trong [study-plans/](../study-plans/) thì mở §📍 Tiến độ của nó và **đề xuất thẳng buổi kế tiếp**; không có (hiện trạng — plan Datalogic đã [lưu trữ](../study-plans/archive/datalogic-plan.md)) thì Claude hỏi bạn chọn track/type.
 
 **Cách 2 — Thủ công:** trong hội thoại mới, nói
 > "Chạy mock interview" (kèm track/type nếu muốn, vd "mock comprehensive track BSP").
@@ -37,12 +37,12 @@ Một phiên = **1 track** (hỏi mảng nào) × **1 interview type** (hình th
 
 ```mermaid
 flowchart TD
-    A["/mock hoặc 'chạy mock interview'"] --> B["Claude đọc config (gồm §6 độ sâu)<br/>+ §📍 plan → đề xuất buổi kế tiếp"]
+    A["/mock hoặc 'chạy mock interview'"] --> B["Claude đọc config (gồm §6 độ sâu)<br/>+ §📍 plan (nếu có) → đề xuất buổi kế tiếp"]
     B --> C["Hỏi từng câu: phần nền + <b>follow-up mở rộng</b><br/><i>KHÔNG chấm giữa chừng</i>"]
     C --> D{"Đủ số câu<br/>hoặc bạn gõ 'xong'?"}
     D -->|chưa| C
     D -->|rồi| E["REVIEW toàn phiên: đúng/sai từng câu + điểm<br/>+ trích bank & tài liệu gốc cho câu ≤3"]
-    E --> F["Cập nhật BẮT BUỘC: sessions/ · weak-register<br/>(gồm <b>lịch kiểm tra lại</b> nếu gỡ câu) · bank/<br/>· coding-arena/reviewed/ · §📍 plan"]
+    E --> F["Cập nhật BẮT BUỘC: sessions/ · weak-register<br/>(gồm <b>lịch kiểm tra lại</b> nếu gỡ câu) · bank/<br/>· coding-arena/reviewed/ · §📍 plan (nếu có)"]
     F --> G["Gợi ý ôn tiếp + phiên kế"]
 ```
 

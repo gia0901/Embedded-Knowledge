@@ -1,7 +1,7 @@
 # The Linux Programming Interface — Michael Kerrisk (No Starch Press, 2010)
 
 > **Nguồn summary:** **đã đối chiếu PDF** — bản 1556 trang (`The Linux Programming Interface.pdf`, ModDate 2025-03-29). **Quy đổi trang: `trang PDF = trang sách + 44`** (xác minh chéo 2 điểm: ch. 47 sách tr. 965 → PDF 1009; ch. 63 sách tr. 1325 → PDF 1369). Mọi số trang trong các file cụm là **trang SÁCH**.
-> **Vì sao đọc cuốn này:** đây là **sách tham chiếu API userspace Linux đầy đủ nhất** — 64 chương, 1400+ trang, viết bởi người bảo trì `man-pages`. Với JD [Datalogic](../../14-prep/study-plans/datalogic-plan.md), trụ số 1 là *"Familiar with Linux userspace + debugging"* — đó chính là nội dung cuốn này. Nó trả lời cấp độ *"vì sao API được thiết kế thế"*, không chỉ *"gọi hàm nào"*.
+> **Vì sao đọc cuốn này:** đây là **sách tham chiếu API userspace Linux đầy đủ nhất** — 64 chương, 1400+ trang, viết bởi người bảo trì `man-pages`. Với JD [Datalogic](../../14-prep/study-plans/archive/datalogic-plan.md), trụ số 1 là *"Familiar with Linux userspace + debugging"* — đó chính là nội dung cuốn này. Nó trả lời cấp độ *"vì sao API được thiết kế thế"*, không chỉ *"gọi hàm nào"*.
 
 ---
 

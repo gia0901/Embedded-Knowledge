@@ -12,6 +12,10 @@ Giải thích ngắn gọn các thuật ngữ tiếng Anh dùng xuyên suốt t�
 |-----------|-----------------|----------|
 | **RAII** | Ràng buộc vòng đời tài nguyên vào vòng đời object (ctor giành, dtor trả) | [02](02-modern-cpp/raii-smart-pointers.md) |
 | **UB** (Undefined Behavior) | Hành vi chuẩn không định nghĩa; compiler được làm bất cứ gì | [01](01-cpp-fundamentals/memory-model.md) |
+| **Array decay** | Tên mảng tự đổi thành con trỏ tới phần tử đầu (trừ `sizeof`, `&`, khởi tạo `char[]`) — truyền mảng vào hàm là truyền con trỏ | [01](01-cpp-fundamentals/c-pointers-arrays.md) |
+| **X-macro** | Một danh sách macro duy nhất sinh ra nhiều thứ phải khớp nhau (`enum` + bảng chuỗi) | [01](01-cpp-fundamentals/c-language-idioms.md) |
+| **Linkage** (internal / external) | Tên có được thấy từ file khác không — `static` ở phạm vi file = internal | [01](01-cpp-fundamentals/c-language-idioms.md) |
+| **Row-major** | Mảng 2 chiều C xếp liền theo hàng: `a[i][j]` ở `base + (i*C + j)*sizeof` | [01](01-cpp-fundamentals/c-pointers-arrays.md) |
 | **vtable / vptr** | Bảng con trỏ hàm virtual / con trỏ ẩn trong object trỏ tới vtable | [01](01-cpp-fundamentals/oop.md) |
 | **ODR** (One Definition Rule) | Mỗi entity chỉ được định nghĩa đúng một lần toàn chương trình | [06](06-build-systems/makefile.md) |
 | **lvalue / rvalue** | Biểu thức có tên/địa chỉ bền / giá trị tạm sắp hết hạn | [02](02-modern-cpp/move-semantics.md) |

@@ -13,7 +13,7 @@ Bạn tự đặt vấn đề đúng: *"không tham lam học hết, một vài 
 
 Hai lý do cụ thể, không phải khẩu hiệu:
 
-1. **Pattern học rời khỏi bối cảnh thì không truy xuất được lúc bị hỏi.** Repo đã đo đúng hiện tượng này hai lần: *T1 3.67 / T2 2.1* — biết định nghĩa nhưng không chuyển thành quyết định ([datalogic-plan §📍](../../14-prep/study-plans/datalogic-plan.md)). Pattern là mảng kiến thức **dễ mắc bệnh này nhất**, vì sách dạy toàn ví dụ `Shape`/`Animal` không dính gì tới công việc.
+1. **Pattern học rời khỏi bối cảnh thì không truy xuất được lúc bị hỏi.** Repo đã đo đúng hiện tượng này hai lần: *T1 3.67 / T2 2.1* — biết định nghĩa nhưng không chuyển thành quyết định ([datalogic-plan §📍](../../14-prep/study-plans/archive/datalogic-plan.md)). Pattern là mảng kiến thức **dễ mắc bệnh này nhất**, vì sách dạy toàn ví dụ `Shape`/`Animal` không dính gì tới công việc.
 2. **Nói ra một tên pattern là mời interviewer hỏi vào đúng nó** (bài học #4 của plan, phiên 19/08). Nói *"em dùng Builder"* trong khi cái đó là Factory ⟹ mất điểm nhiều hơn là không nói gì. Thư mục này gọi đúng tên từng thứ trong code bạn đã viết.
 
 ---

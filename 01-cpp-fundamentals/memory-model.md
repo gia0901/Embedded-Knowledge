@@ -182,10 +182,11 @@ Quy tắc: cặp đôi phải khớp — `new`↔`delete`, `new[]`↔`delete[]`,
 |----|---------|
 | [CPP-004](../14-prep/mock-interview/bank/cpp.md) | Sự khác nhau giữa stack và heap? Khi nào dùng cái nào? |
 | [CPP-001](../14-prep/mock-interview/bank/cpp.md) | Con trỏ và tham chiếu khác nhau thế nào? |
+| [C-001…C-020](../14-prep/mock-interview/bank/c-programming.md) | C thuần — con trỏ, mảng, chuỗi: xem [c-pointers-arrays.md](c-pointers-arrays.md) |
 | [CPP-060](../14-prep/mock-interview/bank/cpp.md) | Đoạn code sau có vấn đề gì? ```cpp int* getValue() { int x = 42; return &x; } ``` |
 | [CPP-036](../14-prep/mock-interview/bank/cpp.md) | Undefined Behavior là gì? Vì sao nguy hiểm? |
 | [CPP-033](../14-prep/mock-interview/bank/cpp.md) | `new`/`delete` khác `malloc`/`free` ở đâu? |
 | [CPP-003](../14-prep/mock-interview/bank/cpp.md) | Phân biệt `const int* p`, `int* const p`, `const int* const p`. |
 
 ---
-⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [oop.md](oop.md)
+⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [c-pointers-arrays.md](c-pointers-arrays.md) *(C thuần: mảng, con trỏ hai chiều, chuỗi)*

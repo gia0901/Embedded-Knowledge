@@ -117,7 +117,7 @@ Dòng resume nói *một binary phục vụ cả standalone lẫn synchronized*.
 ## 3. Memento — feature Preset (Samsung Display Manager)
 
 > Neo resume: *"Built the 'Preset' feature — users can save a display configuration, restore it across restarts, and **export it to apply on another monitor**"*
-> ⚠️ Kèm ghi chú thực tế: phần **lưu JSON đã có sẵn** trước khi bạn vào, **không nhận công** ([plan §📍, ghi chú 07/09](../../14-prep/study-plans/datalogic-plan.md) · câu [RES-022](../../14-prep/mock-interview/bank/resume.md)).
+> ⚠️ Kèm ghi chú thực tế: phần **lưu JSON đã có sẵn** trước khi bạn vào, **không nhận công** ([plan §📍, ghi chú 07/09](../../14-prep/study-plans/archive/datalogic-plan.md) · câu [RES-022](../../14-prep/mock-interview/bank/resume.md)).
 
 ### 3.1 Pattern
 
@@ -146,7 +146,7 @@ Memento kinh điển là **trong một process, trong một phiên chạy** (und
 2. **Khả năng của thiết bị.** Màn hình đích **không hỗ trợ** một setting, hoặc có dải giá trị khác. *(Trả lời: áp dụng từng phần + báo cáo cái bỏ qua — chính là ý **`-ENOTSUP`** của [Null Object](A2-cpp-interface-hal.md) ở tầng khác.)*
 3. **Tính nguyên tử.** Áp 10 setting, cái thứ 7 hỏng — dừng hay đi tiếp? *(Không có đáp án đúng duy nhất; có **quyết định rõ ràng và nhất quán** mới là câu trả lời.)*
 
-> 💡 **Bài nói bấm giờ:** ba ý trên chính là khung trả lời cho [RES-022](../../14-prep/mock-interview/bank/resume.md) — *phạm vi · ranh giới công lao · đánh đổi đã chấp nhận* — đang nằm ở việc **#4** trong [hàng đợi của plan](../../14-prep/study-plans/datalogic-plan.md). Đọc to, bấm giờ, đừng chỉ đọc thầm.
+> 💡 **Bài nói bấm giờ:** ba ý trên chính là khung trả lời cho [RES-022](../../14-prep/mock-interview/bank/resume.md) — *phạm vi · ranh giới công lao · đánh đổi đã chấp nhận* — đang nằm ở việc **#4** trong [hàng đợi của plan](../../14-prep/study-plans/archive/datalogic-plan.md). Đọc to, bấm giờ, đừng chỉ đọc thầm.
 
 ---
 

@@ -2,7 +2,7 @@
 
 - **Level:** mid-level · **Trần độ sâu:** **T2** · **Số câu:** 15/16 (dừng trước bài coding) · ~70 phút
 - **Điểm trung bình:** **3.0 / 4**
-- **Bối cảnh:** Buổi CN Tuần 1 — chốt Tuần 1, theo [datalogic-plan](../../study-plans/datalogic-plan.md). Chạy lại sau lần [tạm dừng 10/08](2026-08-10--comprehensive--cpp-system.md); **bộ câu hoàn toàn mới**, câu sổ yếu/retention đều đổi góc.
+- **Bối cảnh:** Buổi CN Tuần 1 — chốt Tuần 1, theo [datalogic-plan](../../study-plans/archive/datalogic-plan.md). Chạy lại sau lần [tạm dừng 10/08](2026-08-10--comprehensive--cpp-system.md); **bộ câu hoàn toàn mới**, câu sổ yếu/retention đều đổi góc.
 - **Câu 16 (coding `SocketHandle`) hoãn** — chưa làm, chưa chấm.
 
 > **Cách dùng file này:** mỗi câu để **nguyên đề bài**, phần nhận xét + đáp án chuẩn **ẩn trong `<details>`** — tự trả lời lại trước khi mở. Cố ý lặp nội dung bank, vì đây là *lỗi của chính mình đặt cạnh đáp án chuẩn*.

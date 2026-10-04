@@ -39,7 +39,7 @@
 
 > *"board thật, shell điều khiển được thông qua đường Serial cắm vào PC"*
 
-**Đối chiếu [plan §📍](../../study-plans/datalogic-plan.md) — 8/8 bài lab BSP đều ⬜ chưa làm**, và plan ghi rõ hai chặn:
+**Đối chiếu [plan §📍](../../study-plans/archive/datalogic-plan.md) — 8/8 bài lab BSP đều ⬜ chưa làm**, và plan ghi rõ hai chặn:
 
 > ⚠️ *"**không có cáp USB–TTL 3.3V thì toàn bộ Thẻ A vô nghĩa**"*
 > ⭐ *"**Chưa tick đủ checklist thì đừng bắt đầu bài 031**"*
@@ -135,7 +135,7 @@ Với công ty tuyển **kỹ sư C++ nhúng**, dòng đó đọc thành: bạn 
 **Rồi nối ngay vào bằng chứng của chính mình** — biến câu phòng thủ thành câu ghi điểm:
 > *"— như bài tối ưu thời gian nạp driver: AI không đọc hộ em `dmesg` để thấy tiến trình RT chen vào giây thứ 4."*
 
-⚠️ **Rủi ro này KHÔNG mới.** [plan §📍](../../study-plans/datalogic-plan.md) đã ghi từ **24/08**:
+⚠️ **Rủi ro này KHÔNG mới.** [plan §📍](../../study-plans/archive/datalogic-plan.md) đã ghi từ **24/08**:
 > ⚠️ **Một câu nên bỏ khỏi vốn từ phỏng vấn:** *"viết code, ngôn ngữ lập trình, testing hoàn toàn có thể làm tốt bởi AI"* (BEH-005). Nói với người đang tuyển kỹ sư C++ nhúng là **rủi ro thật**.
 
 Cùng một rủi ro, **đổi vỏ** từ *câu nói* sang *dòng resume* — và không nhận ra. ⇒ Bài học: cảnh báo được ghi dưới dạng **một câu cụ thể** thì chỉ chặn được **đúng câu đó**. Phải nâng lên thành **nguyên tắc**: *mỗi dòng resume tự hỏi "câu này mở ra câu hỏi nào?"* — dòng nói về **công cụ** luôn mở ra *"còn năng lực của bạn ở đâu?"*; dòng nói về **chẩn đoán** thì không.
@@ -229,13 +229,13 @@ Thêm được ba thứ mà **không tốn thêm dòng**: (1) đúng sự thật
 
 | | Việc | Vì sao |
 |---|---|---|
-| **1** 🔴 | **Chốt sự thật về lab BBB** — làm rồi thì cập nhật [plan §📍](../../study-plans/datalogic-plan.md); chưa thì **đổi câu trả lời Yocto ngay** | Sập ở đây làm **mất cả buổi**, không chỉ một câu |
+| **1** 🔴 | **Chốt sự thật về lab BBB** — làm rồi thì cập nhật [plan §📍](../../study-plans/archive/datalogic-plan.md); chưa thì **đổi câu trả lời Yocto ngay** | Sập ở đây làm **mất cả buổi**, không chỉ một câu |
 | **2** 🔴 | **Học thuộc câu chặn dòng AI** (một câu + ví dụ insmod) | 0 điểm, và rủi ro này plan cảnh báo từ 24/08 mà **vẫn lọt** |
 | **3** 🟠 | **Viết + bấm giờ 45 giây cho `RES-001`** — bắt buộc mở bằng *"nhìn thành từng ô"*, đóng bằng **một con số** | Lỗi **lần thứ ba**; chỉ chữa được bằng **nói to**, không phải đọc thêm |
 
 ## 🧾 Ghi chú đồng bộ
 
-- **Bank đã lệch khỏi resume:** `RES-009` bám con số *"giảm 70%"* — **con số đó không còn trong resume** (nay là *"1 day → 1–2 hours"* và *">50%"*). Cảnh báo tương ứng trong [plan §📍](../../study-plans/datalogic-plan.md) cũng đã cũ.
+- **Bank đã lệch khỏi resume:** `RES-009` bám con số *"giảm 70%"* — **con số đó không còn trong resume** (nay là *"1 day → 1–2 hours"* và *">50%"*). Cảnh báo tương ứng trong [plan §📍](../../study-plans/archive/datalogic-plan.md) cũng đã cũ.
 - **Có 3 bản resume:** `RESUME_embedded_linux.tex` · `RESUME_cpp_linux.tex` · 🆕 `RESUME_bosch.tex`. Bank `RES` neo vào **bản embedded_linux** ([tracks.md](../tracks.md)) — cần chốt bản nào là bản chuẩn cho track `resume`.
 - **Nợ retention quá hạn:** đợt **24–29/08** (`CPP-019/024/045/020/029`) **chưa chạy**. Đợt **04–09/09** (`CPP-009`, `CPP-032`) mở từ 04/09.
 

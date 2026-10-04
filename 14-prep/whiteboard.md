@@ -659,4 +659,4 @@ Câu này **khó**, và nó là câu thật.
 
 ---
 
-⬅️ [14-prep](study-plans/datalogic-plan.md) · Từ vựng: [in-practice/README.md](../11-design-patterns/in-practice/README.md) · Kiến trúc đầy đủ: [A1-baseline-libdisplay.md](../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+⬅️ [study-plans](study-plans/README.md) · Từ vựng: [in-practice/README.md](../11-design-patterns/in-practice/README.md) · Kiến trúc đầy đủ: [A1-baseline-libdisplay.md](../11-design-patterns/in-practice/A1-baseline-libdisplay.md)

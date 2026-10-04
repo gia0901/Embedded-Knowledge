@@ -35,7 +35,7 @@ flowchart LR
 
 | # | File | Nội dung | Trạng thái |
 |---|------|----------|-----------|
-| 5 | [bare-metal-c.md](bare-metal-c.md) | C cho embedded: stdint/promotion, bit manipulation, truy cập thanh ghi (volatile/bitfield), fixed-point, integer overflow, CRC, MISRA | ✅ |
+| 5 | [bare-metal-c.md](bare-metal-c.md) | C cho embedded: stdint/promotion, bit manipulation (+ §2.1 bài viết tay), truy cập thanh ghi (volatile/bitfield), fixed-point, integer overflow, CRC, MISRA | ✅ |
 | 6 | [memory-and-startup.md](memory-and-startup.md) | `.text/.data/.bss/.rodata`, **startup/crt0** (trước main), **linker script**, stack/heap MCU, MPU | ✅ |
 | 7 | [interrupts-bare-metal.md](interrupts-bare-metal.md) | ISR rules, vector table/NVIC, **chia sẻ dữ liệu ISR↔main** (critical section), latency, reentrancy, hard fault | ✅ |
 | 8 | [rtos-programming.md](rtos-programming.md) | scheduler, primitive (sem/mutex/queue/event), **ISR→task FromISR**, stack sizing, RMS, tickless, kiến trúc firmware, bootloader | ✅ |

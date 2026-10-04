@@ -1,7 +1,7 @@
 # Phiên mock — 2026-08-03 · rapid · track cpp-system
 
 - **Điểm trung bình:** 3.25 / 4
-- **Bối cảnh:** Buổi 1 của [datalogic-plan](../../study-plans/datalogic-plan.md) (Tuần 1 — C++17). Warm-up cpp-system.
+- **Bối cảnh:** Buổi 1 của [datalogic-plan](../../study-plans/archive/datalogic-plan.md) (Tuần 1 — C++17). Warm-up cpp-system.
 
 | ID | Câu (tóm tắt) | Tự đánh giá | Điểm | Ghi chú (thiếu gì / lỗ hổng) |
 |----|---------------|-------------|------|------------------------------|

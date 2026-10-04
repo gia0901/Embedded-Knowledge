@@ -9,7 +9,7 @@
 > **Kế hoạch:** tự ôn đủ 16 câu (kể cả follow-up) → **mock lại phiên này** sau. Khi mock lại, interviewer đọc file này để **đổi góc hỏi**, không lặp nguyên văn (config §6).
 
 - **Level:** mid-level · **Đã hỏi:** 9 câu + follow-up · **Còn lại:** 7 câu (câu 10–16)
-- **Bối cảnh:** Buổi CN Tuần 1 phần 2 — chốt Tuần 1 (C++17 & Modern C++), theo [datalogic-plan](../../study-plans/datalogic-plan.md)
+- **Bối cảnh:** Buổi CN Tuần 1 phần 2 — chốt Tuần 1 (C++17 & Modern C++), theo [datalogic-plan](../../study-plans/archive/datalogic-plan.md)
 - **Cơ cấu đã thiết kế:** 3 câu 🟢 khởi động · 5 câu 🟡🟠 cơ chế · 3 câu 🔴 design 🏗️ · 2 bài coding · 3 câu xuyên-topic. Chèn sẵn 2 câu sổ yếu (CPP-032, CPP-054) + 2 câu retention đến hạn (CPP-020, CPP-029).
 
 ---

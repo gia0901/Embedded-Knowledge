@@ -12,9 +12,9 @@
 - File này đã được hoàn thiện (không còn là bản nháp mơ hồ). Vẫn có thể tinh chỉnh khi phát sinh nhu cầu mới.
 - Xem **Mục 7 — Tiến độ** để biết tài liệu nào đã/đang/chưa viết.
 
-> 🎯 **ĐANG CHẠY SPRINT PHỎNG VẤN 3–4 NGÀY (Datalogic, JD mới).** Plan 28 ngày cũ đã **bỏ hẳn 2026-09-11**; bản hiện tại là sprint 4 buổi bám `RESUME_current.tex` + JD mới (coding **trên giấy**, PV **50% Việt / 50% Anh**).
-> Conversation mới muốn tiếp tục ôn: mở **[`14-prep/study-plans/datalogic-plan.md`](14-prep/study-plans/datalogic-plan.md) → §📍 Tiến độ hiện tại** (ngay đầu file) để biết đang ở buổi nào (B1–B4) + việc làm tiếp. Đó là **nguồn tracking DUY NHẤT** — không suy đoán từ nơi khác.
-> ❄️ Ba bộ lab 🧪 (BSP phần cứng · DBG · DP) và mục tiêu **độ phủ bank** đã **đóng băng** tới sau buổi PV — xem §10 của plan.
+> 📦 **Sprint Datalogic đã KẾT THÚC (phỏng vấn xong, 2026-10-03).** Hiện **không có plan JD nào đang chạy**. Plan cũ lưu ở [`14-prep/study-plans/archive/`](14-prep/study-plans/archive/) — giữ vì các *"bài học #N"* được trích từ nhiều nơi.
+> Conversation mới muốn ôn: `/mock` sẽ hỏi track + type (ôn tự do). Có JD mới ⇒ viết plan mới vào `14-prep/study-plans/` theo khuôn ở [study-plans/README](14-prep/study-plans/README.md).
+> 🧪 Ba bộ lab (BSP phần cứng · DBG · DP) **hết đóng băng** — làm được bất cứ lúc nào.
 
 ---
 
@@ -79,6 +79,8 @@ Embedded-Interview/
 │
 ├── 01-cpp-fundamentals/          # C/C++ nền tảng
 │   ├── memory-model.md           # stack/heap, con trỏ, tham chiếu, layout
+│   ├── c-pointers-arrays.md      # C thuần: decay, đọc khai báo, T**, mảng 2 chiều, chuỗi, con trỏ hàm (bank domain C)
+│   ├── c-language-idioms.md      # C thuần: macro, linkage, union/byte, goto cleanup, atoi/itoa (bit viết tay ở 08/bare-metal-c §2.1)
 │   ├── oop.md                    # class, kế thừa, virtual, vtable
 │   ├── templates.md              # template, generic programming
 │   └── ...
@@ -170,7 +172,7 @@ Embedded-Interview/
 ├── 14-prep/                      # Chuẩn bị phỏng vấn thực tế
 │   ├── lab-setup.md              # 🔧 Hạ tầng cho bộ lab phần cứng (BeagleBone Black) — MỘT chỗ duy nhất
 │   ├── whiteboard.md             # 🖊️ 6 sơ đồ vẽ tay khi PV (2 sequence) + chiến lược chọn + kịch bản 🇻🇳/🇬🇧 + nhận định kiến trúc + trang gấp
-│   ├── study-plans/              # ⭐ Plan bám JD đang nhắm (datalogic-plan, có §📍 tracking) + gap-register
+│   ├── study-plans/              # Plan bám JD đang nhắm (có §📍 tracking — hiện KHÔNG có plan chạy) + archive/ + gap-register
 │   └── mock-interview/           # ⭐ Phỏng vấn thử tương tác (/mock) + NGÂN HÀNG CÂU HỎI DUY NHẤT (bank/) + sessions/weak-register/coding-arena(+reviewed/)
 │
 ├── 15-book-summaries/            # Tóm tắt sách chuyên ngành theo cụm chủ đề
@@ -205,7 +207,7 @@ Embedded-Interview/
 |-------|-----------|---------|
 | CLAUDE.md | ✅ Xong | Đã hoàn thiện |
 | README.md (mục lục + lộ trình) | ✅ Xong | Mục lục + lộ trình 1-3 tháng |
-| 01 C++ fundamentals | ✅ Xong | memory-model, oop, templates |
+| 01 C++ fundamentals | ✅ Xong | memory-model, **c-pointers-arrays + c-language-idioms** (thêm 03/10 sau phản hồi PV thật: C thuần vẫn bị hỏi; bank domain `C` 51 câu, gồm mục N 🔎 đọc code), oop, templates |
 | 02 Modern C++ | ✅ Xong | raii-smart-pointers, move-semantics, lambdas-functional, concurrency |
 | 03 Operating System | ✅ Xong | process-thread, scheduling, memory-management, sync-primitives, ipc |
 | 04 Linux system programming | ✅ Xong | file-io, processes-signals, io-multiplexing, ipc-linux |
@@ -219,7 +221,7 @@ Embedded-Interview/
 | 12 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
 | 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
-| 14 Prep | 🟡 Đang dùng | **study-plans/** (`datalogic-plan` — **SPRINT 4 buổi trước phỏng vấn**, viết lại 11/09, §📍 là nguồn tracking duy nhất — + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
+| 14 Prep | 🟡 Đang dùng | **study-plans/** (không có plan đang chạy — `datalogic-plan` đã **lưu trữ** vào `archive/` 03/10 sau buổi PV; + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
 | 15 Book summaries | 🟡 Đang viết | **8 cuốn đã xong**, tất cả đối chiếu PDF (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset, **cpp-high-performance** — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); TLPI ✅ 10/10 cụm (đủ 64 chương); **cpp-high-performance là bản CHỌN LỌC 3/14 chương có chủ đích** (bỏ phần trùng EMC/Williams + ~30% là C++20 ngoài JD C++17); còn LDD3/Bootlin ⬜. Tiến độ chi tiết từng cuốn xem `15-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu

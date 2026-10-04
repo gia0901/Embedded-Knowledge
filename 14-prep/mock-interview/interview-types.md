@@ -10,7 +10,7 @@
 - 2 câu **rapid** 🟢 (phản xạ nhanh, đáp án 1–2 câu).
 - 3 câu **concept** 🟡 (giải thích cơ chế, so sánh).
 - 1 câu **revisit** — từ [weak-register.md](weak-register.md) (ưu tiên), hoặc nếu trống thì **câu retention** (câu đã trả lời tốt, đã lâu chưa hỏi lại — đọc [sessions/](sessions/)).
-- Track: mặc định `bsp`; hoặc `all` để trộn. Theo §📍 của [datalogic-plan](../study-plans/datalogic-plan.md) nếu plan đang chạy.
+- Track: mặc định `bsp`; hoặc `all` để trộn. Theo §📍 của plan JD đang chạy nếu có (hiện không có — xem [study-plans/](../study-plans/)).
 
 ## `rapid` — Phản xạ nhanh · 12 câu · ~15′
 Bắn liên tục câu 🟢🟡 **concept**, đáp án ngắn gọn, đo độ *trôi chảy* — thứ interviewer test ở màn khởi động. Ít follow-up. Hợp warm-up trước phiên lớn hoặc lúc ít thời gian.

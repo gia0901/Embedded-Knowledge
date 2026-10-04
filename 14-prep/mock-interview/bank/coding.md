@@ -216,6 +216,8 @@ int is_little_endian() {
     return *(char*)&x == 1;   // byte thấp ở địa chỉ thấp -> little-endian
 }
 ```
+
+**Liên quan:** [C-033](c-programming.md) (`union` cho thấy thứ tự byte; type punning C vs C++) · [C-034](c-programming.md) (đọc số big-endian từ buffer bằng phép dịch — không phụ thuộc endianness) · [C-028](c-programming.md) (đảo byte).
 </details>
 
 #### COD-011 · 🟡 · coding · ⭐ · [→ complexity-and-structures](../../../12-dsa/complexity-and-structures.md)

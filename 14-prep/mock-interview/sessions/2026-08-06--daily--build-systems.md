@@ -2,7 +2,7 @@
 
 - **Level:** mid-level · **Số câu:** 6 · **Thời lượng:** ~20 phút
 - **Điểm trung bình:** 3.17 / 4
-- **Bối cảnh:** Tuần 1 **Buổi 4** của [datalogic-plan](../../study-plans/datalogic-plan.md) — CMake **tư duy target-based** (không cú pháp) + chạm Yocto. Slot revisit dùng cho CPP-019 theo cờ ⚠️ của plan.
+- **Bối cảnh:** Tuần 1 **Buổi 4** của [datalogic-plan](../../study-plans/archive/datalogic-plan.md) — CMake **tư duy target-based** (không cú pháp) + chạm Yocto. Slot revisit dùng cho CPP-019 theo cờ ⚠️ của plan.
 
 ## Kết quả từng câu (nhìn nhanh)
 | ID | Câu (tóm tắt) | Điểm | Ghi chú ngắn |

@@ -6,7 +6,7 @@
 
 ## Cách dùng
 
-**Vào việc ngay:** mở [datalogic-plan.md](datalogic-plan.md) → **§📍 Tiến độ hiện tại** (ngay đầu file). Đó là **nguồn tracking DUY NHẤT** — cho biết đang ở buổi nào, lệnh `/mock` làm tiếp, sổ yếu hiện tại. Không suy đoán tiến độ từ nơi khác.
+**Hiện không có plan nào đang chạy.** Plan Datalogic đã kết thúc và nằm ở [archive/](archive/). Ôn tự do bằng `/mock` (Claude hỏi track/type). Khi có JD mới: viết `<công-ty>-plan.md` **ngay trong thư mục này** (không trong `archive/`) với block **§📍 Tiến độ hiện tại** ở đầu file — `/mock` và config tự nhận ra nó là plan đang chạy.
 
 Kế hoạch tổ chức theo **tuần × buổi**, mỗi buổi hai cột: **Đọc/Hiểu** (chuẩn bị trước — doc cụ thể + pool câu hỏi bank) và **Test 🎤** (phiên mock). Ba nguyên tắc xuyên suốt nằm ở đầu plan: ① ưu tiên *tư duy* hơn cú pháp · ② **xen kẽ + lặp lại ngắt quãng** (khởi động trộn ~5–10′ mỗi buổi + ôn dồn tích cuối tuần) · ③ đọc thì liệt kê đầy đủ, mock thì để ngẫu nhiên.
 
@@ -24,9 +24,15 @@ Ký hiệu trong checklist: `- [ ]` chưa ôn · `- [x]` đã ôn vững · **�
 
 | Vị trí | Kế hoạch | Trọng tâm |
 |--------|----------|-----------|
-| 🎯 **Embedded Linux Engineer @ Datalogic** (JD cụ thể) **← ĐANG CHẠY, DUY NHẤT** | [datalogic-plan.md](datalogic-plan.md) — **resume ở §📍 Tiến độ (đầu file)** | 4 tuần (dùng được cho 2 tuần nước rút): C++17, Linux sysprog+debug, kernel/driver I2C/SPI + **PCI/USB**, **Yocto**/CMake/CI, design + lead/review |
+| *(chưa có — viết khi có JD mới)* | — | — |
 
-> **Chỉ còn một kế hoạch, cố ý.** Hai plan nghề chung chung trước đây (`bsp-plan.md`, `cpp-systemsw-plan.md`) đã **xoá 2026-08-09**: chúng trỏ vào bộ câu hỏi cũ nay không còn, không ai tick checkbox, và nội dung đã bị `datalogic-plan` phủ kín ở dạng cụ thể hơn (bám JD thật, có §📍 tracking sống). Ôn theo JD đang nhắm — khi có JD mới thì viết plan mới cho JD đó, đừng dựng lại plan generic.
+**Đã lưu trữ:**
+
+| Vị trí | Kế hoạch | Kết thúc |
+|--------|----------|----------|
+| 📦 Embedded Linux Engineer @ Datalogic | [archive/datalogic-plan.md](archive/datalogic-plan.md) — sprint 4 buổi (B1 3.00 · B2 3.14 · B3 2.58), chứa **bài học #1…#N** được trích từ nhiều nơi | 2026-10-03 |
+
+> **Mỗi lúc chỉ một kế hoạch, cố ý.** Hai plan nghề chung chung trước đây (`bsp-plan.md`, `cpp-systemsw-plan.md`) đã **xoá 2026-08-09**: chúng trỏ vào bộ câu hỏi cũ nay không còn, không ai tick checkbox, và nội dung đã bị `datalogic-plan` phủ kín ở dạng cụ thể hơn (bám JD thật, có §📍 tracking sống). Ôn theo JD đang nhắm — khi có JD mới thì viết plan mới cho JD đó (lấy plan đã lưu trữ làm khuôn), đừng dựng lại plan generic. Plan xong việc thì chuyển vào `archive/`, không xoá.
 
 ## Tài liệu dùng chung cho cả hai hướng
 

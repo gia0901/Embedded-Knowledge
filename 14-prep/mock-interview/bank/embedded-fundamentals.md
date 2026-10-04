@@ -8,7 +8,7 @@
 
 | Mảng (câu) | Tài liệu học |
 |---|---|
-| A. C & thanh ghi + F. Số học/độ tin cậy (001–004, 024–027) | [bare-metal-c.md](../../../08-embedded-systems/bare-metal-c.md) |
+| A. C & thanh ghi + F. Số học/độ tin cậy (001–004, 024–027) | [bare-metal-c.md](../../../08-embedded-systems/bare-metal-c.md) — bài bit **viết tay** ở bank [`C` mục I](c-programming.md) (C-026…029) |
 | B. Bộ nhớ bare-metal & startup (005–008) | [memory-and-startup.md](../../../08-embedded-systems/memory-and-startup.md) |
 | C. Ngắt bare-metal + hard fault (009–013, 032) | [interrupts-bare-metal.md](../../../08-embedded-systems/interrupts-bare-metal.md) |
 | D. RTOS + E. Kiến trúc firmware (014–023) | [rtos-programming.md](../../../08-embedded-systems/rtos-programming.md) |
@@ -53,6 +53,8 @@ Map bằng con trỏ tới `volatile`: `#define REG (*(volatile uint32_t*)0x4002
 - **`volatile`**: cấm compiler tối ưu truy cập — thanh ghi phần cứng, biến bị ISR sửa.
 - **`extern`**: khai báo biến/hàm định nghĩa ở TU khác (chia sẻ giữa file).
 - Kết hợp hay gặp: `volatile` cho biến ISR; `const volatile` cho thanh ghi chỉ-đọc (status) — vừa cấm ghi vừa cấm tối ưu đọc.
+
+**Đào sâu:** [C-035](c-programming.md) (hai nghĩa của `static`, `static` trong header) · [C-036](c-programming.md) (khai báo vs định nghĩa, `-fno-common` từ gcc 10, `const` ở phạm vi file C khác C++).
 </details>
 
 #### EMB-037 · 🟡 · concept · ⭐ · 🎤 2026-09-14 · [→ bare-metal-c](../../../08-embedded-systems/bare-metal-c.md)
@@ -139,6 +141,8 @@ offset: 0  1  2  3    4  5    6    7
 ⚠️ **Đừng nhảy sang `__attribute__((packed))` để tiết kiệm:** nó bỏ padding nhưng khiến mọi truy cập thành **misaligned** — compiler tự sinh code đọc từng byte (chậm hơn), và trên ARM cấu hình chặt thì lấy địa chỉ member trong struct packed là bẫy mới. `packed` dành cho **wire format**, không dành cho tiết kiệm RAM. Và với wire format thì cách đúng vẫn là **giải mã từng field bằng `memcpy`** ([COD-025](coding.md)).
 
 **Công cụ:** `pahole <binary>` in ra layout + chỗ hổng của mọi struct. `offsetof()` để tự kiểm nhanh.
+
+**Liên quan:** [CPP-038](cpp.md) — phần khái niệm (`alignas`/`alignof`, vì sao CPU cần căn chỉnh).
 </details>
 
 ---

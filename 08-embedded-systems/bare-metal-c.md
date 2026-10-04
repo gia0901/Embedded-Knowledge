@@ -49,6 +49,57 @@ REG = (REG & ~(0x3u << 4)) | (val << 4);   // đặt trường 2-bit ở vị tr
 
 Lưu ý: dùng `1u` (unsigned) — `1 << 31` trên int là **UB** (tràn dấu). **RMW không atomic**: nếu ISR cũng đụng thanh ghi đó cần [critical section](interrupts-bare-metal.md); nhiều SoC có thanh ghi **SET/CLR riêng** (ghi 1 để set/clear từng bit) tránh RMW.
 
+### 2.1 Bài viết tay hay gặp
+
+> Output thật (gcc 11.4, `-std=c11 -Wall -Wextra`). Đếm số bit 1 và kiểm endianness đã có ở [COD-009](../14-prep/mock-interview/bank/coding.md), [COD-010](../14-prep/mock-interview/bank/coding.md); tạo mask `n` bit ở [COD-021](../14-prep/mock-interview/bank/coding.md).
+
+```c
+bool     is_pow2(uint32_t x)        { return x && !(x & (x - 1)); }   /* x & (x-1) xoa bit 1 thap nhat */
+uint32_t lowest_set(uint32_t x)     { return x & (~x + 1); }          /* = x & -x voi unsigned */
+uint8_t  swap_nibbles(uint8_t b)    { return (uint8_t)((b << 4) | (b >> 4)); }
+uint8_t  reverse8(uint8_t b) {
+    uint8_t r = 0;
+    for (int i = 0; i < 8; i++) { r = (uint8_t)((r << 1) | (b & 1u)); b >>= 1; }   /* lay bit thap cua b, day vao r */
+    return r;
+}
+uint32_t bswap32(uint32_t x) {      /* dao thu tu BYTE — doi endianness */
+    return  (x >> 24) | ((x >> 8) & 0x0000FF00u) | ((x << 8) & 0x00FF0000u) | (x << 24);
+}
+```
+
+```
+is_pow2: 0=0 1=1 64=1 96=0
+lowest_set(0x68)=0x8
+swap_nibbles(0xA5)=0x5A
+reverse8(0x01)=0x80 reverse8(0xB0)=0x0D
+bswap32(0x11223344)=0x44332211  __builtin_bswap32=0x44332211
+```
+
+**Đọc / ghi một trường bit** (`width` bit bắt đầu từ `pos`) — dạng thao tác thanh ghi thật hay gặp nhất:
+
+```c
+#define FIELD_MASK(pos, width)        (((1u << (width)) - 1u) << (pos))
+#define FIELD_GET(reg, pos, width)    (((reg) & FIELD_MASK(pos, width)) >> (pos))
+#define FIELD_SET(reg, pos, width, v) \
+    ((reg) = ((reg) & ~FIELD_MASK(pos, width)) | (((uint32_t)(v) << (pos)) & FIELD_MASK(pos, width)))
+```
+
+```
+FIELD_GET(0xFFFF00FF, 4, 4) = 0xF
+sau FIELD_SET(reg, 8, 4, 0xA):  0xFFFF0AFF
+sau FIELD_SET(reg, 8, 4, 0x1F): 0xFFFF0FFF     <- gia tri qua rong bi CAT, khong lan sang truong ben canh
+```
+
+Ba chi tiết phân biệt người làm thật: ① **xoá trường cũ trước** rồi mới OR giá trị mới (chỉ OR thì bit 1 cũ còn nguyên) · ② **AND giá trị với mask** để giá trị quá rộng không phá trường bên cạnh · ③ `width = 32` làm `1u << 32` — **UB** ([COD-021](../14-prep/mock-interview/bank/coding.md)). Kernel có sẵn `GENMASK`, `FIELD_GET`/`FIELD_PREP` cho đúng việc này. Macro này đánh giá `reg` hai lần — đừng truyền biểu thức có tác dụng phụ ([C-022](../14-prep/mock-interview/bank/c-programming.md)).
+
+| Bài | Ý chính một câu |
+|---|---|
+| Lũy thừa của 2 | `x & (x - 1)` xoá bit 1 thấp nhất; còn 0 nghĩa là chỉ có một bit 1. Nhớ loại `x = 0` |
+| Bit 1 thấp nhất | `x & -x` (unsigned) — dùng để duyệt từng bit đang bật |
+| Đảo bit | Lấy bit thấp của nguồn, đẩy vào bên phải của đích, lặp `width` lần; nhanh hơn thì bảng tra 16 hoặc 256 phần tử |
+| Đổi chỗ nibble / byte | Dịch rồi OR; đổi byte = đổi endianness (`__builtin_bswap32`, `htonl`) |
+| Ghi trường bit | Xoá trường → AND giá trị với mask → OR vào; nếu ISR cũng đụng thì cần critical section |
+
 ## 3. Truy cập thanh ghi phần cứng
 
 Map bằng con trỏ tới `volatile`:
@@ -74,6 +125,8 @@ GPIOA->ODR |= BIT(5);
 - **`volatile`**: cấm tối ưu truy cập — thanh ghi, biến bị ISR sửa.
 - **`extern`**: khai báo biến/hàm định nghĩa ở TU khác.
 - Kết hợp: `const volatile` cho thanh ghi status (cấm ghi + cấm tối ưu đọc).
+
+> Hệ quả khi build **nhiều file** (khai báo vs định nghĩa, `-fno-common` từ gcc 10, `static` trong header, `const` ở phạm vi file khác nhau giữa C và C++): [01/c-language-idioms §2](../01-cpp-fundamentals/c-language-idioms.md).
 
 ## 5. Fixed-point vs floating-point (khi không có FPU)
 
@@ -119,6 +172,7 @@ Bộ **coding guideline** cho C trong hệ an toàn/quan trọng (ô tô, y tế
 | ID | Câu hỏi |
 |----|---------|
 | [EMB-001](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Set / clear / toggle / test một bit trong thanh ghi |
+| [C-026…029](../14-prep/mock-interview/bank/c-programming.md) | Bài bit viết tay: lũy thừa của 2 · đảo bit · đảo byte · đọc/ghi trường bit |
 | [EMB-002](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Vì sao ưu tiên fixed-width types — `int` có rủi ro gì |
 | [EMB-003](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Truy cập thanh ghi trong C, vì sao `volatile`, `union`/bitfield |
 | [EMB-004](../14-prep/mock-interview/bank/embedded-fundamentals.md) | Vai trò `static` / `const` / `volatile` / `extern` |

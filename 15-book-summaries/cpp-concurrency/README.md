@@ -24,7 +24,7 @@ Repo đã có concurrency ở **ba tầng khác nhau**, nhưng đều dừng ở
 
 Các chương còn lại **chồng lấn có chủ đích** với tài liệu sẵn có — nhưng theo [quy ước Mục 1](../README.md), summary vẫn **viết đầy đủ tại chỗ, chấp nhận lặp**, để đọc liền mạch không phải nhảy tài liệu; link chéo chỉ đặt cuối file như "đọc thêm (tùy chọn)".
 
-**Liên hệ nghề:** trúng thẳng hướng **System Software / C++** (bank domain `CPP` + `OS`; trong [datalogic-plan](../../14-prep/study-plans/datalogic-plan.md) là Tuần 1 Buổi 3). Với **BSP**: chương 5 (memory ordering ↔ barrier trong kernel — [lkd/sync-timers](../lkd/03-sync-timers.md)) và chương 8 (false sharing, cache ping-pong ↔ [cpp-mindset ch.4](../cpp-mindset/understanding-the-machine.md)) là phần giao nhau đáng đọc.
+**Liên hệ nghề:** trúng thẳng hướng **System Software / C++** (bank domain `CPP` + `OS`; trong [datalogic-plan](../../14-prep/study-plans/archive/datalogic-plan.md) là Tuần 1 Buổi 3). Với **BSP**: chương 5 (memory ordering ↔ barrier trong kernel — [lkd/sync-timers](../lkd/03-sync-timers.md)) và chương 8 (false sharing, cache ping-pong ↔ [cpp-mindset ch.4](../cpp-mindset/understanding-the-machine.md)) là phần giao nhau đáng đọc.
 
 ---
 

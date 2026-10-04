@@ -321,7 +321,7 @@ Câu này tồn tại vì **người đến vì lương sẽ đi vì lương**. 
 
 ⚠️ **Luật chống nói quá — quan trọng hơn cả khung trên:** trước khi nói *"em đã làm X"*, tự hỏi **"nếu họ đào ba câu nữa, em còn trả lời được không?"**. Người đã build Yocto thật nhớ được `bitbake core-image-minimal`, giá trị `MACHINE` chính xác, và cái `DL_DIR`/`SSTATE_DIR` phải đặt vì hết ổ đĩa. Không nhớ nổi ba chi tiết đó ⇒ **đừng khẳng định đã làm**.
 
-> Nhớ [bài học #8](../../study-plans/datalogic-plan.md): *"gộp nhầm, không phải bịa — nhưng **interviewer không phân biệt được hai thứ đó**"*.
+> Nhớ [bài học #8](../../study-plans/archive/datalogic-plan.md): *"gộp nhầm, không phải bịa — nhưng **interviewer không phân biệt được hai thứ đó**"*.
 
 **Bẫy:** ① thanh minh dài ⇒ nghe như chột dạ · ② *"em học nhanh lắm"* mà không có bằng chứng · ③ chê thứ mình chưa biết (*"Jenkins cũng chỉ là CI thôi mà"*) · ④ trả lời ba thứ thành ba đoạn rời — nối liền mạch nghe tự tin hơn hẳn.
 </details>

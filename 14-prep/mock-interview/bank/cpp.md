@@ -52,6 +52,8 @@ Stack: tự động theo scope, rất nhanh, nhỏ, vòng đời theo `{}`. Heap
 <details><summary>Đáp án</summary>
 
 Mỗi kiểu có **alignment** (địa chỉ phải chia hết cho N) do phần cứng yêu cầu/tối ưu truy cập. Compiler chèn **padding** giữa/sau member để mỗi member đúng alignment → `sizeof(struct)` lớn hơn tổng member; **thứ tự khai báo member ảnh hưởng kích thước** (sắp từ lớn→nhỏ giảm padding). `alignof(T)` truy vấn; `alignas(N)` ép alignment mạnh hơn — dùng cho: buffer DMA (thường cần căn cache line 64B), tránh **false sharing** (đệm biến giữa các core ra 2 cache line), MMIO/struct ánh xạ phần cứng, SIMD. Embedded còn quan tâm: đọc dữ liệu chưa căn lề (misaligned) có thể **fault** trên ARM cũ, và struct trao đổi qua wire cần `#pragma pack`/serialize thủ công vì layout không portable.
+
+**Liên quan:** [EMB-038](embedded-fundamentals.md) — cùng chủ đề ở dạng **đọc code**: hai struct cùng field, tính `sizeof` và tự sắp lại layout.
 </details>
 
 #### CPP-036 · 🟠 · concept · [→ memory-model](../../../01-cpp-fundamentals/memory-model.md)
@@ -94,6 +96,8 @@ static int x = 5; return &x;                             // ⚠️ được, nh�
 **Cùng một lớp lỗi, các dạng khác hay gặp:** trả về `std::string_view`/`std::span` trỏ vào temporary · lambda **bắt tham chiếu** rồi chạy bất đồng bộ · giữ iterator sau khi `vector` reallocate · trả tham chiếu tới thành viên của đối tượng đã chết ([CPP-037](cpp.md), [DBG-025](debugging.md)).
 
 **Chốt:** *"Trả địa chỉ biến cục bộ là UB — và nó 'chạy được' vì stack chưa bị ghi đè ngay, nên bug lọt qua test rồi nổ khi thứ tự lời gọi đổi."*
+
+**Liên quan:** [C-017](c-programming.md) — cùng lỗi với buffer chuỗi, và **ba cách sửa** theo câu hỏi *ai sở hữu bộ nhớ của kết quả*.
 </details>
 
 ---

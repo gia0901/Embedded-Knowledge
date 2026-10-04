@@ -31,7 +31,7 @@
 | `/proc`, `/sys` không có tài liệu | ✅ **ĐÚNG — cùng lỗi** | Bank LNX-023 cũng ghi `→ file-io`; file-io.md không có mục nào. Nội dung rải ở [09-debugging/tools.md](../../../09-debugging/tools.md), [05-drivers-device-tree](../../../05-drivers-device-tree/) |
 | `TIME_WAIT`/`SO_REUSEADDR` không có tài liệu | ❌ **KHÔNG đúng** — nhưng ngoài phạm vi đọc | Có ở [sockets-and-protocols.md:56](../../../13-networking/sockets-and-protocols.md) và [tcp-ip.md:67](../../../13-networking/tcp-ip.md). Thuộc topic 13, không nằm trong lịch Tuần 2 → hợp lý khi chưa đọc |
 
-⇒ **Hai việc phải vá repo** (cộng lỗ hổng TCP-framing từ phần 1 là **ba**), đã ghi vào mục "Nợ" của [datalogic-plan §📍](../../study-plans/datalogic-plan.md).
+⇒ **Hai việc phải vá repo** (cộng lỗ hổng TCP-framing từ phần 1 là **ba**), đã ghi vào mục "Nợ" của [datalogic-plan §📍](../../study-plans/archive/datalogic-plan.md).
 
 ---
 
@@ -540,4 +540,4 @@ Sau vài phút chạy, `mq_send` bắt đầu **chặn**, và luồng đọc c�
 ⇒ **Gợi ý cách ôn hợp với bạn:** đọc theo *triệu chứng → cơ chế*, đừng đọc theo mục lục khái niệm. Với mỗi mục tài liệu, tự đặt câu hỏi *"cái này hỏng thì khách thấy gì?"* trước khi đọc nội dung.
 
 ---
-⬅️ [Phần 1 của buổi này](2026-08-13--rapid--linux-sysprog.md) · [Sessions index](README.md) · [weak-register](../weak-register.md) · [datalogic-plan §📍](../../study-plans/datalogic-plan.md)
+⬅️ [Phần 1 của buổi này](2026-08-13--rapid--linux-sysprog.md) · [Sessions index](README.md) · [weak-register](../weak-register.md) · [datalogic-plan §📍](../../study-plans/archive/datalogic-plan.md)

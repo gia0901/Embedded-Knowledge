@@ -42,8 +42,8 @@
 ## 1. Giao thức một phiên (session protocol) — Claude PHẢI theo
 
 **Bước 0 — Khởi tạo.** Đọc file này + [tracks.md](tracks.md) + [interview-types.md](interview-types.md) + [weak-register.md](weak-register.md) + **lướt [sessions/](sessions/)** (lịch sử câu đã hỏi + điểm).
-- **Luôn bắt đầu từ plan JD đang chạy:** mở [datalogic-plan.md](../study-plans/datalogic-plan.md) **§📍 Tiến độ hiện tại** (đầu file) → nó cho biết **buổi kế tiếp + lệnh mock chính xác**. **Đề xuất thẳng buổi đó** thay vì hỏi lại từ đầu; sau phiên, cập nhật block §📍 đó (tick buổi + 4 dòng trạng thái).
-- **Chỉ khi plan đã chạy hết** (hoặc người dùng nói rõ là ôn tự do): **hỏi 2 điều** — (a) track nào? (b) interview type nào? — gợi ý mặc định theo §0.
+- **Có plan JD đang chạy** (file `*-plan.md` ngay trong [study-plans/](../study-plans/), **không tính `archive/`**): mở **§📍 Tiến độ hiện tại** của nó → **đề xuất thẳng buổi kế tiếp + lệnh mock chính xác**; sau phiên, cập nhật block §📍 đó.
+- **Không có plan** (hiện trạng từ 2026-10-03 — plan Datalogic đã [lưu trữ](../study-plans/archive/datalogic-plan.md)) hoặc người dùng nói rõ là ôn tự do: **hỏi 2 điều** — (a) track nào? (b) interview type nào? — gợi ý mặc định theo §0.
 
 **Bước 1 — Chốt phiên.** Xác nhận: track + type + **số câu** (lấy từ interview-types.md) + level + **trần độ sâu**. Thông báo ngắn gọn:
 
@@ -109,11 +109,12 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 ## 3. Ngân hàng — ID & cách thêm câu
 
 - Bank là **một** ngân hàng, đặt tại [bank/](bank/), chia file theo **domain** cho dễ đọc nhưng ID **xuyên suốt toàn bank**.
-- **ID = `<DOMAIN>-<NNN>`** (số 3 chữ số, tăng dần, không tái sử dụng). **16 domain** (khớp đúng file trong [bank/](bank/)):
+- **ID = `<DOMAIN>-<NNN>`** (số 3 chữ số, tăng dần, không tái sử dụng). **17 domain** (khớp đúng file trong [bank/](bank/)):
 
   | Domain | File | Domain | File |
   |---|---|---|---|
-  | `CPP` | cpp.md | `BLD` | build-systems.md |
+  | `C` | c-programming.md | `CPP` | cpp.md |
+  | `BLD` | build-systems.md | | |
   | `OS` | os.md | `EMB` | embedded-fundamentals.md |
   | `LNX` | linux-sysprog.md | `DBG` | debugging.md |
   | `DRV` · `BUS` | drivers-embedded.md | `DP` | design-patterns.md |
@@ -127,7 +128,7 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 - Mỗi câu có **dòng metadata**: `#### <ID> · <level> · <type> [· ⭐] [· 🏗️] [· 🎤 <ngày>] · [→ link nguồn]`
   - **level** ∈ 🟢 cơ bản / 🟡 trung bình / 🟠 khó / 🔴 senior.
   - **type** ∈ `concept` / `coding` / `design` / **`lab` 🧪**. (rapid-fire là *chế độ phiên*, rút từ câu `concept` 🟢🟡; không phải type riêng.)
-    - **`lab` 🧪 = bài NGỒI MÁY LÀM**, không hỏi trong phiên mock miệng. Code có bug thật + nhiệm vụ đánh số + `<details>` chứa lệnh cần gõ và **OUTPUT THẬT đã chạy, dán nguyên văn** (cấm viết tay/phỏng đoán). Không chấm điểm, không vào weak-register; theo dõi *đã làm hay chưa* ở **§📍 plan**. Phiên mock hỏi câu `concept` tương ứng. Quy ước đầy đủ: [bank/README.md](bank/README.md).
+    - **`lab` 🧪 = bài NGỒI MÁY LÀM**, không hỏi trong phiên mock miệng. Code có bug thật + nhiệm vụ đánh số + `<details>` chứa lệnh cần gõ và **OUTPUT THẬT đã chạy, dán nguyên văn** (cấm viết tay/phỏng đoán). Không chấm điểm, không vào weak-register; theo dõi *đã làm hay chưa* ở **§📍 plan đang chạy**; không có plan ⇒ thêm `· ✅ <ngày>` vào cuối dòng metadata của chính câu lab trong bank. Phiên mock hỏi câu `concept` tương ứng. Quy ước đầy đủ: [bank/README.md](bank/README.md).
   - **⭐** = xác suất gặp cao với JD.
   - **🏗️** = câu **mở / tình huống** — chấm theo *khung tiếp cận*, chấp nhận nhiều hướng đúng, **không có đáp án duy nhất** (§5).
   - **🎤 `<ngày>`** = câu sinh ra từ một phiên mock, không phải soạn sẵn.
@@ -247,7 +248,7 @@ Trả lời đúng **không** kết thúc câu hỏi. Kỹ thuật hiệu quả:
 > - **Khi xếp phiên SAU cho cùng chủ đề đó:** ❌ **KHÔNG** đưa câu vừa đạt **0–2 điểm** vào phiên đào T2. T1 chưa có thì hỏi T2 lên trên **không đo được gì và không dạy được gì**. Đường đúng của câu đó là: **đọc lại tài liệu → hỏi lại ở T1, góc khác**.
 > - **Câu đưa lên T2 phải là câu đã đạt 3–4** — T1 chắc mới sẵn sàng cho vận dụng. Phỏng vấn thật cũng vậy: trả lời khái niệm gọn ⇒ interviewer follow-up sâu hơn; ú ớ ở khái niệm ⇒ họ **chuyển câu khác**.
 >
-> **Vì sao có mục này:** Giai đoạn 1 của [datalogic-plan](../study-plans/datalogic-plan.md) mắc đúng lỗi này — ứng viên phản ánh *"khái niệm chưa cứng, thậm chí chưa hỏi, đã phải trả lời câu chuyên sâu"*. Đo lại thấy phủ bank chỉ **29%** trong khi các phiên toàn chạy `by-level 🟠`/`deep-dive`.
+> **Vì sao có mục này:** Giai đoạn 1 của [datalogic-plan](../study-plans/archive/datalogic-plan.md) mắc đúng lỗi này — ứng viên phản ánh *"khái niệm chưa cứng, thậm chí chưa hỏi, đã phải trả lời câu chuyên sâu"*. Đo lại thấy phủ bank chỉ **29%** trong khi các phiên toàn chạy `by-level 🟠`/`deep-dive`.
 
 **⑤ Bắt VIẾT CODE rồi review chính code đó — kể cả phiên không phải type `coding`.**
 Một bug thật trong code ứng viên tự viết có giá trị hơn mười câu lý thuyết. Câu hỏi về RAII / move / API design / concurrency: yêu cầu viết vào [coding-arena/](coding-arena/) rồi đọc file. **Lỗi ứng viên tự tạo ra mà không nhận ra là dữ liệu chẩn đoán tốt nhất của cả phiên.**
@@ -365,7 +366,7 @@ Khi ứng viên phản hồi *"câu này quá sâu"*: **phân định từng ý*
 ```bash
 cd 14-prep/mock-interview
 # So cau DA TUNG HOI (rut tu log phien)
-grep -oh "\b\(CPP\|OS\|LNX\|DRV\|BUS\|BSP\|SD\|BEH\|BLD\|EMB\|DBG\|DP\|DSA\|NET\|COD\|RES\)-[0-9]\{3\}" \
+grep -oh "\b\(C\|CPP\|OS\|LNX\|DRV\|BUS\|BSP\|SD\|BEH\|BLD\|EMB\|DBG\|DP\|DSA\|NET\|COD\|RES\)-[0-9]\{3\}" \
   sessions/*.md | sort -u | sed 's/-[0-9]*//' | sort | uniq -c
 # So cau CO trong bank
 grep -c "^#### " bank/*.md
@@ -376,9 +377,9 @@ grep -c "^#### " bank/*.md
 | Tình trạng | Nghĩa | Việc phải làm |
 |---|---|---|
 | Domain 🎯 **trụ JD** phủ **< 20%** | 🔴 Rủi ro cao nhất | **Dừng đào sâu**, chuyển sang `rapid` quét rộng domain đó ngay |
-| Một domain > 60% trong khi domain khác < 10% | 🟠 Lệch | Cân lại lịch — xem [datalogic-plan §🔄](../study-plans/datalogic-plan.md) |
+| Một domain > 60% trong khi domain khác < 10% | 🟠 Lệch | Cân lại lịch — xem [datalogic-plan §🔄](../study-plans/archive/datalogic-plan.md) |
 | Tổng phủ < 50% khi đã dùng > 50% quỹ thời gian | 🔴 Không kịp | Cắt `deep-dive`/`by-level`, ưu tiên `rapid` + `daily` |
 
 ⚠️ **Phủ KHÔNG phải mục tiêu tự thân.** Hỏi qua loa 397 câu vô dụng ngang hỏi sâu 100 câu rồi bỏ trắng phần còn lại. Luật này chỉ để **phát hiện lệch**, còn quyết định vẫn theo *xác suất bị hỏi × độ yếu hiện tại*. Domain ngoài JD (vd `EMB` cụm RTOS/bare-metal) **cố ý** để phủ thấp — ghi rõ lý do ở plan thay vì cố kéo lên.
 
-**Ghi kết quả ở đâu:** bảng phủ trong **§📍 của plan đang chạy** — một chỗ duy nhất, không chép số sang file khác.
+**Ghi kết quả ở đâu:** bảng phủ trong **§📍 của plan đang chạy**; không có plan ⇒ ghi trong **log phiên** vừa đo. Một chỗ duy nhất mỗi lần đo, không chép số sang file khác.

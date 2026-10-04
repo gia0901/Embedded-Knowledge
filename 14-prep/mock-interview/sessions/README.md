@@ -71,7 +71,7 @@ Ghi *"CPP-030 size/capacity"* rồi bên dưới phân tích ba trang là **log 
 - **Câu mới thêm vào bank:** BSP-0xx (nếu có)
 - **Cập nhật weak-register:** +BSP-011 / gỡ BSP-002 → **đã xếp lịch kiểm tra lại: Tuần N+2**
 - **Bản code đã review:** `../coding-arena/reviewed/YYYY-MM-DD--<ID>--<slug>.cpp` (nếu phiên có code)
-- **Cập nhật §📍 plan:** đã tick buổi … + sửa 4 dòng trạng thái
+- **Cập nhật §📍 plan** *(chỉ khi có plan JD đang chạy)*: đã tick buổi … + sửa dòng trạng thái
 
 ## Phiên kế đề xuất
 - vd: `deep-dive track bsp` tập trung DMA/interrupt; hoặc `weak-review` cuối tuần.
@@ -81,4 +81,4 @@ Ghi *"CPP-030 size/capacity"* rồi bên dưới phân tích ba trang là **log 
 
 ## Xem tiến bộ
 - Điểm trung bình theo thời gian, câu lặp lại nhiều lần mà vẫn thấp → xem [../weak-register.md](../weak-register.md).
-- Lịch chạy: §📍 của [datalogic-plan](../../study-plans/datalogic-plan.md).
+- Lịch chạy: §📍 của plan JD đang chạy trong [study-plans/](../../study-plans/) (hiện không có; plan cũ ở `archive/`).

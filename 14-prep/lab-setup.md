@@ -204,9 +204,9 @@ Làm được — và **đúng là thứ interview hỏi** — là **U-Boot veri
 | Nơi | Cập nhật |
 |---|---|
 | [bank/bsp.md](mock-interview/bank/bsp.md) | Dán **output thật** vào ô `(chua chay)` của bài vừa làm — luật bank: *cấm viết tay, cấm phỏng đoán* |
-| [datalogic-plan §📍](study-plans/datalogic-plan.md) | Tick ⬜ → ✅ trong bảng tracking 8 bài |
+| Câu lab trong [bank/bsp.md](mock-interview/bank/bsp.md) | Thêm `· ✅ <ngày>` vào cuối dòng metadata (không có plan đang chạy — [config §3](mock-interview/config.md)) |
 | **File này** | Lệnh nào không khớp máy bạn thì **sửa lại tại đây**, đừng sửa trong lab |
 | [gap-register](study-plans/gap-register.md) | Bài 035 xong ⇒ cập nhật ô *Secure boot* |
 
 ---
-⬅️ [datalogic-plan §📍](study-plans/datalogic-plan.md) · 🧪 [Bộ lab BSP-031…038](mock-interview/bank/bsp.md)
+⬅️ [study-plans](study-plans/README.md) · 🧪 [Bộ lab BSP-031…038](mock-interview/bank/bsp.md)
