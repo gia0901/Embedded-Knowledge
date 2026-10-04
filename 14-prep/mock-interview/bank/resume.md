@@ -454,6 +454,8 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 >
 > ⇒ **Chọn một trước buổi phỏng vấn:** ⓐ **làm thật** `BSP-036` (một buổi tối) rồi mọi thứ nói ra đều thật; hoặc ⓑ **hạ khẳng định**: *"Em chưa vận hành Yocto trong sản phẩm. Phần em thật sự chạm là **sstate** — em đã đo ba phép đo về cache build."* — cái này **có thật** (`BSP-038` ✅) và **vẫn mạnh**, vì `sstate` là chi tiết chỉ người đã chạm mới nói.
 >
+> **Câu chữ đã chốt khi bị hỏi về board (06/09 — dùng nguyên văn):** *"Em chưa dùng Yocto trong sản phẩm thật. Em **có board BBB**, đã dựng xong console serial qua CP2102 và boot được, **đang bắt đầu bộ lab**."* Kèm một chi tiết chỉ người cầm board mới biết: **giữ S2 lúc cấp nguồn để SD thắng eMMC**. Phân biệt rạch ròi *"dựng được môi trường"* với *"build được image"* — bị khoan thì hai câu đó đọc như nhau.
+>
 > **Phép thử trước khi khẳng định bất cứ điều gì:** *"nếu họ đào ba câu nữa, mình còn trả lời được không?"* Không ⇒ đừng khẳng định. Khung xử lý khoảng trống đầy đủ: [BEH-017](behavioral.md).
 
 

@@ -61,7 +61,9 @@
   - **Luật bắt buộc:** output trong câu `lab` phải là **output chạy thật, dán nguyên văn** — không được viết tay, không được phỏng đoán. Người học đối chiếu màn hình của mình với nó; sai một chữ là hỏng mục đích.
   - **Vì sao có loại này (2026-08-17):** đo được **T1 3.67 / T2 2.1** qua hai phiên liên tiếp ⇒ ứng viên *biết* công cụ nhưng *chưa dùng* công cụ. Câu `concept` không vá được khoảng cách đó — chỉ có ngồi gõ và nhìn output mới vá được.
   - **Không dùng ở phiên mock miệng** (`rapid`/`daily`/`comprehensive`) — đây là bài tự luyện ngoài phiên. Phiên mock hỏi câu `concept` tương ứng.
+  - **Không chấm điểm, không vào weak-register.** Theo dõi *đã làm hay chưa* ở **§📍 plan đang chạy**; không có plan ⇒ thêm `· ✅ <ngày>` vào cuối dòng metadata của chính câu lab.
 - **→ nguồn** = link tài liệu để ôn lại (dùng khi review).
+- ⚠️ **`RES` có dạng đáp án RIÊNG.** Chỉ ứng viên mới biết họ đã làm gì, nên đáp án **không phải "lời giải"** mà là **khung 4 phần**: *interviewer đang dò gì · câu trả lời tốt gồm · nền kỹ thuật phải nắm · bẫy*. Chấm theo **khung tiếp cận** (🏗️), không theo đáp án duy nhất.
 
 ## ✍️ Tiêu chí viết đáp án (áp cho câu mới **và** khi sửa câu cũ)
 

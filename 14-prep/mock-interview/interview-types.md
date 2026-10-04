@@ -8,8 +8,10 @@
 ## `daily` — Ôn hằng ngày (mặc định) · 6 câu · 15–20′
 Đa dạng, nhẹ, giữ nhịp mỗi ngày. Cơ cấu:
 - 2 câu **rapid** 🟢 (phản xạ nhanh, đáp án 1–2 câu).
-- 3 câu **concept** 🟡 (giải thích cơ chế, so sánh).
-- 1 câu **revisit** — từ [weak-register.md](weak-register.md) (ưu tiên), hoặc nếu trống thì **câu retention** (câu đã trả lời tốt, đã lâu chưa hỏi lại — đọc [sessions/](sessions/)).
+- 2 câu **concept** 🟡 (giải thích cơ chế, so sánh).
+- 1 câu **revisit** — từ [weak-register.md](weak-register.md).
+- 1 câu **retention** — câu **đến hạn** trong bảng [🔁 Lịch kiểm tra lại](weak-register.md), hỏi **ngay sau 2 câu rapid mở màn**. Không có câu nào đến hạn ⇒ thay bằng 1 câu concept.
+- Câu revisit/retention hỏi dạng **Ⓖ gốc / Ⓑ biến thể** theo [config §6 → 🔁 Hỏi lại](config.md).
 - Track: mặc định `bsp`; hoặc `all` để trộn. Theo §📍 của plan JD đang chạy nếu có (hiện không có — xem [study-plans/](../study-plans/)).
 
 ## `rapid` — Phản xạ nhanh · 12 câu · ~15′
@@ -27,7 +29,7 @@ Mô phỏng một vòng phỏng vấn kỹ thuật đầy đủ trên **1 track 
 | 🟠🔴 Design/tình huống 🏗️ | **3** | chấm theo khung, đào sâu nhiều |
 | 💻 **Coding** | **1** | **1 bài cỡ vừa (20–30′)** — hoặc **2 bài cỡ nhỏ**, khi đó rút bớt 1 câu concept |
 | 🔴 Revisit từ [weak-register](weak-register.md) | **2** | ưu tiên cao nhất |
-| 🔁 Retention (đến hạn) + câu **xuyên-topic** | **2** | xuyên-topic = nối nhiều mảng, thước đo senior |
+| 🔁 Retention (đến hạn, hỏi **đầu phiên**) + câu **xuyên-topic** | **2** | không có câu đến hạn ⇒ cả 2 là xuyên-topic. Xuyên-topic = nối nhiều mảng, thước đo senior |
 | **Tổng** | **16** | |
 
 ⚠️ **Không nhét 2 bài coding cỡ vừa** — ngân sách 60′ không đủ (xem [config §6 → ba cỡ bài](config.md)). Đây là lỗi đã mắc ngày 2026-08-10.
@@ -50,10 +52,10 @@ Interviewer ra **3 bài cỡ nhỏ (10–15′/bài)** — một hàm, không ph
 - Dùng khi muốn **nâng trần**, không dùng để giả lập vòng phỏng vấn thật — cái đó là `comprehensive`.
 
 ## `weak-review` — Ôn lại câu yếu · toàn bộ weak-register
-Hỏi lại **mọi câu** trong [weak-register.md](weak-register.md) (lọc theo track nếu nêu) tới khi trả lời vững. Trả lời đạt ≥ 3 điểm hai lần → interviewer gỡ khỏi sổ.
+Hỏi lại **mọi câu** trong [weak-register.md](weak-register.md) (lọc theo track nếu nêu) tới khi trả lời vững — mỗi câu chọn dạng **Ⓖ gốc / Ⓑ biến thể** theo [config §6 → 🔁 Hỏi lại](config.md). Trả lời đạt ≥ 3 điểm hai lần → interviewer gỡ khỏi sổ.
 
 ---
 
 > 🗑️ **Đã bỏ 2026-08-18 — `retention` và `full-review`.** Cả hai **chưa từng chạy một lần nào** trong 17 phiên, và cơ chế của chúng đã sống ở chỗ khác:
-> - *Retention* = **slot khởi động 🔁 5–10′ đầu mỗi buổi**, rút từ bảng [🔁 Lịch kiểm tra lại](weak-register.md). Chính `interview-types` bản cũ cũng ghi *"không nhất thiết chạy thành phiên riêng"* — tức type này tự khai là thừa.
+> - *Retention* = **suất retention** đầu phiên `daily`/`comprehensive`, rút từ bảng [🔁 Lịch kiểm tra lại](weak-register.md). Chính `interview-types` bản cũ cũng ghi *"không nhất thiết chạy thành phiên riêng"* — tức type này tự khai là thừa.
 > - *Full-review* = `comprehensive` (giả lập vòng thật) + `weak-review` (quét câu đã sai). Không có gì nó làm được mà hai type kia không làm.

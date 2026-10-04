@@ -46,12 +46,13 @@ flowchart TD
     F --> G["Gợi ý ôn tiếp + phiên kế"]
 ```
 
-**Luật vận hành sống ở [config.md](config.md), không chép lại ở đây.** Bốn thứ quyết định chất lượng một phiên, đọc trước khi chạy:
+**Luật vận hành sống ở [config.md](config.md), không chép lại ở đây.** Năm thứ quyết định chất lượng một phiên, đọc trước khi chạy:
 
 | Ở đâu | Luật | Chặn lỗi gì |
 |---|---|---|
 | [§⚖️](config.md) | Thứ tự ưu tiên khi hai file mâu thuẫn | interviewer tự chọn khi config nói ngược nhau |
 | [§6](config.md) | Hợp đồng độ sâu — T1/T2/T3, trần mặc định **T2** | phiên **nông** *và* phiên **lệch tầng** (hai lỗi ngược nhau) |
+| [§6 → 🔁 Hỏi lại](config.md) | Hỏi lại câu weak/retention: **Ⓖ đề gốc** hoặc **Ⓑ biến thể**, tung đồng xu, tối đa 2 Ⓑ liên tiếp | góc hỏi trôi xa dần khỏi bank, quên bản gốc |
 | [§7](config.md) | Đo độ phủ bank mỗi 5 phiên | đào sâu một góc, bỏ trắng phần còn lại |
 | [§1 Bước 4](config.md) | Cập nhật bắt buộc sau phiên | phiên chạy xong rồi bay hơi |
 

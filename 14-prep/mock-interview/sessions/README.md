@@ -16,7 +16,7 @@ Ghi *"CPP-030 size/capacity"* rồi bên dưới phân tích ba trang là **log 
 
 **② TRÌNH BÀY THEO KIỂU BANK — đề mở, feedback + đáp án ẩn trong `<details>`.**
 ```markdown
-### Câu N · <ID> · <level> · **<điểm>/4**
+### Câu N · <ID> · <Ⓖ|Ⓑ> · <level> · **<điểm>/4**
 
 <nguyên văn đề bài, đủ code>
 
@@ -28,11 +28,11 @@ Ghi *"CPP-030 size/capacity"* rồi bên dưới phân tích ba trang là **log 
 **✅ Được:** … **❌ Vì sao mất điểm:** …
 **Đáp án đầy đủ:** <cơ chế + bảng + code>
 **Chốt:** <một câu>
-**Lần sau sẽ hỏi:** <góc mới — chép sang weak-register>
+**Lần sau sẽ hỏi:** <(Ⓖ bắt buộc) hoặc (tung đồng xu) + góc mới — chép sang weak-register>
 **Ôn:** <link tài liệu + bank>
 </details>
 ```
-Để đề **mở** thì lần sau còn tự trả lời lại được; đáp án **ẩn** nên không lộ. **Không ngại lặp nội dung bank** — giá trị của log nằm ở chỗ *lỗi của chính mình đặt cạnh đáp án chuẩn*, thứ bank không có.
+**Nhãn Ⓖ/Ⓑ** = câu được hỏi đúng đề bank (Ⓖ) hay bọc tình huống khác (Ⓑ) — bắt buộc, vì luật *tối đa 2 Ⓑ liên tiếp* ([config §6 → 🔁 Hỏi lại](../config.md)) đếm từ đây. Để đề **mở** thì lần sau còn tự trả lời lại được; đáp án **ẩn** nên không lộ. **Không ngại lặp nội dung bank** — giá trị của log nằm ở chỗ *lỗi của chính mình đặt cạnh đáp án chuẩn*, thứ bank không có.
 
 **③ CÂU ĐIỂM 3 PHẢI GIẢI THÍCH ĐẦY ĐỦ NHƯ CÂU ĐIỂM 2.**
 Điểm 3 là *"đạt mức mid"*, **không** phải "xong rồi". Gộp các câu 3 vào một danh sách gạch đầu dòng ngắn là **sai** — đó chính là khoảng cách giữa 3 và 4, tức chỗ cần đọc nhất. Mỗi câu 3 phải nói rõ: **được gì · vì sao chưa 4 · đáp án đầy đủ của phần còn thiếu**.

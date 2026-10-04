@@ -42,7 +42,7 @@ Trình tự đúng khi gặp lại một bài đã có trong `reviewed/`:
 2. **Bản bạn nộp, GIỮ NGUYÊN từng dòng** — chỉ chèn comment `// ❌ [X] …` / `// ✅ …` tại đúng dòng. Không sửa code ở phần này; giá trị nằm ở chỗ thấy được chính xác mình đã viết gì.
 3. **Bản sửa** — giữ **mọi quyết định thiết kế của bạn** (nếu chúng hợp lý), chỉ sửa đúng các lỗi đã đánh nhãn. Kèm đoạn "bài học lớn nhất" nếu có lỗi thuộc về *lớp bug* chứ không phải *một dòng*.
 
-Yêu cầu: file trong `reviewed/` phải **biên dịch và chạy được** (`g++ -std=c++17 -Wall`), có `main()` test các ca biên đã bàn trong phiên. Phần bản-nộp-nguyên-trạng bọc trong `#if 0 … #endif` nếu nó không compile.
+Yêu cầu: file trong `reviewed/` phải **biên dịch và chạy sạch, không warning** (`g++ -std=c++17 -Wall -Wextra` — cùng bộ cờ với [config §6 luật ⑥](../config.md)), có `main()` test các ca biên đã bàn trong phiên. Phần bản-nộp-nguyên-trạng bọc trong `#if 0 … #endif` nếu nó không compile.
 
 ## Liên quan
 - Đề coding rút từ [../bank/coding.md](../bank/coding.md) (`COD-*`) + [../bank/dsa.md](../bank/dsa.md).

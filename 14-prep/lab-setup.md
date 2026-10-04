@@ -204,7 +204,7 @@ Làm được — và **đúng là thứ interview hỏi** — là **U-Boot veri
 | Nơi | Cập nhật |
 |---|---|
 | [bank/bsp.md](mock-interview/bank/bsp.md) | Dán **output thật** vào ô `(chưa chạy)` của bài vừa làm — luật bank: *cấm viết tay, cấm phỏng đoán* |
-| Câu lab trong [bank/bsp.md](mock-interview/bank/bsp.md) | Thêm `· ✅ <ngày>` vào cuối dòng metadata (không có plan đang chạy — [config §3](mock-interview/config.md)) |
+| Câu lab trong [bank/bsp.md](mock-interview/bank/bsp.md) | Thêm `· ✅ <ngày>` vào cuối dòng metadata (không có plan đang chạy — [bank/README](mock-interview/bank/README.md)) |
 | **File này** | Lệnh nào không khớp máy bạn thì **sửa lại tại đây**, đừng sửa trong lab |
 | [gap-register](study-plans/gap-register.md) | Bài 035 xong ⇒ cập nhật ô *Secure boot* |
 
