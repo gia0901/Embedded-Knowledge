@@ -149,6 +149,49 @@ void produce(int x) {
 - Luôn dùng `cv.wait(lock, predicate)` — predicate chống **spurious wakeup** (thức dậy không lý do).
 - `notify_one()` / `notify_all()`.
 
+### 7.1 Thread chạy theo chu kỳ — giữ nhịp và dừng được ngay
+
+Bài toán điển hình của embedded: một thread tính toán **mỗi khung hình** (60 Hz ≈ 16,67 ms), ví dụ đọc cảm biến rồi tính độ sáng. Có hai yêu cầu dễ đá nhau: **giữ đúng nhịp** và **dừng ngay** khi được yêu cầu.
+
+**① Giữ nhịp: hẹn giờ theo mốc tuyệt đối, không theo khoảng.** `sleep_for(period)` ngủ đủ `period` **sau khi** việc xong ⟹ thời gian làm việc cộng dồn vào chu kỳ. `sleep_until(next += period)` hẹn theo mốc ⟹ việc nằm **trong** chu kỳ.
+
+```
+120 chu kỳ, việc 3 ms/chu kỳ, lý thuyết 2000 ms   (g++ -O2, chạy thật)
+sleep_for  : 2467 ms  (48.6 Hz)      <- trôi 23%
+sleep_until: 2000 ms  (60.0 Hz)
+```
+Mốc phải lấy từ **`steady_clock`**: `system_clock` nhảy theo NTP ⟹ nhịp nhảy theo ([LNX-029](../14-prep/mock-interview/bank/linux-sysprog.md)).
+
+**② Dừng ngay: chờ bằng condition variable thay vì ngủ.** `sleep_until` không đánh thức được, nên cờ `stop` chỉ được thấy khi hết giấc ngủ hiện tại. `cv.wait_until(lk, next, pred)` vừa hẹn đúng mốc, vừa thức ngay khi có `notify`.
+
+```cpp
+std::unique_lock<std::mutex> lk(m_);
+auto next = Clock::now();                                   // Clock = steady_clock
+for (;;) {
+    next += period;
+    if (cv_.wait_until(lk, next, [this] { return stop_; })) break;   // true ⟹ được yêu cầu dừng
+    lk.unlock();  tick();  lk.lock();                       // KHÔNG giữ khoá khi làm việc
+    if (Clock::now() > next + period) next = Clock::now();  // trễ quá một chu kỳ ⟹ bỏ nhịp
+}
+// Bên dừng:  { lock_guard lk(m_); stop_ = true; }  cv_.notify_one();  th_.join();
+```
+```
+Chu kỳ 1 s, yêu cầu dừng sau 100 ms   (chạy thật)
+sleep_until + atomic<bool> stop : 900 ms
+cv.wait_until + stop_           :   0 ms
+60 Hz trong 1 s, một chu kỳ cố ý chạy quá 5 lần: ticks=57 overruns=1
+```
+
+Ba chi tiết hay sai:
+
+| Chi tiết | Sai thì sao |
+|---|---|
+| Ghi `stop_` **khi giữ mutex**, rồi mới `notify` | Lọt vào khe giữa *"kiểm predicate"* và *"đi ngủ"* ⟹ **lost wakeup**, chờ thêm cả chu kỳ ([OS-012](../14-prep/mock-interview/bank/os.md)) |
+| Trễ quá thì **dời mốc**, đừng cứ `next += period` | Sau một lần kẹt, các mốc đã qua hết ⟹ vòng lặp chạy bù **dồn dập** nhiều lần liền |
+| Member `std::thread` khai báo **cuối class** | Thread chạy ngay trong constructor, trước khi các member khai báo sau nó được khởi tạo ⟹ data race thật (TSan bắt được) |
+
+> ⚠️ **Bẫy công cụ:** TSan của gcc 11 không chặn `pthread_cond_clockwait` (thứ `wait_until` với `steady_clock` dùng bên dưới) ⟹ báo nhầm *"double lock"* và *"data race"* trên code đúng. Thử lại với `system_clock` thì TSan im. Đây là giới hạn của công cụ, không phải bug.
+
 ---
 
 ## 8. `std::async` & `std::future` — mô hình tác vụ
@@ -192,6 +235,9 @@ int result = fut.get();   // chờ & lấy kết quả (block tới khi xong)
 | [CPP-019](../14-prep/mock-interview/bank/cpp.md) | Memory order để làm gì? Mặc định nên dùng cái nào? |
 | [OS-012](../14-prep/mock-interview/bank/os.md) | Vì sao cv.wait nên dùng kèm predicate? |
 | [CPP-057](../14-prep/mock-interview/bank/cpp.md) | std::thread bị hủy khi còn joinable thì sao? jthread khác gì? |
+| [CPP-069](../14-prep/mock-interview/bank/cpp.md) | Vòng 60 Hz bằng `sleep_for(16ms)` đo ra ~48 Hz — vì sao, sửa thế nào? |
+| [CPP-070](../14-prep/mock-interview/bank/cpp.md) | Thread chu kỳ phải dừng ngay khi tắt máy — viết bằng condition variable |
+| [CPP-071](../14-prep/mock-interview/bank/cpp.md) | Đọc cảm biến chậm nằm trong vòng 60 Hz — tách thread, trao giá trị bằng gì? |
 
 ---
 ⬅️ [lambdas-functional.md](lambdas-functional.md) · ➡️ Tiếp theo: [03-operating-system/](../03-operating-system/)

@@ -17,6 +17,8 @@
 ## `rapid` — Phản xạ nhanh · 12 câu · ~15′
 Bắn liên tục câu 🟢🟡 **concept**, đáp án ngắn gọn, đo độ *trôi chảy* — thứ interviewer test ở màn khởi động. Ít follow-up. Hợp warm-up trước phiên lớn hoặc lúc ít thời gian.
 
+- **Rapid quét phủ** (do plan đang chạy chỉ định một danh sách câu, vd `R<n>-rapid` của [resume-plan](../study-plans/resume-plan.md)): được dùng cả câu **🟠🔴** và câu 🏗️. Hỏi đúng đề bank, nhưng **chỉ chấm lõi T1** — ý *Chốt* của đáp án, hoặc khung 60″ với câu `RES` 🏗️ — theo thang rapid. Không đào; muốn đào thì câu đó thuộc phiên khác. *Tiền lệ: `/mock rapid track resume` vốn đã hỏi câu 🟠 theo cách này từ 08/2026; ghi thành luật 2026-10-05 để plan không trái file này.*
+
 > ⚠️ **`rapid` là NGOẠI LỆ DUY NHẤT của [config §6](config.md) luật ①②③④⑤** — xem mục *"Ngoại lệ duy nhất của luật ① và ④"*. Ở đây **được phép hỏi thẳng *"X là gì"***, tối đa **1 probe ngắn**, **~1 phút/câu**. Đây là loại phiên duy nhất luyện năng lực *nói gọn một khái niệm* — thứ vòng screen thật hỏi trước tiên. Chạy đúng ngân sách 15′; muốn sâu thì đổi type, **không** trộn.
 
 ## `comprehensive` — Giả lập vòng technical thật · 16 câu · ~60′

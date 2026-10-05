@@ -1,6 +1,6 @@
 # 📄 RES — Câu hỏi bám RESUME
 
-> **Domain `RES`.** Mọi câu ở đây bám vào **một dòng cụ thể trong [RESUME_embedded_linux.tex](../../../RESUME_embedded_linux.tex)**. Đây là phần **chắc chắn 100% bị hỏi** — khác với câu kỹ thuật thuần chỉ *có thể* bị hỏi. Phỏng vấn thật dành **30–50%** thời gian ở đây.
+> **Domain `RES`.** Mọi câu ở đây bám vào **một dòng cụ thể trong [RESUME_current.tex](../../../RESUME_current.tex)** *(chuyển từ `RESUME_embedded_linux.tex` ngày 2026-10-05; khác biệt đáng kể: bỏ Yocto khỏi skills, dòng AI chuyển từ Core Responsibilities xuống Skills và bỏ con số — xem ghi chú ở `RES-012`, `RES-016`)*. Đây là phần **chắc chắn 100% bị hỏi** — khác với câu kỹ thuật thuần chỉ *có thể* bị hỏi. Phỏng vấn thật dành **30–50%** thời gian ở đây.
 >
 > ⚠️ **Đáp án ở file này KHÔNG phải "lời giải".** Chỉ bạn mới biết bạn đã làm gì. Đáp án là **KHUNG**, gồm 4 phần:
 > 1. **Interviewer đang dò gì** — câu hỏi thật nằm sau câu hỏi bề mặt.
@@ -450,6 +450,8 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 #### RES-012 · 🟠 · concept · ⭐ · 🏗️ · [→ RESUME vs JD: thiếu Yocto, I2C/SPI, PCI/USB]
 **"Anh thấy resume em không nhắc Yocto, cũng không thấy I2C/SPI hay PCI/USB. Bên anh dùng những thứ đó khá nhiều."**
 
+> 🔄 *Cập nhật 2026-10-05:* `RESUME_current.tex` **đã bỏ Yocto/BitBake khỏi Skills** ⟹ không còn dòng nào trên resume bị khoan ngược. Câu hỏi này vẫn đến **từ phía JD**, và rủi ro nói quá bên dưới vẫn nguyên: đừng tự đưa lại khẳng định đã bị gỡ khỏi resume.
+
 > 🔴 **CẢNH BÁO NÓI QUÁ — sự cố lặp lần thứ hai (14/09).** Trả lời câu Yocto, ứng viên nói *"…và **đã thành công build một minimal image**"*, rồi khi bị đào chỉ đưa được *"image cho BeagleBone, PC x86, ~30 phút, đặt MACHINE là beaglebone"* — **không** tên image, **không** giá trị `MACHINE` đúng (`beaglebone-yocto`), **không** gì trong `local.conf`. Tracking repo ([plan §10](../../study-plans/archive/datalogic-plan.md)) ghi lab BSP **1/8**, `BSP-036` (Yocto) **⬜ chưa làm**. Cùng khẳng định này **đã bị phân xử là sai ngày 06/09** ([bài học #8](../../study-plans/archive/datalogic-plan.md)).
 >
 > ⇒ **Chọn một trước buổi phỏng vấn:** ⓐ **làm thật** `BSP-036` (một buổi tối) rồi mọi thứ nói ra đều thật; hoặc ⓑ **hạ khẳng định**: *"Em chưa vận hành Yocto trong sản phẩm. Phần em thật sự chạm là **sstate** — em đã đo ba phép đo về cache build."* — cái này **có thật** (`BSP-038` ✅) và **vẫn mạnh**, vì `sstate` là chi tiết chỉ người đã chạm mới nói.
@@ -745,7 +747,7 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 
 ---
 
-#### RES-016 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME: "Applied AI … cutting authoring time from about 1 day to 1–2 hours"]
+#### RES-016 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME Skills: "AI-assisted Development: Claude Code, internal AI — unit-test generation, code implementation"]
 **"Dòng về AI trong resume — nếu interviewer đọc nó theo hướng bất lợi cho em thì họ nghĩ gì? Em nói thêm câu nào để chặn?"**
 
 <details><summary>Khung trả lời</summary>
@@ -756,6 +758,8 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 > *"Vậy phần nào là **em** làm? Bỏ AI đi thì còn lại gì?"*
 
 Với công ty đang tuyển **kỹ sư C++ nhúng**, dòng đó có thể đọc thành: bạn là **người điều phối công cụ**, không phải người **giải được vấn đề**. Rủi ro càng lớn khi con số (1 ngày → 1–2 giờ) **ấn tượng hơn** mọi con số khác trong resume.
+
+> 🔄 *Cập nhật 2026-10-05 (`RESUME_current.tex`):* dòng AI đã chuyển xuống **Skills** và **bỏ con số**. Rủi ro *"con số AI át mọi con số khác"* không còn; câu hỏi vẫn còn nguyên, chỉ đổi dạng thành *"code AI sinh ra thì em kiểm soát chất lượng thế nào?"*. Câu chặn và cách nối sang bằng chứng bên dưới giữ nguyên.
 
 **Câu chặn — một câu, không thanh minh dài:**
 > *"AI giúp em đi nhanh ở phần **lặp lại**, nên phần em muốn đầu tư là chỗ **nó không làm thay được**."*
@@ -1026,6 +1030,47 @@ Người nghe có khung rồi thì ngữ pháp lệch vài chỗ cũng không c�
 | *"**achieve** the GPL license rule"* | *"…to stay on the right side of the **GPL boundary**"* |
 
 **Với câu "kể thành tựu 30 giây" bằng tiếng Anh:** phải đóng bằng **kết quả**, không phải bằng nỗ lực. *"…in about two weeks"* là nỗ lực; *"…and it shipped with the product"* là kết quả.
+</details>
+
+#### RES-034 · 🟠 · concept · ⭐ · 🏗️ · [→ A1 §10](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+🇬🇧 **"Walk me through the architecture of the library you worked on."** — trả lời bằng tiếng Anh, ≤ 90 giây, vẽ sơ đồ song song.
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** ① bạn nhìn hệ thống theo **ranh giới và quyết định**, hay theo danh sách class · ② bạn có tự nói ra **vì sao** ở mỗi ranh giới không · ③ tiếng Anh kỹ thuật có giữ được mạch khi không còn đọc thuộc.
+
+**Câu trả lời tốt gồm — ba ranh giới, một ý đắt nhất:**
+1. App → C++ interface: ranh giới **khép**, C++ được phép.
+2. Interface → library: **C API**, vì library được nạp vào nhiều process build lệch thời gian. Đồng thời là **điểm khoá** duy nhất.
+3. Sau mặt tiền: Picture Quality (nặng logic, có state) và Display Control (lệnh đơn → `ioctl`).
+4. Ý đắt nhất: **cùng một ý tưởng ở hai tầng** — Bridge bằng `virtual` ở user-space, bảng con trỏ hàm ở kernel.
+
+**Bản mẫu ~75 giây:**
+> *"It's a display-control shared library used across several product lines and more than ten chipsets. I'd describe it through three boundaries.*
+>
+> *First, applications don't call the library directly. They call a C++ interface. That boundary is **closed** — same team, same toolchain — so C++ is fine there. The implementation of that interface calls down into the library through a **plain C API**, because the library is loaded by many processes built at different times, and only C gives a stable binary contract. Each C function is also the **single place where we take the inter-process lock**.*
+>
+> *Second, behind that C facade there are two components, split by how much logic they carry. **Picture Quality** — mainly dimming — is algorithm-heavy, stateful, and runs every frame. **Display Control** is simple commands like resolution or refresh rate; it just packs arguments and issues an ioctl. Picture Quality also writes its final brightness through Display Control, so that's the only path to the hardware.*
+>
+> *Third, in the kernel, a core driver that knows nothing about the chip calls through a **function-pointer table**, and each chip driver registers itself into that table at probe time.*
+>
+> *What I find most interesting is that **the same idea appears twice**: in user space we separate algorithms from hardware access with a Bridge using virtual functions; in the kernel we do the same with a hand-written vtable. In both places, the chip is fixed at build time and the combination for a model is chosen at runtime."*
+
+**Cụm từ nên dùng thay cho cách nói dịch từng chữ:**
+
+| Tránh | Dùng |
+|---|---|
+| *"the app calls to the library"* | *"the app calls **into** the library"* / *"calls down into"* |
+| *"C is more stable"* | *"C gives a **stable binary contract** / a stable ABI"* |
+| *"we lock at the API"* | *"each C entry point is **the single place where we take the lock**"* |
+| *"the kernel uses pointer functions"* | *"the kernel driver **dispatches through a function-pointer table**"* |
+| *"it is decided when building"* | *"the chip is **fixed at build time**; the combination is **chosen at runtime**"* |
+
+**Nền kỹ thuật phải nắm:** [A1 §3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) (narrow waist), §4 (PQ/DC), §6.3 (bảng hai tầng). Câu đuổi chắc chắn tới: *"why not expose the C++ interface directly?"* — trả lời bằng **hai lý do độc lập** ([DP-040](design-patterns.md)).
+
+**Bẫy:**
+1. Kể **danh sách class** thay vì ranh giới. Người nghe tiếng Anh mất mạch nhanh hơn người nghe tiếng Việt.
+2. Sang tiếng Anh thì **co nội dung** lại còn một nửa (lỗi đã đo ở [RES-032](resume.md)). Ba ranh giới phải còn đủ ba.
+3. Nói tên sản phẩm, tên symbol nội bộ. Nói *"a display-control shared library"* là đủ, và nói rõ mình đang giữ ranh giới bảo mật là **điểm cộng** ([A1 §🔒](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
 </details>
 
 ---

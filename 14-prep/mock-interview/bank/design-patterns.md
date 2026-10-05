@@ -133,6 +133,10 @@ Khi vấn đề đơn giản và code ổn định, không có nhu cầu thay đ
 Đảm bảo một class chỉ có một instance + điểm truy cập toàn cục. C++11+ dùng Meyers' Singleton: `static` local trong hàm `instance()` — khởi tạo **lazy** (chỉ dựng lần gọi đầu) và **thread-safe theo chuẩn** (compiler sinh guard variable, xem [DP-014](#dp-014--concept---creational)). Cấm copy (`= delete`), constructor private.
 
 > ⚠️ **"Một instance" chỉ đúng trong MỘT chương trình đã link xong.** Khi singleton nằm ở header mà nhiều `.so` cùng include, số instance do **dynamic linker** quyết định chứ không do C++ — xem [DP-020](#dp-020--concept---creational-linking-loading-symbol-interposition).
+>
+> Ca đơn giản hơn (định nghĩa `instance()` **chỉ** nằm trong `libA.so`): **một process = một instance**, vì `libA.so` chỉ được nạp **một lần** cho mỗi process, dù có bao nhiêu `.so` khác cùng link tới nó. **Nhiều process = mỗi process một bản** ([DP-041](design-patterns.md)). Chạy thật (2 process, libB và libC cùng gọi, tắt ASLR bằng `setarch -R` để so được địa chỉ): cả hai in **cùng địa chỉ ảo** `0x7ffff7f9f024`, nhưng `count` của process 2 **bắt đầu lại từ 1**. Cùng địa chỉ ảo, khác khung trang vật lý ([OS-022](os.md)).
+>
+> Chỉ phần **khởi tạo** là thread-safe. Gọi method của singleton từ nhiều thread vẫn cần khoá riêng.
 </details>
 
 #### DP-020 · 🟠 · concept · ⭐ · 🎤 2026-08-21 · [→ creational](../../../11-design-patterns/creational.md), [linking-loading §symbol interposition](../../../07-shared-libraries/linking-loading.md#L100)
@@ -369,14 +373,85 @@ Code gần như giống nhau (giữ con trỏ tới interface rồi ủy nhiệm
 **Strategy pattern là gì? C++ hiện đại hiện thực gọn thế nào?**
 <details><summary>Đáp án</summary>
 
-Đóng gói các thuật toán/hành vi hoán đổi được sau interface chung, chọn/đổi lúc runtime mà không sửa code dùng (OCP + DIP). C++ hiện đại với strategy đơn giản thường dùng `std::function` + lambda gọn hơn cả cây class; cần hiệu năng compile-time thì dùng template parameter.
+**Cơ chế:** context giữ một **"khe cắm"** cho thuật toán và **uỷ nhiệm** mọi lời gọi vào khe đó. Thêm thuật toán thứ tư ⟹ viết thêm một thứ cắm vào, **context không sửa dòng nào** (OCP + DIP). Hành vi được **cắm vào** (composition), không **nướng vào** (inheritance).
+
+**Ba cách hiện thực cùng một ý — chọn theo strategy có state không, và có cần đổi lúc runtime không:**
+
+| Cách | Khe cắm là gì | Đổi lúc runtime | Cái giá | Hợp khi |
+|---|---|---|---|---|
+| Cây class (GoF) | `std::unique_ptr<IAlgo>` | ✅ | virtual call + một class/thuật toán | Thuật toán **có state** (bộ lọc, lịch sử, timer) — vd dimming ở [behavioral §1](../../../11-design-patterns/behavioral.md) |
+| ⭐ `std::function` + lambda | `std::function<R(Args)>` | ✅ | type erasure (có thể cấp phát nếu lambda bắt nhiều) | Thuật toán **thuần hàm** — một công thức, một comparator |
+| Template parameter | kiểu `Curve` | ❌ chốt lúc compile | mỗi kiểu một bản code | Đường nóng, không cần đổi |
+
+```cpp
+class Backlight {                                       // CONTEXT
+    std::function<uint32_t(int32_t lux)> curve_;        // khe cắm
+public:
+    explicit Backlight(std::function<uint32_t(int32_t)> c) : curve_(std::move(c)) {}
+    void setCurve(std::function<uint32_t(int32_t)> c) { curve_ = std::move(c); }
+    uint32_t onLux(int32_t lux) { return curve_(lux); } // không biết thuật toán nào
+};
+
+Backlight b([](int32_t lux) { return static_cast<uint32_t>(lux / 8); });  // tuyến tính
+b.onLux(400);                                                              // 50
+b.setCurve([](int32_t lux) { return lux > 300 ? 100u : 20u; });           // đổi lúc runtime
+b.onLux(400);                                                              // 100
+
+template <typename Curve> class BacklightT {            // biến thể compile-time
+    Curve curve_;
+public:
+    explicit BacklightT(Curve c) : curve_(c) {}
+    uint32_t onLux(int32_t lux) { return curve_(lux); } // inline được, không gián tiếp
+};
+BacklightT t([](int32_t lux) { return static_cast<uint32_t>(lux / 2); }); // CTAD C++17 → 200
+```
+Output thật (`g++ -std=c++17 -Wall -Wextra`, gcc 11.4): `linear: 50` · `step: 100` · `tmpl: 200`.
+
+**Bẫy:** nghĩ giá trị của Strategy là *"có nhiều class kế thừa"*. Giá trị nằm ở chỗ **context đóng băng**. Và biết chỗ **không** dùng lambda cũng là một điểm: strategy có state thì class là đúng, nhồi state vào lambda capture chỉ giấu nó đi.
+
+**Chốt:** *"Strategy = context giữ một khe cắm và uỷ nhiệm vào đó. Thuần hàm thì `std::function` + lambda; có state thì cây class; chốt lúc compile thì template parameter."*
 </details>
 
 #### DP-006 · 🟡 · concept · [→ behavioral](../../../11-design-patterns/behavioral.md)
 **Observer pattern dùng khi nào? Rủi ro?**
 <details><summary>Đáp án</summary>
 
-Khi một subject đổi trạng thái cần tự động thông báo nhiều observer quan tâm mà không gắn chặt — nền của event-driven/callback (phổ biến embedded: sự kiện sensor, GPIO, nút bấm). Rủi ro chính: lifetime/dangling — observer bị hủy mà chưa unsubscribe → subject gọi vào con trỏ chết (UB); dùng weak_ptr hoặc unsubscribe an toàn.
+**Cơ chế:** subject giữ **danh sách callback** đã đăng ký; trạng thái đổi ⟹ duyệt danh sách, gọi từng cái. Subject **không biết** ai đang nghe ⟹ thêm người nghe mới không sửa subject. Bạn đã dùng nó nhiều lần dù không gọi tên: mọi API kiểu `register_callback()`, vsync callback, sự kiện sensor/GPIO/nút bấm đều là Observer.
+
+**Dùng khi:** một nguồn sự kiện, **nhiều** bên quan tâm, và số bên đó thay đổi theo cấu hình. **Đừng dùng khi** chỉ có đúng một người nghe ⟹ gọi thẳng hoặc một callback.
+
+**Rủi ro — xếp theo mức nguy hiểm:**
+
+| Rủi ro | Chuyện gì xảy ra | Chữa |
+|---|---|---|
+| 🔴 **Vòng đời** | Observer bị huỷ mà chưa `unsubscribe` ⟹ subject gọi vào object đã chết ⟹ UB | Giữ `weak_ptr`, `lock()` trước khi gọi, chết thì tự gỡ |
+| Đăng ký/huỷ **trong lúc** đang notify | Iterator invalidation | Notify trên bản sao danh sách, hoặc hoãn thay đổi |
+| Notify từ **ISR** | Observer chạy trong ngữ cảnh ngắt | ISR chỉ đẩy sự kiện vào queue, luồng khác notify |
+| Thứ tự thông báo | Code ngầm phụ thuộc thứ tự ⟹ vỡ khi đổi cài đặt | Không được phụ thuộc |
+
+```cpp
+std::vector<ILuxObserver*> obs_;                 // ❌ con trỏ thô: không biết observer còn sống không
+std::vector<std::weak_ptr<ILuxObserver>> obs_;   // ✅ không giữ vòng đời, phát hiện được đã chết
+
+void publish(int v) {
+    for (auto it = obs_.begin(); it != obs_.end();) {
+        if (auto p = it->lock()) { p->onLux(v); ++it; }
+        else                     { it = obs_.erase(it); }   // tự dọn
+    }
+}
+```
+Chạy thật (gcc 11.4, `-fsanitize=address`). Bản con trỏ thô, `delete` observer rồi `publish` lần nữa:
+```
+ERROR: AddressSanitizer: heap-use-after-free ...
+    #0 ... in SensorRaw::publish(int) obs.cpp:11
+freed by thread T0 here:
+    #1 ... in Dimming::~Dimming() obs.cpp:5
+```
+Bản `weak_ptr`: `Dimming nhận 100` → `observer đã chết -> gỡ`. Lỗi **crash** thành hành vi **tự dọn**.
+
+**Bẫy:** coi rủi ro của Observer là *"hiệu năng khi nhiều observer"*. Rủi ro thật là **vòng đời**, cùng lớp bug với member `std::vector<IObserver*>` ở [CPP-067](cpp.md). Bẫy thứ hai mang tính miền: nối thẳng `onLux → setBacklight` thì đúng pattern nhưng sai sản phẩm (nhấp nháy), phải lọc + hysteresis phía sau ([behavioral §3.1](../../../11-design-patterns/behavioral.md)).
+
+**Chốt:** *"Observer = subject giữ danh sách callback, không biết ai nghe. Rủi ro số một là vòng đời: observer chết mà subject còn giữ con trỏ. Giữ `weak_ptr` để biến crash thành tự dọn."*
 </details>
 
 #### DP-010 · 🟠 · concept · [→ behavioral](../../../11-design-patterns/behavioral.md)
@@ -1034,6 +1109,34 @@ int32_t lib_api_set_backlight(int32_t backlight) {
 - Lợi ích "mịn" gần như không có: các thao tác đều ngắn, tranh chấp thấp.
 
 **Chốt:** *"Đổi **chỗ đặt** khoá, không đổi **số** khoá. Và khi dời khoá xuống, phải gỡ khoá cũ — semaphore không biết ai đang giữ nó."*
+</details>
+
+#### DP-048 · 🟠 · concept · [→ A1 §7.3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**Mọi `lib_api_*` đã khoá bằng named semaphore. Driver kernel của panel phía dưới vẫn có mutex riêng trong `ioctl`. Reviewer đề xuất bỏ mutex trong driver *"cho đỡ khoá hai lần"*. Bạn đồng ý không? Và nếu đề xuất ngược lại — bỏ khoá ở library vì kernel đã khoá — thì sao?**
+<details><summary>Đáp án</summary>
+
+**Không đồng ý cả hai chiều.** Hai khoá bảo vệ **hai thứ khác nhau**, trên **hai phạm vi khác nhau**:
+
+| | Named semaphore ở `lib_api_*` | Mutex trong driver kernel |
+|---|---|---|
+| Bảo vệ | **State của library** trong shm + **trình tự nhiều bước** (đọc state → tính → ghi) | **Thanh ghi / bus** của thiết bị trong **một** `ioctl` |
+| Phạm vi | Mọi process **dùng library** | **Mọi** bên mở thiết bị — kể cả tool test, script không đi qua library |
+| Thiếu nó thì | Hai process tính chồng lên nhau, state trong shm hỏng | Hai `ioctl` xen vào giữa một chuỗi ghi thanh ghi ⟹ phần cứng nhận cấu hình nửa nọ nửa kia |
+
+**Bỏ mutex kernel — sai vì phạm vi:** kernel **không được tin** rằng user-space luôn đi qua library. Bất kỳ ai mở được `/dev/...` cũng gọi được `ioctl`. Driver phải tự bảo vệ phần cứng của nó.
+
+**Bỏ khoá library — sai vì độ hạt:** mutex kernel chỉ làm **từng** `ioctl` nguyên tử. Một thao tác của library là *đọc state → tính → ghi xuống* qua **nhiều** lời gọi. Mỗi lời gọi nguyên tử không làm **cả chuỗi** nguyên tử: hai process vẫn đọc cùng state cũ rồi ghi đè nhau.
+
+**"Vì sao" hai tầng:**
+- *Nông:* hai tầng khác nhau thì mỗi tầng một khoá.
+- *Sâu:* khoá user-space bảo vệ **tính nhất quán của chính sách**; khoá kernel bảo vệ **tính nguyên tử của lệnh phần cứng**. Câu hỏi đúng không phải *"có thừa không"* mà *"mỗi khoá bảo vệ bất biến nào, cho ai"*.
+
+**Bẫy:**
+1. Đếm số khoá thay vì hỏi mỗi khoá bảo vệ **bất biến** gì.
+2. Quên những caller **đi tắt** qua library (tool, script, process khác) — chính lý do driver phải tự khoá.
+3. Giữ mutex kernel xuyên qua lần quay về user-space ⟹ một process user giữ được khoá kernel vô thời hạn.
+
+**Chốt:** *"Khoá library bảo vệ trình tự nhiều bước trên state dùng chung; khoá driver bảo vệ từng lệnh phần cứng, cho mọi caller kể cả đi tắt. Hai bất biến khác nhau nên không cái nào thay được cái kia."*
 </details>
 
 ---

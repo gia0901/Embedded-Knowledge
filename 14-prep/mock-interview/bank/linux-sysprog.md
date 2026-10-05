@@ -1110,6 +1110,73 @@ Trả lời theo **bốn trục** ([ipc-linux.md §2](../../../04-linux-system-p
 **Chốt:** *"60 MB/s thì shm đáng giá, nhưng 'decoder hay crash' mới là vế quyết định — phải chọn cơ chế đồng bộ sống sót được khi một bên chết, nếu không thì việc tách process thành vô nghĩa."*
 </details>
 
+#### LNX-044 · 🟡 · concept · [→ ipc-linux §5.1](../../../04-linux-system-programming/ipc-linux.md)
+**S-Box: một thread nằm chặn trong `mq_receive()` để nhận lệnh đồng bộ độ sáng từ unit khác. Khi service tắt, code đặt `stop = true` rồi `join()` — và treo. Vì sao? Dừng thread đó thế nào?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** `mq_receive()` chặn trong kernel tới khi **có message**. Cờ `stop` là biến trong bộ nhớ, kernel không biết tới nó ⟹ thread không bao giờ quay lại vòng lặp để đọc cờ ⟹ `join()` chờ mãi. Phải **đánh thức nó bằng chính cái nó đang chờ**, hoặc cho nó chờ thêm một nguồn thứ hai.
+
+| Cách | Cơ chế | Đánh đổi |
+|---|---|---|
+| ⭐ **Message sentinel** | Gửi một message "QUIT" với **priority cao nhất** ⟹ nó vượt mọi message đang chờ | Đơn giản, dừng tức thì. Hàng **đang đầy** thì chính `mq_send` của sentinel bị chặn ⟹ dùng `mq_timedsend` hoặc một descriptor `O_NONBLOCK` riêng |
+| `mq_timedreceive` + cờ | Thức dậy định kỳ để kiểm cờ | Độ trễ khi dừng = độ dài timeout. ⚠️ Hạn chót tính theo **`CLOCK_REALTIME`** ⟹ NTP nhảy là timeout sai |
+| `epoll` trên `mqd_t` + `eventfd` | Trên Linux `mqd_t` là fd ⟹ chờ chung với một `eventfd` dành cho việc dừng | Sạch nhất nếu đã có event loop. Không portable: POSIX không hứa `mqd_t` là fd |
+
+Chạy thật (gcc 11.4, `-lrt`):
+```
+rx: nhan QUIT sau 5 message -> thoat
+main: join mat 170 us
+mq_timedreceive (hang rong, han +1s REALTIME): ret=-1 errno=Connection timed out sau 1000 ms
+```
+
+**Bẫy:**
+1. `pthread_cancel` cho thread C++: hủy giữa chừng có thể bỏ qua destructor của object trên stack ⟹ rò tài nguyên, khoá bị giữ.
+2. Tính hạn chót cho `mq_timedreceive` từ `CLOCK_MONOTONIC` (đếm từ lúc boot): kernel đọc nó như giờ `REALTIME` (đếm từ 1970) ⟹ hạn đã nằm **trong quá khứ** ⟹ trả `ETIMEDOUT` ngay ⟹ vòng lặp quay tít, đốt CPU ([LNX-029](linux-sysprog.md)).
+3. Gửi sentinel priority 0: nó xếp **sau** mọi lệnh đang chờ ⟹ tắt chậm, và vẫn xử lý lệnh cũ trong lúc tắt.
+
+**Chốt:** *"Thread chặn trong syscall không đọc được cờ của bạn. Đánh thức nó bằng chính thứ nó chờ: một message sentinel priority cao nhất. Có event loop thì chờ chung với một `eventfd`."*
+</details>
+
+#### LNX-045 · 🟠 · concept · ⭐ · [→ ipc-linux §4.3](../../../04-linux-system-programming/ipc-linux.md), [A1 §7.2](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**Library của bạn được nạp vào nhiều process; mọi hàm `lib_api_*` bọc giữa `sem_wait`/`sem_post` trên một named semaphore. Một tool test bị `kill -9` đúng lúc đang ở trong một hàm API. Các process còn lại ra sao? Vì sao không có `EOWNERDEAD` như robust mutex? Bạn xử lý thế nào?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — bốn bước:**
+1. Tool test gọi `sem_wait` ⟹ giá trị semaphore 1 → 0.
+2. Bị `kill -9` ⟹ không chạy được `sem_post`. Kernel dọn fd, bộ nhớ, `flock` của nó, nhưng **không đụng tới semaphore**.
+3. Vì sao không đụng: semaphore là **bộ đếm, không có chủ sở hữu** ([OS-007](os.md)). Kernel không biết lần `sem_wait` nào thuộc về ai ⟹ không biết phải hoàn trả cho ai.
+4. Process kế tiếp gọi bất kỳ `lib_api_*` nào ⟹ `sem_wait` **treo vĩnh viễn**. Tất cả process dùng library lần lượt đứng hình.
+
+Chạy thật (process A `sem_wait` rồi `_exit`, process B xin khoá với hạn 2 s):
+```
+A da chet. Gia tri semaphore = 0 (0 = van 'dang bi giu')
+B: sem_timedwait -> -1 (Connection timed out)
+```
+
+**Robust mutex thì khác ở đâu:** mutex **có chủ** (thread đã lock). Kernel ghi nhận chủ khi process chết, nên lần `lock()` kế tiếp trả `EOWNERDEAD` thay vì treo ([ipc-linux §4.3](../../../04-linux-system-programming/ipc-linux.md)).
+
+**Xử lý — ba hướng, khác nhau ở chỗ *phát hiện* hay *khôi phục*:**
+
+| Hướng | Làm gì | Được gì / mất gì |
+|---|---|---|
+| `sem_timedwait` + log lịch sử | Hết hạn ⟹ log ai giữ khoá lần cuối (chính là việc của `prev_called_proc` trong shm) | **Phát hiện** và debug được. **Không** tự khôi phục |
+| ⭐ Robust mutex process-shared đặt trong shm | Thay semaphore bằng `pthread_mutex` có `PTHREAD_PROCESS_SHARED` + `PTHREAD_MUTEX_ROBUST` | **Khôi phục được**. Nhưng phải viết `repair_shared_state()`: state có thể đang dở dang |
+| Một daemon sở hữu state | Các process khác chỉ gửi lệnh qua IPC; daemon là nơi duy nhất ghi state | Client chết không kéo ai theo. Đổi lại phải sửa kiến trúc lớn (hướng của [B1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)) |
+
+**"Vì sao" hai tầng:**
+- *Nông:* process chết khi giữ khoá thì khoá kẹt.
+- *Sâu:* **dữ liệu dở dang mới là vấn đề thật.** Kể cả khi lấy lại được khoá, state trong shm có thể đã bị ghi một nửa. Mọi lời giải nghiêm túc đều phải có bước *kiểm và sửa state* (magic, version, checksum, hoặc ghi theo kiểu commit một lần).
+
+> 🔺 *T3, không chấm:* System V semaphore có `SEM_UNDO` (kernel hoàn tác thao tác khi process chết); POSIX semaphore không có tương đương.
+
+**Bẫy:**
+1. *"Kernel tự nhả khoá khi process chết"*: đúng với fd, `flock`, robust mutex; **sai** với POSIX semaphore.
+2. Sửa bằng cách *"tăng semaphore lên 1 khi thấy treo"*: không biết process cũ chết hay chỉ đang chậm ⟹ có thể cho hai bên cùng vào.
+3. Chỉ nghĩ tới khoá, quên state trong shm đang dở dang.
+
+**Chốt:** *"Semaphore là bộ đếm không chủ nên kernel không nhả hộ được. Process chết khi giữ nó là mọi caller sau treo. Phát hiện bằng `sem_timedwait` + lịch sử người gọi; muốn khôi phục thì dùng robust mutex và phải sửa state dở dang."*
+</details>
+
 ---
 
 ## E — Môi trường chạy: thời gian, container, mạng

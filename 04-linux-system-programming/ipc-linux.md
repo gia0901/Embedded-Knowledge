@@ -241,6 +241,24 @@ mq_receive(mq, buf, sizeof buf, &prio);       // ⚠️ buf phải ≥ mq_msgsiz
 
 **Khi nào KHÔNG dùng mq:** dữ liệu lớn/tần suất cao (mỗi message vẫn 2 lần copy) · cần chạy khác máy · cần truyền fd.
 
+### 5.1. Tắt một thread đang chặn trong `mq_receive`
+
+Thread nhận thường nằm chặn trong `mq_receive()`. Lúc tắt máy, cờ `stop` không đánh thức được nó. Ba cách, theo thứ tự nên dùng:
+
+| Cách | Cơ chế | Đánh đổi |
+|---|---|---|
+| ⭐ **Message sentinel** | Gửi một message "QUIT" với **priority cao nhất** ⟹ nó vượt mọi message đang chờ, thread nhận xong thì thoát | Đơn giản, không mất nhịp. Nhưng nếu hàng **đang đầy** thì chính `mq_send` của sentinel bị chặn ⟹ dùng `mq_timedsend` hoặc một descriptor `O_NONBLOCK` riêng |
+| `mq_timedreceive` + cờ | Thức dậy định kỳ để kiểm cờ | Độ trễ tắt = độ dài timeout. ⚠️ Hạn chót đo theo **`CLOCK_REALTIME`** ⟹ NTP nhảy là timeout sai ([LNX-029](../14-prep/mock-interview/bank/linux-sysprog.md)) |
+| `epoll` trên `mqd_t` + `eventfd` | Trên Linux `mqd_t` là fd ⟹ chờ chung với một `eventfd` dùng để báo dừng | Sạch nhất khi đã có event loop. Không portable (POSIX không hứa `mqd_t` là fd) |
+
+```
+Chạy thật (sentinel, priority 31):
+rx: nhan QUIT sau 5 message -> thoat
+main: join mat 170 us
+mq_timedreceive (hang rong, han +1s REALTIME): ret=-1 errno=Connection timed out sau 1000 ms
+```
+⚠️ **Không dùng `pthread_cancel`** cho thread C++: hủy giữa chừng thì destructor của object trên stack có thể không chạy đúng.
+
 ---
 
 ## 6. Unix domain socket — mặc định nên chọn
@@ -338,6 +356,8 @@ Nhanh hơn TCP loopback vì **không đi qua stack TCP/IP** (không checksum, kh
 | [LNX-035](../14-prep/mock-interview/bank/linux-sysprog.md) | Unix domain socket hơn TCP loopback và pipe ở chỗ nào? |
 | [LNX-017](../14-prep/mock-interview/bank/linux-sysprog.md) | Khi nào chọn message queue thay vì shared memory? Hàng đầy thì xử lý sao? |
 | [LNX-036](../14-prep/mock-interview/bank/linux-sysprog.md) | POSIX IPC và System V IPC khác nhau? Nên dùng cái nào? |
+| [LNX-044](../14-prep/mock-interview/bank/linux-sysprog.md) | Thread nhận nằm chặn trong `mq_receive` — tắt máy thì dừng nó bằng cách nào? |
+| [LNX-045](../14-prep/mock-interview/bank/linux-sysprog.md) ⭐ | Process chết khi đang giữ named semaphore — các process khác ra sao, vì sao không có `EOWNERDEAD`? |
 
 ---
 ⬅️ [io-multiplexing.md](io-multiplexing.md) · ➡️ Tiếp theo: [05-drivers-device-tree/](../05-drivers-device-tree/)

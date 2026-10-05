@@ -6,7 +6,7 @@
 
 ## Cách dùng
 
-**Hiện không có plan nào đang chạy.** Plan Datalogic đã kết thúc và nằm ở [archive/](archive/). Ôn tự do bằng `/mock` (Claude hỏi track/type). Khi có JD mới: viết `<công-ty>-plan.md` **ngay trong thư mục này** (không trong `archive/`) với block **§📍 Tiến độ hiện tại** ở đầu file — `/mock` và config tự nhận ra nó là plan đang chạy.
+**Plan đang chạy: [resume-plan.md](resume-plan.md)** (từ 2026-10-05) — plan đầu tiên bám **resume** thay vì JD. Plan Datalogic đã kết thúc và nằm ở [archive/](archive/). Muốn ôn tự do thì nói rõ khi gọi `/mock`. Khi có JD mới: viết `<công-ty>-plan.md` **ngay trong thư mục này** (không trong `archive/`) với block **§📍 Tiến độ hiện tại** ở đầu file — `/mock` và config tự nhận ra nó là plan đang chạy.
 
 Kế hoạch tổ chức theo **tuần × buổi**, mỗi buổi hai cột: **Đọc/Hiểu** (chuẩn bị trước — doc cụ thể + pool câu hỏi bank) và **Test 🎤** (phiên mock). Ba nguyên tắc xuyên suốt nằm ở đầu plan: ① ưu tiên *tư duy* hơn cú pháp · ② **xen kẽ + lặp lại ngắt quãng** (khởi động trộn ~5–10′ mỗi buổi + ôn dồn tích cuối tuần) · ③ đọc thì liệt kê đầy đủ, mock thì để ngẫu nhiên.
 
@@ -24,7 +24,7 @@ Ký hiệu trong checklist: `- [ ]` chưa ôn · `- [x]` đã ôn vững · **�
 
 | Vị trí | Kế hoạch | Trọng tâm |
 |--------|----------|-----------|
-| *(chưa có — viết khi có JD mới)* | — | — |
+| 🎯 *Chưa có JD* — bám `RESUME_current.tex` | [resume-plan.md](resume-plan.md) — 4 buổi × ~105′, 82 câu (R1 kiến trúc · R2 ranh giới `.so` · R3 S-Box concurrency · R4 phần còn lại + 🇬🇧) | C++ System SW: C++ interface · shared library · ABI · concurrency · pattern |
 
 **Đã lưu trữ:**
 

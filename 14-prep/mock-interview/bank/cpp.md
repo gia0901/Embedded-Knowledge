@@ -1378,6 +1378,148 @@ if (ready.load(memory_order_relaxed))   // thấy true, nhưng KHÔNG lập cặ
 **Chốt (câu trả lời an toàn):** *"CPU và compiler đều reorder; single-thread không thấy, đa thread thì lộ. Ba mức: seq_cst / acquire-release / relaxed. Em mặc định `seq_cst` và chỉ hạ khi đã profile — sai ở đây tạo bug không tái hiện được."* Thái độ thận trọng ở câu cuối là thứ interviewer chấm, không phải việc thuộc tên.
 </details>
 
+#### CPP-069 · 🟡 · coding · ⭐ · [→ concurrency §7.1](../../../02-modern-cpp/concurrency.md)
+**Thread tính độ sáng của S-Box phải chạy 60 Hz. Đồng nghiệp viết như dưới, đo ngoài hiện trường chỉ được khoảng 48 Hz. Vì sao? Sửa thế nào — và nếu một chu kỳ `compute()` bị kẹt 80 ms thì bản sửa của bạn làm gì ở các chu kỳ sau?**
+```cpp
+while (running) {
+    compute();                                         // ~3 ms
+    std::this_thread::sleep_for(std::chrono::milliseconds(16));
+}
+```
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** `sleep_for(16ms)` ngủ đủ 16 ms **sau khi** `compute()` xong ⟹ một chu kỳ thật là `3 + 16 + độ trễ đánh thức` ms. Thời gian làm việc **cộng dồn** vào chu kỳ thay vì nằm trong nó. Sửa: hẹn theo **mốc tuyệt đối**.
+
+```cpp
+using Clock = std::chrono::steady_clock;               // ✅ không nhảy theo NTP
+const auto period = std::chrono::microseconds(16667);
+auto next = Clock::now();
+while (running) {
+    compute();
+    next += period;                                    // mốc kế tiếp, tính từ mốc trước
+    if (Clock::now() > next + period) {                // trễ quá một chu kỳ
+        ++overruns;                                    // đếm để biết
+        next = Clock::now();                           // ✅ bỏ nhịp, không chạy bù
+    }
+    std::this_thread::sleep_until(next);
+}
+```
+
+Chạy thật (120 chu kỳ, `compute()` giả lập 3 ms, `g++ -O2`, gcc 11.4):
+```
+120 chu ky, ly thuyet 2000 ms
+sleep_for  : 2467 ms  (48.6 Hz)
+sleep_until: 2000 ms  (60.0 Hz)
+```
+
+**Chu kỳ bị kẹt — ba chính sách:**
+
+| Chính sách | Hành vi sau khi kẹt 80 ms | Hợp khi |
+|---|---|---|
+| Cứ `next += period` | Các mốc đã qua hết ⟹ `sleep_until` trả về ngay ⟹ chạy **5 lần liền** để đuổi | Hầu như không bao giờ: mỗi lần chạy bù tính trên dữ liệu đã cũ |
+| ⭐ **Bỏ nhịp + đếm** | Dời mốc về hiện tại, chạy tiếp đều nhịp, `overruns++` | Thuật toán theo khung hình: một khung trễ thì bỏ, không bù |
+| Bù có giới hạn | Chạy bù tối đa N lần | Bộ lọc phụ thuộc số mẫu đều đặn |
+
+**Bẫy:**
+1. Dùng `system_clock` làm mốc: NTP chỉnh giờ là nhịp nhảy theo ([LNX-029](linux-sysprog.md)).
+2. Sửa bằng cách *"trừ thời gian compute ra khỏi 16 ms"*. Vẫn trôi, vì độ trễ đánh thức và phép làm tròn tích luỹ mỗi chu kỳ. Mốc tuyệt đối thì sai số **không cộng dồn**.
+3. Không đếm overrun. Bỏ nhịp thì được, nhưng **không biết mình bỏ** thì không.
+
+**Chốt:** *"`sleep_for` đo khoảng nên thời gian làm việc cộng dồn; `sleep_until` theo mốc tuyệt đối trên `steady_clock` thì không. Kẹt quá một chu kỳ thì dời mốc, đếm overrun, không chạy bù."*
+</details>
+
+#### CPP-070 · 🟠 · coding · ⭐ · [→ concurrency §7.1](../../../02-modern-cpp/concurrency.md), [OS-012](os.md)
+**Thread 60 Hz ở trên dùng `std::atomic<bool> stop` + `sleep_until`. Khi service tắt, systemd chỉ chờ có hạn, và có lúc chu kỳ được cấu hình dài tới 1 giây. Viết lại để thread dừng gần như ngay lập tức mà vẫn giữ nhịp. Nêu ba chỗ dễ viết sai.**
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** `sleep_until` **không đánh thức được** ⟹ cờ `stop` chỉ được nhìn thấy khi hết giấc ngủ hiện tại. `condition_variable::wait_until(lk, next, pred)` làm cả hai việc: hẹn đúng mốc **và** thức ngay khi có `notify`.
+
+```cpp
+class Ticker {
+    std::mutex m_;
+    std::condition_variable cv_;
+    bool stop_ = false;                    // đọc/ghi DƯỚI mutex
+    std::thread th_;                       // ⚠️ khai báo CUỐI CÙNG
+public:
+    explicit Ticker(std::chrono::milliseconds period) : th_([this, period] {
+        std::unique_lock<std::mutex> lk(m_);
+        auto next = std::chrono::steady_clock::now();
+        for (;;) {
+            next += period;
+            if (cv_.wait_until(lk, next, [this] { return stop_; })) break;  // true ⟹ dừng
+            lk.unlock();  tick();  lk.lock();                               // không giữ khoá khi làm việc
+            if (std::chrono::steady_clock::now() > next + period)
+                next = std::chrono::steady_clock::now();                    // bỏ nhịp (CPP-069)
+        }
+    }) {}
+    ~Ticker() {
+        { std::lock_guard<std::mutex> lk(m_); stop_ = true; }   // ✅ ghi cờ khi giữ khoá
+        cv_.notify_one();
+        th_.join();
+    }
+};
+```
+
+Chạy thật (chu kỳ 1 s, yêu cầu dừng sau 100 ms, gcc 11.4):
+```
+SleepTicker (chu ky 1 s) dung mat: 900 ms
+CvTicker    (chu ky 1 s) dung mat: 0 ms
+CvTicker 60 Hz trong 1 s: ticks=57 overruns=1      <- một chu kỳ cố ý chạy quá 5 lần
+```
+
+**Ba chỗ dễ sai:**
+
+| Chỗ | Viết sai | Hậu quả |
+|---|---|---|
+| Ghi cờ | `stop_ = true;` **không** giữ mutex (hoặc dùng atomic rồi bỏ mutex) | `notify` lọt vào khe giữa *"kiểm predicate"* và *"đi ngủ"* ⟹ **lost wakeup**, thread ngủ thêm trọn một chu kỳ ([OS-012](os.md)) |
+| Thứ tự member | `std::thread th_` khai báo **trước** các member nó dùng | Member được dựng theo **thứ tự khai báo** ⟹ thread đã chạy trong khi các member sau nó chưa được khởi tạo ⟹ data race thật. Đã bắt được bằng TSan khi viết đáp án này: `std::atomic<int> ticks` khai báo sau `th_` |
+| Giữ khoá khi làm việc | Gọi `tick()` khi vẫn giữ `lk` | Destructor phải chờ `tick()` xong mới ghi được cờ; mọi thread khác cần mutex cũng bị chặn |
+
+**"Vì sao" hai tầng:**
+- *Nông:* condvar đánh thức được, sleep thì không.
+- *Sâu:* predicate **và** mutex mới là thứ làm việc dừng **đáng tin**. `wait_until` có predicate kiểm cờ **trước khi ngủ lần đầu** và sau **mỗi** lần thức (kể cả spurious wakeup). Mutex biến *"kiểm cờ → đi ngủ"* thành một bước nguyên tử.
+
+> 🔺 *T3, không chấm:* TSan của gcc 11 không chặn `pthread_cond_clockwait` (thứ `wait_until` với `steady_clock` dùng bên dưới), nên báo nhầm *"double lock"* trên code đúng. Thử với `system_clock` thì TSan im.
+
+**Bẫy:** dùng `std::jthread` + `stop_token` rồi tưởng xong. `jthread` chỉ **yêu cầu** dừng. Thread đang nằm trong `sleep_until` vẫn không thấy yêu cầu đó, trừ khi chờ bằng `condition_variable_any` có nhận `stop_token` (C++20, ngoài phạm vi C++17).
+
+**Chốt:** *"Muốn vừa giữ nhịp vừa dừng ngay thì chờ bằng `cv.wait_until(lk, next, pred)` trên `steady_clock`. Ghi cờ dưới mutex rồi mới notify, đừng giữ khoá khi làm việc, và khai báo member thread cuối cùng."*
+</details>
+
+#### CPP-071 · 🟡 · design · ⭐ · 🏗️ · [→ ipc-linux §5](../../../04-linux-system-programming/ipc-linux.md), [concurrency §3, §5](../../../02-modern-cpp/concurrency.md)
+**Đọc cảm biến ánh sáng (polling, lọc nhiễu) mất 5–20 ms và đang nằm ngay trong vòng 60 Hz ⟹ vỡ nhịp. Bạn tách việc đọc sang một thread riêng. Hai thread trao giá trị lux cho nhau bằng gì — queue, `std::atomic`, hay mutex? Vì sao?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế — câu hỏi quyết định là: lux là *trạng thái* hay *sự kiện*?** Lux là **trạng thái**: vòng tính chỉ cần **giá trị mới nhất**. Mẫu cũ đã sai so với hiện tại ⟹ không có lý do giữ hàng đợi. Cấu trúc đúng là **hộp thư một ô** (latest-value-wins): bên đọc cảm biến ghi đè, vòng 60 Hz lấy bản mới nhất.
+
+| Cách | Hợp khi | Cái giá / rủi ro |
+|---|---|---|
+| Queue | Dữ liệu là **sự kiện** — mỗi phần tử là một việc phải làm | Với trạng thái: tồn đọng ⟹ vòng tính xử lý **dữ liệu cũ**, phải tự xả hàng |
+| ⭐ `std::atomic<int32_t>` | Chỉ **một giá trị** | Không khoá, không chặn. Nhưng không mang thêm được thông tin nào khác |
+| ⭐ Mutex + struct nhỏ | **Nhiều trường phải nhất quán với nhau**: `{lux, timestamp, valid}` | Critical section chỉ là **một phép copy** ⟹ gần như không tranh chấp |
+
+```cpp
+struct Sample { int32_t lux; std::chrono::steady_clock::time_point at; bool valid; };
+
+// ❌ hai atomic riêng: vòng tính có thể đọc lux MỚI với timestamp CŨ
+std::atomic<int32_t> lux_;  std::atomic<int64_t> at_;
+
+// ✅ một khoá bảo vệ CẢ NHÓM, copy ra rồi nhả ngay
+Sample latest() { std::lock_guard<std::mutex> lk(m_); return s_; }
+```
+
+**Vì sao phải có `timestamp` — chỗ phân biệt ứng viên:** hộp thư một ô luôn trả về **một** giá trị, kể cả khi thread đọc cảm biến đã treo 10 giây. Vòng tính phải kiểm *"mẫu này cũ bao lâu"* để **chuyển chế độ an toàn** (giữ độ sáng hiện tại, ghi log), thay vì chỉnh sáng theo số liệu đã chết.
+
+**Lọc đặt ở đâu:** khử nhiễu (median, EMA) đặt ở **thread đọc**, theo nhịp của cảm biến. **Hysteresis + giới hạn tốc độ** đặt ở **vòng tính**, theo nhịp khung hình ([RES-025](resume.md), [behavioral §3.1](../../../11-design-patterns/behavioral.md)).
+
+**Bẫy:**
+1. Chọn queue *"cho chắc, không mất mẫu"*. Với trạng thái, không mất mẫu nghĩa là **xử lý mẫu cũ**.
+2. Nhiều `std::atomic` riêng lẻ cho một nhóm trường. Từng trường nguyên tử **không** làm cả nhóm nhất quán.
+3. Không có cách phát hiện cảm biến đã chết.
+
+**Chốt:** *"Lux là trạng thái nên dùng hộp thư một ô, ghi đè, không queue. Một số thì `atomic`; một nhóm trường phải nhất quán thì mutex bảo vệ một phép copy. Kèm timestamp để biết mẫu đã cũ."*
+</details>
+
 ---
 
 ## H — C++17, container & ABI
@@ -1601,7 +1743,37 @@ Lợi: buộc khởi tạo, tránh chuyển kiểu ngầm/thu hẹp ngoài ý, g
 **`= delete` khác cách cũ (khai báo private không định nghĩa) thế nào?**
 <details><summary>Đáp án</summary>
 
-Cách cũ (C++98) cấm copy: khai báo copy ctor/assign **private + không định nghĩa** → dùng nhầm chỉ lỗi lúc **link** (hoặc runtime với friend/member), thông báo mơ hồ. `= delete` (C++11): hàm **tồn tại nhưng bị xóa** → mọi lời gọi lỗi ngay lúc **compile**, rõ ràng; đặt `public` để thông báo lỗi đẹp hơn. Còn mạnh hơn: `delete` được cho **hàm bất kỳ** (không chỉ special members) và **template instantiation cụ thể** — vd cấm gọi một overload với kiểu nhất định (`void f(char) = delete;` chặn ép ngầm). Luôn dùng `= delete`.
+> ⚠️ *Sửa 2026-10-05:* bản cũ của đáp án này ghi *"cách cũ chỉ lỗi lúc link (hoặc runtime với friend/member)"*. Câu đó **sai và gây nhầm**: gọi từ ngoài là lỗi **compile**, còn "runtime" thì không bao giờ xảy ra. Ứng viên đảo chiều compile/link **3 lần liên tiếp** (10/08 → 04/09 → 05/10), rất có thể vì ôn đúng câu sai này.
+
+**Cơ chế — cách cũ (C++98) đi qua HAI cửa kiểm tra, mỗi cửa bắt một nhóm người gọi:**
+
+1. **Cửa 1 · compile, access check:** hàm là `private` ⟹ code **ngoài class** gọi vào bị chặn ngay.
+2. **Cửa 2 · link:** member/`friend` **qua được** cửa 1 (họ có quyền truy cập), nhưng hàm **không có định nghĩa** ⟹ linker không tìm thấy symbol.
+
+| Ai gọi | Cách cũ: `private` + không định nghĩa | `= delete` |
+|---|---|---|
+| Code **ngoài** class | ❌ **compile** — `is private within this context` | ❌ compile — `use of deleted function` |
+| **Member / `friend`** | ❌ **link** — `undefined reference`, báo ở file `.o`, không chỉ ra dòng gọi | ❌ **compile**, chỉ đúng dòng gọi |
+
+Chạy thật (gcc 11.4, `-std=c++17`):
+```
+// gọi từ ngoài:   Fd b = a;
+error: 'Fd::Fd(const Fd&)' is private within this context          <- COMPILE
+
+// gọi từ member:  Fd clone() const { return *this; }
+undefined reference to `Fd::Fd(Fd const&)'                         <- LINK
+collect2: error: ld returned 1 exit status
+```
+Mẹo nhớ: ***private chặn NGƯỜI NGOÀI, thiếu định nghĩa chặn NGƯỜI NHÀ.*** Người nhà chỉ bị bắt ở bước cuối, và thông báo không chỉ ra dòng gọi.
+
+**`= delete` (C++11) hơn ở ba điểm:**
+- Hàm **tồn tại nhưng bị xoá** ⟹ **mọi** lời gọi, kể cả member/friend, lỗi ngay lúc **compile**, chỉ đúng dòng. Đặt `public` để thông báo nói *"deleted"* thay vì *"private"*.
+- Dùng được cho **hàm bất kỳ** và **template instantiation cụ thể**: `void f(char) = delete;` chặn ép ngầm `char → int`.
+- Nói rõ **ý định** ngay trong khai báo, không phải đoán từ việc thiếu định nghĩa.
+
+**Bẫy phụ (đúng cho cả hai cách):** *khai báo* copy ctor, dù `private` hay `= delete`, sẽ **chặn compiler sinh move** ⟹ class thành không copy được **và** không move được, trừ khi khai báo move tường minh ([CPP-020](cpp.md), [CPP-054](cpp.md)).
+
+**Chốt:** *"Cách cũ: người ngoài bị chặn lúc compile vì `private`, người nhà (member/friend) lọt tới link mới chết vì thiếu định nghĩa. `= delete` bắt tất cả ngay lúc compile, chỉ đúng dòng, và xoá được cả hàm thường."*
 </details>
 
 #### CPP-046 · 🟡 · concept · [→ EMC Item 12](../../../15-book-summaries/effective-modern-cpp.md)

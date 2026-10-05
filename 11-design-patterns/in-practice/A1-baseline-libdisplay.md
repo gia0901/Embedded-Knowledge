@@ -598,6 +598,20 @@ Mỗi thuật toán giữ **reference** tới phần shared memory của nó, bi
 
 > 💡 `prev_called_proc` lưu lịch sử process đã gọi, để khi deadlock còn biết ai giữ khoá. Đây là chi tiết **thiết kế cho lúc debug**, rất "thực chiến" khi bị hỏi *"hệ này debug kiểu gì?"*.
 
+⚠️ **Rủi ro của chính idiom này:** named semaphore **không có chủ sở hữu**. Một process chết khi đang giữ nó (crash, bị `kill -9`) thì kernel không biết phải nhả hộ ai ⟹ mọi process khác treo ở `lib_api_*` kế tiếp. Đó là lý do `prev_called_proc` tồn tại, và là câu interviewer sẽ khoan ([LNX-045](../../14-prep/mock-interview/bank/linux-sysprog.md)). Cơ chế và ba cách xử lý: [ipc-linux §4.3](../../04-linux-system-programming/ipc-linux.md).
+
+### 7.3 Hai khoá ở hai tầng — không thừa
+
+Ngoài named semaphore ở mặt tiền, **driver kernel** của panel còn một mutex riêng. Nhìn qua thì giống khoá hai lần cho một việc:
+
+| | Named semaphore ở `lib_api_*` | Mutex trong driver kernel |
+|---|---|---|
+| Bảo vệ | **State của library** trong shared memory + **trình tự nhiều bước** (đọc state → tính → ghi) | **Thanh ghi / bus** của thiết bị trong **một** lệnh `ioctl` |
+| Phạm vi | Mọi process **dùng library** | **Mọi** bên mở thiết bị, kể cả tool không đi qua library |
+| Thiếu nó thì | Hai process tính chồng lên nhau, state trong shm hỏng | Hai `ioctl` xen vào giữa một chuỗi ghi thanh ghi |
+
+⟹ Khoá user-space bảo vệ **tính nhất quán của chính sách**. Khoá kernel bảo vệ **tính nguyên tử của từng lệnh phần cứng**. Không cái nào thay được cái kia ([DP-048](../../14-prep/mock-interview/bank/design-patterns.md)).
+
 ---
 
 ## 8. Bảng tổng kết — pattern nào, ở đâu, vì sao
@@ -675,6 +689,9 @@ Nêu trước khi bị hỏi là **điểm cộng**; bị vặn ra mới thừa 
 | [DP-042](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Backend nhân theo chip × thuật toán — còn gọi là Bridge được không? |
 | [DP-043](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | `panel_ops` trong kernel so với `virtual` — giống, khác, thừa hưởng rủi ro gì? |
 | [DP-044](../../14-prep/mock-interview/bank/design-patterns.md) | Vòng vsync ngoài mặt tiền — hai vấn đề thiết kế và cách sửa |
+| [DP-048](../../14-prep/mock-interview/bank/design-patterns.md) | Khoá ở mặt tiền rồi, driver kernel còn khoá nữa — thừa không? |
+| [LNX-045](../../14-prep/mock-interview/bank/linux-sysprog.md) ⭐ | Process chết khi đang giữ named semaphore của library — chuyện gì xảy ra? |
+| [RES-034](../../14-prep/mock-interview/bank/resume.md) 🇬🇧 | *"Walk me through the architecture of the library you worked on."* |
 | [DP-024](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Lệnh đơn để nguyên hàm gọi thẳng — vì sao không bọc cho đồng bộ? |
 | [DP-038](../../14-prep/mock-interview/bank/design-patterns.md) | Bridge giải vấn đề gì? Khác Strategy chỗ nào khi code giống hệt? |
 | [DP-023](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | N thuật toán dimming × M SoC — thiết kế sao để không thành N×M lớp? |

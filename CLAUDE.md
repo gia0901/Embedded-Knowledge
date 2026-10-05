@@ -12,8 +12,9 @@
 - File này đã được hoàn thiện (không còn là bản nháp mơ hồ). Vẫn có thể tinh chỉnh khi phát sinh nhu cầu mới.
 - Xem **Mục 7 — Tiến độ** để biết tài liệu nào đã/đang/chưa viết.
 
-> 📦 **Sprint Datalogic đã KẾT THÚC (phỏng vấn xong, 2026-10-03).** Hiện **không có plan JD nào đang chạy**. Plan cũ lưu ở [`14-prep/study-plans/archive/`](14-prep/study-plans/archive/) — giữ vì các *"bài học #N"* được trích từ nhiều nơi.
-> Conversation mới muốn ôn: `/mock` sẽ hỏi track + type (ôn tự do). Có JD mới ⇒ viết plan mới vào `14-prep/study-plans/` theo khuôn ở [study-plans/README](14-prep/study-plans/README.md).
+> 🎯 **Plan đang chạy (từ 2026-10-05): [`resume-plan.md`](14-prep/study-plans/resume-plan.md)** — 4 buổi × ~105′ (mock chính + rapid quét phủ) bám `RESUME_current.tex`, nghiêng C++ System SW. `/mock` tự nhận và đề xuất buổi kế.
+> 📦 **Sprint Datalogic đã KẾT THÚC (phỏng vấn xong, 2026-10-03).** Plan cũ lưu ở [`14-prep/study-plans/archive/`](14-prep/study-plans/archive/) — giữ vì các *"bài học #N"* được trích từ nhiều nơi.
+> Conversation mới muốn ôn: `/mock` sẽ đề xuất buổi kế của `resume-plan` (nói rõ *"ôn tự do"* thì nó hỏi track + type). Có JD mới ⇒ viết plan mới vào `14-prep/study-plans/` theo khuôn ở [study-plans/README](14-prep/study-plans/README.md).
 > 🧪 Ba bộ lab (BSP phần cứng · DBG · DP) **hết đóng băng** — làm được bất cứ lúc nào.
 
 ---
@@ -221,7 +222,7 @@ Embedded-Interview/
 | 12 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
 | 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
-| 14 Prep | 🟡 Đang dùng | **study-plans/** (không có plan đang chạy — `datalogic-plan` đã **lưu trữ** vào `archive/` 03/10 sau buổi PV; + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
+| 14 Prep | 🟡 Đang dùng | **study-plans/** (**`resume-plan` đang chạy** từ 05/10 — 4 buổi R1–R4 bám resume, nghiêng C++ System SW; `datalogic-plan` đã **lưu trữ** vào `archive/` 03/10; + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
 | 15 Book summaries | 🟡 Đang viết | **8 cuốn đã xong**, tất cả đối chiếu PDF (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset, **cpp-high-performance** — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); TLPI ✅ 10/10 cụm (đủ 64 chương); **cpp-high-performance là bản CHỌN LỌC 3/14 chương có chủ đích** (bỏ phần trùng EMC/Williams + ~30% là C++20 ngoài JD C++17); còn LDD3/Bootlin ⬜. Tiến độ chi tiết từng cuốn xem `15-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu

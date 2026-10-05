@@ -517,11 +517,38 @@ if (op < OPCODE_MAX && handlers[op]) handlers[op](p, n);   // ✅ kiểm biên +
 | Chứa địa chỉ của **mọi** kiểu dữ liệu | **Dereference** — không biết đọc bao nhiêu byte |
 | Trong C: gán **ngầm** qua lại với `T *` | **Số học** — không biết bước nhảy. `p + 1` chỉ chạy nhờ **extension GNU**; gcc im lặng với `-Wall -Wextra`, chỉ cảnh báo khi bật `-Wpedantic` |
 
-**`malloc` trong C:** `int *p = malloc(n * sizeof *p);` — **không ép**. Ép kiểu thừa, và ở C89 còn **che lỗi** quên `#include <stdlib.h>` (khi đó `malloc` bị ngầm coi là trả `int`, mất nửa trên địa chỉ 64-bit).
+**`malloc` trong C:** `int *p = malloc(n * sizeof *p);` — **không ép**. Lý do có hai tầng:
 
-**Trong C++:** `void *` → `T *` **không** ngầm định — phải `static_cast`, vì đó là chuyển đổi làm mất an toàn kiểu. (Và C++ nên dùng `new`/container thay `malloc`.)
+- *Tầng nông:* thừa. C cho `void *` → `T *` ngầm định.
+- *Tầng sâu:* **cast là lệnh "im đi" gửi compiler**. Quên `#include <stdlib.h>` trong C89 thì `malloc` bị **ngầm khai báo là trả `int`** ⟹ địa chỉ 64-bit bị **cắt còn 32 bit**. Cast biến lỗi *"gán số nguyên cho con trỏ"* thành một phép ép **cố ý** trông hợp lệ.
 
-**Chốt:** *"`void *` là địa chỉ không có kiểu: chuyền đi được, không đọc và không cộng được cho tới khi gán lại cho một kiểu cụ thể."*
+**Cơ chế theo từng bước, chạy thật (gcc 11.4, x86-64, `-std=c89 -fno-builtin`, cố ý bỏ `<stdlib.h>`):**
+
+1. Compiler không thấy prototype ⟹ C89 cho phép, coi `malloc` là `int malloc()`.
+2. `malloc` thật trả về con trỏ 64-bit trong `rax`; phía gọi chỉ lấy 32 bit thấp (`eax`) rồi **sign-extend**.
+3. Ghi qua con trỏ đó ⟹ ghi vào địa chỉ rác.
+
+```
+p = 0xffffffff992392a0          <- nửa trên đã mất, bị sign-extend thành 0xffffffff...
+Segmentation fault (core dumped)
+```
+
+| | Không ép | Có ép `(int *)` |
+|---|---|---|
+| Cảnh báo gcc 11 (không cần `-Wall`) | `initialization of 'int *' from 'int' makes pointer from integer without a cast` — **nói thẳng ra bệnh** | `cast to pointer from integer of different size` — vẫn có, nhưng trông như cảnh báo về cast của chính bạn |
+| Compiler cũ / cảnh báo bị tắt | Thường vẫn báo | **Im hoàn toàn** — đây là nguồn gốc lời khuyên |
+
+⟹ Với gcc hiện đại, lỗi **không còn bị giấu hẳn**, nhưng không ép kiểu vẫn cho cảnh báo **đúng bệnh**. Lý do thứ hai: không ép thì đổi kiểu `p` chỉ phải sửa một chỗ (`sizeof *p` tự theo).
+
+**Trong C++:** `void *` → `T *` **không** ngầm định, vì đó là chuyển đổi làm mất an toàn kiểu. Không ép thì **không compile**:
+```
+error: invalid conversion from 'void*' to 'int*' [-fpermissive]
+```
+Phải `static_cast<int *>(malloc(...))`. Nhưng C++ nên dùng `new`/container/`make_unique` thay `malloc`.
+
+**Bẫy:** nói *"ép trong C là vô hại, chỉ thừa"*. Thừa là tầng nông. Tầng sâu là cast **tắt kiểm tra kiểu** ngay chỗ nó cần nhất.
+
+**Chốt:** *"`void *` là địa chỉ không có kiểu: chuyền đi được, không đọc và không cộng được cho tới khi gán lại cho một kiểu cụ thể. Trong C đừng ép `malloc`, vì cast tắt tiếng compiler đúng lúc nó cần báo quên include. Trong C++ thì không ép là không compile."*
 </details>
 
 ---
@@ -836,7 +863,14 @@ snprintf(dst, sizeof dst, "%s", src);   // luôn có '\0', cắt bớt nếu thi
 ```
 Output thật: `"abc"`. `snprintf` còn **trả về độ dài lẽ ra cần** ⟹ so với `sizeof dst` để biết đã bị cắt. (`strlcpy` làm cùng việc, có trên BSD và glibc ≥ 2.38, nhưng không phải chuẩn C.)
 
-**Chốt:** *"`strncpy` không bảo đảm `'\0'` — chép chuỗi có giới hạn thì dùng `snprintf` và kiểm giá trị trả về."*
+**Hai bẫy hay nói nhầm:**
+
+| Bẫy | Thực tế (chạy thật, gcc 11.4) |
+|---|---|
+| *"`strncpy` vẫn ghi tràn `dst` khi nguồn dài"* | **Sai** — với `n = sizeof dst` nó **không ghi quá `n` byte**. Đặt một vùng canary ngay sau `dst[4]`: sau `strncpy` canary vẫn `"ZZZ"`. Lỗi không nằm ở **lúc ghi**, mà ở **lúc đọc sau đó** (thiếu `'\0'` ⟹ `strlen`/`printf` chạy tràn sang vùng kế bên) |
+| `sizeof dst` khi `dst` là **tham số hàm** `char *dst` | Ra **8** (cỡ con trỏ, x86-64), không phải cỡ mảng ⟹ `n` sai hoàn toàn, lúc này mới thật sự ghi tràn. Mảng truyền vào hàm đã decay ([C-004](c-programming.md)) ⟹ hàm phải nhận thêm tham số độ dài |
+
+**Chốt:** *"`strncpy` không bảo đảm `'\0'` — chép chuỗi có giới hạn thì dùng `snprintf` và kiểm giá trị trả về. Và `sizeof` trên tham số con trỏ là 8, không phải cỡ buffer."*
 </details>
 
 ---
@@ -910,11 +944,33 @@ int next_id(void) { static int id = 100; return id++; }
 ```
 Ba lời gọi ở ba câu lệnh riêng: `100 101 102`. *(Gọi gọn trong một `printf` thì gcc in `102 101 100` — thứ tự đánh giá đối số là unspecified, [COD-026](coding.md).)*
 
-**`static` trong header:** mỗi `.c` include nó có **một bản riêng** — đã kiểm: địa chỉ `helper` in từ hai file là **2 địa chỉ khác nhau**.
-- Với hàm nhỏ `static inline`: **chủ ý**, đây là cách viết hàm tiện ích trong header C.
-- Với **biến** `static` trong header: gần như luôn là **bug** — mỗi file sửa bản riêng và tưởng là dùng chung.
+**Khởi tạo khi nào — C khác C++, chỗ hay nói nhầm nhất:**
 
-**Chốt:** *"Trong hàm, `static` đổi vòng đời; ngoài hàm, `static` đổi phạm vi nhìn thấy."*
+| | C | C++ |
+|---|---|---|
+| Initializer phải là | **Hằng lúc compile** | Bất kỳ biểu thức nào |
+| Giá trị được đặt lúc | **Trước `main`** — nằm sẵn trong `.data` của file ELF, loader map vào là xong; `.bss` thì zero sẵn. **Không có code nào chạy** | Hằng ⟹ như C. Không hằng ⟹ **lần đầu luồng chạy qua dòng khai báo** (dynamic init, có guard thread-safe từ C++11 — đây là cơ chế của Meyers' Singleton) |
+
+Chạy thật cùng một dòng `static int x = f();` (gcc 11.4):
+```
+C   (gcc -std=c11):    error: initializer element is not constant
+C++ (g++ -std=c++17):  compile OK
+```
+⟹ Câu *"khởi tạo lần đầu hàm được gọi"* là mô tả của **C++**, mang sang C là sai: C cấm luôn trường hợp cần chạy code để khởi tạo.
+
+**`static` trong header:** mỗi `.c` include nó có **một bản riêng**, và **link bình thường, không lỗi**. Chính vì internal linkage nên mỗi bản là symbol **cục bộ** của file mình, linker không thấy hai định nghĩa trùng. Chạy thật, 3 file `.c` cùng include, in địa chỉ `helper`:
+```
+a: helper @ 0x59c045eeb167
+b: helper @ 0x59c045eeb19f
+c: helper @ 0x59c045eeb1d7      <- 3 bản, 3 địa chỉ, exit=0
+```
+- Với hàm nhỏ `static inline`: **chủ ý**, đây là cách viết hàm tiện ích trong header C. Cái giá: code nhân bản theo số file, và `-Wunused-function` ở file nào không gọi.
+- Với **biến** `static` trong header: gần như luôn là **bug** — mỗi file sửa bản riêng và tưởng là dùng chung.
+- Lỗi linker *"multiple definition"* là của trường hợp **ngược lại**: hàm/biến **không** `static` được định nghĩa trong header ([C-036](c-programming.md)).
+
+**Bẫy:** đoán *"static trong header ⟹ lỗi linker"*. Sai. `static` chính là thứ **chặn** lỗi linker, đổi lại nó âm thầm nhân bản.
+
+**Chốt:** *"Trong hàm, `static` đổi vòng đời, và trong C giá trị đã có sẵn trước `main`. Ngoài hàm, `static` đổi phạm vi nhìn thấy, nên đặt trong header thì mỗi file một bản riêng, không lỗi link."*
 </details>
 
 #### C-036 · 🟠 · concept · [→ c-language-idioms §2.2, §2.4](../../../01-cpp-fundamentals/c-language-idioms.md)

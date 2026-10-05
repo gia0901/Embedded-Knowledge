@@ -42,8 +42,8 @@
 ## 1. Giao thức một phiên (session protocol) — Claude PHẢI theo
 
 **Bước 0 — Khởi tạo.** Đọc file này + [tracks.md](tracks.md) + [interview-types.md](interview-types.md) + [weak-register.md](weak-register.md) + **1–2 log gần nhất** trong [sessions/](sessions/).
-- **Có plan JD đang chạy** (file `*-plan.md` ngay trong [study-plans/](../study-plans/), **không tính `archive/`**): mở **§📍 Tiến độ hiện tại** của nó → **đề xuất thẳng buổi kế tiếp + lệnh mock chính xác**; sau phiên, cập nhật block §📍 đó.
-- **Không có plan** (hiện trạng từ 2026-10-03 — plan Datalogic đã [lưu trữ](../study-plans/archive/datalogic-plan.md)) hoặc người dùng nói rõ là ôn tự do: **hỏi 2 điều** — (a) track nào? (b) interview type nào? — gợi ý mặc định theo §0.
+- **Có plan đang chạy** — plan JD hoặc plan bám resume (file `*-plan.md` ngay trong [study-plans/](../study-plans/), **không tính `archive/`**): mở **§📍 Tiến độ hiện tại** của nó → **đề xuất thẳng buổi kế tiếp + lệnh mock chính xác**; sau phiên, cập nhật block §📍 đó.
+- **Không có plan** hoặc người dùng nói rõ là ôn tự do (từ 2026-10-05 plan đang chạy là [resume-plan](../study-plans/resume-plan.md); plan Datalogic đã [lưu trữ](../study-plans/archive/datalogic-plan.md)): **hỏi 2 điều** — (a) track nào? (b) interview type nào? — gợi ý mặc định theo §0.
 
 **Bước 1 — Chốt phiên.** Xác nhận: track + type + **số câu** (§2) + level + **trần độ sâu**. Thông báo ngắn gọn:
 
