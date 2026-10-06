@@ -354,15 +354,48 @@ Logic phía trên **không biết** có cache — đó chính là giá trị c�
 **Bridge pattern giải quyết vấn đề gì? Nó khác Strategy chỗ nào khi code trông giống hệt nhau?**
 <details><summary>Đáp án</summary>
 
-Bridge chống **bùng nổ lớp con** khi có **hai chiều biến thiên độc lập**: thay vì kế thừa cả hai trục (N × M lớp), giữ một trục ở cây kế thừa (abstraction) và đẩy trục kia ra một interface riêng (implementor) mà abstraction **giữ** — còn N + M lớp, ghép được N × M tổ hợp lúc runtime.
+> 🔄 *Nâng cấp 2026-10-06 — người học phản hồi "đọc bank không hiểu gì, không có ví dụ cụ thể". Bản cũ chỉ có bảng khẳng định; bản này dựng trên chính hệ dimming.*
 
-| | Strategy | Bridge |
+**Cơ chế — Bridge giải gì:** khi có **hai chiều biến thiên độc lập**, kế thừa cả hai cho N × M lớp. Bridge giữ một chiều ở cây kế thừa (**abstraction**), đẩy chiều kia ra một interface riêng (**implementor**), abstraction **giữ con trỏ** tới implementor. Phần đắt nhất không bị nhân bản. *(Sách nói "còn N + M lớp" — ở hệ thật của bạn backend còn nhân theo thuật toán, xem [DP-042](design-patterns.md); đừng lặp con số N + M khi kể hệ thật.)*
+
+**Ví dụ trên chính hệ dimming — cùng một class đóng HAI vai:**
+```cpp
+class lib_dimming {                              // CONTEXT
+    IDimmingAlgo* m_pDimmingPanel;               // ① Strategy: thuật toán nào, theo model
+public:
+    uint32_t SetBacklight(int v) { return m_pDimmingPanel->SetBacklight(v); }
+};
+
+class GlobalDimming : public IDimmingAlgo {      // ABSTRACTION (nửa "tính toán")
+    IDimmingBackend* m_pDimmingBackend;          // ② Bridge: nửa "ghi phần cứng", theo chip
+public:
+    uint32_t SetBacklight(int v) override {
+        BackendGd2DFinalDuty_t duty = compute(v);           // logic thuật toán — viết một lần
+        return m_pDimmingBackend->t_Set2DFinalDuty(&duty);  // phần cứng — mỗi chip một kiểu
+    }
+};
+```
+
+**Hai phép thử để phân biệt — áp vào code ở trên:**
+
+| Phép thử | `IDimmingAlgo` đối với `lib_dimming` ⟹ **Strategy** | `IDimmingBackend` đối với `GlobalDimming` ⟹ **Bridge** |
 |---|---|---|
-| Số trục biến thiên | Một | **Hai** |
-| Thứ được cắm vào | Thuật toán **thay thế được** | **Nửa còn lại** của cùng một thứ |
-| Đổi lúc runtime | Có — mục đích chính | Hiếm; thường gắn lúc dựng |
+| ① **Bỏ phần được cắm vào thì phần kia còn làm được việc của nó không?** | Còn: `lib_dimming` vẫn là context nguyên vẹn, cắm base `IDimmingAlgo` (no-op) là chạy | **Không**: thuật toán tính xong mà không có backend thì **không chạm được phần cứng** — hai nửa của **một** tính năng |
+| ② **Có mấy trục biến thiên?** | **Một**: thuật toán đổi theo model, context đứng yên | **Hai**: thuật toán đổi theo model, backend đổi theo chip, **độc lập** nhau |
+| Đổi khi nào | Chọn theo model lúc khởi tạo; về nguyên tắc đổi được lúc chạy | Gắn một lần qua constructor; chip chốt lúc build |
 
-Code gần như giống nhau (giữ con trỏ tới interface rồi ủy nhiệm); khác nhau ở **ý định**: Strategy tách *hành vi khỏi context*, Bridge tách *hai chiều biến thiên khỏi nhau*. Pimpl là một ứng dụng khác của cùng ý tưởng, phục vụ mục tiêu khác (giấu implementation, giữ ABI).
+⟹ **Code trông giống hệt** (giữ con trỏ tới interface rồi ủy nhiệm), **ý định khác nhau**: Strategy tách **hành vi khỏi context**; Bridge tách **hai chiều biến thiên khỏi nhau**.
+
+**"Vì sao" hai tầng:**
+- *Nông:* "Strategy một trục, Bridge hai trục" — đúng nhưng học thuộc được mà không hiểu.
+- *Sâu:* phép thử ① — **"nửa còn lại của một thứ"** nghĩa là thiếu nó thì thứ kia **không hoàn chỉnh**. Strategy thì thiếu vẫn là một context hợp lệ, chỉ là chưa có hành vi.
+
+**Bẫy:**
+1. Thuộc câu *"thứ được cắm vào là nửa còn lại"* mà không chỉ ra được nửa nào trong hệ của mình.
+2. Gọi `IDimmingAlgo` là "Bridge" rồi dừng: nó là **cả hai** — Strategy khi nhìn từ `lib_dimming`, abstraction của Bridge khi nhìn sang `IDimmingBackend` ([A1 §5.5](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
+3. Pimpl cũng là "giữ con trỏ tới phần còn lại" nhưng phục vụ mục tiêu khác: giấu implementation, giữ `sizeof` ổn định.
+
+**Chốt:** *"Bỏ phần được cắm vào đi: nếu phần kia vẫn là một thứ hoàn chỉnh thì đó là Strategy; nếu nó thành một nửa không dùng được thì đó là Bridge. Ở dimming: thuật toán là Strategy của `lib_dimming`, còn backend là nửa phần cứng của thuật toán."*
 </details>
 
 ---
@@ -528,6 +561,8 @@ Memento cổ điển sống **trong một process, một phiên** (undo/redo). M
 
 #### DP-021 · 🟠 · concept · ⭐ · 🎤 2026-09-09 · [→ A1 §5](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [B1 §1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
 **Trong library display của bạn: dimming chia thành global / local / oled (cùng xuất phát từ một class gốc), còn video enhancement chia theo loại chip (cũng kế thừa từ một class gốc). Nhìn qua thì cả hai đều là "kế thừa + đa hình". Vì sao đây lại là HAI pattern khác nhau — và là hai cái nào?**
+
+> 🚫 *Ghi chú 2026-10-06:* người học **không làm phần video enhancement** ⟹ câu này nằm **ngoài bán kính resume** ([resume-plan §1](../../study-plans/resume-plan.md) luật ①). Không hỏi trong plan bám resume; vẫn giữ trong bank cho người dùng khác. Ý muốn kiểm tra (Strategy vs Abstract Factory) hỏi qua [DP-022](design-patterns.md) / [DP-037](design-patterns.md) thay thế.
 <details><summary>Đáp án</summary>
 
 **Cơ chế — hỏi "trục biến thiên" trước khi gọi tên pattern.** Cùng là kế thừa, nhưng *cái gì thay đổi* khác nhau:
@@ -910,7 +945,47 @@ App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **de
 
 **Ngoại lệ (tự nêu là điểm cộng):** vòng vsync chạy **bên trong** library, không đi qua mặt tiền ⟹ không được khoá ở mặt tiền bảo vệ (DP-044). "Duy nhất" đúng cho **caller bên ngoài**, không đúng cho **mọi đường chạm state**.
 
-**Bẫy:** chỉ nói "C ổn định hơn" mà không nói ổn định **cái gì** (bố cục nhị phân) và **với ai** (bên build lệch thời gian). **Chốt:** *Ranh giới mở → C; ranh giới khép → C++ interface được phép. Ở hệ của tôi, mặt tiền C còn là điểm khoá duy nhất cho caller.*
+**🧩 ABI là gì — giải thích cho người không chuyên** *(thêm 2026-10-06)*: ***API là hợp đồng bằng TÊN, ABI là hợp đồng bằng VỊ TRÍ.***
+- API là thứ ghi trong header: hàm tên gì, nhận gì, trả gì. **Compiler** đọc nó.
+- Khi compile xong, binary **không còn đọc header nữa**. Nó chỉ nhớ **vị trí**: hàm này là *ngăn số 2* của bảng ảo, field kia nằm ở *byte thứ 8*, tham số đầu nằm ở *thanh ghi nào*, symbol tên *chính xác là gì*.
+- Hình dung một **tủ có ngăn đánh số**: binary cũ nhớ *"lấy đồ ở ngăn số 2"*. Ai đó chèn một ngăn mới vào giữa tủ thì ngăn số 2 giờ chứa thứ khác. Binary cũ vẫn lấy ở ngăn 2, không hề báo lỗi. Đó chính là output ở [DP-043](design-patterns.md): gọi `set_freq` mà `set_brightness` chạy.
+- ⟹ *"Giữ ABI"* = **không đổi vị trí** của bất cứ thứ gì binary cũ đã nhớ.
+
+**Phản biện hay gặp — *"Bỏ chuyện ABI đi. Phơi C++ interface rồi khoá ngay trong từng method thì bản chất vẫn vậy?"*** *(thêm 2026-10-06 từ phiên R1)*
+
+**Nửa đúng** — về chức năng thì giống, về **cấu trúc** thì không:
+
+| # | Khoá trong từng method | Mặt tiền C |
+|---|---|---|
+| 1 | **Ai ép?** Kỷ luật. Method thứ 151 quên khoá vẫn **compile sạch** | Object C++ **không ai bên ngoài với tới được** ⟹ không có đường nào đi vòng qua khoá |
+| 2 | **Method gọi method** ⟹ xin lại chính khoá đang giữ ⟹ **tự deadlock**, vì semaphore không recursive | Khoá một lần ở mặt tiền; bên trong gọi nhau tự do |
+| 3 | Nếu **buộc phải** phơi C++: dùng **NVI** (public không virtual lấy khoá rồi gọi private virtual) — chữa được (1) cho các API đi qua NVI | NVI vẫn để **vtable đi qua ranh giới** ⟹ lý do ABI vẫn loại phương án này |
+
+Chạy thật cho ý (2), named semaphore giá trị 1, `applyPreset()` gọi `setBacklight()`, mỗi method tự khoá (dùng `sem_timedwait` 1 s để demo không treo thật):
+```
+applyPreset: da lay khoa, goi setBacklight...
+  setBacklight: KHONG lay duoc khoa (Connection timed out)
+applyPreset -> -1
+```
+Code thật dùng `sem_wait` thì dòng đó **treo vĩnh viễn**.
+
+**Câu đuổi tiếp — *"Giả sử chỉ xoá `extern "C"`, giữ nguyên chữ ký kiểu C. Còn ổn định không?"*** *(thêm 2026-10-06)*
+
+**Với caller C++ trên Linux thì vẫn chạy.** GCC và Clang dùng chung quy tắc mangling (Itanium C++ ABI), nên tên symbol ổn định qua các phiên bản compiler. Cái **mất** và cái **thay đổi**:
+
+| | Có `extern "C"` | Bỏ `extern "C"` |
+|---|---|---|
+| Tên symbol (`nm -D`) | `lib_api_set_backlight` | `_Z21lib_api_set_backlighti` |
+| Caller C thuần, Python `ctypes`, `dlsym("lib_api_set_backlight")` | ✅ tìm thấy | ❌ `undefined symbol: lib_api_set_backlight` |
+| Đổi chữ ký (thêm tham số `ramp_ms`), **không** build lại app | 🔴 **Chạy, sai im lặng**: `level=80 ramp_ms=1214657832`, exit 0 | 🟢 **Chết to ngay**: `symbol lookup error: undefined symbol: _Z21lib_api_set_backlighti`, exit 127 |
+
+Output trên là chạy thật (gcc 11.4). Dòng cuối là chỗ ít người biết: mangling mã hoá **kiểu tham số** vào tên symbol, nên đổi chữ ký thành **lỗi lúc nạp**, còn `extern "C"` thì **im lặng**. Vậy `extern "C"` không *"an toàn hơn"* ở mọi mặt; nó đổi lấy **khả năng gọi từ mọi ngôn ngữ**, và với C thì giữ chữ ký là việc của **kỷ luật** (chỉ thêm hàm mới, không sửa hàm cũ).
+
+⚠️ **Thứ làm ranh giới ổn định không phải là chữ `extern "C"`, mà là CHỈ CHO KIỂU C ĐI QUA.** `extern "C"` chỉ tắt mangling và overload; nó **không chặn** kiểu C++. Đã kiểm: `extern "C" int f(const std::string&)` compile sạch với `g++ -Wall -Wextra`, không một cảnh báo. Kiểu `std::string`/class/vtable/exception đi qua ranh giới thì vẫn mang theo ABI của bên build, có hay không có `extern "C"`.
+
+> 🔺 *T3, không chấm:* `std::string` có hai ABI trong libstdc++ từ gcc 5 (`_GLIBCXX_USE_CXX11_ABI`), mangling khác nhau (`B5cxx11`) ⟹ hai bên build khác cờ là `undefined symbol`.
+
+**Bẫy:** chỉ nói "C ổn định hơn" mà không nói ổn định **cái gì** (bố cục nhị phân) và **với ai** (bên build lệch thời gian). **Chốt:** *Ranh giới mở → C; ranh giới khép → C++ interface được phép. Ở hệ của tôi, mặt tiền C còn là điểm khoá duy nhất cho caller — cần đúng **một** chỗ khoá, và **cấu trúc** ép mọi đường đi qua nó.*
 </details>
 
 #### DP-041 · 🟡 · concept · ⭐ · [→ A1 §7](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
@@ -938,23 +1013,32 @@ App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **de
 **Bạn kể dimming là Bridge: thuật toán (Global/Local/OLED) × backend theo chip. Interviewer chỉ vào tên lớp `DimmingBackendChipA_Global`, `DimmingBackendChipA_Local`… và nói: "backend của bạn nhân theo chip × thuật toán — vẫn là N×M, đâu phải Bridge". Trả lời thế nào?**
 <details><summary>Đáp án</summary>
 
+> ⚠️ *Sửa 2026-10-06 — người học phản bác và đúng (đã đếm source thật).* Bản trước lập luận *"thứ bị nhân là lớp **mỏng**, vài chục dòng"*. **Sai với hệ thật.** Thuật toán Global khoảng 7,6 nghìn dòng, Local khoảng 8,6 nghìn dòng, mỗi cái viết một lần. Backend Global khoảng 0,8–1,1 nghìn dòng mỗi chip; backend Local khoảng 4–8,5 nghìn dòng mỗi chip × biến thể panel, tức **dày ngang thuật toán**. Lập luận bảo vệ Bridge phải đứng được **mà không cần** backend mỏng.
+
 **Cơ chế — thừa nhận trước, rồi đổi thước đo:**
-1. Đúng, backend nhân theo **chip × thuật toán**, vì cách ghi phần cứng của từng thuật toán khác hẳn nhau: Global ghi **một** giá trị, Local ghi **từng vùng** màn hình.
-2. Nhưng thứ bị nhân là lớp **mỏng** (vài chục dòng ghi thanh ghi). Thứ **đắt** — thuật toán — vẫn được viết **đúng một lần** và mọi chip dùng chung.
+1. Đúng, backend nhân theo **chip × thuật toán**, vì phần cứng ghi khác nhau thật: Global ghi **một** giá trị; Local ghi **từng vùng**, và cách ghi từng vùng khác nhau giữa các chip.
+2. Và backend **không mỏng**: backend Local dày ngang thuật toán.
+3. Thứ Bridge bảo vệ là **thuật toán chỉ viết một lần cho mọi chip**. Không có Bridge, mỗi lớp `GlobalDimmingChipX` phải chứa **cả** thuật toán ⟹ hàng nghìn dòng thuật toán bị chép M lần, sửa một bug thuật toán phải sửa M chỗ.
 
 | | Gộp logic + phần cứng | Bridge sách | Hệ thật |
 |---|---|---|---|
-| Số lớp | N × M — **đều nặng** | N + M | N **nặng** + N × M **mỏng** |
+| Số lớp | N × M — mỗi lớp chứa **cả thuật toán** | N + M | N thuật toán + N × M backend |
+| Phần bị nhân | **Thuật toán** bị chép theo chip | — | Backend — **Local dày ngang thuật toán** |
 | Sửa bug thuật toán | **M chỗ** | 1 | **1** |
-| Thêm 1 chip | +N lớp nặng | +1 | +N backend mỏng |
+| Thêm 1 chip | +N lớp, chép lại mọi thuật toán | +1 | +N backend, **không chép thuật toán** |
 
 **"Vì sao" tách tầng:**
 - *Nông:* "vẫn đỡ hơn N×M".
-- *Sâu:* **mục tiêu của Bridge không phải con số N+M, mà là phần đắt không bị nhân bản** và hai nửa đổi được độc lập. Implementor được phép phụ thuộc vào abstraction nó phục vụ khi phần cứng thật sự khác nhau theo thuật toán — giả vờ có một hợp đồng phần cứng chung cho cả Global lẫn Local mới là thiết kế sai.
+- *Sâu:* **mục tiêu của Bridge không phải con số N+M, mà là thuật toán (thứ đổi theo model) và phần ghi phần cứng (thứ đổi theo chip) đổi được độc lập, và thuật toán không bị nhân bản.** Implementor được phép phụ thuộc vào abstraction nó phục vụ khi phần cứng thật sự khác nhau theo thuật toán. Giả vờ có một hợp đồng phần cứng chung cho cả Global lẫn Local mới là thiết kế sai.
 
-**Đi thêm một bước (điểm cộng):** chip được chốt **lúc build** (CMake chỉ build thư mục chip đích) ⟹ trong một binary chỉ có N backend, không phải N×M. Và nếu làm lại, tách `IDimmingBackendGlobal`/`IDimmingBackendLocal` thì ghép nhầm thuật toán với backend thành **lỗi compile** (B1 §4).
+**Đi thêm một bước (điểm cộng):** chip được chốt **lúc build** (CMake chỉ build thư mục chip đích) ⟹ trong một binary chỉ có N backend, không phải N×M. Và nếu làm lại, tách `IDimmingBackendGlobal`/`IDimmingBackendLocal` thì ghép nhầm thuật toán với backend thành **lỗi compile** ([B1 §4](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)).
 
-**Bẫy:** cãi "vẫn là N+M" (sai, bị vặn tiếp là lộ) hoặc gật "vậy không phải Bridge" (bỏ mất luận điểm đúng). **Chốt:** *"Bridge ở đây không phẳng như sách; tôi chấp nhận nhân phần mỏng để phần đắt chỉ viết một lần."*
+**Bẫy:**
+1. Cãi *"vẫn là N+M"*: sai, bị vặn tiếp là lộ.
+2. Gật *"vậy không phải Bridge"*: bỏ mất luận điểm đúng.
+3. 🔴 Nói *"backend chỉ vài chục dòng"* hoặc *"cố tình kể N+M cho dễ"*: **sai với hệ thật**. Rút gọn bằng cách **bỏ bớt**, không rút gọn **thành sai**. Người từng mở source sẽ bắt được ngay.
+
+**Chốt:** *"Bridge ở đây không phẳng như sách: backend nhân theo chip × thuật toán và không mỏng, vì phần cứng Local khác nhau thật. Cái Bridge giữ được là thuật toán chỉ viết một lần cho mọi chip; không có nó thì cả thuật toán bị chép theo từng chip."*
 </details>
 
 #### DP-043 · 🟠 · concept · ⭐ · [→ A1 §6](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
@@ -980,7 +1064,41 @@ App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **de
 | Slot `NULL` bị gọi ⟹ **kernel oops** | Gọi pure virtual / thiếu Null Object | Điền sẵn cả bảng bằng stub trả `-ENOTSUP` + log; chip ghi đè cái mình có |
 | **Chèn** một hàm vào giữa struct ⟹ mọi slot sau lệch, gọi nhầm hàm, version khớp vẫn không cứu (DP-033) | Chèn virtual vào giữa interface | Chỉ thêm vào **cuối**; thêm trường `size`/`version` đầu struct để kiểm lúc đăng ký |
 
+**Hai rủi ro, chạy thật** *(thêm 2026-10-06 — mô phỏng user-space, gcc 11.4)*. Driver nền build với header **mới** (chèn `get_temp` vào giữa `init` và `set_freq`); `.ko` của chip build với header **cũ**:
+
+```
+header CŨ (.ko chip)        header MỚI (driver nền)
+slot 0  init                slot 0  init
+slot 1  set_freq            slot 1  get_temp      <- chen vao
+slot 2  set_brightness      slot 2  set_freq      <- driver nen goi slot 2
+```
+```
+--- slot lech ---
+core: goi ops->set_freq(p, 120)
+[chipA] set_brightness(120)          <- ham ke ben chay voi doi so cua ham kia
+exit=0
+--- slot NULL ---
+Segmentation fault (core dumped)     <- trong kernel la oops
+exit=139
+```
+Đọc kết quả: `set_freq` là **slot 2** theo layout mới, mà `.ko` cũ đặt `set_brightness` ở slot 2 ⟹ **hàm kế bên chạy với đối số của hàm kia**. Không crash, exit 0 — panel đổi độ sáng thay vì đổi tần số. ⚠️ Đoán *"`get_temp` chạy"* là **ngược**: `get_temp` không tồn tại trong `.ko` cũ; driver nền gọi theo **số slot**, và slot nào chứa gì là do bên **điền bảng** quyết định.
+
+**Câu đuổi hay gặp — *"Bộ HAL và bộ driver panel build đồng thời ra một RPM để cài. Vậy hết lo chưa?"***
+
+**Chặn được đường thường, không chặn được mọi đường.** Build cùng một lần từ cùng một header thì hai bên **khớp layout** — đây đúng là biện pháp chính, và nên nói ra như vậy. Nhưng nó là bảo đảm của **quy trình**, không phải của **cấu trúc**. Những đường vẫn lọt:
+
+| Đường lọt | Vì sao RPM không cứu |
+|---|---|
+| Hotfix một `.ko` lẻ, hoặc rollback một gói con | Hai nửa lại lệch phiên bản trên cùng máy |
+| `.ko` cũ còn sót trong `/lib/modules` (board dev, máy test) | Probe nạp nhầm file cũ, RPM mới không xoá nó |
+| Giữ tương thích nhiều nhánh kernel (vd 5.10 và 6.12 cùng lúc) | Một header ops phục vụ hai dòng build khác nhau |
+| Cache build còn object cũ | "Build cùng lúc" nhưng không thật sự build lại hết |
+
+⟹ Giữ RPM làm tuyến chính, **cộng** hai lớp rẻ ở cấu trúc: ① chỉ thêm slot vào **cuối** struct, ② trường `size`/`version` ở đầu struct, driver nền **kiểm lúc đăng ký** và từ chối bảng không khớp. *(Pin phiên bản giữa các gói con bằng `Requires: … = %{version}` trong spec cũng giúp, nhưng vẫn là quy trình.)* ⚠️ *"Rebuild toàn bộ"* không phải câu trả lời: nó không chặn được `.ko` cũ **đang còn trên máy**.
+
 **"Vì sao" tách tầng:** *Nông:* "function pointer cho linh hoạt". *Sâu:* kernel viết bằng C nên **phải tự dựng** thứ C++ cho sẵn — và vì tự dựng, mọi bảo đảm (không có slot rỗng, bố cục ổn định) **cũng phải tự giữ**. Kernel đã có khuôn chuẩn cho việc này: `file_operations`, `net_device_ops`.
+
+**Cách trả lời câu cơ học (slot, layout, ABI):** vẽ **hai layout cạnh nhau, đánh số slot**, rồi mới nói hàm nào chạy. Đoán trong đầu là cách dễ ra đáp án ngược nhất.
 
 **Chốt:** *"Bảng ops là vtable viết tay — nên nó thừa hưởng nguyên hai bệnh của vtable: slot rỗng và slot lệch."*
 </details>
@@ -1137,6 +1255,46 @@ int32_t lib_api_set_backlight(int32_t backlight) {
 3. Giữ mutex kernel xuyên qua lần quay về user-space ⟹ một process user giữ được khoá kernel vô thời hạn.
 
 **Chốt:** *"Khoá library bảo vệ trình tự nhiều bước trên state dùng chung; khoá driver bảo vệ từng lệnh phần cứng, cho mọi caller kể cả đi tắt. Hai bất biến khác nhau nên không cái nào thay được cái kia."*
+</details>
+
+#### DP-049 · 🟠 · design · ⭐ · 🎤 2026-10-06 · [→ A1 §5.8](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [B1 §6](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
+**Vòng vsync đọc/ghi state trong shared memory mà không qua semaphore của mặt tiền ([DP-044](design-patterns.md)). Đồng nghiệp đề xuất: đổi mọi field trong struct shm sang `std::atomic`, khỏi cần khoá. Đủ chưa? Cái giá thật là gì?**
+<details><summary>Đáp án</summary>
+
+**Không đủ.** `std::atomic` từng field chỉ làm **từng lần đọc/ghi** nguyên tử. Vấn đề của vòng vsync là **cả một khung hình** phải thấy state nhất quán.
+
+**Bốn lý do, xếp theo mức nghiêm trọng:**
+
+| # | Lý do | Chuyện gì xảy ra |
+|---|---|---|
+| 1 | **Bất biến trải trên nhiều field** (cờ bật/tắt, đường cong, gain, duty cuối) | API đang ghi dở chuỗi field thì vsync đọc ⟹ thấy **nửa cũ nửa mới**: gain mới với đường cong cũ. Hết data race theo nghĩa UB, nhưng **race về logic vẫn còn** |
+| 2 | **Bảng và LUT không lock-free được** | `std::atomic` cho kiểu lớn được hiện thực bằng **khoá nội bộ của libatomic, nằm trong bộ nhớ của từng process** ⟹ hai process dùng hai khoá khác nhau ⟹ **vô nghĩa** trên shared memory |
+| 3 | **Layout shm là ABI giữa các process** | Các process build lệch thời gian cùng map một struct. Đổi `int` → `std::atomic<int>` là **đổi struct dùng chung**: mọi process phải cập nhật cùng lúc |
+| 4 | **Không chạm vào vấn đề ai là chủ vòng vsync** | Điểm yếu #5(b) của A1 — vòng vsync chạy trong process nạp `.so` sau cùng — vẫn y nguyên |
+
+Chạy thật cho ý 2 (gcc 11.4, x86-64): một bảng 64 phần tử `uint16_t`:
+```
+atomic<int32_t>      always_lock_free = 1
+atomic<Lut 128 byte> always_lock_free = 0, is_lock_free() = 0
+```
+Không thêm `-latomic` thì link **lỗi** (`undefined reference to '__atomic_load'`): đó là dấu hiệu nó gọi sang thư viện có khoá, không phải lệnh atomic của CPU.
+
+**Bằng chứng ở hệ thật (đã kiểm source, 06/10):** đường API lấy named semaphore ở mọi hàm `lib_api_*`; đường vsync gọi `t_vSyncCallBack()` đọc/ghi `Shm` mà **không** lấy semaphore. Có một `pthread_mutex` quanh callback, nhưng nó là mutex riêng của thread vsync (process-private, cặp với condvar để thread chính đánh thức mỗi khung hình). API **không bao giờ** lấy mutex đó ⟹ nó không bảo vệ gì. Race xảy ra **ngay trong một process** (thread API ↔ thread vsync), không chỉ giữa các process.
+
+**Phương án đúng:** **khoá đi cùng state** — `ShmGuard` RAII lấy semaphore ở constructor, nhả ở destructor, mọi đường chạm `Shm` (API lẫn vsync) đều phải qua nó ([DP-047](design-patterns.md), [B1 §6.1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)). ⚠️ Phải **gỡ khoá ở mặt tiền** khi chuyển khoá xuống cạnh state, nếu không đường API lấy khoá hai lần ⟹ tự deadlock (semaphore không recursive — [DP-040](design-patterns.md)).
+
+> 🔺 *T3, không chấm:* nếu khoá trong vòng vsync là quá đắt, dùng **double-buffer** (ghi vào bản phụ rồi đổi con trỏ một lần) hoặc **seqlock** (bộ đếm phiên bản, đọc lại nếu đếm đổi).
+
+**"Vì sao" hai tầng:**
+- *Nông — và hay nói sai:* *"atomic chậm"*. Trên ARM, load/store atomic căn chỉnh ở cỡ word gần như rẻ. Cái giá thật **không** phải tốc độ.
+- *Sâu:* cái giá thật là **tính đúng** (bất biến nhiều field không được bảo vệ) và **ABI của shm** (đổi struct dùng chung giữa các process).
+
+**Bẫy:**
+1. Thấy có mutex quanh callback rồi tưởng là đã bảo vệ. Phải hỏi: ***"mutex đó còn ai khác lấy không?"***
+2. Nghĩ "đã atomic thì hết race". Atomic chặn **UB**, không chặn **logic đọc nửa cũ nửa mới**.
+3. Đưa khoá xuống cạnh state mà quên gỡ khoá ở mặt tiền.
+
+**Chốt:** *"Atomic từng field chỉ làm từng lần đọc nguyên tử, không làm cả khung hình nhất quán. Bất biến trải trên nhiều field thì cần một khoá bao cả chuỗi, đặt cạnh state."*
 </details>
 
 ---

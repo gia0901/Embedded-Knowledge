@@ -33,6 +33,7 @@ flowchart TD
 | 2 | [creational.md](creational.md) | **Factory Method · Abstract Factory · Singleton** (*vì sao Meyers thread-safe*, *"một instance" qua `.so`*) **· Object Pool**; Builder ở mức nhận diện | ✅ |
 | 3 | [structural.md](structural.md) | **Bridge** (+ *Pimpl*) **· Adapter · Facade**; Proxy/Decorator ở mức nhận diện — mở đầu bằng bảng phân biệt *4 cách bọc object* | ✅ |
 | 4 | [behavioral.md](behavioral.md) | **Strategy · Template Method · Observer · State · Command · Memento · Null Object** — sợi chỉ đỏ: *pattern mua cấu trúc, không mua tính đúng đắn của miền* | ✅ |
+| ⭐ | 🎓 **[essential-training.md](essential-training.md)** | **Bản training rút gọn — chỉ pattern bạn đã làm và đã thấy** (nguồn: A1 + A2, không dùng bản cải tiến). Nền interface/vtable → Strategy · Bridge · Factory Method · Abstract Factory · Singleton · Null Object · Facade (+Adapter) · Self-registration · Service Locator; mỗi pattern **ví dụ cơ bản chạy được → áp dụng trong việc thật**; kèm chỗ *cố ý không dùng* và bản đồ một trang | ✅ |
 | 5 | 🎯 **[in-practice/](in-practice/)** | **Pattern trong việc của BẠN**, chia hai phần: 🅰️ **TIÊU CHUẨN** (`libdisplay` — hệ thật, đã khử nhạy cảm + HAL C++ interface có pack code & 5 lab 🧪) · 🅱️ **CẢI TIẾN** (cùng bối cảnh, làm lại) | ✅ |
 
 ## 🎯 Hai tầng của topic này — đọc đúng tầng
@@ -47,6 +48,8 @@ flowchart TD
 > ⚠️ **Bốn file generic KHÔNG bị thay thế** — chúng vẫn là chỗ tra "pattern X là gì". `in-practice/` **không lặp lại** nội dung đó, chỉ link sang. Một sự thật, một chỗ.
 
 ## Thứ tự đọc gợi ý
+> ⏱️ **Ít thời gian / đang ôn phỏng vấn bám resume:** đọc **[essential-training.md](essential-training.md)** trước — nó gom đúng phần pattern đã dùng trong việc thật, từ cơ bản tới hệ thật, rồi trỏ sang A1/A2 khi cần bối cảnh.
+
 `solid-principles` (nền tảng) → `creational` → `structural` → `behavioral` → 🎯 **[in-practice/](in-practice/)** (áp vào việc thật — đọc sau cùng, nhưng đây mới là phần được hỏi).
 
 ## Nguyên tắc xuyên suốt

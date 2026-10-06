@@ -75,7 +75,7 @@ auto pDimming = std::make_unique<LocalDimming>(std::make_unique<DimmingBackendCh
 | Thêm 1 thuật toán | +M lớp | **+1 lớp** |
 | Tổ hợp mới | Phải viết lớp mới | **Ghép lúc runtime** |
 
-> ⚠️ **Hệ thật không phẳng như sách:** backend còn tách tiếp theo thuật toán (`DimmingBackendChipA_Global`, `DimmingBackendChipA_Local`…), vì Global và Local ghi phần cứng khác hẳn nhau ⟹ N nặng + N×M mỏng. Vẫn là Bridge, vì phần đắt (thuật toán) chỉ viết một lần — xem [in-practice/A1 §5.4](in-practice/A1-baseline-libdisplay.md).
+> ⚠️ **Hệ thật không phẳng như sách:** backend còn tách tiếp theo thuật toán (`DimmingBackendChipA_Global`, `DimmingBackendChipA_Local`…), vì Global và Local ghi phần cứng khác hẳn nhau ⟹ N thuật toán + N×M backend, và backend **không mỏng** (backend Local dày ngang thuật toán). Vẫn là Bridge, vì thuật toán chỉ viết một lần cho mọi chip; không có Bridge thì cả thuật toán bị chép theo từng chip — xem [in-practice/A1 §5.4](in-practice/A1-baseline-libdisplay.md).
 
 ### 1.1 ⭐ Bridge vs Strategy — code giống hệt, Ý ĐỊNH khác
 

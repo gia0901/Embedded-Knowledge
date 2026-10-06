@@ -282,6 +282,8 @@ ALS (I2C) -> driver đọc định kỳ / interrupt -> lọc & làm mượt
 #### RES-007 · 🟢 · concept · ⭐ · [→ RESUME: "display enhancement (dimming, frame-rate control, timing control)"]
 **Dimming, FRC, TCON — em giải thích ngắn gọn cho người ngoài ngành hiểu được không?**
 
+> 🔄 *Ghi chú 2026-10-06 — người học góp ý: chiến lược kể đã đổi sang khung **Picture Quality + Display Control**.* Câu hỏi vẫn giữ, vì dòng resume ghi **nguyên văn** *"dimming, frame-rate and timing control"* nên interviewer sẽ hỏi đúng các từ đó. Cách trả lời: giải thích ba thứ bằng ngôn ngữ đời thường, rồi **nối vào khung**: *"dimming thuộc Picture Quality — phần phải tính toán theo nội dung; FRC và TCON là các lệnh Display Control gửi xuống chip."* Một câu nối đó biến câu 🟢 thành móc dẫn sang câu kiến trúc ([A1 §4](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ① bạn **hiểu** hay chỉ chép từ khoá vào resume · ② **năng lực diễn đạt** — giải thích được cái khó cho người không biết là dấu hiệu senior rõ nhất. Datalogic có JD nhắc *"lead junior / code review"*, nên đây là kỹ năng họ tìm.

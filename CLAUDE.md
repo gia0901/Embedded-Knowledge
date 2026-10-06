@@ -149,6 +149,7 @@ Embedded-Interview/
 │   └── system-design.md          # thiết kế hệ thống hướng Embedded Linux
 │
 ├── 11-design-patterns/           # Mẫu thiết kế — CÓ CHỦ ĐÍCH không dàn đều 23 pattern GoF
+│   ├── essential-training.md     # 🎓 bản training rút gọn: CHỈ pattern đã làm/thấy (nguồn A1+A2), cơ bản → việc thật
 │   ├── solid-principles.md       # 5 nguyên lý = 5 cách nói của MỘT mục tiêu + bảng ánh xạ nguyên lý→pattern
 │   ├── creational.md             # Factory Method · Abstract Factory · Singleton · Object Pool (Builder: nhận diện)
 │   ├── structural.md             # Bridge(+Pimpl) · Adapter · Facade (Proxy/Decorator: nhận diện)
@@ -218,7 +219,7 @@ Embedded-Interview/
 | 08 Embedded systems | ✅ Xong | architecture, boot-process, rtos-vs-linux, rtos-programming, bare-metal-c, memory-and-startup, interrupts-bare-metal, hardware-debug, constraints |
 | 09 Debugging | ✅ Xong | mindset, gdb, tools, memory-bugs, kernel-debugging |
 | 10 Thinking | ✅ Xong | problem-solving, system-design |
-| 11 Design patterns | ✅ Xong | **Viết lại toàn diện 09/09 theo hướng CHỌN LỌC** — 12 pattern bám việc thật (5 sở hữu · 7 biết), phần còn lại hạ xuống mức *nhận diện*; mỗi pattern có thẻ *bản chất · cái biến thiên · cái giá · đừng dùng khi*. Kèm 🎯 **`in-practice/`** — **tái cấu trúc 10/09 thành 🅰️ TIÊU CHUẨN (`libdisplay`, hệ thật đã khử nhạy cảm, có bộ từ vựng chuẩn) + 🅱️ CẢI TIẾN (vá đúng 5 điểm yếu)**, kèm pack code + 5 lab 🧪. Bank `DP` 20 → **39 câu**. **03/10: A1/B1 viết lại** theo kiến trúc PQ/DC + kernel `panel_ops` (nguồn sự thật: `shared_lib.md`, gitignore); bank `DP` → **47 câu** |
+| 11 Design patterns | ✅ Xong | **Viết lại toàn diện 09/09 theo hướng CHỌN LỌC** — 12 pattern bám việc thật (5 sở hữu · 7 biết), phần còn lại hạ xuống mức *nhận diện*; mỗi pattern có thẻ *bản chất · cái biến thiên · cái giá · đừng dùng khi*. Kèm 🎯 **`in-practice/`** — **tái cấu trúc 10/09 thành 🅰️ TIÊU CHUẨN (`libdisplay`, hệ thật đã khử nhạy cảm, có bộ từ vựng chuẩn) + 🅱️ CẢI TIẾN (vá đúng 5 điểm yếu)**, kèm pack code + 5 lab 🧪. Bank `DP` 20 → **39 câu**. **03/10: A1/B1 viết lại** theo kiến trúc PQ/DC + kernel `panel_ops` (nguồn sự thật: `shared_lib.md`, gitignore); bank `DP` → **47 câu**. **05–06/10:** thêm `DP-048` (hai khoá hai tầng), `DP-049` (atomic từng field không đủ cho vsync) → **49 câu**; sửa `DP-042` (backend không mỏng — người học phản bác đúng). **06/10:** thêm 🎓 **`essential-training.md`** — bản training chỉ gồm 9 pattern + nền đã dùng trong việc thật (nguồn A1+A2, chưa dùng B1/B2), mỗi pattern có ví dụ cơ bản đã compile + phần áp vào hệ thật |
 | 12 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
 | 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |

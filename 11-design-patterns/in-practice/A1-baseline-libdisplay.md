@@ -276,7 +276,7 @@ Các hàm `dc_*` là **hàm tự do**: không interface, không factory, không 
 
 Dimming là việc điều khiển độ sáng đèn nền theo nội dung hình. Đường đi: `lib_api_set_backlight` → `lib_dimming` (ủy nhiệm) → cặp object do `DimmingFactory` dựng.
 - **Thuật toán** `IDimmingAlgo` (Global/Local/OLED): logic nặng, **viết một lần**, mọi chip dùng chung.
-- **Backend** `DimmingBackendChipX_AlgoY`: mỏng, **chỉ ghi phần cứng**, theo chip × thuật toán.
+- **Backend** `DimmingBackendChipX_AlgoY`: **chỉ ghi phần cứng**, theo chip × thuật toán. ⚠️ **Không mỏng**: backend Local dày ngang thuật toán (§5.4).
 - Thuật toán giữ con trỏ tới backend ⟹ **Bridge** tách *logic* khỏi *phần cứng*.
 
 `DimmingFactory` là **Abstract Factory + Meyers Singleton**: chip chốt lúc build, cặp thuật toán + backend chốt lúc runtime theo model. Platform không có panel thì dùng chính base class làm **Null Object**. Ngoài lời gọi API, thuật toán còn được **vòng vsync** gọi mỗi khung hình.
@@ -349,7 +349,7 @@ GlobalDimming::GlobalDimming(IDimmingBackend* pDimmingBackend,
 }
 ```
 
-**Implementor — phần ghi phần cứng (mỏng, theo chip):**
+**Implementor — phần ghi phần cứng (theo chip × thuật toán, không mỏng — xem §5.4):**
 
 ```cpp
 // dimming/Backend/IDimmingBackend.h
@@ -380,13 +380,21 @@ Mỗi `ChipX_AlgoY` chỉ override **nhóm method của thuật toán mình**, r
 
 Bridge sách vở hứa **N + M** lớp, vì implementor chỉ biến thiên theo chip. Ở đây backend biến thiên theo **chip × thuật toán**, vì cách ghi phần cứng của từng thuật toán khác hẳn nhau: Global ghi **một** giá trị, Local ghi **từng vùng** màn hình.
 
+> ⚠️ *Sửa 2026-10-06 — người học phản bác và đúng (đã đếm source thật).* Bản trước ghi backend là *"lớp mỏng, vài chục dòng"*. **Sai.** Cỡ thật, làm tròn:
+> - Thuật toán: Global khoảng **7,6 nghìn** dòng, Local khoảng **8,6 nghìn** dòng — **mỗi cái viết một lần**.
+> - Backend Global: khoảng **0,8–1,1 nghìn** dòng **mỗi chip**.
+> - Backend Local: khoảng **4–8,5 nghìn** dòng **mỗi chip × biến thể panel** ⟹ **dày ngang thuật toán**.
+
 | | Gộp logic + phần cứng | Bridge sách | **Hệ thật** |
 |---|---|---|---|
-| Số lớp | N × M — **đều nặng** | N + M | N **nặng** + N × M **mỏng** |
+| Số lớp | N × M — mỗi lớp chứa **cả thuật toán** | N + M | N thuật toán + N × M backend |
+| Độ dày phần bị nhân | Cả thuật toán bị chép theo từng chip | — | Backend; **Local dày ngang thuật toán** |
 | Sửa bug thuật toán | **M chỗ** | 1 chỗ | **1 chỗ** |
-| Thêm 1 chip | +N lớp nặng | +1 | +N backend mỏng |
+| Thêm 1 chip | +N lớp, **chép lại mọi thuật toán** | +1 | +N backend, **không chép thuật toán** |
 
-⭐ **Cách nói ăn điểm:** *"Mục tiêu của Bridge không phải con số N+M, mà là **phần đắt không bị nhân bản**. Phần đắt ở đây là thuật toán, và nó được viết đúng một lần. Phần còn nhân theo chip × thuật toán là lớp ghi thanh ghi vài chục dòng; tôi chấp nhận vì cách ghi của local và global khác nhau thật."*
+⭐ **Cách nói ăn điểm:** *"Mục tiêu của Bridge ở đây không phải con số N+M, mà là **thuật toán chỉ viết một lần cho mọi chip**. Backend nhân theo chip × thuật toán vì phần cứng Local khác nhau thật giữa các chip, và nó không mỏng: backend Local dày ngang thuật toán. Không có Bridge thì **cả thuật toán** bị chép theo từng chip."*
+
+> 🚫 **Rút gọn bằng cách bỏ bớt, không rút gọn thành sai:** không nói *"N + M"* hay *"backend chỉ vài chục dòng"*. Muốn kể ngắn thì nói *"em kể bản 30 giây, phần nào anh muốn thì em mở ra"*.
 
 ### 5.5 Strategy và Bridge cùng tồn tại — hai vai khác nhau
 
@@ -476,6 +484,14 @@ Base class (`IDimmingAlgo`, và cả `lib_*_interface`) **không** abstract thu�
 | Bao nhiêu bản | Mỗi process tự gọi | **Một vòng cho cả hệ**: process khác nạp `.so` ⟹ vòng **reset, chạy lại trong process mới** |
 
 ⭐ **Hệ quả đáng nói:** vòng vsync đổi process mà thuật toán **không mất trí nhớ**, vì mọi state nằm trong shared memory (§7.2). Đây là luận cứ mạnh nhất cho việc đặt state vào shared memory thay vì vào object.
+
+> 🔎 **Đã kiểm ở source thật (2026-10-06): vòng vsync đọc/ghi state không có khoá nào bảo vệ.**
+> - **Đường API:** mọi hàm mặt tiền `lib_api_*` (vài trăm hàm) đều lấy named semaphore.
+> - **Đường vsync:** `lib_dimming` gọi `t_vSyncCallBack()` của lớp thuật toán; hàm này đọc/ghi `Shm` **không** lấy semaphore.
+> - Có một `pthread_mutex` bao quanh callback, nhưng đó là mutex **riêng của thread vsync**: mặc định process-private, chỉ để cặp với condition variable cho thread chính đánh thức mỗi khung hình. Đường API **không bao giờ** lấy mutex này ⟹ nó **không bảo vệ** state.
+> - ⟹ Race xảy ra **ngay trong một process** (thread API ↔ thread vsync), chứ không chỉ giữa các process.
+>
+> ⚠️ **Bẫy khi đọc code:** thấy một mutex quanh callback rồi tưởng là đã được bảo vệ. Câu phải hỏi: *"mutex này còn ai khác lấy không?"*. Một khoá chỉ bảo vệ được bất biến khi **mọi** đường chạm vào state đều lấy **cùng** khoá đó. Vì sao đổi mọi field sang `std::atomic` cũng không đủ: [DP-049](../../14-prep/mock-interview/bank/design-patterns.md). Cách vá: [B1 §6](B1-redesign-architecture.md).
 
 ---
 
@@ -668,7 +684,7 @@ Nêu trước khi bị hỏi là **điểm cộng**; bị vặn ra mới thừa 
 |---|---|
 | *"Sao không phơi thẳng C++ interface cho gọn?"* | Ranh giới **mở**: name mangling · vtable layout · phiên bản STL. Và mất luôn điểm khoá duy nhất (§3.3) |
 | *"Sao dimming có cả cây class mà Display Control chỉ là hàm?"* | Biến thể chip của DC đã được driver hấp thụ; trừu tượng hoá phải trả giá cho biến thể **đang tồn tại** (§4.4) |
-| *"N thuật toán × M chip — có thành N×M lớp không?"* | Bridge; và hệ thật **không phẳng như sách**: phần đắt viết một lần, phần mỏng nhân lên (§5.4) |
+| *"N thuật toán × M chip — có thành N×M lớp không?"* | Bridge; và hệ thật **không phẳng như sách**: thuật toán viết một lần, backend nhân theo chip × thuật toán và **không mỏng** (§5.4) |
 | *"Nhiều process cùng chỉnh một panel thì đồng bộ kiểu gì?"* | State trong shared memory + named semaphore; **object per-process, state per-system** (§7.2) |
 | *"Nếu làm lại thì đổi gì?"* | Năm điểm ở §9 — nêu **thứ tự ưu tiên theo rủi ro**, đừng nói "làm lại hết" ([B1](B1-redesign-architecture.md)) |
 
@@ -690,6 +706,7 @@ Nêu trước khi bị hỏi là **điểm cộng**; bị vặn ra mới thừa 
 | [DP-043](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | `panel_ops` trong kernel so với `virtual` — giống, khác, thừa hưởng rủi ro gì? |
 | [DP-044](../../14-prep/mock-interview/bank/design-patterns.md) | Vòng vsync ngoài mặt tiền — hai vấn đề thiết kế và cách sửa |
 | [DP-048](../../14-prep/mock-interview/bank/design-patterns.md) | Khoá ở mặt tiền rồi, driver kernel còn khoá nữa — thừa không? |
+| [DP-049](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Vòng vsync chạm shm không khoá — đổi mọi field sang `std::atomic` đủ chưa? |
 | [LNX-045](../../14-prep/mock-interview/bank/linux-sysprog.md) ⭐ | Process chết khi đang giữ named semaphore của library — chuyện gì xảy ra? |
 | [RES-034](../../14-prep/mock-interview/bank/resume.md) 🇬🇧 | *"Walk me through the architecture of the library you worked on."* |
 | [DP-024](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Lệnh đơn để nguyên hàm gọi thẳng — vì sao không bọc cho đồng bộ? |

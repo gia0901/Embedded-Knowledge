@@ -138,6 +138,9 @@ Nêu trần ra **bắt buộc** — để ứng viên biết mình đang ở ch�
 
 **Ngưỡng:** câu **≤ 2** → vào [weak-register.md](weak-register.md). Câu **≥ 3 hai lần liên tiếp** → gỡ khỏi sổ (**và bắt buộc xếp lịch 🔁** — Bước 4).
 
+**⚖️ Ứng viên nói trái bank ở câu bám HỆ THẬT** (resume, `in-practice/`, project của chính họ): **chưa chấm sai**. Kiểm bằng chứng trước — source, output chạy thật, tài liệu gốc. Không kiểm được trong phiên ⟹ ghi *"tranh chấp"* ở log, chấm phần không tranh chấp, quay lại khi có bằng chứng. Bank sai thì **sửa bank** (kèm ghi chú ngày sửa) trước khi cập nhật weak-register.
+*Vì sao (05/10, 06/10):* hai ngày liền bank sai về sự thật — [CPP-045](bank/cpp.md) đảo chiều compile/link, [DP-042](bank/design-patterns.md) ghi backend "mỏng" trong khi source thật dày ngang thuật toán. Chấm theo bank sai là phạt người học vì biết đúng hơn tài liệu.
+
 ### 🚫 Thang chấm riêng cho phiên `rapid` — BẮT BUỘC đọc kèm
 
 `rapid` **cố ý không hỏi T2** ⇒ áp thang trên nguyên xi thì mọi câu kịch trần ở 2–3 kể cả khi trả lời hoàn hảo. Trong `rapid`, neo thang vào thứ thực sự đo — **độ trôi chảy của T1**:
