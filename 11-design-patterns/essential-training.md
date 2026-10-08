@@ -4,7 +4,7 @@
 > - Bản training **chỉ gồm những gì bạn đã làm và đã thấy** trong hai tài liệu chuẩn: [A1 — `libdisplay`](in-practice/A1-baseline-libdisplay.md) và [A2 — C++ interface/HAL](in-practice/A2-cpp-interface-hal.md). Không học dàn đều 23 pattern GoF; không dùng bản cải tiến B1/B2.
 > - **9 pattern + 1 nền**, xếp theo thứ tự học: §0 **interface & đa hình** (nền của mọi thứ, kể cả bảng con trỏ hàm trong kernel) → §1 Strategy → §2 Bridge → §3 Factory Method → §4 Abstract Factory → §5 Singleton → §6 Null Object → §7 Facade (+ Adapter) → §8 Self-registration → §9 Service Locator (mức nhận diện).
 > - Mỗi pattern đi theo đúng một khuôn: **một câu** → **vấn đề nó giải** → **ví dụ cơ bản** (code chạy được) → **trong công việc của bạn** → **cái giá & bẫy**.
-> - §10 là thứ đáng giá không kém: **chỗ bạn cố ý KHÔNG dùng pattern** (Display Control). §11 là bản đồ một trang để ôn trước giờ phỏng vấn.
+> - §10 là thứ đáng giá không kém: **chỗ bạn cố ý KHÔNG dùng pattern** (Panel Control). §11 là bản đồ một trang để ôn trước giờ phỏng vấn.
 > - Mọi code ở phần *ví dụ cơ bản* đã compile và chạy thật (`g++ -std=c++17 -Wall -Wextra`, gcc 11.4); output in ngay dưới code.
 
 > 🔒 **Tên trong tài liệu này là tên đã khử nhạy cảm** (`libdisplay`, `lib_api_*`, `IDimmingAlgo`, `panel_ops`…), giống A1/A2. Khi kể ở phỏng vấn cũng dùng đúng các tên này, hoặc nói chung chung *"một shared library điều khiển màn hình"*.
@@ -182,7 +182,7 @@ GlobalDimming::GlobalDimming(IDimmingBackend* pDimmingBackend, DimmingType_k eDe
 
 ⭐ **Một lớp, hai vai:** `IDimmingAlgo` là **Strategy** khi nhìn từ `lib_dimming`, và là **abstraction của Bridge** khi nhìn sang `IDimmingBackend` ([A1 §5.5](in-practice/A1-baseline-libdisplay.md)).
 
-⚠️ **Hệ thật không phẳng như sách — nói thẳng ra:** backend nhân theo **chip × thuật toán**, vì phần cứng Local khác nhau thật giữa các chip. Và backend **không mỏng**: backend Local dày ngang thuật toán. Cái Bridge giữ được là **thuật toán chỉ viết một lần cho mọi chip**; không có Bridge thì cả thuật toán bị chép theo từng chip. 🚫 Đừng kể *"N + M lớp"* hay *"backend chỉ vài chục dòng"* — sai với hệ thật ([A1 §5.4](in-practice/A1-baseline-libdisplay.md), sửa 06/10).
+⚠️ **Hệ thật không phẳng như sách — nói thẳng ra:** backend nhân theo **chip × thuật toán**, vì phần cứng Local khác nhau thật giữa các chip. Và backend **không mỏng**: backend Local dày ngang thuật toán. Cái Bridge giữ được là **thuật toán chỉ viết một lần cho mọi chip**; không có Bridge thì cả thuật toán bị chép theo từng chip. 🚫 Đừng kể *"N + M lớp"* hay *"backend chỉ vài chục dòng"* — sai với hệ thật ([A1 §5.4](in-practice/A1-baseline-libdisplay.md)).
 
 **Bridge xuất hiện lần hai — ở kernel, viết bằng C** ([A1 §6.3](in-practice/A1-baseline-libdisplay.md)):
 
@@ -474,7 +474,7 @@ int DisplayImpl::setPower(bool onoff) {
 ```
 
 **Cái giá & bẫy:**
-- Facade dễ phình thành "god object" nếu dồn cả logic vào. `lib_api_*` giữ được gọn vì nó **chỉ điều phối**, logic nằm ở PQ/DC phía sau.
+- Facade dễ phình thành "god object" nếu dồn cả logic vào. `lib_api_*` giữ được gọn vì nó **chỉ điều phối**, logic nằm ở PQ/Panel Control phía sau.
 - Nói tên *"Facade"* là mời câu *"Facade khác Adapter thế nào?"* — chuẩn bị bảng ở trên ([structural §0](structural.md)).
 
 ---
@@ -558,12 +558,12 @@ void lib_init_modules() {                            // chạy một lần, tron
 
 ---
 
-## §10. Chỗ bạn CỐ Ý không dùng pattern — Display Control
+## §10. Chỗ bạn CỐ Ý không dùng pattern — Panel Control
 
-**Một câu:** các hàm `dc_*` (đổi tần số, resolution, nguồn panel) là **hàm tự do** gọi thẳng `ioctl` — không interface, không factory, không đa hình. Đó là quyết định đúng.
+**Một câu:** các hàm `panel_ctl_*` (đổi tần số, resolution, nguồn panel) là **hàm tự do** gọi thẳng `ioctl` — không interface, không factory, không đa hình. Đó là quyết định đúng.
 
 ```cpp
-int32_t dc_set_frequency(int hz) {
+int32_t panel_ctl_set_frequency(int hz) {
     panel_freq_t arg;
     arg.hz = hz;
     return ioctl(g_panel_fd, PANEL_IOC_SET_FREQ, &arg);  // A1 §4.3
@@ -572,7 +572,7 @@ int32_t dc_set_frequency(int hz) {
 
 **Vì sao không bọc cho đồng bộ với dimming** ([A1 §4.4](in-practice/A1-baseline-libdisplay.md)):
 - Trừu tượng hoá phải **trả giá cho một biến thể đang tồn tại**.
-- Display Control **có** biến thể theo chip, nhưng biến thể đó đã được **kernel driver hấp thụ**: một bộ ioctl chung, mỗi chip một driver (§2, Bridge ở kernel).
+- Panel Control **có** biến thể theo chip, nhưng biến thể đó đã được **kernel driver hấp thụ**: một bộ ioctl chung, mỗi chip một driver (§2, Bridge ở kernel).
 - ⟹ Ở user-space không còn gì để trừu tượng. Bọc thêm interface là trả giá (gián tiếp, thêm file, thêm test double, thêm một thứ phải giữ ABI) để mua **số không**.
 
 **Ba câu hỏi lọc trước khi dùng bất kỳ pattern nào** (từ [README](README.md)): đã có **≥ 2 biến thể thật** chưa? · chúng khác **hành vi** hay chỉ khác **tham số**? · có ai cần **hoán đổi** không?
@@ -595,11 +595,11 @@ int32_t dc_set_frequency(int hz) {
 | 7 | Facade · Adapter | Một cửa che trình tự · khớp interface | `lib_api_*` (shm → khoá → điều phối) · `DisplayImpl` gọi C API | Vòng vsync **không** qua mặt tiền |
 | 8 | Self-registration | Implementation tự ghi danh khi được nạp | `__attribute__((constructor))` trong `.so` · `.ko` chip điền `panel_ops` | Cần `-rdynamic`; ô `NULL` ⟹ crash |
 | 9 | Service Locator | Con trỏ toàn cục + `get_*()` | `get_dimming_instance()` | Không phải Singleton; không race vì init trước khi có thread |
-| 10 | *Cố ý không dùng* | Biến thể đã ở driver | `dc_*` → `ioctl` | Trừu tượng hoá phải trả giá cho biến thể **đang tồn tại** |
+| 10 | *Cố ý không dùng* | Biến thể đã ở driver | `panel_ctl_*` → `ioctl` | Trừu tượng hoá phải trả giá cho biến thể **đang tồn tại** |
 
 **Câu kể toàn cảnh — 3 ý, đúng thứ tự:**
 1. *Ba ranh giới*: app → C++ interface (khép) → **C API** (mở, điểm khoá duy nhất) → `ioctl` xuống kernel.
-2. *Sau mặt tiền*: Picture Quality nặng logic (Strategy + Bridge + Abstract Factory + Null Object); Display Control **cố ý** không pattern.
+2. *Sau mặt tiền*: Picture Quality nặng logic (Strategy + Bridge + Abstract Factory + Null Object); Panel Control **cố ý** không pattern.
 3. *Cùng một ý tưởng hai lần*: Bridge bằng `virtual` ở dimming, bằng bảng con trỏ hàm ở kernel — chip chốt lúc build, tổ hợp theo model chốt lúc chạy.
 
 Bản nói đầy đủ ~75″: [A1 §10](in-practice/A1-baseline-libdisplay.md) · bản tiếng Anh: bank [RES-034](../14-prep/mock-interview/bank/resume.md).

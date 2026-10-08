@@ -1008,6 +1008,124 @@ SRCREV = "a1b2c3d4"   # ghim commit → build tái lập được
 **Chốt:** *"Đừng fork source vendor — giữ upstream nguyên vẹn và diễn đạt mọi thay đổi của mình dưới dạng patch có thứ tự."*
 </details>
 
+## F — Unit test & code quality (bám việc thật, mức cơ bản)
+
+#### BLD-040 · 🟡 · concept · ⭐ · [→ unit-test-and-code-quality §3](../../../06-build-systems/unit-test-and-code-quality.md)
+**Bạn muốn unit test thuật toán dimming (tính độ sáng theo từng khung hình) trên máy build, không có panel, không có chip. Làm thế nào? Fake, mock, stub khác nhau ở đâu?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** muốn test một phần tách khỏi phần cứng thì phần đó phải **gọi phần cứng qua một interface**, để test **cắm thay** được. Thuật toán dimming giữ `IDimmingBackend*` (Bridge) ⟹ test đưa vào một backend giả, rồi kiểm **những gì thuật toán đã yêu cầu ghi**.
+
+```cpp
+struct FakeBackend : IDimmingBackend {                 // ghi lại thay vì chạm phần cứng
+    std::vector<int32_t> writes;
+    uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* p) override { writes.push_back(p->value); return LIB_OK; }
+};
+GlobalDimming algo(&fake, shm);
+algo.SetBacklight(25);
+for (int i = 0; i < 5; ++i) algo.t_vSyncCallBack();
+EXPECT_EQ(fake.writes, (std::vector<int32_t>{10, 20, 25}));   // chạy thật: PASS
+```
+
+| Test double | Làm gì | Khi nào dùng |
+|---|---|---|
+| **Stub** | Trả giá trị cố định | Chỉ cần phụ thuộc "đứng đó" cho code chạy qua |
+| **Fake** | Cài đặt đơn giản nhưng chạy được (vector, file tạm, shm giả) | Muốn kiểm **kết quả** |
+| **Mock** | Kiểm **lời gọi**: gọi mấy lần, đối số gì (gMock `EXPECT_CALL`) | Muốn kiểm **tương tác** |
+
+**"Vì sao" hai tầng:**
+- *Nông:* "dùng mock".
+- *Sâu:* **testability là hệ quả của thiết kế.** Thuật toán gọi thẳng `ioctl` thì không test được nếu không có thiết bị. Bridge/DIP tạo ra đúng chỗ cắm.
+
+**Bẫy:** ① mock **mọi thứ** ⟹ test chỉ kiểm lại cách cài đặt, đổi code là vỡ test dù hành vi đúng · ② quên rằng fake chạy đúng **không** chứng minh backend thật đúng — cần integration test / test trên thiết bị.
+
+**Chốt:** *"Thuật toán gọi phần cứng qua interface nên test cắm fake backend vào và kiểm những giá trị nó yêu cầu ghi. Fake kiểm kết quả, mock kiểm lời gọi, stub chỉ đứng đó."*
+</details>
+
+#### BLD-041 · 🟡 · concept · ⭐ · [→ unit-test-and-code-quality §4](../../../06-build-systems/unit-test-and-code-quality.md)
+**Báo cáo coverage của library ghi 90% line coverage. Con số đó nói lên điều gì, KHÔNG nói lên điều gì? Bạn đọc báo cáo thế nào?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** build với `--coverage`, compiler chèn bộ đếm vào mỗi dòng/nhánh; chạy test xong, `gcov`/`gcovr` đọc bộ đếm. Kết quả trả lời **một** câu hỏi: *dòng nào đã chạy ít nhất một lần khi test*.
+
+| Coverage nói | Coverage KHÔNG nói |
+|---|---|
+| Dòng/nhánh nào **chưa từng chạy** ⟹ chắc chắn chưa được test | Dòng đã chạy có **đúng** không |
+| Chỗ nên viết test tiếp | Test có `EXPECT` có ý nghĩa không |
+| — | Các tổ hợp cấu hình (model, chip) đã được thử chưa |
+
+**Đọc báo cáo thế nào — ví dụ chạy thật** (`libdisplay_lab`, tổng 90%):
+```
+src/dimming/DimmingBackendChipA.cpp            5        3    60%   4-5
+```
+Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integration test chạy model `local` ⟹ đường *thuật toán Global → backend thật → Panel Control* **chưa có test nào đi qua**, dù tổng là 90%. Đọc cột **Missing**, đừng đọc cột tổng.
+
+**"Vì sao" hai tầng:**
+- *Nông:* "coverage càng cao càng tốt".
+- *Sâu:* coverage là **thông tin**, không phải **ngưỡng chất lượng**. Đặt chỉ tiêu cứng (vd ≥ 80%) dễ sinh ra test không có `EXPECT`, chỉ để chạy qua code.
+
+**Bẫy:** ① *"100% coverage nghĩa là không còn bug"* · ② không nói thẳng *"ở công ty em không đo coverage"* mà cố tả như đã làm.
+
+**Chốt:** *"Coverage chỉ ra chỗ chưa test, không chứng minh chỗ đã test là đúng. Em đọc cột Missing để tìm đường quan trọng chưa ai đi qua."*
+</details>
+
+#### BLD-042 · 🟡 · concept · ⭐ · [→ unit-test-and-code-quality §5](../../../06-build-systems/unit-test-and-code-quality.md)
+**`-Werror`, static analysis, sanitizer, unit test, code review — mỗi cái bắt loại lỗi nào? Vì sao không chọn một cái là đủ?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế:** mỗi công cụ nhìn code từ một góc khác nhau ⟹ mỗi cái có **điểm mù riêng**.
+
+| Công cụ | Nhìn thấy | Điểm mù |
+|---|---|---|
+| Code review | Logic, thiết kế, đặt tên | Lỗi cơ học dễ trượt mắt |
+| `-Wall -Wextra -Werror` | Code đáng ngờ **biết được lúc compile** | Lỗi chỉ lộ lúc chạy |
+| Static analysis (clang-tidy, cppcheck, `-fanalyzer`; kernel: `checkpatch.pl`, `sparse`) | Mẫu lỗi qua phân tích luồng | Báo nhầm; không biết dữ liệu thật |
+| ASan / UBSan | Lỗi bộ nhớ, UB **trên đường đã chạy** | Đường không chạy thì không thấy |
+| TSan | Data race **đã xảy ra** khi chạy | Race không bị kích hoạt thì không thấy |
+| Unit test | Hành vi sai so với mong đợi | Chỉ những gì test đã nghĩ tới |
+
+**Bằng chứng chạy thật** (`libdisplay_lab`, cố ý đọc `zones[4]` trên mảng 4 phần tử):
+- Build **Debug `-O0`**: **im lặng**, chạy ra kết quả, exit 0.
+- Build **Release `-O2`** + `-Werror`: `warning: array subscript 4 is above array bounds` ⟹ build fail. *(Cảnh báo này cần tối ưu mới bật.)*
+- **ASan**: `stack-buffer-overflow ... DimmingBackendChipA.cpp:8`.
+- **TSan** trên cùng lab bắt được race vòng vsync mà không công cụ nào khác thấy.
+
+**"Vì sao" hai tầng:**
+- *Nông:* "càng nhiều công cụ càng tốt".
+- *Sâu:* xếp công cụ theo **chi phí phát hiện**: rẻ chạy trước, mọi lần (warning, unit test); đắt chạy sau hoặc định kỳ (sanitizer, test trên thiết bị).
+
+**Bẫy:** ① chạy `-Werror` chỉ trên Debug ⟹ mất các cảnh báo cần tối ưu · ② coi sanitizer xanh là "không có bug" — nó chỉ thấy đường đã chạy.
+
+**Chốt:** *"Mỗi công cụ có điểm mù riêng nên phải chồng lên nhau. Rẻ thì chạy mọi lần, đắt thì chạy sau."*
+</details>
+
+#### BLD-043 · 🟡 · concept · ⭐ · 🏗️ · [→ unit-test-and-code-quality §3](../../../06-build-systems/unit-test-and-code-quality.md), [RES-016](resume.md)
+**"Mỗi lần submit em đưa scenario cho AI, AI sinh unit test theo bộ khung có sẵn." — Vậy em kiểm chất lượng của test đó thế nào? Test xanh có nghĩa là gì?**
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** bạn **sở hữu** chất lượng hay chỉ chuyển tiếp output của công cụ (cùng gốc với [RES-016](resume.md)).
+
+**Câu trả lời tốt — ba phép kiểm, mỗi phép một câu:**
+1. **Test có kiểm hành vi không?** Đọc các `EXPECT`: chúng kiểm **kết quả mong đợi** của scenario, hay chỉ gọi hàm cho chạy qua? Test không có `EXPECT` có ý nghĩa vẫn xanh — và vẫn tăng coverage ([BLD-041](build-systems.md)).
+2. **Làm hỏng code, test có đỏ không?** Cố ý đổi một điều kiện (`>` thành `>=`), chạy lại. Vẫn xanh ⟹ test không bảo vệ gì. Đây là ý tưởng của *mutation testing*.
+3. **Scenario có phủ đường lỗi không?** AI viết theo scenario bạn đưa. Scenario chỉ có đường thành công thì test chỉ có đường thành công — đường lỗi (tham số sai, phần cứng trả lỗi) là trách nhiệm của **người viết scenario**.
+
+**Vế sau — test xanh nghĩa là gì:** chỉ nghĩa là *"code làm đúng những gì test kiểm"*. Một thay đổi chạy trên **rất nhiều model** ⟹ unit test xanh vẫn phải qua test trên thiết bị gốc.
+
+**Nền kỹ thuật:** test double ([BLD-040](build-systems.md)) · coverage ([BLD-041](build-systems.md)).
+
+**Bẫy:** ① *"AI viết test rồi nên em yên tâm"* · ② thanh minh dài · ③ không nêu được **một** cách cụ thể để biết test vô dụng.
+
+**Chốt:** *"Em kiểm ba thứ: test có kiểm kết quả không, làm hỏng code thì test có đỏ không, và scenario có ca lỗi không. AI viết nhanh, còn quyết định test đủ hay chưa vẫn là của em."*
+</details>
+
+#### BLD-044 · 🟢 · concept · [→ unit-test-and-code-quality §3](../../../06-build-systems/unit-test-and-code-quality.md)
+**GoogleTest ở library và KUnit ở driver — mỗi cái test cái gì, chạy ở đâu?**
+<details><summary>Đáp án</summary>
+
+**GoogleTest** chạy như một chương trình user-space bình thường trên máy build; test class/hàm C++ của library, cắm fake thay phần phụ thuộc. **KUnit** là framework unit test **bên trong kernel**: test built-in hoặc module, thường chạy bằng `tools/testing/kunit/kunit.py run` trên kernel UML — không cần board; test **logic** của driver (kiểm tham số, bảng ops, máy trạng thái), **không** test được phần cứng thật. Cả hai đều không thay được test trên thiết bị.
+</details>
+
 ---
 
 ⬅️ [Bank index](README.md)

@@ -18,7 +18,7 @@
 
 | Track | Domain | Topic gốc |
 |---|---|---|
-| **`c`** | `C` (+ `EMB` mục A, các câu C trong `COD` — danh sách ở đầu [bank/c-programming.md](bank/c-programming.md)) | **C thuần trên giấy** — con trỏ, mảng, chuỗi, macro, bit, linkage — [01/c-pointers-arrays](../../01-cpp-fundamentals/c-pointers-arrays.md), [01/c-language-idioms](../../01-cpp-fundamentals/c-language-idioms.md). Thêm 2026-10 sau phản hồi buổi PV thật |
+| **`c`** | `C` (+ `EMB` mục A, các câu C trong `COD` — danh sách ở đầu [bank/c-programming.md](bank/c-programming.md)) | **C thuần trên giấy** — con trỏ, mảng, chuỗi, macro, bit, linkage — [01/c-pointers-arrays](../../01-cpp-fundamentals/c-pointers-arrays.md), [01/c-language-idioms](../../01-cpp-fundamentals/c-language-idioms.md). C thuần vẫn bị hỏi ở phỏng vấn thật, kể cả vị trí C++ |
 | `modern-cpp` | `CPP` | [01](../../01-cpp-fundamentals/), [02](../../02-modern-cpp/) |
 | `os` | `OS` | [03](../../03-operating-system/) |
 | `linux-sysprog` | `LNX` | [04](../../04-linux-system-programming/) |

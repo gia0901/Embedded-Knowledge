@@ -445,6 +445,29 @@ Toàn bộ thiết kế xoay quanh một câu: *"lần crash tới, thiết bị
 
 ---
 
+#### DBG-045 · 🟡 · concept · ⭐ · 🏗️ · [→ crash-analysis-workflow §1–2](../../../09-debugging/crash-analysis-workflow.md)
+**Library của bạn crash trên TV. Ba tình huống: bản debug, bản release, và máy không boot lên được. Với mỗi tình huống, bạn có bằng chứng gì, dùng công cụ gì — và cần thêm thứ gì để ra được dòng code?**
+<details><summary>Đáp án</summary>
+
+**Cơ chế chung:** crash chỉ để lại **địa chỉ**. Biến địa chỉ thành *hàm + dòng* luôn cần ba thứ: **offset** trong file (không phải địa chỉ tuyệt đối — ASLR đổi địa chỉ gốc mỗi lần chạy) · **file symbol khớp đúng bản build** · nhớ **địa chỉ trả về** lệch một lệnh.
+
+| Tình huống | Bằng chứng | Công cụ | Cần thêm |
+|---|---|---|---|
+| **Bản debug** | Log tự in backtrace kèm tên | Đọc log | Hàm `static`/ẩn vẫn chỉ hiện offset ⟹ vẫn cần `addr2line` + debug info |
+| **Bản release** | Coredump + image đang chạy | Hệ thống phân tích nội bộ — bên trong là gdb + symbol của image | **Đúng** image và symbol khớp; thiếu symbol thì frame ra `??` |
+| **Không boot được** | Trace log: kernel oops/panic, hoặc log crash user-space | `addr2line` (user-space) · `faddr2line`/gdb trên `.ko` (kernel, dạng `hàm+0xoff/0xsize`) | File symbol / `.ko` có debug info của **đúng image** |
+
+**"Vì sao" hai tầng:**
+- *Nông:* "dùng addr2line".
+- *Sâu:* biết **vì sao** mỗi bước cần thứ đó: bản ship đã strip nên debug info nằm ở file riêng (`.gnu_debuglink`); symbol của bản build khác cho dòng **sai mà không báo lỗi**; coredump cho **chuỗi nhân quả** (biến sai từ frame nào) còn `addr2line` chỉ cho **một điểm**.
+
+**Bẫy:** ① dùng symbol của bản build khác · ② tra địa chỉ tuyệt đối thẳng vào `addr2line` · ③ nói *"em dùng gdb phân tích core thường xuyên"* trong khi thực tế là hệ thống nội bộ làm — nói đúng: *"hệ thống làm, và em hiểu nó làm gì; em đã tự làm lại bằng gdb ở lab"* ([DBG-044](debugging.md)).
+
+**Chốt:** *"Crash chỉ để lại địa chỉ; em cần offset, symbol khớp đúng image, và nhớ trừ 1 với địa chỉ trả về. Core thì cho thêm cả chuỗi giá trị để đi ngược tới chỗ sai thật."*
+</details>
+
+---
+
 ## D — Lỗi bộ nhớ & sanitizer
 
 #### DBG-024 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ memory-bugs](../../../09-debugging/memory-bugs.md)
@@ -1738,6 +1761,119 @@ set stop-on-solib-events 1          # dung MOI lan nap/go .so
 ```
 
 **Chốt:** *"Symbol của plugin chưa tồn tại lúc gdb khởi động — đó là lý do breakpoint phải pending. Và constructor của `.so` chạy BÊN TRONG `dlopen`, không phải trước main, không phải sau khi dlopen trả về."*
+</details>
+
+#### DBG-043 · 🟡 · lab 🧪 · ⭐ · [→ crash-analysis-workflow §3](../../../09-debugging/crash-analysis-workflow.md)
+**🧪 NGỒI MÁY LÀM. Bản release crash, log chỉ có `libsensor.so(+0x112d)` — không tên hàm, thiết bị không còn chạy để debug. Tìm ra hàm và dòng code gây crash.**
+
+Mã nguồn và lệnh build (tách symbol rồi strip, như bản release thật): [crash-analysis-workflow §3](../../../09-debugging/crash-analysis-workflow.md).
+
+**Nhiệm vụ:**
+1. Chạy `./app 0`, đọc log. Frame nào là **chỗ crash**? Vì sao nó không có tên hàm trong khi `sensor_average` thì có?
+2. Dùng `addr2line` ra **hàm + dòng** của chỗ crash.
+3. Cất file symbol đi, chạy lại lệnh ở bước 2 trên **bản ship**. Rồi đặt file symbol **cạnh** bản ship, chạy lại. Giải thích sự khác nhau.
+4. Frame `sensor_average+0x35` là **địa chỉ trả về**. Tra ra dòng gọi.
+5. Log chỉ có địa chỉ tuyệt đối `0x70a2134a512d`. Tính lại offset — cần thêm thông tin gì?
+
+<details><summary>Lệnh + output thật + giải thích</summary>
+
+**1.** Output thật (đường dẫn rút gọn):
+```
+*** caught signal 11, backtrace:
+./app(+0x127d)[0x56a00cd8d27d]
+/lib/x86_64-linux-gnu/libc.so.6(+0x42520)[0x70a213242520]
+libsensor.so(+0x112d)[0x70a2134a512d]
+libsensor.so(sensor_average+0x35)[0x70a2134a517b]
+./app(main+0x36)[0x56a00cd8d2ec]
+```
+Chỗ crash là frame **ngay dưới bộ chuyển signal của libc** (`libc.so.6(+0x42520)`): `libsensor.so(+0x112d)`. Không có tên vì hàm đó là `static` ⟹ không nằm trong bảng symbol **động** mà `backtrace_symbols` dùng. `sensor_average` được export nên có tên. *(Cùng lý do, `crash_handler` — cũng `static` — hiện thành `./app(+0x127d)`.)*
+
+**2.**
+```
+$ addr2line -f -e symbols/libsensor.debug 0x112d
+sum_samples
+sensor.c:8 (discriminator 3)
+```
+
+**3.**
+```
+$ addr2line -f -e libsensor.so 0x112d          # file symbol đã cất đi
+??
+??:0
+```
+Đặt `libsensor.debug` cạnh `libsensor.so` thì **cùng lệnh đó** ra `sum_samples sensor.c:8`: bản ship mang `.gnu_debuglink` trỏ tới tên file symbol, `addr2line` tự đi theo.
+```
+$ readelf --string-dump=.gnu_debuglink libsensor.so
+  [     0]  libsensor.debug
+```
+⟹ Đó chính là cơ chế đằng sau *"dùng symbol tương ứng image"*: symbol phải **khớp đúng bản build**; bản khác cho ra dòng sai mà không báo lỗi.
+
+**4.** `0x1146 + 0x35 = 0x117b`. Đây là lệnh **sau** `call` ⟹ tra `0x117a`:
+```
+$ addr2line -f -e libsensor.debug 0x117a
+sensor_average
+sensor.c:14
+```
+
+**5.** Cần **địa chỉ gốc** của `libsensor.so` trong process đó — từ `/proc/<pid>/maps`, hoặc dòng `segfault at … in libsensor.so[gốc+kích thước]` của kernel. `0x70a2134a512d − 0x112d = 0x70a2134a4000` (tròn trang 4 KB) chính là địa chỉ gốc. ASLR đổi địa chỉ gốc mỗi lần chạy, **offset thì không**.
+
+**Chốt:** *"Crash chỉ để lại địa chỉ. Ra được dòng code cần offset trong file, file symbol khớp đúng bản build, và nhớ trừ 1 với địa chỉ trả về."*
+</details>
+
+#### DBG-044 · 🟡 · lab 🧪 · ⭐ · [→ crash-analysis-workflow §4](../../../09-debugging/crash-analysis-workflow.md), [gdb §5](../../../09-debugging/gdb.md)
+**🧪 NGỒI MÁY LÀM. Lần đầu mở coredump bằng gdb: process crash trong một `.so` đã strip. Lấy backtrace đầy đủ, chỉ ra biến nào sai và nó sai từ đâu.**
+
+Cùng mã nguồn với [DBG-043](debugging.md).
+
+**Nhiệm vụ:**
+1. Sinh core: `ulimit -c unlimited; LAB_NO_HANDLER=1 ./app 0`. Shell báo `(core dumped)` — file core ở đâu?
+2. Mở core khi file symbol của `.so` **không** nằm cạnh nó. Frame 0 hiện gì, vì sao frame #2, #3 vẫn ra dòng?
+3. Đặt file symbol cạnh `.so`, mở lại. Dùng `bt`, `frame`, `info locals`, `info args`, `p` chỉ ra biến sai và nó sai từ frame nào.
+4. Coredump cho thứ gì mà `addr2line` ở DBG-043 không cho?
+
+<details><summary>Lệnh + output thật + giải thích</summary>
+
+**1.** `cat /proc/sys/kernel/core_pattern` trên máy lab (Ubuntu 22.04):
+```
+|/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -F%F -- %E
+```
+Ký tự `|` nghĩa là core được **đẩy qua pipe** cho apport ⟹ file nằm ở `/var/lib/apport/coredump/core.<đường-dẫn>.<uid>.<boot-id>.<pid>.<time>`, không phải thư mục hiện tại. Cùng lớp vấn đề với [DBG-033](debugging.md).
+
+**2.**
+```
+$ gdb -batch -q -ex bt ./app core.app
+Program terminated with signal SIGSEGV, Segmentation fault.
+#0  0x00007e8c7768012d in ?? () from libsensor.so
+#1  0x00007e8c7768017b in sensor_average () from libsensor.so
+#2  0x00005ded84b582ec in read_light_sensor (present=<optimized out>) at app.c:21
+#3  main (argc=2, argv=0x7fff7fb4c0c8) at app.c:27
+```
+`??` vì `libsensor.so` đã strip và không tìm thấy file symbol. `sensor_average` vẫn có **tên** (bảng symbol động) nhưng **không có dòng, không có tham số**. `app` build `-g` nên frame #2, #3 đầy đủ.
+
+**3.**
+```
+#0  0x00007e8c7768012d in sum_samples (buf=0x0, n=4) at sensor.c:8
+#1  0x00007e8c7768017b in sensor_average (buf=0x0, n=4) at sensor.c:14
+#2  0x00005ded84b582ec in read_light_sensor (present=<optimized out>) at app.c:21
+#3  main (argc=2, argv=0x7fff7fb4c0c8) at app.c:27
+(gdb) frame 0
+8	        s += buf[i];                       /* <-- crash khi buf == NULL */
+(gdb) info locals
+i = 0
+s = 0
+(gdb) p buf
+$1 = (const int *) 0x0
+(gdb) frame 1
+14	    return sum_samples(buf, n) / (int)n;
+(gdb) info args
+buf = 0x0
+n = 4
+```
+`buf = 0x0` từ **frame #1** — `sensor_average` nhận `NULL` từ người gọi ⟹ lỗi nằm ở `read_light_sensor` (cảm biến vắng mặt trả `NULL`), không phải ở `sum_samples`. Crash ở lần lặp đầu (`i = 0`).
+
+**4.** `addr2line` cho **một điểm**: hàm + dòng. Coredump cho **cả chuỗi nhân quả**: backtrace, tham số, biến cục bộ của từng frame — đủ để biết **giá trị sai đến từ đâu**, không chỉ **chết ở đâu**. Đó cũng là việc hệ thống phân tích coredump nội bộ làm khi được đưa image + core.
+
+**Chốt:** *"Mở core cần đúng binary và đúng file symbol. Có rồi thì `bt` cho chuỗi gọi, `frame` + `info locals` cho giá trị — đi ngược lên tới frame nơi giá trị bắt đầu sai."*
 </details>
 
 ---

@@ -12,7 +12,7 @@
 - File này đã được hoàn thiện (không còn là bản nháp mơ hồ). Vẫn có thể tinh chỉnh khi phát sinh nhu cầu mới.
 - Xem **Mục 7 — Tiến độ** để biết tài liệu nào đã/đang/chưa viết.
 
-> 🎯 **Plan đang chạy (từ 2026-10-05): [`resume-plan.md`](14-prep/study-plans/resume-plan.md)** — 4 buổi × ~105′ (mock chính + rapid quét phủ) bám `RESUME_current.tex`, nghiêng C++ System SW. `/mock` tự nhận và đề xuất buổi kế.
+> 🎯 **Plan đang chạy (từ 2026-10-05): [`resume-plan.md`](14-prep/study-plans/resume-plan.md)** — bám `RESUME_current.tex`, nghiêng C++ System SW. **08/10 đổi chiến lược kể:** người không làm TV vẫn hiểu (không FRC/TCON; library = **Picture Quality + Panel Control**, kernel = **panel driver**), kể ngắn trước, mỗi câu thả **móc** vào kiến thức nền, ôn ở mức cơ bản. Buổi: R1 ✅ → **R1′ (làm lại)** → R2–R4 → **R5 CI/unit test** → **R6 troubleshooting**. `/mock` tự nhận và đề xuất buổi kế.
 > 📦 **Sprint Datalogic đã KẾT THÚC (phỏng vấn xong, 2026-10-03).** Plan cũ lưu ở [`14-prep/study-plans/archive/`](14-prep/study-plans/archive/) — giữ vì các *"bài học #N"* được trích từ nhiều nơi.
 > Conversation mới muốn ôn: `/mock` sẽ đề xuất buổi kế của `resume-plan` (nói rõ *"ôn tự do"* thì nó hỏi track + type). Có JD mới ⇒ viết plan mới vào `14-prep/study-plans/` theo khuôn ở [study-plans/README](14-prep/study-plans/README.md).
 > 🧪 Ba bộ lab (BSP phần cứng · DBG · DP) **hết đóng băng** — làm được bất cứ lúc nào.
@@ -120,7 +120,8 @@ Embedded-Interview/
 │   ├── cmake.md
 │   ├── cross-compilation.md      # toolchain, cross-compile cho embedded
 │   ├── yocto.md                  # BitBake, layer/recipe/bbappend, sstate, SDK
-│   └── ci-and-test-farm.md       # CI/CD embedded: gated check-in, build matrix, smoke/robustness, test farm
+│   ├── ci-and-test-farm.md       # CI/CD embedded: gated check-in, build matrix, smoke/robustness, test farm
+│   └── unit-test-and-code-quality.md # mức cơ bản bám việc thật: pipeline người dùng, GoogleTest/KUnit, coverage, cổng chất lượng + 🧪 lab 5 cổng
 │
 ├── 07-shared-libraries/          # Thư viện chia sẻ
 │   ├── static-vs-shared.md
@@ -142,7 +143,8 @@ Embedded-Interview/
 │   ├── gdb.md
 │   ├── tools.md                  # valgrind, strace, ltrace, perf, addr2line
 │   ├── memory-bugs.md            # leak, corruption, UB, sanitizers
-│   └── kernel-debugging.md       # dmesg, ftrace, crash dump
+│   ├── kernel-debugging.md       # dmesg, ftrace, crash dump
+│   └── crash-analysis-workflow.md # 3 tình huống crash thật · addr2line · coredump gdb + 🧪 2 lab
 │
 ├── 10-thinking/                  # Tư duy (xuyên suốt)
 │   ├── problem-solving.md        # phương pháp giải quyết vấn đề
@@ -156,7 +158,7 @@ Embedded-Interview/
 │   ├── behavioral.md             # Strategy · Template Method · Observer · State · Command · Memento · Null Object
 │   └── in-practice/              # 🎯 Pattern ÁP VÀO VIỆC THẬT — chia 🅰️ TIÊU CHUẨN / 🅱️ CẢI TIẾN
 │       ├── README.md                    # bản đồ 3 tầng + BỘ TỪ VỰNG CHUẨN + luật khử nhạy cảm
-│       ├── A1-baseline-libdisplay.md    # 🅰️ hệ THẬT: narrow waist · Picture Quality / Display Control · dimming=Bridge · kernel panel_ops · 5 điểm yếu · bản nói
+│       ├── A1-baseline-libdisplay.md    # 🅰️ hệ THẬT: narrow waist · Picture Quality / Panel Control · dimming=Bridge · kernel panel_ops · 5 điểm yếu · bản nói
 │       ├── A2-cpp-interface-hal.md      # 🅰️ Tầng 0 — ranh giới C++ interface/impl: pack code + 5 lab 🧪
 │       ├── B1-redesign-architecture.md  # 🅱️ làm lại: luật "mỗi thứ một chủ" — vá đúng 5 điểm yếu của A1 + thứ tự ưu tiên theo rủi ro
 │       └── B2-redesign-events.md        # 🅱️ Observer+hysteresis · Command+apply_at · Memento/Preset
@@ -214,16 +216,16 @@ Embedded-Interview/
 | 03 Operating System | ✅ Xong | process-thread, scheduling, memory-management, sync-primitives, ipc |
 | 04 Linux system programming | ✅ Xong | file-io, processes-signals, io-multiplexing, ipc-linux |
 | 05 Drivers & Device Tree | ✅ Xong | driver-basics, kernel-userspace, device-tree, **bus-protocols**, pci-usb-drivers |
-| 06 Build systems | ✅ Xong | makefile, cmake, cross-compilation, yocto, **ci-and-test-farm** |
+| 06 Build systems | ✅ Xong | makefile, cmake, cross-compilation, yocto, **ci-and-test-farm**, **unit-test-and-code-quality** (08/10 — mức cơ bản bám việc thật + lab pipeline 5 cổng; bank `BLD-040…044`) |
 | 07 Shared libraries | ✅ Xong | static-vs-shared, linking-loading, abi-versioning, api-design |
 | 08 Embedded systems | ✅ Xong | architecture, boot-process, rtos-vs-linux, rtos-programming, bare-metal-c, memory-and-startup, interrupts-bare-metal, hardware-debug, constraints |
-| 09 Debugging | ✅ Xong | mindset, gdb, tools, memory-bugs, kernel-debugging |
+| 09 Debugging | ✅ Xong | mindset, gdb, tools, memory-bugs, kernel-debugging, **crash-analysis-workflow** (08/10 — bám luồng crash thật; bank `DBG-043/044` lab + `DBG-045`) |
 | 10 Thinking | ✅ Xong | problem-solving, system-design |
-| 11 Design patterns | ✅ Xong | **Viết lại toàn diện 09/09 theo hướng CHỌN LỌC** — 12 pattern bám việc thật (5 sở hữu · 7 biết), phần còn lại hạ xuống mức *nhận diện*; mỗi pattern có thẻ *bản chất · cái biến thiên · cái giá · đừng dùng khi*. Kèm 🎯 **`in-practice/`** — **tái cấu trúc 10/09 thành 🅰️ TIÊU CHUẨN (`libdisplay`, hệ thật đã khử nhạy cảm, có bộ từ vựng chuẩn) + 🅱️ CẢI TIẾN (vá đúng 5 điểm yếu)**, kèm pack code + 5 lab 🧪. Bank `DP` 20 → **39 câu**. **03/10: A1/B1 viết lại** theo kiến trúc PQ/DC + kernel `panel_ops` (nguồn sự thật: `shared_lib.md`, gitignore); bank `DP` → **47 câu**. **05–06/10:** thêm `DP-048` (hai khoá hai tầng), `DP-049` (atomic từng field không đủ cho vsync) → **49 câu**; sửa `DP-042` (backend không mỏng — người học phản bác đúng). **06/10:** thêm 🎓 **`essential-training.md`** — bản training chỉ gồm 9 pattern + nền đã dùng trong việc thật (nguồn A1+A2, chưa dùng B1/B2), mỗi pattern có ví dụ cơ bản đã compile + phần áp vào hệ thật |
+| 11 Design patterns | ✅ Xong | **Viết lại toàn diện 09/09 theo hướng CHỌN LỌC** — 12 pattern bám việc thật (5 sở hữu · 7 biết), phần còn lại hạ xuống mức *nhận diện*; mỗi pattern có thẻ *bản chất · cái biến thiên · cái giá · đừng dùng khi*. Kèm 🎯 **`in-practice/`** — **tái cấu trúc 10/09 thành 🅰️ TIÊU CHUẨN (`libdisplay`, hệ thật đã khử nhạy cảm, có bộ từ vựng chuẩn) + 🅱️ CẢI TIẾN (vá đúng 5 điểm yếu)**, kèm pack code + 5 lab 🧪. Bank `DP` 20 → **39 câu**. **03/10: A1/B1 viết lại** theo kiến trúc PQ/Panel Control + kernel `panel_ops` (nguồn sự thật: `shared_lib.md`, gitignore); bank `DP` → **47 câu**. **05–06/10:** thêm `DP-048` (hai khoá hai tầng), `DP-049` (atomic từng field không đủ cho vsync) → **49 câu**; sửa `DP-042` (backend không mỏng — người học phản bác đúng). **06/10:** thêm 🎓 **`essential-training.md`** — bản training chỉ gồm 9 pattern + nền đã dùng trong việc thật (nguồn A1+A2, chưa dùng B1/B2), mỗi pattern có ví dụ cơ bản đã compile + phần áp vào hệ thật. **08/10:** đổi từ vựng *Display Control → **Panel Control***, bỏ FRC/TCON; A1 §10 viết lại thành **bản kể 30″/90″ + bản đồ móc nền tảng**; **A1 §11** thêm `libdisplay_lab` build được (27 file, GoogleTest, thí nghiệm TSan bắt race vsync); A2 dời mã nguồn xuống **§8 phụ lục** |
 | 12 DSA | ✅ Xong | complexity-and-structures, algorithm-patterns, **ring-buffer** (bổ sung) |
 | 13 Networking | ✅ Xong | tcp-ip, sockets-and-protocols (bổ sung) |
 | 00 Glossary | ✅ Xong | tra cứu nhanh thuật ngữ (bổ sung) |
-| 14 Prep | 🟡 Đang dùng | **study-plans/** (**`resume-plan` đang chạy** từ 05/10 — 4 buổi R1–R4 bám resume, nghiêng C++ System SW; `datalogic-plan` đã **lưu trữ** vào `archive/` 03/10; + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
+| 14 Prep | 🟡 Đang dùng | **study-plans/** (**`resume-plan` đang chạy** từ 05/10 — R1–R4 bám resume + **R1′, R5 (CI), R6 (troubleshooting)** thêm 08/10, nghiêng C++ System SW; `datalogic-plan` đã **lưu trữ** vào `archive/` 03/10; + gap-register); **mock-interview/** (phỏng vấn thử `/mock` + **ngân hàng câu hỏi duy nhất** `bank/` + sessions/weak-register/coding-arena + coding-arena/reviewed git-track) |
 | 15 Book summaries | 🟡 Đang viết | **8 cuốn đã xong**, tất cả đối chiếu PDF (Effective Modern C++, OSTEP, LKD, MELP, cpp-concurrency, cpp-mindset, **cpp-high-performance** — đều "đọc trực tiếp PDF", neo trang/§, tự chứa); TLPI ✅ 10/10 cụm (đủ 64 chương); **cpp-high-performance là bản CHỌN LỌC 3/14 chương có chủ đích** (bỏ phần trùng EMC/Williams + ~30% là C++20 ngoài JD C++17); còn LDD3/Bootlin ⬜. Tiến độ chi tiết từng cuốn xem `15-book-summaries/README.md` |
 
 Ký hiệu: ✅ Xong · 🟡 Đang viết · ⬜ Chưa bắt đầu

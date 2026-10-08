@@ -17,7 +17,7 @@
 > - ⚠️ **`IDisplayBuilder` KHÔNG phải Builder pattern.** Nó là **Factory Method**. Nói sai tên ở phỏng vấn tệ hơn không nói.
 > - 🔴 **Ba vấn đề thật, đã đo bằng máy, không phỏng đoán:** (1) `getInstance()` có **data race** — TSan bắt được; (2) chèn một `virtual` vào giữa `IDisplay` ⟹ app gọi `setPower()` mà **destructor chạy**, exit 0, **không crash, không log**; (3) cái tên sai ở trên.
 > - Bài học lớn nhất: **qua ranh giới `.so`, vtable là ABI.** Thêm virtual **luôn** là ABI break — virtual-không-pure chỉ cho tương thích **mã nguồn**, không cho tương thích **nhị phân** (§2.1). Và version check bảo vệ được API **thiếu**, không bảo vệ được slot **bị đảo** (§3.3).
-> - 📦 **§6 — pack code hoàn chỉnh** (9 file, 301 dòng, build sạch `-Wall -Wextra`) đặt trong mục ẩn để copy sang máy khác: `HAL_layer` đang bị `.gitignore` nên không đi theo repo.
+> - 📦 **§6 — pack code hoàn chỉnh** (9 file, 301 dòng, build sạch `-Wall -Wextra`): §6 giải thích, **mã nguồn đầy đủ ở §8 — phụ lục cuối file** (đóng mở được). `HAL_layer` đang bị `.gitignore` nên không đi theo repo.
 > - 🧪 **§7 — 5 bài lab NGỒI MÁY** tái hiện đúng từng vấn đề trên, kèm **output thật đã chạy** để đối chiếu.
 
 ---
@@ -376,6 +376,281 @@ error: 'static void IDisplay::injectBuilder(IDisplayBuilder*)' is protected with
 Đây là **friendship hai chặng** — chạy đúng nhưng khá ngầm; ở phỏng vấn nói ra được là điểm cộng, còn trong code thật thì đáng một dòng comment (pack đã thêm).
 
 ### 6.4 Toàn bộ mã nguồn
+
+➡️ **Ở [§8 — Phụ lục](#8--phụ-lục--mã-nguồn-build-được-hoàn-chỉnh)** cuối file (một bản duy nhất, đóng mở được).
+
+---
+
+## 7. 🧪 Năm bài lab — NGỒI MÁY LÀM
+
+> **Cấu trúc bốn bước, giống bộ lab BSP** ([plan §🧪](../../14-prep/study-plans/archive/datalogic-plan.md)): ① **ĐỌC** cơ chế → ② **QUAN SÁT** nó chạy đúng → ③ **PHÁ có chủ đích** (⚠️ **viết dự đoán ra giấy TRƯỚC khi chạy**) → ④ **ĐỐI CHIẾU** với output thật bên dưới.
+>
+> Chỗ **dự đoán sai** chính là chỗ mô hình còn hổng — đó là toàn bộ giá trị của bài lab, không phải việc chạy được lệnh.
+>
+> **Yêu cầu:** `g++` (≥ 9), `cmake` ≥ 3.16, TSan (đi kèm gcc). Userspace thuần, **không cần root**. Mọi output dưới đây là **output thật đã chạy**, dán nguyên văn — không viết tay.
+
+| # | Bài | Phá cái gì | Vá lỗ hổng |
+|---|---|---|---|
+| 0 | Null Object | Giấu `.so` đi | §2.1 · `DP-028` |
+| 1 | Data race trong Singleton | Đưa `getInstance()` về dạng gốc | §3.2 · `DP-026` · `DP-002` (sổ yếu, regression 4→1) |
+| 2 | Self-registration & `-rdynamic` | Tắt `ENABLE_EXPORTS` | §1 · §4 · `DP-029` |
+| 3a | vtable ABI — chèn slot vào giữa | Đặt API mới **trước** destructor | §3.3 · `DP-027` |
+| 3b | vtable ABI — `.so` cũ thiếu slot | Build `.so` ở v1, app ở v2 | §2.1 · §3.3 |
+
+### Lab 0 — Null Object: khi `.so` biến mất
+
+**Phá:**
+```bash
+cd build/bin && mv libdisplay.so ../libdisplay.so.bak && ./hal_demo
+```
+
+**Dự đoán trước:** chương trình crash, hay chạy tiếp? Exit code mấy?
+
+<details><summary>Output thật + giải thích</summary>
+
+```
+loadlib FAILED: libdisplay.so -> libdisplay.so: cannot open shared object file: No such file or directory
+=> khong co impl, dung NULL OBJECT (moi API tra -ENOTSUP)
+
+-- API v1 (luon goi duoc) --
+setPower(true)      -> -95
+
+-- API v2 (PHAI kiem version truoc) --
+BO QUA: impl ABI v0 < v2, .so cu KHONG co slot nay.
+       Goi thang se doc qua cuoi vtable -> segfault (Lab 3).
+(exit=0)
+```
+
+**Đọc gì từ đây:** `-95` chính là `-ENOTSUP`. Không crash, **exit 0**, và caller **không phải viết một câu `if (p == nullptr)` nào**. Nếu `getInstance()` trả `nullptr` thì dòng `d->setPower(true)` đã segfault.
+
+`implAbiVersion()` trả `0` (không có builder) ⟹ nhánh v2 tự bỏ qua. Đây là **cùng một cơ chế** che cho cả hai ca: *không có `.so`* và *`.so` quá cũ*.
+
+**Khôi phục:** `mv ../libdisplay.so.bak libdisplay.so`
+</details>
+
+### Lab 1 — 🔴 Data race trong `getInstance()`
+
+**Phá:** trong `interface/IDisplay.cpp`, thay thân `getInstance()` bằng dạng gốc:
+```cpp
+IDisplay* IDisplay::getInstance() {
+    static IDisplay* p_instance = nullptr;          // <-- khởi tạo HẰNG: không sinh guard
+    if (p_instance == nullptr) {                    // <-- check-then-act
+        if (loadlib(libPath()) && builder) {
+            p_instance = builder->buildNewDisplayHandle();
+        } else {
+            p_instance = new (std::nothrow) IDisplay();
+        }
+    }
+    return p_instance;
+}
+```
+
+**Nhiệm vụ:**
+1. Build thường, chạy `./hal_demo --threads 8` khoảng 200 lần, đếm số lần `DisplayImpl ctor` xuất hiện **nhiều hơn một**.
+2. Build lại với TSan rồi chạy: `cmake -S . -B build_tsan -DHAL_TSAN=ON && cmake --build build_tsan -j4`
+3. `cd build_tsan/bin && HAL_DISPLAY_LIB=./libdisplay.so setarch -R ./hal_demo --threads 8`
+4. Khôi phục bản đã sửa, chạy lại **cả hai** phép đo.
+
+**Dự đoán trước:** race hiếm hay thường? Bao nhiêu phần trăm lần chạy sẽ hỏng?
+
+<details><summary>Output thật + giải thích</summary>
+
+**① Triệu chứng nhìn thấy được, KHÔNG cần sanitizer:**
+```
+so lan dung ctor NHIEU HON 1: 178 / 200
+```
+Một lần chạy hỏng điển hình:
+```
+loadlib OK: libdisplay.so
+DisplayImpl ctor  (fd=-1, ...)
+  [impl] setPower -> ON
+loadlib OK: libdisplay.so        ⬅️ dlopen LẦN HAI
+DisplayImpl ctor  (fd=-1, ...)   ⬅️ DỰNG OBJECT THỨ HAI -> RÒ 1 fd
+  [impl] setPower -> ON
+```
+
+⚠️ **178/200 — đây không phải bug "hiếm gặp".** Nhiều người mặc định race chỉ hiện 1/1000 lần; ở đúng đường khởi tạo, nó là **đa số**.
+
+**② TSan trên bản racy:**
+```
+WARNING: ThreadSanitizer: data race (pid=16742)
+    #0 IDisplay::getInstance() interface/IDisplay.cpp:53
+    #0 IDisplay::getInstance() interface/IDisplay.cpp:51
+  Location is global 'IDisplay::getInstance()::p_instance' of size 8
+SUMMARY: ThreadSanitizer: data race interface/IDisplay.cpp:53 in IDisplay::getInstance()
+```
+
+**③ Bản đã sửa, cùng phép đo:**
+```
+TSan, 8 luong           -> khong co dong ThreadSanitizer nao
+200 lan x 8 luong       -> so lan ctor KHAC 1 lan: 0 / 200
+```
+
+**④ Guard variable có thật không:**
+```bash
+g++ -std=c++17 -O1 -S -Iinterface interface/IDisplay.cpp -o - | grep cxa_guard
+```
+```
+	call	__cxa_guard_acquire@PLT
+	call	__cxa_guard_release@PLT
+	call	__cxa_guard_abort@PLT
+```
+
+**Đọc gì từ đây:** `static IDisplay* p = nullptr` là **constant initialization** ⟹ compiler **không sinh guard**. Chuyển sang khởi tạo động (lambda) ⟹ guard xuất hiện ⟹ hết race. Cùng chữ `static`, hai hành vi hoàn toàn khác nhau.
+
+**Bẫy môi trường:** TSan xung đột ASLR trên kernel ≥ 6.x ⟹ **bắt buộc** `setarch -R`. Và TSan chặn `dlopen` khiến `$ORIGIN` không bung ra ⟹ **bắt buộc** `HAL_DISPLAY_LIB=./libdisplay.so`.
+</details>
+
+### Lab 2 — Self-registration hỏng khi thiếu `-rdynamic`
+
+**Phá:** trong `CMakeLists.txt`, đổi `ENABLE_EXPORTS ON` → `OFF`, build thư mục mới rồi chạy.
+
+**Dự đoán trước:** hỏng lúc **build**, lúc **link**, lúc **`dlopen`**, hay lúc **gọi API**? Thông báo lỗi nhắc tới symbol nào?
+
+<details><summary>Output thật + giải thích</summary>
+
+Build vẫn **thành công, không một warning**. Chỉ khi chạy:
+```
+loadlib FAILED: libdisplay.so -> .../libdisplay.so: undefined symbol: _ZTI8IDisplay
+=> khong co impl, dung NULL OBJECT (moi API tra -ENOTSUP)
+
+-- API v1 (luon goi duoc) --
+setPower(true)      -> -95
+(exit=0)
+```
+
+**Đọc gì từ đây:**
+- `_ZTI8IDisplay` = **typeinfo for IDisplay** (thử `c++filt _ZTI8IDisplay`). Nó nằm trong **app**; `.so` cần nó để dựng vtable của `DisplayImpl`. Không có `-rdynamic` thì executable **không xuất** symbol đó ⟹ `dlopen` thất bại.
+- Lỗi **không phải** lúc build hay link — mũi tên phụ thuộc đi **ngược** (từ `.so` lên app) nên không công cụ tĩnh nào thấy trước.
+- ⭐ Và đây là chỗ hai pattern **cứu nhau**: self-registration hỏng, nhưng **Null Object** biến sự cố thành *"thiếu feature"* thay vì *"chết ngay lúc khởi động"*.
+
+**Khôi phục:** đổi lại `ENABLE_EXPORTS ON`.
+</details>
+
+### Lab 3a — 🔴 Chèn virtual vào giữa: chạy nhầm hàm, im lặng
+
+**Phá:** trong `interface/IDisplay.hpp`, chuyển `setBrightness` lên **trước** destructor:
+```cpp
+    virtual int setPower(bool onoff);
+    virtual int setBrightness(int nits);       // <-- PHÁ: chèn TRƯỚC destructor
+    virtual ~IDisplay();
+```
+
+**⚠️ Thao tác bắt buộc đúng thứ tự** — `add_dependencies(hal_demo display)` khiến `.so` cũng bị build lại, phải giữ bản cũ:
+```bash
+cmake --build build -j4                        # 1. build sạch ở trạng thái ĐÚNG
+cp build/bin/libdisplay.so /tmp/so_cu.so       # 2. GIỮ .so cũ lại
+#    3. sửa header như trên
+cmake --build build -j4                        # 4. build lại (cả app lẫn .so)
+cp /tmp/so_cu.so build/bin/libdisplay.so       # 5. TRẢ .so CŨ về -> lệch phiên bản
+cd build/bin && ./hal_demo
+```
+
+**Dự đoán trước:** ba câu, viết ra giấy trước khi chạy —
+① `setPower` còn đúng không? ② `setBrightness` sẽ làm gì? ③ **version check có chặn được không?**
+
+<details><summary>Output thật + giải thích</summary>
+
+```
+loadlib OK: $ORIGIN/libdisplay.so
+impl ABI version = 2 (interface = 2)      ⬅️ VERSION KHOP! check PASS
+DisplayImpl ctor  (fd=-1, ...)
+
+-- API v1 (luon goi duoc) --
+  [impl] setPower -> ON                   ⬅️ (1) VẪN ĐÚNG (slot 0 không đổi)
+setPower(true)      -> 0
+
+-- API v2 (PHAI kiem version truoc) --
+DisplayImpl dtor                          ⬅️ (2) gọi setBrightness mà DESTRUCTOR chạy
+setBrightness(200)  -> -1172642352        ⬅️ giá trị RÁC
+(exit=0)
+```
+
+**Đọc gì từ đây — ba điều, theo thứ tự quan trọng:**
+
+1. 🔴 **Version check PASS** (`2` và `2`) mà vẫn hỏng. Đây là bài học đắt nhất của cả tài liệu: **cơ chế version bảo vệ được API THIẾU, không bảo vệ được slot BỊ ĐẢO.** Hai bên cùng "v2" nhưng "v2" của mỗi bên có bố cục khác nhau.
+2. **Hỏng có CHỌN LỌC:** `setPower` vẫn chạy đúng vì nó vẫn ở slot 0. Chỉ hàm sau chỗ chèn mới lệch. Ngoài hiện trường điều này cực kỳ khó truy — "hầu hết mọi thứ vẫn chạy".
+3. **Không crash, exit 0.** Destructor chạy sớm ⟹ object thành zombie; mọi lời gọi sau đó là use-after-free. Triệu chứng có thể xuất hiện **rất xa** chỗ gây lỗi.
+
+Bản đồ slot (xác nhận bằng `g++ -fdump-lang-class`):
+
+| slot hàm | `.so` cũ | app mới | app gọi `setBrightness` → |
+|---|---|---|---|
+| 0 | `setPower` | `setPower` | — |
+| 1 | `~DisplayImpl` | **`setBrightness`** | 💥 **destructor** |
+| 2 | `~DisplayImpl` | `~IDisplay` | |
+| 3 | `setBrightness` | — | |
+
+**Khôi phục:** trả header về trạng thái cũ rồi `cmake --build build -j4`.
+</details>
+
+### Lab 3b — 🔴 `.so` cũ không có slot của API mới
+
+**Phá:** build `.so` ở **v1** (chưa có `setBrightness`), app ở **v2**.
+```bash
+cmake --build build -j4                                # trạng thái đúng
+#  hạ cấp TẠM THỜI về v1:
+#   - IDisplay.hpp : HAL_DISPLAY_ABI_VERSION -> 1u, xoá dòng khai báo setBrightness
+#   - IDisplay.cpp : xoá định nghĩa IDisplay::setBrightness
+#   - DisplayImpl.hpp/.cpp : xoá override + định nghĩa setBrightness
+cmake --build build --target display -j4
+cp build/bin/libdisplay.so /tmp/so_v1.so               # giữ .so v1
+#  khôi phục TOÀN BỘ về v2, build lại app:
+cmake --build build -j4
+cp /tmp/so_v1.so build/bin/libdisplay.so               # app v2 + .so v1
+cd build/bin && ./hal_demo                             # có kiểm tra version
+cd build/bin && ./hal_demo --force-v2                  # BỎ QUA kiểm tra version
+```
+
+**Dự đoán trước:** ① bản có version check in ra gì? ② bản `--force-v2` — trả `-ENOTSUP`, hay chuyện khác?
+
+<details><summary>Output thật + giải thích</summary>
+
+**① Có version check — an toàn:**
+```
+impl ABI version = 1 (interface = 2)      ⬅️ phát hiện lệch
+  [impl] setPower -> ON
+setPower(true)      -> 0
+
+-- API v2 (PHAI kiem version truoc) --
+BO QUA: impl ABI v1 < v2, .so cu KHONG co slot nay.
+(exit=0)
+```
+
+**② Bỏ qua version check:**
+```
+Segmentation fault (core dumped)
+(exit=139)
+```
+
+**Đọc gì từ đây — điểm đảo ngược trực giác phổ biến nhất:**
+
+Rất nhiều người (kể cả bản đầu của tài liệu này) tin rằng *"virtual không-pure ⟹ `.so` cũ tự rơi về bản base trả `-ENOTSUP`"*. **Sai.** Vtable của `DisplayImpl` được **phát ra bởi `.so`**, biên dịch từ header **v1** — nó chỉ có 3 slot hàm. App v2 gọi `setBrightness` = *"nhảy tới slot 3"* ⟹ **đọc quá cuối bảng** ⟹ segfault.
+
+| | Tương thích **nguồn** | Tương thích **nhị phân** |
+|---|---|---|
+| `.so` build lại với header mới, không sửa code | ✅ virtual-không-pure cho được | — |
+| `.so` **đã biên dịch từ trước** dùng luôn | ❌ **Không** | Phải có **version/capability check** từ v1 |
+
+⟹ Đây chính là lý do pack ở §6 đặt `abiVersion()` vào một interface bootstrap **đông cứng vĩnh viễn**: phải có **một** thứ không bao giờ đổi để hỏi "bên kia biết làm gì".
+</details>
+
+### 🧾 Bảng tự chấm
+
+Điền sau khi làm xong. Cột **"dự đoán đúng?"** mới là thứ đáng nhìn lại — không phải cột "chạy được".
+
+| Lab | Chạy được? | Dự đoán đúng? | Chỗ mô hình còn hổng |
+|---|---|---|---|
+| 0 — Null Object | ⬜ | ⬜ | |
+| 1 — Data race | ⬜ | ⬜ | |
+| 2 — `-rdynamic` | ⬜ | ⬜ | |
+| 3a — chèn slot giữa | ⬜ | ⬜ | |
+| 3b — `.so` thiếu slot | ⬜ | ⬜ | |
+
+## 8. 📦 Phụ lục — mã nguồn build được hoàn chỉnh
+
+> 9 file, build sạch `-Wall -Wextra`, nền cho 5 bài lab ở §7. Những gì khác so với bản gốc: §6.1 · cách build và output chuẩn: §6.2 · chi tiết `friend` hai chặng: §6.3.
+> Muốn xem **tầng dưới** (`lib_api_*`, PQ, Panel Control, panel driver) cũng build được: [A1 §11](A1-baseline-libdisplay.md).
 
 <details><summary><b>📦 Bấm để mở — 9 file, 301 dòng (CMake + interface + impl + main)</b></summary>
 
@@ -737,272 +1012,6 @@ int main(int argc, char** argv) {
 </details>
 
 ---
-
-## 7. 🧪 Năm bài lab — NGỒI MÁY LÀM
-
-> **Cấu trúc bốn bước, giống bộ lab BSP** ([plan §🧪](../../14-prep/study-plans/archive/datalogic-plan.md)): ① **ĐỌC** cơ chế → ② **QUAN SÁT** nó chạy đúng → ③ **PHÁ có chủ đích** (⚠️ **viết dự đoán ra giấy TRƯỚC khi chạy**) → ④ **ĐỐI CHIẾU** với output thật bên dưới.
->
-> Chỗ **dự đoán sai** chính là chỗ mô hình còn hổng — đó là toàn bộ giá trị của bài lab, không phải việc chạy được lệnh.
->
-> **Yêu cầu:** `g++` (≥ 9), `cmake` ≥ 3.16, TSan (đi kèm gcc). Userspace thuần, **không cần root**. Mọi output dưới đây là **output thật đã chạy**, dán nguyên văn — không viết tay.
-
-| # | Bài | Phá cái gì | Vá lỗ hổng |
-|---|---|---|---|
-| 0 | Null Object | Giấu `.so` đi | §2.1 · `DP-028` |
-| 1 | Data race trong Singleton | Đưa `getInstance()` về dạng gốc | §3.2 · `DP-026` · `DP-002` (sổ yếu, regression 4→1) |
-| 2 | Self-registration & `-rdynamic` | Tắt `ENABLE_EXPORTS` | §1 · §4 · `DP-029` |
-| 3a | vtable ABI — chèn slot vào giữa | Đặt API mới **trước** destructor | §3.3 · `DP-027` |
-| 3b | vtable ABI — `.so` cũ thiếu slot | Build `.so` ở v1, app ở v2 | §2.1 · §3.3 |
-
-### Lab 0 — Null Object: khi `.so` biến mất
-
-**Phá:**
-```bash
-cd build/bin && mv libdisplay.so ../libdisplay.so.bak && ./hal_demo
-```
-
-**Dự đoán trước:** chương trình crash, hay chạy tiếp? Exit code mấy?
-
-<details><summary>Output thật + giải thích</summary>
-
-```
-loadlib FAILED: libdisplay.so -> libdisplay.so: cannot open shared object file: No such file or directory
-=> khong co impl, dung NULL OBJECT (moi API tra -ENOTSUP)
-
--- API v1 (luon goi duoc) --
-setPower(true)      -> -95
-
--- API v2 (PHAI kiem version truoc) --
-BO QUA: impl ABI v0 < v2, .so cu KHONG co slot nay.
-       Goi thang se doc qua cuoi vtable -> segfault (Lab 3).
-(exit=0)
-```
-
-**Đọc gì từ đây:** `-95` chính là `-ENOTSUP`. Không crash, **exit 0**, và caller **không phải viết một câu `if (p == nullptr)` nào**. Nếu `getInstance()` trả `nullptr` thì dòng `d->setPower(true)` đã segfault.
-
-`implAbiVersion()` trả `0` (không có builder) ⟹ nhánh v2 tự bỏ qua. Đây là **cùng một cơ chế** che cho cả hai ca: *không có `.so`* và *`.so` quá cũ*.
-
-**Khôi phục:** `mv ../libdisplay.so.bak libdisplay.so`
-</details>
-
-### Lab 1 — 🔴 Data race trong `getInstance()`
-
-**Phá:** trong `interface/IDisplay.cpp`, thay thân `getInstance()` bằng dạng gốc:
-```cpp
-IDisplay* IDisplay::getInstance() {
-    static IDisplay* p_instance = nullptr;          // <-- khởi tạo HẰNG: không sinh guard
-    if (p_instance == nullptr) {                    // <-- check-then-act
-        if (loadlib(libPath()) && builder) {
-            p_instance = builder->buildNewDisplayHandle();
-        } else {
-            p_instance = new (std::nothrow) IDisplay();
-        }
-    }
-    return p_instance;
-}
-```
-
-**Nhiệm vụ:**
-1. Build thường, chạy `./hal_demo --threads 8` khoảng 200 lần, đếm số lần `DisplayImpl ctor` xuất hiện **nhiều hơn một**.
-2. Build lại với TSan rồi chạy: `cmake -S . -B build_tsan -DHAL_TSAN=ON && cmake --build build_tsan -j4`
-3. `cd build_tsan/bin && HAL_DISPLAY_LIB=./libdisplay.so setarch -R ./hal_demo --threads 8`
-4. Khôi phục bản đã sửa, chạy lại **cả hai** phép đo.
-
-**Dự đoán trước:** race hiếm hay thường? Bao nhiêu phần trăm lần chạy sẽ hỏng?
-
-<details><summary>Output thật + giải thích</summary>
-
-**① Triệu chứng nhìn thấy được, KHÔNG cần sanitizer:**
-```
-so lan dung ctor NHIEU HON 1: 178 / 200
-```
-Một lần chạy hỏng điển hình:
-```
-loadlib OK: libdisplay.so
-DisplayImpl ctor  (fd=-1, ...)
-  [impl] setPower -> ON
-loadlib OK: libdisplay.so        ⬅️ dlopen LẦN HAI
-DisplayImpl ctor  (fd=-1, ...)   ⬅️ DỰNG OBJECT THỨ HAI -> RÒ 1 fd
-  [impl] setPower -> ON
-```
-
-⚠️ **178/200 — đây không phải bug "hiếm gặp".** Nhiều người mặc định race chỉ hiện 1/1000 lần; ở đúng đường khởi tạo, nó là **đa số**.
-
-**② TSan trên bản racy:**
-```
-WARNING: ThreadSanitizer: data race (pid=16742)
-    #0 IDisplay::getInstance() interface/IDisplay.cpp:53
-    #0 IDisplay::getInstance() interface/IDisplay.cpp:51
-  Location is global 'IDisplay::getInstance()::p_instance' of size 8
-SUMMARY: ThreadSanitizer: data race interface/IDisplay.cpp:53 in IDisplay::getInstance()
-```
-
-**③ Bản đã sửa, cùng phép đo:**
-```
-TSan, 8 luong           -> khong co dong ThreadSanitizer nao
-200 lan x 8 luong       -> so lan ctor KHAC 1 lan: 0 / 200
-```
-
-**④ Guard variable có thật không:**
-```bash
-g++ -std=c++17 -O1 -S -Iinterface interface/IDisplay.cpp -o - | grep cxa_guard
-```
-```
-	call	__cxa_guard_acquire@PLT
-	call	__cxa_guard_release@PLT
-	call	__cxa_guard_abort@PLT
-```
-
-**Đọc gì từ đây:** `static IDisplay* p = nullptr` là **constant initialization** ⟹ compiler **không sinh guard**. Chuyển sang khởi tạo động (lambda) ⟹ guard xuất hiện ⟹ hết race. Cùng chữ `static`, hai hành vi hoàn toàn khác nhau.
-
-**Bẫy môi trường:** TSan xung đột ASLR trên kernel ≥ 6.x ⟹ **bắt buộc** `setarch -R`. Và TSan chặn `dlopen` khiến `$ORIGIN` không bung ra ⟹ **bắt buộc** `HAL_DISPLAY_LIB=./libdisplay.so`.
-</details>
-
-### Lab 2 — Self-registration hỏng khi thiếu `-rdynamic`
-
-**Phá:** trong `CMakeLists.txt`, đổi `ENABLE_EXPORTS ON` → `OFF`, build thư mục mới rồi chạy.
-
-**Dự đoán trước:** hỏng lúc **build**, lúc **link**, lúc **`dlopen`**, hay lúc **gọi API**? Thông báo lỗi nhắc tới symbol nào?
-
-<details><summary>Output thật + giải thích</summary>
-
-Build vẫn **thành công, không một warning**. Chỉ khi chạy:
-```
-loadlib FAILED: libdisplay.so -> .../libdisplay.so: undefined symbol: _ZTI8IDisplay
-=> khong co impl, dung NULL OBJECT (moi API tra -ENOTSUP)
-
--- API v1 (luon goi duoc) --
-setPower(true)      -> -95
-(exit=0)
-```
-
-**Đọc gì từ đây:**
-- `_ZTI8IDisplay` = **typeinfo for IDisplay** (thử `c++filt _ZTI8IDisplay`). Nó nằm trong **app**; `.so` cần nó để dựng vtable của `DisplayImpl`. Không có `-rdynamic` thì executable **không xuất** symbol đó ⟹ `dlopen` thất bại.
-- Lỗi **không phải** lúc build hay link — mũi tên phụ thuộc đi **ngược** (từ `.so` lên app) nên không công cụ tĩnh nào thấy trước.
-- ⭐ Và đây là chỗ hai pattern **cứu nhau**: self-registration hỏng, nhưng **Null Object** biến sự cố thành *"thiếu feature"* thay vì *"chết ngay lúc khởi động"*.
-
-**Khôi phục:** đổi lại `ENABLE_EXPORTS ON`.
-</details>
-
-### Lab 3a — 🔴 Chèn virtual vào giữa: chạy nhầm hàm, im lặng
-
-**Phá:** trong `interface/IDisplay.hpp`, chuyển `setBrightness` lên **trước** destructor:
-```cpp
-    virtual int setPower(bool onoff);
-    virtual int setBrightness(int nits);       // <-- PHÁ: chèn TRƯỚC destructor
-    virtual ~IDisplay();
-```
-
-**⚠️ Thao tác bắt buộc đúng thứ tự** — `add_dependencies(hal_demo display)` khiến `.so` cũng bị build lại, phải giữ bản cũ:
-```bash
-cmake --build build -j4                        # 1. build sạch ở trạng thái ĐÚNG
-cp build/bin/libdisplay.so /tmp/so_cu.so       # 2. GIỮ .so cũ lại
-#    3. sửa header như trên
-cmake --build build -j4                        # 4. build lại (cả app lẫn .so)
-cp /tmp/so_cu.so build/bin/libdisplay.so       # 5. TRẢ .so CŨ về -> lệch phiên bản
-cd build/bin && ./hal_demo
-```
-
-**Dự đoán trước:** ba câu, viết ra giấy trước khi chạy —
-① `setPower` còn đúng không? ② `setBrightness` sẽ làm gì? ③ **version check có chặn được không?**
-
-<details><summary>Output thật + giải thích</summary>
-
-```
-loadlib OK: $ORIGIN/libdisplay.so
-impl ABI version = 2 (interface = 2)      ⬅️ VERSION KHOP! check PASS
-DisplayImpl ctor  (fd=-1, ...)
-
--- API v1 (luon goi duoc) --
-  [impl] setPower -> ON                   ⬅️ (1) VẪN ĐÚNG (slot 0 không đổi)
-setPower(true)      -> 0
-
--- API v2 (PHAI kiem version truoc) --
-DisplayImpl dtor                          ⬅️ (2) gọi setBrightness mà DESTRUCTOR chạy
-setBrightness(200)  -> -1172642352        ⬅️ giá trị RÁC
-(exit=0)
-```
-
-**Đọc gì từ đây — ba điều, theo thứ tự quan trọng:**
-
-1. 🔴 **Version check PASS** (`2` và `2`) mà vẫn hỏng. Đây là bài học đắt nhất của cả tài liệu: **cơ chế version bảo vệ được API THIẾU, không bảo vệ được slot BỊ ĐẢO.** Hai bên cùng "v2" nhưng "v2" của mỗi bên có bố cục khác nhau.
-2. **Hỏng có CHỌN LỌC:** `setPower` vẫn chạy đúng vì nó vẫn ở slot 0. Chỉ hàm sau chỗ chèn mới lệch. Ngoài hiện trường điều này cực kỳ khó truy — "hầu hết mọi thứ vẫn chạy".
-3. **Không crash, exit 0.** Destructor chạy sớm ⟹ object thành zombie; mọi lời gọi sau đó là use-after-free. Triệu chứng có thể xuất hiện **rất xa** chỗ gây lỗi.
-
-Bản đồ slot (xác nhận bằng `g++ -fdump-lang-class`):
-
-| slot hàm | `.so` cũ | app mới | app gọi `setBrightness` → |
-|---|---|---|---|
-| 0 | `setPower` | `setPower` | — |
-| 1 | `~DisplayImpl` | **`setBrightness`** | 💥 **destructor** |
-| 2 | `~DisplayImpl` | `~IDisplay` | |
-| 3 | `setBrightness` | — | |
-
-**Khôi phục:** trả header về trạng thái cũ rồi `cmake --build build -j4`.
-</details>
-
-### Lab 3b — 🔴 `.so` cũ không có slot của API mới
-
-**Phá:** build `.so` ở **v1** (chưa có `setBrightness`), app ở **v2**.
-```bash
-cmake --build build -j4                                # trạng thái đúng
-#  hạ cấp TẠM THỜI về v1:
-#   - IDisplay.hpp : HAL_DISPLAY_ABI_VERSION -> 1u, xoá dòng khai báo setBrightness
-#   - IDisplay.cpp : xoá định nghĩa IDisplay::setBrightness
-#   - DisplayImpl.hpp/.cpp : xoá override + định nghĩa setBrightness
-cmake --build build --target display -j4
-cp build/bin/libdisplay.so /tmp/so_v1.so               # giữ .so v1
-#  khôi phục TOÀN BỘ về v2, build lại app:
-cmake --build build -j4
-cp /tmp/so_v1.so build/bin/libdisplay.so               # app v2 + .so v1
-cd build/bin && ./hal_demo                             # có kiểm tra version
-cd build/bin && ./hal_demo --force-v2                  # BỎ QUA kiểm tra version
-```
-
-**Dự đoán trước:** ① bản có version check in ra gì? ② bản `--force-v2` — trả `-ENOTSUP`, hay chuyện khác?
-
-<details><summary>Output thật + giải thích</summary>
-
-**① Có version check — an toàn:**
-```
-impl ABI version = 1 (interface = 2)      ⬅️ phát hiện lệch
-  [impl] setPower -> ON
-setPower(true)      -> 0
-
--- API v2 (PHAI kiem version truoc) --
-BO QUA: impl ABI v1 < v2, .so cu KHONG co slot nay.
-(exit=0)
-```
-
-**② Bỏ qua version check:**
-```
-Segmentation fault (core dumped)
-(exit=139)
-```
-
-**Đọc gì từ đây — điểm đảo ngược trực giác phổ biến nhất:**
-
-Rất nhiều người (kể cả bản đầu của tài liệu này) tin rằng *"virtual không-pure ⟹ `.so` cũ tự rơi về bản base trả `-ENOTSUP`"*. **Sai.** Vtable của `DisplayImpl` được **phát ra bởi `.so`**, biên dịch từ header **v1** — nó chỉ có 3 slot hàm. App v2 gọi `setBrightness` = *"nhảy tới slot 3"* ⟹ **đọc quá cuối bảng** ⟹ segfault.
-
-| | Tương thích **nguồn** | Tương thích **nhị phân** |
-|---|---|---|
-| `.so` build lại với header mới, không sửa code | ✅ virtual-không-pure cho được | — |
-| `.so` **đã biên dịch từ trước** dùng luôn | ❌ **Không** | Phải có **version/capability check** từ v1 |
-
-⟹ Đây chính là lý do pack ở §6 đặt `abiVersion()` vào một interface bootstrap **đông cứng vĩnh viễn**: phải có **một** thứ không bao giờ đổi để hỏi "bên kia biết làm gì".
-</details>
-
-### 🧾 Bảng tự chấm
-
-Điền sau khi làm xong. Cột **"dự đoán đúng?"** mới là thứ đáng nhìn lại — không phải cột "chạy được".
-
-| Lab | Chạy được? | Dự đoán đúng? | Chỗ mô hình còn hổng |
-|---|---|---|---|
-| 0 — Null Object | ⬜ | ⬜ | |
-| 1 — Data race | ⬜ | ⬜ | |
-| 2 — `-rdynamic` | ⬜ | ⬜ | |
-| 3a — chèn slot giữa | ⬜ | ⬜ | |
-| 3b — `.so` thiếu slot | ⬜ | ⬜ | |
 
 ## Câu hỏi phỏng vấn liên quan
 

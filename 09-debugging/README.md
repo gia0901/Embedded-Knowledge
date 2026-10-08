@@ -30,6 +30,7 @@ flowchart TD
 | 3 | [tools.md](tools.md) | strace/ltrace, perf, ltrace, /proc, logging, profiling | ✅ |
 | 4 | [memory-bugs.md](memory-bugs.md) | leak, corruption, UAF, sanitizers (ASan/UBSan/TSan), valgrind | ✅ |
 | 5 | [kernel-debugging.md](kernel-debugging.md) | printk/dmesg, oops/panic, ftrace, kgdb, dynamic debug | ✅ |
+| 6 | [crash-analysis-workflow.md](crash-analysis-workflow.md) | **Bám luồng xử lý crash thật:** ba tình huống debug/release/không boot · từ địa chỉ tới dòng code (offset · symbol khớp image · địa chỉ trả về) · 🧪 lab `addr2line` từ log release · 🧪 lab coredump đầu tiên bằng gdb · phía kernel `hàm+0xoff/0xsize` | ✅ |
 
 ## Thứ tự đọc gợi ý
 `mindset` (nền tảng tư duy) → `gdb` → `tools` → `memory-bugs` → `kernel-debugging`.

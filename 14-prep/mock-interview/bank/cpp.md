@@ -1743,8 +1743,6 @@ Lợi: buộc khởi tạo, tránh chuyển kiểu ngầm/thu hẹp ngoài ý, g
 **`= delete` khác cách cũ (khai báo private không định nghĩa) thế nào?**
 <details><summary>Đáp án</summary>
 
-> ⚠️ *Sửa 2026-10-05:* bản cũ của đáp án này ghi *"cách cũ chỉ lỗi lúc link (hoặc runtime với friend/member)"*. Câu đó **sai và gây nhầm**: gọi từ ngoài là lỗi **compile**, còn "runtime" thì không bao giờ xảy ra. Ứng viên đảo chiều compile/link **3 lần liên tiếp** (10/08 → 04/09 → 05/10), rất có thể vì ôn đúng câu sai này.
-
 **Cơ chế — cách cũ (C++98) đi qua HAI cửa kiểm tra, mỗi cửa bắt một nhóm người gọi:**
 
 1. **Cửa 1 · compile, access check:** hàm là `private` ⟹ code **ngoài class** gọi vào bị chặn ngay.

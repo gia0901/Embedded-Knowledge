@@ -625,7 +625,7 @@ Ký = **hash nội dung** rồi **ký hash bằng khoá riêng**; thiết bị g
 
 ## 🧪 J — LAB NGỒI MÁY (BeagleBone Black)
 
-> **Bộ 8 bài thực hành trên phần cứng thật**, thêm 2026-08-27. Khác bộ [🧪 DBG-030…036](debugging.md) ở **cấu trúc**, và khác có chủ đích:
+> **Bộ 8 bài thực hành trên phần cứng thật.** Khác bộ [🧪 DBG-030…036](debugging.md) ở **cấu trúc**, và khác có chủ đích:
 >
 > | | DBG lab | **BSP lab (bộ này)** |
 > |---|---|---|

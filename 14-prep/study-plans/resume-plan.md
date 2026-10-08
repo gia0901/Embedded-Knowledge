@@ -5,6 +5,8 @@
 > **Nguồn sự thật cho phần kiến trúc:** [A1 — `libdisplay`](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) (hệ thật đã khử nhạy cảm) và [A2 — C++ interface/HAL](../../11-design-patterns/in-practice/A2-cpp-interface-hal.md). Tư liệu nội bộ còn tên thật (`shared_lib.md`) bị `.gitignore`: **không trích tên nào từ đó vào plan, bank, log**.
 >
 > Viết 2026-10-05. Khuôn: [study-plans/README](README.md) · plan trước đã lưu trữ: [datalogic-plan](archive/datalogic-plan.md).
+>
+> **Chiến lược kể** (luật ⑤ ở [§1](#1-năm-luật-của-plan)): **người không làm TV vẫn hiểu** — library = **Picture Quality + Panel Control**, kernel = **panel driver** · **kể ngắn trước, mở dần** · mỗi câu **thả một móc** vào kiến thức nền · chỉ ôn **ở mức hiểu cơ bản** những gì đã làm. Ngoài R1–R4 bám resume còn **R1′** (kể kiến trúc theo chiến lược này), **R5** (CI · unit test · code quality) và **R6** (troubleshooting), mỗi buổi kèm tài liệu + lab.
 
 ---
 
@@ -18,39 +20,42 @@
 | | |
 |---|---|
 | **Mục tiêu** | Trả lời được **mọi dòng** của resume tới tầng T2, nghiêng C++ System SW. Không có hạn chót cứng |
-| **Ngân sách** | **4 buổi × ~105′** — mỗi buổi: **đọc ~30′** + **mock chính ~60′** (12 câu, trần T2) + **⚡ rapid pool ~15′** (phiên riêng, 7–10 câu) |
+| **Ngân sách** | **R1–R4 × ~105′** (đọc ~30′ + mock chính ~60′, 12 câu + ⚡ rapid pool ~15′) · **R1′, R5, R6 × ~90′** (đọc/lab ~30′ + mock ~60′) |
 | **Ngôn ngữ** | Tiếng Việt, **có vòng tiếng Anh** (R1 câu 12 · R4 câu 9 và 12) |
 | **Buổi gần nhất** | ✅ **R1-rapid — 2026-10-06**, 15/24 = **2.50**, 6 câu chấm + 1 bỏ (`DP-021` ngoài phạm vi) ([log](../mock-interview/sessions/2026-10-06--R1-rapid--pool.md)) · trước đó R1 mock chính 2.33 ([log](../mock-interview/sessions/2026-10-06--R1--kien-truc.md)) |
-| ▶️ **Phiên kế** | **R2 mock chính** ([§4](#4-r2--ranh-giới-c-interface--so-a2)), rồi R2-rapid |
+| ▶️ **Phiên kế** | **R1′ — kể kiến trúc theo luật ⑤** ([§11](#11-r1--kể-kiến-trúc-theo-chiến-lược-hiện-tại)), rồi R2 |
 | **Chẩn đoán mang vào** | **R1 (06/10):** hiểu hệ thật **sâu hơn tài liệu** (sửa được bank `DP-042`, đọc đúng race vsync trong code thật), nhưng **chưa bảo vệ được quyết định thiết kế**: biết *cái gì*, chưa nói được *vì sao chọn phương án này thay vì phương án kia*. Vẫn mẫu **T1 ổn, T2 hụt**. Phiên [rapid 05/10](../mock-interview/sessions/2026-10-05--rapid--cpp-system.md) 2.36: hệ quả cơ học thì đoán (R1 lặp lại ở `DP-043`) |
 | 🔴 **Rủi ro lớn nhất** | [`RES-001`](../mock-interview/bank/resume.md) **trượt 5 lần** — thời lượng đã vào trần, còn **câu có/không** ở cuối và **kết quả không đo được** · [`RES-034`](../mock-interview/bank/resume.md) sang tiếng Anh **ba ranh giới co còn một**. Cả hai là lỗi **đóng gói** ⇒ chữa bằng nói to + bấm giờ + chiến thuật ở [§10](#10--chiến-thuật-trả-lời--rút-ra-từ-r1-0610) |
 
-### ▶️ LÀM TIẾP — 4 buổi, chạy đúng thứ tự
+### ▶️ LÀM TIẾP — chạy đúng thứ tự
 
 | # | Buổi | Trục | ~ | Mock chính | ⚡ Rapid pool |
 |---|---|---|---|---|---|
-| **R1** | 🗣️ **Kể kiến trúc** | Câu mở màn · ba ranh giới · PQ/DC · Bridge · `panel_ops` — [§3](#3-r1--kể-kiến-trúc-a1) | 105′ | ✅ **2.33** ([06/10](../mock-interview/sessions/2026-10-06--R1--kien-truc.md)) | ✅ **2.50** ([06/10](../mock-interview/sessions/2026-10-06--R1-rapid--pool.md)) |
+| **R1** | 🗣️ **Kể kiến trúc** | Câu mở màn · ba ranh giới · PQ/Panel Control · Bridge · `panel_ops` — [§3](#3-r1--kể-kiến-trúc-a1) | 105′ | ✅ **2.33** ([06/10](../mock-interview/sessions/2026-10-06--R1--kien-truc.md)) | ✅ **2.50** ([06/10](../mock-interview/sessions/2026-10-06--R1-rapid--pool.md)) |
+| **R1′** | 🔁 **Kể kiến trúc — làm lại** | Bản 30″/90″ · móc nền tảng ở mức cơ bản · người không làm TV vẫn hiểu — [§11](#11-r1--kể-kiến-trúc-theo-chiến-lược-hiện-tại) | 90′ | ⬜ | — |
 | **R2** | 🔩 **Ranh giới C++ interface / `.so`** | ABI · vtable · Singleton & race · Null Object · ownership — [§4](#4-r2--ranh-giới-c-interface--so-a2) | 105′ | ⬜ | ⬜ |
 | **R3** | 🧵 **S-Box & nhiều process** | Thread 60 Hz + condvar · sensor · POSIX mq · shm + semaphore — [§5](#5-r3--s-box-thread-60-hz-sensor-mq-nhiều-process) | 105′ | ⬜ | ⬜ |
 | **R4** | 🧭 **Phần còn lại + tiếng Anh** | Preset · porting/AI · load-time · migration · debug · 🇬🇧 — [§6](#6-r4--phần-còn-lại-của-resume--tiếng-anh) | 105′ | ⬜ | ⬜ |
+| **R5** | ⚙️ **CI · unit test · code quality** | Pipeline nhìn từ người dùng · GoogleTest/KUnit · coverage · các cổng chất lượng · 🧪 lab pipeline 5 cổng — [§12](#12-r5--ci--unit-test--code-quality) | 90′ | ⬜ | — |
+| **R6** | 🔎 **Troubleshooting** | Ba tình huống crash · `addr2line` · coredump bằng gdb · oops · log — [§13](#13-r6--troubleshooting) | 90′ | ⬜ | — |
 
-**Nhãn cột *Nguồn*:** `mới` = chưa từng hỏi · `đã hỏi` = từng hỏi ở phiên trước và đạt ⟹ **hỏi lại bình thường như câu mới** (luật ④ ở [§1](#1-bốn-luật-của-plan)) · `🔴 weak` / `🔁 retention` = theo lệnh *"Lần sau hỏi"* ở weak-register.
+**Nhãn cột *Nguồn*:** `mới` = chưa từng hỏi · `đã hỏi` = từng hỏi ở phiên trước và đạt ⟹ **hỏi lại bình thường như câu mới** (luật ④ ở [§1](#1-năm-luật-của-plan)) · `🔴 weak` / `🔁 retention` = theo lệnh *"Lần sau hỏi"* ở weak-register.
 
-**Gọi phiên:** gõ `/mock`. Interviewer đọc block này và đề xuất phiên kế tiếp theo thứ tự **R1 → R1-rapid → R2 → R2-rapid → …**; danh sách câu nằm ở mục tương ứng bên dưới.
+**Gọi phiên:** gõ `/mock`. Interviewer đọc block này và đề xuất phiên kế tiếp theo thứ tự **R1′ → R2 → R2-rapid → R3 → R3-rapid → R4 → R4-rapid → R5 → R6**; danh sách câu nằm ở mục tương ứng bên dưới. R5 và R6 không phụ thuộc R2–R4, đổi thứ tự được nếu cần.
 
 **⚡ Rapid pool — vì sao có, chạy thế nào:** mục tiêu của plan là **phủ đủ** (luật ④), mà mỗi buổi có 7–10 câu liên quan **không** chen được vào 12 câu chính. Đọc mà không bị hỏi thì không biết có nói ra được không ⟹ quét chúng bằng một phiên `rapid` **tách riêng**, chạy ngay sau mock chính (config cấm trộn rapid vào phiên sâu). Luật của rapid: hỏi thẳng đề bank, ~1 phút/câu, **tối đa 1 probe**, chấm theo [thang rapid](../mock-interview/config.md) — chỉ đo **lõi T1** (ý *Chốt* của đáp án, hoặc khung 60″ với câu `RES` 🏗️), không đào. Câu ≤ 2 vào weak-register phải ghi rõ lỗ hổng **DIỄN ĐẠT** hay **KIẾN THỨC**. Log: `YYYY-MM-DD--R<n>-rapid--pool.md`. Câu weak và retention hỏi theo dạng **Ⓖ/Ⓑ** ghi ở cột *"Lần sau hỏi"* của [weak-register](../mock-interview/weak-register.md). Plan **không** chép lại các lệnh đó.
 
-### ⏭️ Trước R2 — 3 việc, ~30′
+### ⏭️ Trước R1′ — 3 việc, ~30′
 
 | # | Việc | ~ | Vì sao |
 |---|---|---|---|
-| 1 | Đọc bank [`DP-038`](../mock-interview/bank/design-patterns.md) **bản nâng cấp 06/10** — hai phép thử *"bỏ phần được cắm vào"* và *"mấy trục biến thiên"*, áp lên `lib_dimming` / `IDimmingAlgo` / `IDimmingBackend`. Rồi **nói to** câu chốt | 10′ | Bridge vs Strategy hụt **hai phiên liền** (`DP-023` ở R1, `DP-038` ở R1-rapid): thuộc chữ, chưa hiểu |
-| 2 | Đọc [A1 §7.1](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) (Service Locator, khởi tạo trong `__attribute__((constructor))`) + [A2 §3.2](../../11-design-patterns/in-practice/A2-cpp-interface-hal.md) (race trong `getInstance()`). Viết **một câu** so sánh: *vì sao A1 không race mà A2 race?* | 10′ | `DP-041` hụt đúng chỗ này, và R2 câu 1, 5 hỏi tiếp vào nó |
-| 3 | Đọc bank [`SD-022`](../mock-interview/bank/system-design.md) — bảng **quy tắc ở biên giới C** — và phần *"chỉ xoá `extern "C"`"* trong [`DP-040`](../mock-interview/bank/design-patterns.md) | 10′ | R2 là buổi ranh giới `.so`; `SD-022` hụt vế quy tắc |
+| 1 | 🎙️ Đọc to **bản 30 giây** ở [A1 §10.1](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) đến khi **thuộc nguyên văn**; rồi nói **bản 90 giây** (§10.2) **bằng lời của mình**. Ghi âm, kiểm: không FRC/TCON, câu cuối của bản 30″ là câu trao quyền | 10′ | Câu mở chính của R1′ ([`RES-035`](../mock-interview/bank/resume.md)) |
+| 2 | Đọc [whiteboard D0](../whiteboard.md) — *"hai câu hỏi về một tấm panel"* + mini-glossary 5 từ | 5′ | [`RES-007`](../mock-interview/bank/resume.md) đã viết lại theo khung này |
+| 3 | Đi qua bảng **móc nền tảng** [A1 §10.3](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md): mỗi dòng, tự nói **một câu cơ bản** về phần nền (vd *"`extern "C"` tắt name mangling nên tên symbol ổn định"*). Dòng nào không nói được ⟹ mở câu bank ở cột cuối | 15′ | R1′ hỏi đúng vào các móc này, ở mức cơ bản |
 
 ---
 
-## 1. Bốn luật của plan
+## 1. Năm luật của plan
 
 | # | Luật | Thi hành |
 |---|---|---|
@@ -58,6 +63,7 @@
 | ② | **Khử nhạy cảm.** Chỉ dùng tên trong A1/A2 (`libdisplay`, `lib_api_*`, `IDimmingAlgo`, `panel_ops`…) | Áp cho plan, bank, log phiên, và **cho chính câu trả lời của bạn** khi luyện |
 | ③ | **Nói to, bấm giờ.** Câu resume là câu **nói**, viết ra giấy không tính | Mỗi câu 🏗️: ≤ 90 giây cho câu trả lời đầu, rồi mới tới follow-up |
 | ④ | **Phủ trước, mới lạ sau.** Mục tiêu của plan là **phủ đủ nội dung resume**, không phải tránh lặp. Câu đã hỏi và đạt được **hỏi lại bình thường**: đúng đề bank, phần nền hỏi đủ, follow-up ≥ 1, chấm như câu mới ([config §6 luật ①](../mock-interview/config.md)). Không tung đồng xu, không cần đổi góc, follow-up cũ dùng lại được | Không trái config: luật Ⓖ/Ⓑ ở config §6 → 🔁 chỉ áp cho câu **weak** và **retention**. Câu weak/retention trong plan vẫn theo weak-register. Câu đã hỏi mà lần này ≤ 2 điểm ⟹ vào weak-register như mọi câu khác (**regression**) |
+| ⑤ | **Người ngoài ngành vẫn hiểu · kể ngắn trước · móc nền tảng · mức cơ bản.** Không FRC/TCON; library = Picture Quality + Panel Control; kernel = panel driver. Dimming chỉ kể *"thuật toán + backend điều khiển phần cứng"* — chi tiết backend nhân theo chip × thuật toán là **câu dự phòng** ([A1 §10.4](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)) | Interviewer **không đào** chi tiết backend. Ở R1′, R5, R6: trần **T1 + một chút T2**; tên công cụ, flag, plugin là T3 — **không chấm**. Câu hỏi vào kiến thức nền chỉ đi theo **móc đã thả** ở bản kể ([A1 §10.3](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)) |
 
 ---
 
@@ -94,7 +100,7 @@
 
 ### 📖 Đọc (~30′)
 
-- [A1](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) **§2** (sơ đồ) · **§3** (narrow waist, 3.3 hai lý do) · **§4.1, §4.4** (PQ/DC, cố ý không pattern) · **§5.0, §5.4, §5.6, §5.7** · **§6.3** (bảng hai tầng) · **§7.2** · **§9** (5 điểm yếu) · **§10** (bản nói 75″ — **đọc to**)
+- [A1](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) **§2** (sơ đồ) · **§3** (narrow waist, 3.3 hai lý do) · **§4.1, §4.4** (PQ/Panel Control, cố ý không pattern) · **§5.0, §5.4, §5.6, §5.7** · **§6.3** (bảng hai tầng) · **§7.2** · **§9** (5 điểm yếu) · **§10** (bản nói 75″ — **đọc to**)
 - Bank: khung `RES-001` Bản C · `RES-034` bản mẫu tiếng Anh
 
 ### 🎤 Mock — 12 câu, ~60′
@@ -114,17 +120,16 @@
 | 11 | `DP-046` | 5 điểm yếu — làm lại thì sửa cái nào trước | mới | Xếp theo **rủi ro**, không phải *"làm lại hết"* |
 | 12 | `RES-034` 🇬🇧 | *"Walk me through the architecture…"* | mới | ≤ 90″, ba ranh giới phải còn đủ ba |
 
-### ⚡ R1-rapid — 6 câu, ~10′ *(gỡ `DP-021` ngày 06/10)*
+### ⚡ R1-rapid — 6 câu, ~10′
 
 | # | ID | Câu (tóm tắt) | Nối với |
 |---|---|---|---|
-| 1 | `RES-007` | Dimming / FRC / TCON cho người ngoài ngành | Core 1 — PQ (dimming, frame-rate, timing) |
+| 1 | `RES-007` | Picture quality và panel control — giải thích cho người ngoài ngành | Core 1 — Picture Quality + Panel Control |
 | 2 | `DP-038` | Bridge giải gì, khác Strategy chỗ nào khi code giống hệt | R1 câu 5–6 (Bridge) |
 | 3 | `DP-037` | Factory Method vs Abstract Factory | R1 câu 7 (`DP-022`) |
 | 4 | `DP-041` | Library nạp vào 5 process — mấy object, mấy state | A1 §7.2 · phiên 05/10 câu 12 |
 | 5 | `SD-022` | Vì sao library hệ thống phơi C API | R1 câu 3 (`DP-040`) |
 | 6 | `RES-003` | Bảng con trỏ hàm trong kernel ≈ cái gì của C++ | R1 câu 9–10 |
-| ~~7~~ | ~~`DP-021`~~ | ~~Dimming chia theo thuật toán, video enhancement chia theo chip~~ | 🚫 **Gỡ 06/10:** người học không làm video enhancement ⟹ ngoài bán kính resume (luật ①). Không chấm |
 
 ---
 
@@ -143,7 +148,7 @@
 | # | ID | Câu (tóm tắt) | Nguồn | Ghi chú cho interviewer |
 |---|---|---|---|---|
 | 1 | `DP-002` | Singleton | 🔴 weak | Theo weak-register (Ⓑ có **viết code**, ~5′) |
-| 2 | `CPP-045` | `= delete` vs private cũ | 🔴 weak | **Bank đã sửa 05/10** — kiểm ứng viên đã đọc bản mới |
+| 2 | `CPP-045` | `= delete` vs private cũ | 🔴 weak | Kiểm đúng chiều: người ngoài chết lúc compile, member/friend chết lúc link |
 | 3 | `CPP-009` | Template ở header / trong `.so` | 🔁 retention (quá hạn) | Dạng **Ⓖ** (mọi góc cũ tính là Ⓑ) |
 | 4 | `DP-025` | `IDisplayBuilder` — Builder hay Factory Method | mới | |
 | 5 | `DP-026` | Đọc `getInstance()` — race ở đâu, vì sao `static` không cứu | mới | Nối thẳng DP-002 câu 1 |
@@ -266,7 +271,7 @@
 
 | Phần | Vì sao để ngoài | Nếu muốn ôn |
 |---|---|---|
-| Video enhancement (`DP-021`) | Người học **không làm** phần này (góp ý 06/10) ⟹ ngoài bán kính resume | — |
+| Video enhancement (`DP-021`) | Người học **không làm** phần này ⟹ ngoài bán kính resume | — |
 | Device tree, I2C/SPI của sensor (`RES-010`, `RES-024`), Yocto (`RES-012`) | Nghiêng BSP; plan chọn trọng số C++ System SW. Resume hiện tại đã bỏ Yocto | `/mock daily track bsp` |
 | C thuần trên giấy (domain `C`, phủ 10%) | Không bám một dòng resume cụ thể; đã đo là yếu ở phiên 05/10 | Xen `/mock rapid track c` giữa các buổi |
 | Symbol interposition / `-fvisibility` (`DP-020`) | Phần tên cờ là T3 (calibration 05/10); `DP-002` còn ở 2 điểm ⇒ [config §6 luật ④](../mock-interview/config.md): chưa lên T2 | Sau khi `DP-002` ≥ 3 |
@@ -308,3 +313,93 @@ Bảng 🔁 của weak-register có **8 câu hạn 18–23/09**, chưa hỏi. Pl
 | 7 | **Mở màn:** vấn đề bằng **một hình ảnh**, kết quả bằng **thứ đo được**, câu cuối là *"anh muốn nghe kỹ phần nào?"* — **không** phải câu có/không. Không nói *"em được giao"*; nói phần **mình tự quyết định** | `RES-001` |
 | 8 | **Câu quyết định thiết kế** trả lời theo mẫu: *"Phương án kia **cho phép** lỗi X; phương án này làm X **không viết ra được**, vì Y."* | `DP-022` · `DP-040` |
 | 9 | **Câu cơ học (slot, layout, ABI):** vẽ **hai layout cạnh nhau, đánh số slot**, rồi mới trả lời | `DP-043` |
+
+---
+
+## 11. R1′ — kể kiến trúc theo chiến lược hiện tại
+
+**Câu hỏi của buổi:** *"Kể kiến trúc library bạn làm"* — nhưng lần này đo ba thứ khác R1: **kể ngắn đúng 30 giây** · **người không làm TV hiểu được** · **mỗi móc vừa thả có đỡ được ở mức cơ bản không**. Không đào chi tiết backend, không hỏi thiết kế lại (đã có ở R1 và weak-register).
+
+### 📖 Đọc (~30′) — xem *"Trước R1′"* ở §📍
+
+### 🎤 Mock — 12 câu, ~60′, trần T1 + một chút T2
+
+| # | ID | Câu (tóm tắt) | Nguồn | Móc / ghi chú cho interviewer |
+|---|---|---|---|---|
+| 1 | `RES-001` | Giới thiệu + project tâm đắc | 🔴 weak | Theo weak-register. Câu cuối **không** được là câu có/không |
+| 2 | `RES-007` | Picture quality và panel control — giải thích cho người ngoài ngành | 🔴 weak | Hai câu hỏi về một tấm panel; có câu nối sang kiến trúc |
+| 3 | `RES-035` | Kể kiến trúc — bản 30″, rồi *"kể thêm"* sang bản 90″ | mới | Chấm: đủ ba ranh giới · câu trao quyền · không FRC/TCON |
+| 4 | `DP-040` | Vì sao giữa hai vùng C++ lại là API C | 🔴 weak | Móc *"API C"*. Mức cơ bản: ABI + **chỗ duy nhất lấy khoá** |
+| 5 | `CPP-006` | Đa hình runtime hoạt động thế nào (vtable/vptr) | đã hỏi | Móc *"C++ interface"* |
+| 6 | `OS-007` | Mutex vs semaphore | 🔁 retention | Móc *"lấy khoá"*. Dẫn sang câu 7 |
+| 7 | `LNX-045` | Process chết khi giữ named semaphore của library | mới | Móc *"shared memory + khoá"*. Mức cơ bản: semaphore **không có chủ** |
+| 8 | `DP-041` | Library nạp vào 5 process — mấy object, mấy state, vì sao khởi tạo không race | 🔴 weak | Móc *"tự khởi tạo khi được nạp"* |
+| 9 | `DRV-006` | Vì sao driver không đọc thẳng con trỏ user | mới | Móc *"ioctl xuống kernel"* |
+| 10 | `DP-043` | `panel_ops` vs `virtual` — hai rủi ro | 🔴 weak | Móc *"bảng con trỏ hàm"*. Có output thật ở bank |
+| 11 | `DP-038` | Bridge giải gì, khác Strategy chỗ nào | 🔴 weak | Móc *"tách thuật toán khỏi backend"*. Phép thử *"bỏ phần cắm vào"* |
+| 12 | `RES-034` 🇬🇧 | *"Walk me through the architecture…"* | 🔴 weak | Ba ranh giới **còn đủ ba** khi sang tiếng Anh |
+
+**Không hỏi ở R1′ (cố ý):** `DP-042` (chi tiết backend — luật ⑤), `DP-022`, `DP-023`, `DP-046` (thiết kế, đã ở weak-register — hỏi ở phiên daily/R2).
+
+---
+
+## 12. R5 — CI · unit test · code quality
+
+**Câu hỏi của buổi:** *"Quy trình đưa code của em vào sản phẩm như thế nào, và em đảm bảo chất lượng ra sao?"* — mức hiểu cơ bản, bám việc thật (bạn là **người dùng** pipeline).
+
+### 📖 Đọc + 🧪 lab (~30′, lab nên làm trước)
+
+- [06/unit-test-and-code-quality](../../06-build-systems/unit-test-and-code-quality.md) — **toàn bộ**, đặc biệt §1 (pipeline của bạn) và §7 (nói thế nào mà không nói quá)
+- [06/ci-and-test-farm](../../06-build-systems/ci-and-test-farm.md) §1, §3 (gated check-in), §5 (tháp test)
+- 🧪 **Lab pipeline 5 cổng** ở §6 của tài liệu trên: chạy `./run_ci.sh`, làm bước 2 (mutation) — mã nguồn ở [A1 §11](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+
+### 🎤 Mock — 12 câu, ~60′, trần T1 + một chút T2
+
+| # | ID | Câu (tóm tắt) | Nguồn |
+|---|---|---|---|
+| 1 | `BLD-021` | Vì sao không có đường submit tay vào nhánh chính | mới |
+| 2 | `BLD-031` | CI / Continuous Delivery / Continuous Deployment | mới |
+| 3 | `BLD-032` | Thuật ngữ pipeline: stage, job, artifact, trigger, gate | mới |
+| 4 | `BLD-033` | Các tầng test (unit/integration/system) và loại test (smoke/regression/soak) | mới |
+| 5 | `BLD-044` | GoogleTest vs KUnit | mới |
+| 6 | `BLD-040` | Test thuật toán không có phần cứng — fake/mock/stub | mới |
+| 7 | `BLD-043` | AI sinh unit test — kiểm chất lượng test thế nào | mới |
+| 8 | `RES-016` | Dòng AI trên resume — chặn cách đọc bất lợi | 🔴 weak |
+| 9 | `BLD-041` | Coverage 90% nghĩa là gì | mới |
+| 10 | `BLD-042` | `-Werror`, static analysis, sanitizer, unit test — mỗi cái bắt gì | mới |
+| 11 | `BLD-035` | Vì sao vẫn phải test trên thiết bị thật | mới |
+| 12 | `BLD-026` | Flaky test trên cổng gated nguy hiểm thế nào | mới |
+
+⚠️ **Interviewer lưu ý:** bạn chưa viết Jenkinsfile ở công ty và không đo coverage. Câu trả lời đúng ở các câu đó là *"hiểu, đã thử ở lab"* — **không** chấm thấp vì thiếu kinh nghiệm thật; **chấm thấp** nếu nói như đã làm ([unit-test-and-code-quality §7](../../06-build-systems/unit-test-and-code-quality.md)).
+
+---
+
+## 13. R6 — troubleshooting
+
+**Câu hỏi của buổi:** *"Library của em crash trên TV — em làm gì?"* — bám ba tình huống thật: bản debug · bản release · không boot được.
+
+### 📖 Đọc + 🧪 lab (~30′, lab nên làm trước)
+
+- [09/crash-analysis-workflow](../../09-debugging/crash-analysis-workflow.md) — toàn bộ
+- 🧪 [`DBG-043`](../mock-interview/bank/debugging.md) (log release → `addr2line`) và [`DBG-044`](../mock-interview/bank/debugging.md) (coredump đầu tiên bằng gdb) — **làm trên máy**, mỗi bài ~15′
+- *(Nếu còn thời gian)* 🧪 [`DBG-033`](../mock-interview/bank/debugging.md), [`DBG-039`](../mock-interview/bank/debugging.md)
+- [09/kernel-debugging](../../09-debugging/kernel-debugging.md) — phần oops/panic
+
+### 🎤 Mock — 12 câu, ~60′, trần T1 + một chút T2
+
+| # | ID | Câu (tóm tắt) | Nguồn |
+|---|---|---|---|
+| 1 | `DBG-045` | Ba tình huống crash — bằng chứng gì, công cụ gì, cần thêm gì | mới |
+| 2 | `RES-008` | Debug xuyên tầng — một ca cụ thể | 🔴 weak |
+| 3 | `DBG-003` | Core dump là gì, phân tích thế nào | đã hỏi |
+| 4 | `DBG-004` | Segfault — điều tra thế nào | mới |
+| 5 | `DBG-019` | Oops vs panic | đã hỏi |
+| 6 | `DBG-015` | Đọc kernel oops — thông tin gì | mới |
+| 7 | `DBG-021` | `printk`/`dmesg` trong driver | mới |
+| 8 | `DBG-029` | Logging ở production | mới |
+| 9 | `DBG-010` | Chương trình treo — điều tra thế nào | mới |
+| 10 | `DBG-018` | Target không có gdb đầy đủ | đã hỏi |
+| 11 | `DBG-016` | Debug lỗi cross-layer | đã hỏi |
+| 12 | `DBG-042` | Chọn sanitizer: ASan vs TSan vs valgrind | 🔴 weak |
+
+⚠️ **Interviewer lưu ý:** bạn chưa dùng gdb với coredump ở công ty (hệ thống nội bộ làm). Câu trả lời đúng là *"hệ thống làm, em hiểu nó làm gì, em đã tự làm lại ở lab"* — giống lưu ý ở R5.

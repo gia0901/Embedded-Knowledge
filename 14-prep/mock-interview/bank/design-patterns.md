@@ -130,9 +130,9 @@ Khi vấn đề đơn giản và code ổn định, không có nhu cầu thay đ
 **Singleton là gì? Cách hiện đại trong C++?**
 <details><summary>Đáp án</summary>
 
-Đảm bảo một class chỉ có một instance + điểm truy cập toàn cục. C++11+ dùng Meyers' Singleton: `static` local trong hàm `instance()` — khởi tạo **lazy** (chỉ dựng lần gọi đầu) và **thread-safe theo chuẩn** (compiler sinh guard variable, xem [DP-014](#dp-014--concept---creational)). Cấm copy (`= delete`), constructor private.
+Đảm bảo một class chỉ có một instance + điểm truy cập toàn cục. C++11+ dùng Meyers' Singleton: `static` local trong hàm `instance()` — khởi tạo **lazy** (chỉ dựng lần gọi đầu) và **thread-safe theo chuẩn** (compiler sinh guard variable, xem [DP-014](design-patterns.md)). Cấm copy (`= delete`), constructor private.
 
-> ⚠️ **"Một instance" chỉ đúng trong MỘT chương trình đã link xong.** Khi singleton nằm ở header mà nhiều `.so` cùng include, số instance do **dynamic linker** quyết định chứ không do C++ — xem [DP-020](#dp-020--concept---creational-linking-loading-symbol-interposition).
+> ⚠️ **"Một instance" chỉ đúng trong MỘT chương trình đã link xong.** Khi singleton nằm ở header mà nhiều `.so` cùng include, số instance do **dynamic linker** quyết định chứ không do C++ — xem [DP-020](design-patterns.md).
 >
 > Ca đơn giản hơn (định nghĩa `instance()` **chỉ** nằm trong `libA.so`): **một process = một instance**, vì `libA.so` chỉ được nạp **một lần** cho mỗi process, dù có bao nhiêu `.so` khác cùng link tới nó. **Nhiều process = mỗi process một bản** ([DP-041](design-patterns.md)). Chạy thật (2 process, libB và libC cùng gọi, tắt ASLR bằng `setarch -R` để so được địa chỉ): cả hai in **cùng địa chỉ ảo** `0x7ffff7f9f024`, nhưng `count` của process 2 **bắt đầu lại từ 1**. Cùng địa chỉ ảo, khác khung trang vật lý ([OS-022](os.md)).
 >
@@ -354,8 +354,6 @@ Logic phía trên **không biết** có cache — đó chính là giá trị c�
 **Bridge pattern giải quyết vấn đề gì? Nó khác Strategy chỗ nào khi code trông giống hệt nhau?**
 <details><summary>Đáp án</summary>
 
-> 🔄 *Nâng cấp 2026-10-06 — người học phản hồi "đọc bank không hiểu gì, không có ví dụ cụ thể". Bản cũ chỉ có bảng khẳng định; bản này dựng trên chính hệ dimming.*
-
 **Cơ chế — Bridge giải gì:** khi có **hai chiều biến thiên độc lập**, kế thừa cả hai cho N × M lớp. Bridge giữ một chiều ở cây kế thừa (**abstraction**), đẩy chiều kia ra một interface riêng (**implementor**), abstraction **giữ con trỏ** tới implementor. Phần đắt nhất không bị nhân bản. *(Sách nói "còn N + M lớp" — ở hệ thật của bạn backend còn nhân theo thuật toán, xem [DP-042](design-patterns.md); đừng lặp con số N + M khi kể hệ thật.)*
 
 **Ví dụ trên chính hệ dimming — cùng một class đóng HAI vai:**
@@ -562,7 +560,7 @@ Memento cổ điển sống **trong một process, một phiên** (undo/redo). M
 #### DP-021 · 🟠 · concept · ⭐ · 🎤 2026-09-09 · [→ A1 §5](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [B1 §1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
 **Trong library display của bạn: dimming chia thành global / local / oled (cùng xuất phát từ một class gốc), còn video enhancement chia theo loại chip (cũng kế thừa từ một class gốc). Nhìn qua thì cả hai đều là "kế thừa + đa hình". Vì sao đây lại là HAI pattern khác nhau — và là hai cái nào?**
 
-> 🚫 *Ghi chú 2026-10-06:* người học **không làm phần video enhancement** ⟹ câu này nằm **ngoài bán kính resume** ([resume-plan §1](../../study-plans/resume-plan.md) luật ①). Không hỏi trong plan bám resume; vẫn giữ trong bank cho người dùng khác. Ý muốn kiểm tra (Strategy vs Abstract Factory) hỏi qua [DP-022](design-patterns.md) / [DP-037](design-patterns.md) thay thế.
+> 🚫 *Phạm vi:* người học **không làm phần video enhancement** ⟹ câu này nằm **ngoài bán kính resume** ([resume-plan §1](../../study-plans/resume-plan.md) luật ①). Không hỏi trong plan bám resume; vẫn giữ trong bank cho người dùng khác. Ý muốn kiểm tra (Strategy vs Abstract Factory) hỏi qua [DP-022](design-patterns.md) / [DP-037](design-patterns.md) thay thế.
 <details><summary>Đáp án</summary>
 
 **Cơ chế — hỏi "trục biến thiên" trước khi gọi tên pattern.** Cùng là kế thừa, nhưng *cái gì thay đổi* khác nhau:
@@ -570,7 +568,7 @@ Memento cổ điển sống **trong một process, một phiên** (undo/redo). M
 | | dimming | video enhancement |
 |---|---|---|
 | Cái thay đổi | **Thuật toán** trên cùng một nền (global: 1 giá trị · local: N zone theo histogram · oled: ABL + chống burn-in) | **Toàn bộ cách điều khiển** vì đổi chip: register map, command set, ràng buộc thời điểm |
-| Số thứ đổi cùng lúc | **Một** — chỉ dimming | **Cả họ** — enhancer + dimming backend + frc của chip đó phải khớp nhau |
+| Số thứ đổi cùng lúc | **Một** — chỉ dimming | **Cả họ** — enhancer + dimming backend + panel driver của chip đó phải khớp nhau |
 | Điểm quyết định | Có thể đổi **lúc runtime** (picture mode, nội dung) | **Một lần lúc boot**, theo board config |
 | ⇒ Pattern | **Strategy** (behavioral) | **Abstract Factory** (creational) |
 
@@ -663,10 +661,10 @@ auto d = std::make_unique<LocalDimming>(std::make_unique<DimmingBackendChipA>())
 </details>
 
 #### DP-024 · 🟡 · concept · ⭐ · 🎤 2026-09-09 · [→ B1 §7.1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
-**Trong library có 4 feature. Dimming và video enhancement đi qua interface + factory. Còn `frc` và `tcon` chỉ là một command cố định xuống chip, và bạn để nguyên hàm gọi thẳng. Vì sao không bọc chúng cho đồng bộ? Nêu cái giá cụ thể.**
+**Trong library, dimming đi qua interface + factory. Còn Panel Control (bật tắt panel, đổi resolution, đổi frame rate) chỉ là lệnh cố định xuống panel driver, và bạn để nguyên hàm tự do gọi thẳng. Vì sao không bọc chúng cho đồng bộ? Nêu cái giá cụ thể.**
 <details><summary>Đáp án</summary>
 
-Vì trừu tượng hoá phải **trả giá cho một biến thể đã tồn tại**, không phải cho một biến thể tưởng tượng. `frc`/`tcon` không có thuật toán, không state, không biến thể — bọc lại thì mua được **số không**.
+Vì trừu tượng hoá phải **trả giá cho một biến thể đã tồn tại**, không phải cho một biến thể tưởng tượng. Các lệnh Panel Control không có thuật toán, không state, và **biến thể theo chip đã được panel driver trong kernel hấp thụ** (một bộ `ioctl` chung, mỗi chip một driver) — bọc thêm ở user-space thì mua được **số không**.
 
 Cái giá cụ thể, không nói chung chung:
 
@@ -677,7 +675,7 @@ Cái giá cụ thể, không nói chung chung:
 | **ABI** | Thêm một virtual interface **qua ranh giới `.so`** = thêm một hợp đồng nhị phân phải giữ **vĩnh viễn** |
 | Nhận thức | Người đọc sau đi tìm biến thể không tồn tại — abstraction **nói dối** về hệ thống |
 
-**Phép thử trước khi trừu tượng hoá** — "không" ở bất kỳ câu nào thì đừng làm: ① đã có **≥ 2 biến thể thật** chưa? ② chúng khác nhau về **hành vi** hay chỉ khác **tham số**? ③ có ai cần **hoán đổi** chúng không? — `frc`/`tcon` trượt cả ba; `dimming` đạt cả ba.
+**Phép thử trước khi trừu tượng hoá** — "không" ở bất kỳ câu nào thì đừng làm: ① đã có **≥ 2 biến thể thật** chưa? ② chúng khác nhau về **hành vi** hay chỉ khác **tham số**? ③ có ai cần **hoán đổi** chúng không? — Panel Control trượt cả ba; `dimming` đạt cả ba.
 
 **Chốt:** *Nói được chỗ mình **cố tình không** dùng pattern là tín hiệu senior mạnh hơn kể tên năm pattern — vì nó cho thấy bạn tính được cả cái giá, không chỉ cái lợi.*
 </details>
@@ -945,13 +943,13 @@ App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **de
 
 **Ngoại lệ (tự nêu là điểm cộng):** vòng vsync chạy **bên trong** library, không đi qua mặt tiền ⟹ không được khoá ở mặt tiền bảo vệ (DP-044). "Duy nhất" đúng cho **caller bên ngoài**, không đúng cho **mọi đường chạm state**.
 
-**🧩 ABI là gì — giải thích cho người không chuyên** *(thêm 2026-10-06)*: ***API là hợp đồng bằng TÊN, ABI là hợp đồng bằng VỊ TRÍ.***
+**🧩 ABI là gì — giải thích cho người không chuyên:** ***API là hợp đồng bằng TÊN, ABI là hợp đồng bằng VỊ TRÍ.***
 - API là thứ ghi trong header: hàm tên gì, nhận gì, trả gì. **Compiler** đọc nó.
 - Khi compile xong, binary **không còn đọc header nữa**. Nó chỉ nhớ **vị trí**: hàm này là *ngăn số 2* của bảng ảo, field kia nằm ở *byte thứ 8*, tham số đầu nằm ở *thanh ghi nào*, symbol tên *chính xác là gì*.
 - Hình dung một **tủ có ngăn đánh số**: binary cũ nhớ *"lấy đồ ở ngăn số 2"*. Ai đó chèn một ngăn mới vào giữa tủ thì ngăn số 2 giờ chứa thứ khác. Binary cũ vẫn lấy ở ngăn 2, không hề báo lỗi. Đó chính là output ở [DP-043](design-patterns.md): gọi `set_freq` mà `set_brightness` chạy.
 - ⟹ *"Giữ ABI"* = **không đổi vị trí** của bất cứ thứ gì binary cũ đã nhớ.
 
-**Phản biện hay gặp — *"Bỏ chuyện ABI đi. Phơi C++ interface rồi khoá ngay trong từng method thì bản chất vẫn vậy?"*** *(thêm 2026-10-06 từ phiên R1)*
+**Phản biện hay gặp — *"Bỏ chuyện ABI đi. Phơi C++ interface rồi khoá ngay trong từng method thì bản chất vẫn vậy?"***
 
 **Nửa đúng** — về chức năng thì giống, về **cấu trúc** thì không:
 
@@ -969,7 +967,7 @@ applyPreset -> -1
 ```
 Code thật dùng `sem_wait` thì dòng đó **treo vĩnh viễn**.
 
-**Câu đuổi tiếp — *"Giả sử chỉ xoá `extern "C"`, giữ nguyên chữ ký kiểu C. Còn ổn định không?"*** *(thêm 2026-10-06)*
+**Câu đuổi tiếp — *"Giả sử chỉ xoá `extern "C"`, giữ nguyên chữ ký kiểu C. Còn ổn định không?"***
 
 **Với caller C++ trên Linux thì vẫn chạy.** GCC và Clang dùng chung quy tắc mangling (Itanium C++ ABI), nên tên symbol ổn định qua các phiên bản compiler. Cái **mất** và cái **thay đổi**:
 
@@ -1013,7 +1011,7 @@ Output trên là chạy thật (gcc 11.4). Dòng cuối là chỗ ít người b
 **Bạn kể dimming là Bridge: thuật toán (Global/Local/OLED) × backend theo chip. Interviewer chỉ vào tên lớp `DimmingBackendChipA_Global`, `DimmingBackendChipA_Local`… và nói: "backend của bạn nhân theo chip × thuật toán — vẫn là N×M, đâu phải Bridge". Trả lời thế nào?**
 <details><summary>Đáp án</summary>
 
-> ⚠️ *Sửa 2026-10-06 — người học phản bác và đúng (đã đếm source thật).* Bản trước lập luận *"thứ bị nhân là lớp **mỏng**, vài chục dòng"*. **Sai với hệ thật.** Thuật toán Global khoảng 7,6 nghìn dòng, Local khoảng 8,6 nghìn dòng, mỗi cái viết một lần. Backend Global khoảng 0,8–1,1 nghìn dòng mỗi chip; backend Local khoảng 4–8,5 nghìn dòng mỗi chip × biến thể panel, tức **dày ngang thuật toán**. Lập luận bảo vệ Bridge phải đứng được **mà không cần** backend mỏng.
+> 📏 *Cỡ thật của hệ (đếm source, làm tròn):* thuật toán Global khoảng 7,6 nghìn dòng, Local khoảng 8,6 nghìn dòng, mỗi cái viết một lần. Backend Global khoảng 0,8–1,1 nghìn dòng mỗi chip; backend Local khoảng 4–8,5 nghìn dòng mỗi chip × biến thể panel, tức **dày ngang thuật toán**. Lập luận bảo vệ Bridge phải đứng được **mà không cần** backend mỏng.
 
 **Cơ chế — thừa nhận trước, rồi đổi thước đo:**
 1. Đúng, backend nhân theo **chip × thuật toán**, vì phần cứng ghi khác nhau thật: Global ghi **một** giá trị; Local ghi **từng vùng**, và cách ghi từng vùng khác nhau giữa các chip.
@@ -1064,7 +1062,7 @@ Output trên là chạy thật (gcc 11.4). Dòng cuối là chỗ ít người b
 | Slot `NULL` bị gọi ⟹ **kernel oops** | Gọi pure virtual / thiếu Null Object | Điền sẵn cả bảng bằng stub trả `-ENOTSUP` + log; chip ghi đè cái mình có |
 | **Chèn** một hàm vào giữa struct ⟹ mọi slot sau lệch, gọi nhầm hàm, version khớp vẫn không cứu (DP-033) | Chèn virtual vào giữa interface | Chỉ thêm vào **cuối**; thêm trường `size`/`version` đầu struct để kiểm lúc đăng ký |
 
-**Hai rủi ro, chạy thật** *(thêm 2026-10-06 — mô phỏng user-space, gcc 11.4)*. Driver nền build với header **mới** (chèn `get_temp` vào giữa `init` và `set_freq`); `.ko` của chip build với header **cũ**:
+**Hai rủi ro, chạy thật** *(mô phỏng user-space, gcc 11.4)*. Driver nền build với header **mới** (chèn `get_temp` vào giữa `init` và `set_freq`); `.ko` của chip build với header **cũ**:
 
 ```
 header CŨ (.ko chip)        header MỚI (driver nền)
@@ -1124,7 +1122,7 @@ exit=139
 </details>
 
 #### DP-045 · 🟠 · coding · [→ B1 §3](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
-**Display Control là các hàm tự do. Bạn muốn `dc_write_brightness()` CHỈ backend của Picture Quality gọi được; một `lib_api_*` nào đó gọi thẳng phải là LỖI COMPILE. Ràng buộc: không thêm interface, không virtual, không tốn gì lúc chạy. Viết cơ chế đó. Có bẫy nào riêng của C++17?**
+**Panel Control là các hàm tự do. Bạn muốn `panel_ctl_write_brightness()` CHỈ backend của Picture Quality gọi được; một `lib_api_*` nào đó gọi thẳng phải là LỖI COMPILE. Ràng buộc: không thêm interface, không virtual, không tốn gì lúc chạy. Viết cơ chế đó. Có bẫy nào riêng của C++17?**
 <details><summary>Đáp án</summary>
 
 **Cơ chế — passkey idiom:** hàm đòi một tham số kiểu "chìa khoá" mà **chỉ** lớp được phép mới tạo được. Compiler kiểm quyền gọi; chìa khoá rỗng nên bị tối ưu mất.
@@ -1135,7 +1133,7 @@ class BrightnessKey {
  // BrightnessKey() = default;            // ❌ C++17: vẫn là aggregate -> ai cũng tạo được
     friend class DimmingBackendBase;
 };
-int32_t dc_write_brightness(BrightnessKey, int32_t brightness);
+int32_t panel_ctl_write_brightness(BrightnessKey, int32_t brightness);
 
 class DimmingBackendBase {
 protected:
@@ -1143,11 +1141,11 @@ protected:
 };
 class DimmingBackendChipA_Global : public DimmingBackendBase, public IDimmingBackendGlobal {
     uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) override {
-        return dc_write_brightness(key(), pInputData->value);              // ✅
+        return panel_ctl_write_brightness(key(), pInputData->value);              // ✅
     }
 };
 int32_t lib_api_set_something(int32_t v) {
-    return dc_write_brightness(BrightnessKey{}, v);                      // ❌ lỗi compile
+    return panel_ctl_write_brightness(BrightnessKey{}, v);                      // ❌ lỗi compile
 }
 ```
 
@@ -1163,7 +1161,7 @@ int32_t lib_api_set_something(int32_t v) {
 
 Ở C++17, class chỉ có constructor `= default` (kể cả `private`) **vẫn là aggregate** ⟹ `{}` đi đường aggregate initialization, **không gọi constructor nào**, nên quyền truy cập không được kiểm. C++20 sửa luật này.
 
-**Vì sao không làm interface cho DC:** vấn đề là **quyền gọi**, không phải **đa hình** — DC không có biến thể nào ở user-space (DP-024). Thêm interface là trả giá cho thứ không cần.
+**Vì sao không làm interface cho Panel Control:** vấn đề là **quyền gọi**, không phải **đa hình** — Panel Control không có biến thể nào ở user-space (DP-024). Thêm interface là trả giá cho thứ không cần.
 
 **Chốt:** *"Passkey biến một quy ước thành thứ compiler kiểm, giá bằng không. Nhớ viết constructor `{}` chứ không `= default` nếu còn ở C++17."*
 </details>
@@ -1279,7 +1277,7 @@ atomic<Lut 128 byte> always_lock_free = 0, is_lock_free() = 0
 ```
 Không thêm `-latomic` thì link **lỗi** (`undefined reference to '__atomic_load'`): đó là dấu hiệu nó gọi sang thư viện có khoá, không phải lệnh atomic của CPU.
 
-**Bằng chứng ở hệ thật (đã kiểm source, 06/10):** đường API lấy named semaphore ở mọi hàm `lib_api_*`; đường vsync gọi `t_vSyncCallBack()` đọc/ghi `Shm` mà **không** lấy semaphore. Có một `pthread_mutex` quanh callback, nhưng nó là mutex riêng của thread vsync (process-private, cặp với condvar để thread chính đánh thức mỗi khung hình). API **không bao giờ** lấy mutex đó ⟹ nó không bảo vệ gì. Race xảy ra **ngay trong một process** (thread API ↔ thread vsync), không chỉ giữa các process.
+**Bằng chứng ở hệ thật (đã kiểm source):** đường API lấy named semaphore ở mọi hàm `lib_api_*`; đường vsync gọi `t_vSyncCallBack()` đọc/ghi `Shm` mà **không** lấy semaphore. Có một `pthread_mutex` quanh callback, nhưng nó là mutex riêng của thread vsync (process-private, cặp với condvar để thread chính đánh thức mỗi khung hình). API **không bao giờ** lấy mutex đó ⟹ nó không bảo vệ gì. Race xảy ra **ngay trong một process** (thread API ↔ thread vsync), không chỉ giữa các process.
 
 **Phương án đúng:** **khoá đi cùng state** — `ShmGuard` RAII lấy semaphore ở constructor, nhả ở destructor, mọi đường chạm `Shm` (API lẫn vsync) đều phải qua nó ([DP-047](design-patterns.md), [B1 §6.1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)). ⚠️ Phải **gỡ khoá ở mặt tiền** khi chuyển khoá xuống cạnh state, nếu không đường API lấy khoá hai lần ⟹ tự deadlock (semaphore không recursive — [DP-040](design-patterns.md)).
 

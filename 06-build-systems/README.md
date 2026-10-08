@@ -33,6 +33,7 @@ flowchart LR
 | 3 | [cross-compilation.md](cross-compilation.md) | host/build/target, toolchain, sysroot, CMake toolchain file, Yocto/Buildroot | ✅ |
 | 4 | [yocto.md](yocto.md) | Yocto Project: BitBake, recipe/layer/bbappend, machine/BSP layer, sstate, devtool, SDK, CVE/license | ✅ |
 | 5 | [ci-and-test-farm.md](ci-and-test-farm.md) | CI/CD cho embedded: gated check-in, build matrix, tháp test (smoke/robustness/soak), giải phẫu test farm, đo latency từ ngoài, flaky test, Git↔Perforce | ✅ |
+| 6 | [unit-test-and-code-quality.md](unit-test-and-code-quality.md) | **Mức hiểu cơ bản, bám việc thật:** pipeline nhìn từ người dùng · Jenkins đủ để đọc · GoogleTest/KUnit + test double · coverage đo gì/không đo gì · mỗi công cụ code quality bắt loại lỗi nào · 🧪 **lab pipeline 5 cổng** trên `libdisplay_lab` (cổng TSan đỏ thật) · cách nói không nói quá | ✅ |
 
 ## Thứ tự đọc gợi ý
 `makefile` (hiểu quá trình build) → `cmake` → `cross-compilation` → `yocto` → `ci-and-test-farm`.

@@ -213,7 +213,7 @@ Phần này quan trọng ngang 5 phần trên — và là câu hỏi 🔴 [DP-01
 2. Chúng khác nhau về **hành vi**, hay chỉ khác **tham số**? *(Chỉ khác tham số ⟹ truyền tham số.)*
 3. Có ai thật sự cần **hoán đổi** chúng không?
 
-> **Ví dụ đối chứng trong chính hệ display:** `dimming` đạt cả ba ⟹ interface + factory. **Display Control** (lệnh đơn: nguồn panel, resolution, tần số…) trượt ngay câu 1 — khác biệt giữa các chip đã nằm trong kernel driver ⟹ **để nguyên hàm gọi thẳng**. Nói được chỗ mình *cố tình không* áp SOLID là tín hiệu senior mạnh hơn kể tên năm pattern ([in-practice/B1 §7.1](in-practice/B1-redesign-architecture.md)).
+> **Ví dụ đối chứng trong chính hệ display:** `dimming` đạt cả ba ⟹ interface + factory. **Panel Control** (lệnh đơn: nguồn panel, resolution, tần số…) trượt ngay câu 1 — khác biệt giữa các chip đã nằm trong kernel driver ⟹ **để nguyên hàm gọi thẳng**. Nói được chỗ mình *cố tình không* áp SOLID là tín hiệu senior mạnh hơn kể tên năm pattern ([in-practice/B1 §7.1](in-practice/B1-redesign-architecture.md)).
 
 **Riêng embedded, thêm hai lưu ý:** ① virtual trên đường **mỗi khung hình** thì đáng đo, trên đường **cấu hình** thì miễn phí — chi phí nằm ở *tần suất gọi*, không ở việc có dùng abstraction hay không; ② **cấm cấp phát động trên đường nóng** kể cả khi pattern gợi ý làm vậy.
 
@@ -231,7 +231,7 @@ Phần này quan trọng ngang 5 phần trên — và là câu hỏi 🔴 [DP-01
 | [DP-008](../14-prep/mock-interview/bank/design-patterns.md) | Cho ví dụ vi phạm Liskov Substitution Principle. |
 | [DP-011](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Logic đọc mã vạch gọi thẳng driver I2C, phải test được không cần phần cứng — DIP "đảo ngược" cái gì? |
 | [DP-012](../14-prep/mock-interview/bank/design-patterns.md) | Khi nào KHÔNG nên dùng design pattern / áp SOLID? |
-| [DP-024](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Display Control chỉ là lệnh đơn — vì sao KHÔNG bọc pattern? Nêu cái giá cụ thể. |
+| [DP-024](../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Panel Control chỉ là lệnh đơn — vì sao KHÔNG bọc pattern? Nêu cái giá cụ thể. |
 
 ---
 ⬅️ [Về index topic](README.md) · ➡️ Tiếp theo: [creational.md](creational.md)

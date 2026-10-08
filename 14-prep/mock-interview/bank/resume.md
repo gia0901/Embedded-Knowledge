@@ -1,6 +1,6 @@
 # 📄 RES — Câu hỏi bám RESUME
 
-> **Domain `RES`.** Mọi câu ở đây bám vào **một dòng cụ thể trong [RESUME_current.tex](../../../RESUME_current.tex)** *(chuyển từ `RESUME_embedded_linux.tex` ngày 2026-10-05; khác biệt đáng kể: bỏ Yocto khỏi skills, dòng AI chuyển từ Core Responsibilities xuống Skills và bỏ con số — xem ghi chú ở `RES-012`, `RES-016`)*. Đây là phần **chắc chắn 100% bị hỏi** — khác với câu kỹ thuật thuần chỉ *có thể* bị hỏi. Phỏng vấn thật dành **30–50%** thời gian ở đây.
+> **Domain `RES`.** Mọi câu ở đây bám vào **một dòng cụ thể trong [RESUME_current.tex](../../../RESUME_current.tex)**. Đây là phần **chắc chắn 100% bị hỏi** — khác với câu kỹ thuật thuần chỉ *có thể* bị hỏi. Phỏng vấn thật dành **30–50%** thời gian ở đây.
 >
 > ⚠️ **Đáp án ở file này KHÔNG phải "lời giải".** Chỉ bạn mới biết bạn đã làm gì. Đáp án là **KHUNG**, gồm 4 phần:
 > 1. **Interviewer đang dò gì** — câu hỏi thật nằm sau câu hỏi bề mặt.
@@ -34,7 +34,7 @@ System SW  (shared library)   <-- bạn ở đây
       | ioctl / sysfs
 Kernel driver (HAL)
       | register / I2C
-SoC (Dimming, FRC, TCON)
+SoC / panel hardware
 ```
 
 ---
@@ -76,7 +76,7 @@ SoC (Dimming, FRC, TCON)
 
 ---
 
-### 🎙️ BẢN C — MỞ MÀN 3 MÓC *(thêm 2026-09-12 — dùng cho `RESUME_current.tex`)*
+### 🎙️ BẢN C — MỞ MÀN 3 MÓC
 
 > ⚠️ **`RES-001` đã hỏng LẦN THỨ TƯ** (18/08 → 23/08 qua `BEH-001` → 29/08 → **12/09**). Bản A/B ở trên trả lời câu *"project tâm đắc nhất"*. Bản C trả lời câu **mở màn thuần** — *"em giới thiệu qua về bản thân"* — là câu **thật sự** được hỏi ngày 12/09, và là câu bị hỏng.
 >
@@ -122,7 +122,7 @@ SoC (Dimming, FRC, TCON)
 #### RES-002 · 🟠 · design · ⭐ · 🏗️ · [→ RESUME: "one interface across chipsets… selects its implementation at boot from board configuration… applications above stay unchanged"]
 **Resume ghi *"một interface dùng chung cho nhiều chipset, thư viện chọn implementation lúc boot theo board configuration"*. Kể cơ chế đó — và điều gì xảy ra khi board configuration đọc ra sai?**
 
-> 📌 *Neo lại 2026-09-04: resume bản mới **đã tự nói ra cơ chế** (chọn lúc boot + bảng con trỏ hàm), nên câu hỏi dịch trọng tâm sang **hệ quả và chế độ hỏng** — đó mới là chỗ interviewer khoan.*
+> 📌 *Resume **đã tự nói ra cơ chế** (chọn lúc boot + bảng con trỏ hàm), nên câu hỏi dịch trọng tâm sang **hệ quả và chế độ hỏng** — đó mới là chỗ interviewer khoan.*
 
 <details><summary>Khung trả lời</summary>
 
@@ -138,8 +138,8 @@ SoC (Dimming, FRC, TCON)
 
 **⭐ Chế độ hỏng — phần resume KHÔNG nói, và là chỗ ăn điểm** *(đã hỏi 2026-08-29, đạt 4đ)*:
 - **Dimming:** không có config khớp ⇒ rơi về **default an toàn** là *Global Dimming*, vốn chiếm hầu hết tỉ trọng sản phẩm. Nêu được *"có default an toàn"* quan trọng hơn nêu tên default.
-- **FRC/TCON:** driver thật xác định **lúc chạy** từ **factory data / FMS key**, vì một board ghép được với nhiều loại panel. ⭐ Và data đó **thay đổi được** để bring-up/test bằng data giả — chi tiết này cho thấy bạn hiểu nhu cầu vận hành thật, không chỉ đường happy path.
-- ⚠️ **Câu còn hụt lúc trả lời:** nếu **FMS key sai** (không phải thiếu) thì sao — load nhầm driver, hay từ chối load? Chốt sẵn câu này.
+- **Panel driver:** driver thật xác định **lúc chạy** từ **factory data / board config**, vì một board ghép được với nhiều loại panel. ⭐ Và data đó **thay đổi được** để bring-up/test bằng data giả — chi tiết này cho thấy bạn hiểu nhu cầu vận hành thật, không chỉ đường happy path.
+- ⚠️ **Câu còn hụt lúc trả lời:** nếu **config sai giá trị** (không phải thiếu) thì sao — load nhầm driver, hay từ chối load? Chốt sẵn câu này.
 
 **Bẫy:** ① nói *"em dùng OOP"* rồi hết — phải nêu **ai chọn implementation, chọn lúc nào** · ② thổi phồng thành kiến trúc plugin động nếu thực tế chỉ là `#ifdef` — hỏi hai tầng là lộ · ③ quên rằng đây là **shared library**: thêm virtual function vào class đang phát hành là **phá ABI** ⇒ nêu được ý này là ghi điểm senior.
 </details>
@@ -279,23 +279,21 @@ ALS (I2C) -> driver đọc định kỳ / interrupt -> lọc & làm mượt
 **Bẫy:** ① chỉ kể *"đọc sensor rồi set brightness"* — bỏ mất phần khó nhất · ② không nói được **đọc bằng polling hay interrupt** và vì sao · ③ không biết cảm biến của mình nối bằng bus gì (chuẩn bị: I2C) · ④ quên phần **người dùng chỉnh tay** thì hệ tự động phải nhường ra sao.
 </details>
 
-#### RES-007 · 🟢 · concept · ⭐ · [→ RESUME: "display enhancement (dimming, frame-rate control, timing control)"]
-**Dimming, FRC, TCON — em giải thích ngắn gọn cho người ngoài ngành hiểu được không?**
-
-> 🔄 *Ghi chú 2026-10-06 — người học góp ý: chiến lược kể đã đổi sang khung **Picture Quality + Display Control**.* Câu hỏi vẫn giữ, vì dòng resume ghi **nguyên văn** *"dimming, frame-rate and timing control"* nên interviewer sẽ hỏi đúng các từ đó. Cách trả lời: giải thích ba thứ bằng ngôn ngữ đời thường, rồi **nối vào khung**: *"dimming thuộc Picture Quality — phần phải tính toán theo nội dung; FRC và TCON là các lệnh Display Control gửi xuống chip."* Một câu nối đó biến câu 🟢 thành móc dẫn sang câu kiến trúc ([A1 §4](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
+#### RES-007 · 🟢 · concept · ⭐ · [→ RESUME: "picture quality (dimming) and panel control (resolution, frame rate, backlight)"]
+**Picture quality (dimming) và panel control — em giải thích ngắn gọn cho người ngoài ngành hiểu được không?**
 
 <details><summary>Khung trả lời</summary>
 
-**Interviewer đang dò gì:** ① bạn **hiểu** hay chỉ chép từ khoá vào resume · ② **năng lực diễn đạt** — giải thích được cái khó cho người không biết là dấu hiệu senior rõ nhất. Datalogic có JD nhắc *"lead junior / code review"*, nên đây là kỹ năng họ tìm.
+**Interviewer đang dò gì:** ① bạn **hiểu** hay chỉ chép từ khoá vào resume · ② **năng lực diễn đạt** — giải thích được cho người không làm TV là dấu hiệu senior rõ nhất.
 
-**Câu trả lời tốt:** mỗi thứ **một câu**, ngôn ngữ đời thường trước, thuật ngữ sau:
-- **Dimming** — điều khiển độ sáng của đèn nền. Sâu hơn: local dimming chia màn thành nhiều vùng, vùng nào ảnh tối thì giảm sáng vùng đó ⇒ tăng tương phản, tiết kiệm điện.
-- **FRC** (Frame Rate Control) — nội dung và màn hình chạy khác tốc độ khung hình ⇒ phải chèn/bỏ/nội suy khung để hình mượt, không giật.
-- **TCON** (Timing Controller) — con chip nhận tín hiệu ảnh rồi phát đúng **thời điểm** cho từng hàng/cột điểm ảnh trên panel. Nó là cầu giữa xử lý ảnh và tấm nền vật lý.
+**Câu trả lời tốt — hai câu hỏi về một tấm panel, ngôn ngữ đời thường trước, thuật ngữ sau:**
+- **Picture quality — "sáng bao nhiêu?"**: *"đằng sau tấm panel là dàn đèn LED; dimming hạ đèn ở vùng ảnh tối — đen sâu hơn, tốn ít điện hơn. Phần này phải **tính toán** theo nội dung từng khung hình."*
+- **Panel control — "hiển thị thế nào?"**: *"bật tắt panel, đổi độ phân giải, đổi số hình mỗi giây, ghi độ sáng đã tính xuống phần cứng. Phần này chỉ là **ra lệnh**, xuống **panel driver** trong kernel."*
+- **Câu nối sang kiến trúc:** *"vì một bên là tính toán, một bên là ra lệnh, nên trong library em tách làm hai component — đó cũng là hai nhánh của kiến trúc."* Câu này biến câu 🟢 thành móc dẫn sang câu kiến trúc ([A1 §4](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
 
-**Ghi điểm thêm:** nói **bạn động vào phần nào** trong ba cái, và động ở tầng nào (viết interface? viết driver? chỉnh tham số?).
+**Ghi điểm thêm:** nói **bạn động vào phần nào** — interface C++, library, hay driver.
 
-**Bẫy:** ① trả lời bằng thuật ngữ chồng thuật ngữ — nghe là biết chưa hiểu · ② nói dài 3 phút cho một câu 🟢 · ③ liệt kê cả ba mà **không nói mình làm cái nào** — resume ghi cả ba thì phải phân định được.
+**Bẫy:** ① thuật ngữ chồng thuật ngữ (PWM, judder, resolution trần) — nghe là biết chưa quen giải thích · ② nói dài 3 phút cho một câu 🟢 · ③ không nói mình làm phần nào.
 </details>
 
 #### RES-008 · 🟠 · concept · ⭐ · 🏗️ · [→ RESUME: "cross-layer debugging (user-space & kernel-space)"]
@@ -325,7 +323,7 @@ ALS (I2C) -> driver đọc định kỳ / interrupt -> lọc & làm mượt
 > 🔴 **BẰNG CHỨNG 2026-09-12 — đọc kỹ trước khi ôn tiếp.** Phần "cắt đôi" dưới đây **đã nằm sẵn trong bank từ trước phiên B1**. Trong phiên đó, ứng viên vẫn trả lời bằng **quét tuần tự từ trên xuống**, và **giữ nguyên câu trả lời sau HAI lần được làm rõ rằng câu hỏi muốn một phép cắt đôi** ⇒ **2 điểm**.
 >
 > ⇒ Đây **không phải lỗ hổng nội dung, mà là lỗi TRUY XUẤT.** Đọc lại mục này lần nữa **sẽ không chữa được** — cùng một cách đã thất bại. Cách chữa: **luyện phản xạ** — mỗi khi nghe một triệu chứng, câu đầu tiên bật ra phải là *"phép đo nào chia đôi được?"*, trước cả khi nghĩ tới log.
-> 🧪 Bộ lab `DBG-030…041` tồn tại đúng cho việc này (hết đóng băng từ 2026-10-03 — làm `DBG-032` ASan + `DBG-036` valgrind trước).
+> 🧪 Bộ lab `DBG-030…041` tồn tại đúng cho việc này — làm `DBG-032` ASan + `DBG-036` valgrind trước.
 
 **⭐ Câu này hỏi CẮT ĐÔI, không hỏi quy trình:**
 
@@ -452,7 +450,7 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 #### RES-012 · 🟠 · concept · ⭐ · 🏗️ · [→ RESUME vs JD: thiếu Yocto, I2C/SPI, PCI/USB]
 **"Anh thấy resume em không nhắc Yocto, cũng không thấy I2C/SPI hay PCI/USB. Bên anh dùng những thứ đó khá nhiều."**
 
-> 🔄 *Cập nhật 2026-10-05:* `RESUME_current.tex` **đã bỏ Yocto/BitBake khỏi Skills** ⟹ không còn dòng nào trên resume bị khoan ngược. Câu hỏi này vẫn đến **từ phía JD**, và rủi ro nói quá bên dưới vẫn nguyên: đừng tự đưa lại khẳng định đã bị gỡ khỏi resume.
+> 📌 *Resume không ghi Yocto/BitBake* ⟹ câu này đến **từ phía JD**, không từ resume. Rủi ro nói quá bên dưới vẫn nguyên: đừng tự đưa ra khẳng định mà resume không có.
 
 > 🔴 **CẢNH BÁO NÓI QUÁ — sự cố lặp lần thứ hai (14/09).** Trả lời câu Yocto, ứng viên nói *"…và **đã thành công build một minimal image**"*, rồi khi bị đào chỉ đưa được *"image cho BeagleBone, PC x86, ~30 phút, đặt MACHINE là beaglebone"* — **không** tên image, **không** giá trị `MACHINE` đúng (`beaglebone-yocto`), **không** gì trong `local.conf`. Tracking repo ([plan §10](../../study-plans/archive/datalogic-plan.md)) ghi lab BSP **1/8**, `BSP-036` (Yocto) **⬜ chưa làm**. Cùng khẳng định này **đã bị phân xử là sai ngày 06/09** ([bài học #8](../../study-plans/archive/datalogic-plan.md)).
 >
@@ -761,7 +759,7 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 
 Với công ty đang tuyển **kỹ sư C++ nhúng**, dòng đó có thể đọc thành: bạn là **người điều phối công cụ**, không phải người **giải được vấn đề**. Rủi ro càng lớn khi con số (1 ngày → 1–2 giờ) **ấn tượng hơn** mọi con số khác trong resume.
 
-> 🔄 *Cập nhật 2026-10-05 (`RESUME_current.tex`):* dòng AI đã chuyển xuống **Skills** và **bỏ con số**. Rủi ro *"con số AI át mọi con số khác"* không còn; câu hỏi vẫn còn nguyên, chỉ đổi dạng thành *"code AI sinh ra thì em kiểm soát chất lượng thế nào?"*. Câu chặn và cách nối sang bằng chứng bên dưới giữ nguyên.
+> 📌 *Dòng AI nằm ở mục **Skills** và không kèm con số* ⟹ dạng hỏi hay gặp nhất là *"code AI sinh ra thì em kiểm soát chất lượng thế nào?"* ([BLD-043](build-systems.md)). Câu chặn và cách nối sang bằng chứng bên dưới áp cho cả dạng đó.
 
 **Câu chặn — một câu, không thanh minh dài:**
 > *"AI giúp em đi nhanh ở phần **lặp lại**, nên phần em muốn đầu tư là chỗ **nó không làm thay được**."*
@@ -1043,7 +1041,7 @@ Người nghe có khung rồi thì ngữ pháp lệch vài chỗ cũng không c�
 **Câu trả lời tốt gồm — ba ranh giới, một ý đắt nhất:**
 1. App → C++ interface: ranh giới **khép**, C++ được phép.
 2. Interface → library: **C API**, vì library được nạp vào nhiều process build lệch thời gian. Đồng thời là **điểm khoá** duy nhất.
-3. Sau mặt tiền: Picture Quality (nặng logic, có state) và Display Control (lệnh đơn → `ioctl`).
+3. Sau mặt tiền: Picture Quality (nặng logic, có state) và Panel Control (lệnh đơn → `ioctl`).
 4. Ý đắt nhất: **cùng một ý tưởng ở hai tầng** — Bridge bằng `virtual` ở user-space, bảng con trỏ hàm ở kernel.
 
 **Bản mẫu ~75 giây:**
@@ -1051,7 +1049,7 @@ Người nghe có khung rồi thì ngữ pháp lệch vài chỗ cũng không c�
 >
 > *First, applications don't call the library directly. They call a C++ interface. That boundary is **closed** — same team, same toolchain — so C++ is fine there. The implementation of that interface calls down into the library through a **plain C API**, because the library is loaded by many processes built at different times, and only C gives a stable binary contract. Each C function is also the **single place where we take the inter-process lock**.*
 >
-> *Second, behind that C facade there are two components, split by how much logic they carry. **Picture Quality** — mainly dimming — is algorithm-heavy, stateful, and runs every frame. **Display Control** is simple commands like resolution or refresh rate; it just packs arguments and issues an ioctl. Picture Quality also writes its final brightness through Display Control, so that's the only path to the hardware.*
+> *Second, behind that C facade there are two components, split by how much logic they carry. **Picture Quality** — mainly dimming — is algorithm-heavy, stateful, and runs every frame. **Panel Control** is simple commands like resolution or refresh rate; it just packs arguments and issues an ioctl. Picture Quality also writes its final brightness through Panel Control, so that's the only path to the hardware.*
 >
 > *Third, in the kernel, a core driver that knows nothing about the chip calls through a **function-pointer table**, and each chip driver registers itself into that table at probe time.*
 >
@@ -1067,12 +1065,37 @@ Người nghe có khung rồi thì ngữ pháp lệch vài chỗ cũng không c�
 | *"the kernel uses pointer functions"* | *"the kernel driver **dispatches through a function-pointer table**"* |
 | *"it is decided when building"* | *"the chip is **fixed at build time**; the combination is **chosen at runtime**"* |
 
-**Nền kỹ thuật phải nắm:** [A1 §3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) (narrow waist), §4 (PQ/DC), §6.3 (bảng hai tầng). Câu đuổi chắc chắn tới: *"why not expose the C++ interface directly?"* — trả lời bằng **hai lý do độc lập** ([DP-040](design-patterns.md)).
+**Nền kỹ thuật phải nắm:** [A1 §3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) (narrow waist), §4 (PQ/Panel Control), §6.3 (bảng hai tầng). Câu đuổi chắc chắn tới: *"why not expose the C++ interface directly?"* — trả lời bằng **hai lý do độc lập** ([DP-040](design-patterns.md)).
 
 **Bẫy:**
 1. Kể **danh sách class** thay vì ranh giới. Người nghe tiếng Anh mất mạch nhanh hơn người nghe tiếng Việt.
 2. Sang tiếng Anh thì **co nội dung** lại còn một nửa (lỗi đã đo ở [RES-032](resume.md)). Ba ranh giới phải còn đủ ba.
 3. Nói tên sản phẩm, tên symbol nội bộ. Nói *"a display-control shared library"* là đủ, và nói rõ mình đang giữ ranh giới bảo mật là **điểm cộng** ([A1 §🔒](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
+</details>
+
+#### RES-035 · 🟡 · concept · ⭐ · 🏗️ · [→ A1 §10](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**"Kể anh nghe kiến trúc phần library em làm."** — bắt đầu bằng bản **30 giây**; interviewer nói *"kể thêm"* thì mở sang bản **90 giây**.
+
+> *Nguyên tắc: người không làm TV vẫn hiểu · kể ngắn trước, mở dần · mỗi câu thả một móc vào kiến thức nền. Bản tiếng Anh: [RES-034](resume.md).*
+
+<details><summary>Khung trả lời</summary>
+
+**Interviewer đang dò gì:** ① bạn nhìn hệ thống theo **ranh giới và lý do**, hay theo danh sách class · ② bạn có **điều khiển được độ dài** không — kể gọn rồi để họ chọn chỗ đào · ③ những chỗ bạn thả móc có **đỡ được** khi họ đào vào không.
+
+**Bản 30 giây — ba ranh giới, hai phần, một câu trao quyền:**
+> *"Em làm một shared library điều khiển màn hình, dùng chung cho nhiều dòng sản phẩm và hơn mười dòng chip. Ba ranh giới: app gọi một **C++ interface**; interface gọi xuống library qua **một API C**; library ra lệnh xuống **panel driver trong kernel** bằng `ioctl`. Trong library có hai phần: **Picture Quality tính độ sáng** theo nội dung hình, **Panel Control ra lệnh** cho panel. Đó là bản 30 giây — phần nào anh muốn em mở ra thì em mở."*
+
+**Bản 90 giây — mỗi ranh giới thêm một câu "vì sao":** xem [A1 §10.2](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md). Ba "vì sao" phải có: API C vì library nạp vào **nhiều process build lệch thời gian** · mỗi hàm C là **chỗ duy nhất lấy khoá** vì state nằm trong shared memory · kernel gọi driver chip qua **bảng con trỏ hàm**. Dimming chỉ kể ở mức *"thuật toán + backend điều khiển phần cứng"*.
+
+**Nền kỹ thuật — các móc vừa thả:** bảng [A1 §10.3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md) — `extern "C"`/ABI · shm + semaphore · `__attribute__((constructor))` · `ioctl`/`copy_from_user` · bảng con trỏ hàm · `virtual`. Ôn mỗi chỗ ở **mức hiểu cơ bản**.
+
+**Bẫy:**
+1. Mở đầu bằng tên class hoặc tên pattern — người không làm TV mất mạch ngay.
+2. Kể luôn bản 90 giây khi chưa ai hỏi — lấy mất quyền chọn của interviewer và đốt thời gian.
+3. Tự mở chi tiết backend nhân theo chip × thuật toán — đó là **câu dự phòng**, chỉ nói khi bị hỏi đúng chỗ ([A1 §10.4](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
+4. Nhắc FRC/TCON hoặc thuật ngữ ngành TV không giải thích.
+
+**Chốt:** bản 30 giây là thứ phải **thuộc nguyên văn**; bản 90 giây là thứ phải **hiểu đủ để nói bằng lời của mình**.
 </details>
 
 ---

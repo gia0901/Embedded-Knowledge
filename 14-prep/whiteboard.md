@@ -25,31 +25,40 @@
 
 ## D0 · "Cái này để làm gì?" — 30 giây, cho người chưa biết display
 
-⚠️ **Chỉ vẽ khi cần.** Dấu hiệu cần: họ hỏi *"dimming là gì?"*, hoặc mặt họ ngơ khi bạn nói "FRC". Nếu họ gật đầu theo kịp thì **bỏ qua D0**, vào thẳng D1.
+⚠️ **Chỉ vẽ khi cần.** Dấu hiệu cần: họ hỏi *"dimming là gì?"*, hoặc mặt họ ngơ khi bạn nói về panel. Nếu họ gật đầu theo kịp thì **bỏ qua D0**, vào thẳng D1.
 
-**Ý tưởng cốt lõi: đừng kể ba tính năng — kể BA NÚM VẶN trên cùng một tấm panel.**
+**Ý tưởng cốt lõi: đừng kể tên tính năng — kể HAI CÂU HỎI về cùng một tấm panel.**
 
 ```
                     Anh đang xem một tấm panel
                               |
-        +---------------------+---------------------+
-        |                     |                     |
-   SÁNG BAO NHIÊU?       MƯỢT KHÔNG?          ĐIỀU KHIỂN THẾ NÀO?
-     (dimming)              (FRC)                  (TCON)
-        |                     |                     |
-   chỉnh đèn nền        chèn frame ở giữa      phát tín hiệu timing
-   phía sau panel       24/30fps -> 60Hz        cho hàng/cột của panel
+             +----------------+----------------+
+             |                                 |
+      SÁNG BAO NHIÊU?                   HIỂN THỊ THẾ NÀO?
+   (Picture Quality — dimming)          (Panel Control)
+             |                                 |
+   TÍNH độ sáng theo nội dung       RA LỆNH cho panel: bật/tắt,
+   từng khung hình                  resolution, frame rate, ghi độ sáng
 ```
 
-**Một câu cho mỗi núm — dùng phép so sánh, đừng dùng định nghĩa:**
+**Một câu cho mỗi câu hỏi — dùng phép so sánh, đừng dùng định nghĩa:**
 
-| Núm | Câu nói (≤ 15 giây) |
+| Câu hỏi | Câu nói (≤ 15 giây) |
 |---|---|
-| **Dimming** | *"Đằng sau tấm panel là một dàn đèn LED. Cảnh tối thì mình hạ đèn ở đúng vùng đó xuống — đen sâu hơn, và tốn ít điện hơn."* |
-| **FRC** | *"Phim quay 24 hình/giây, panel chạy 60 hoặc 120. FRC **đoán ra các hình ở giữa** để chuyển động không bị giật."* |
-| **TCON** | *"TCON là con chip nói chuyện trực tiếp với tấm kính — nó biến dữ liệu điểm ảnh thành tín hiệu điện đúng thời điểm cho từng hàng, từng cột."* |
+| **Sáng bao nhiêu** — Picture Quality | *"Đằng sau tấm panel là một dàn đèn LED. Cảnh tối thì mình hạ đèn ở đúng vùng đó xuống — đen sâu hơn, tốn ít điện hơn. Phần này phải **tính toán** theo từng khung hình."* |
+| **Hiển thị thế nào** — Panel Control | *"Bật tắt panel, đổi độ phân giải, đổi số hình mỗi giây, ghi độ sáng đã tính xuống phần cứng. Phần này chỉ là **ra lệnh**, không phải tính."* |
 
-> ⭐ **Vì sao cách kể này ăn điểm:** ba tính năng nghe rời rạc, nhưng *"ba núm vặn trên một tấm panel"* thì ai cũng hình dung được ngay. Và nó **dọn đường cho D2** — vì khi tắt màn hình, bạn phải vặn **cả ba núm theo đúng thứ tự**.
+**Mini-glossary — mỗi từ một câu đời thường:**
+
+| Từ | Câu nói |
+|---|---|
+| **Backlight** | *"Dàn đèn LED phía sau tấm panel."* |
+| **Dimming** | *"Hạ hoặc tăng độ sáng đèn nền theo nội dung hình."* |
+| **Frame rate** | *"Số hình panel vẽ mỗi giây — 60 hay 120."* |
+| **Panel driver** | *"Driver trong kernel nói chuyện trực tiếp với phần cứng của panel."* |
+| **SoC** | *"Con chip chính của TV — CPU và các khối phần cứng trên cùng một chip."* |
+
+> ⭐ **Vì sao cách kể này ăn điểm:** *"tính toán"* vs *"ra lệnh"* là phân biệt ai cũng hiểu, và nó **dọn đường cho D1**: hai câu hỏi chính là hai nhánh của kiến trúc.
 
 ---
 
@@ -108,9 +117,9 @@
                         |
               +---------+---------+
               |                   |
-        +-----+-----+       +-----+------+
-        |  Dimming  |       | FRC / TCON |
-        +-----+-----+       +-----+------+
+        +-----+-----+       +------+--------+
+        |  Dimming  |       | Panel Control |
+        +-----+-----+       +------+--------+
               |                   |
             ioctl            panel_ops
               |                   |
@@ -119,10 +128,10 @@
 
 **Bảng đi kèm — nói, không vẽ:**
 
-| | Dimming | FRC / TCON |
+| | Dimming (Picture Quality) | Panel Control → panel driver |
 |---|---|---|
-| Lượng logic | **nặng** — thuật toán | **mỏng** — lệnh thanh ghi |
-| Sống ở | userspace, C++ | kernel |
+| Lượng logic | **nặng** — thuật toán | **mỏng** — lệnh xuống phần cứng |
+| Sống ở | userspace, C++ | hàm tự do ở library → `ioctl` → panel driver trong kernel |
 | Đa hình đặt ở | Factory chọn `Algo` + `Backend` | bảng `panel_ops` |
 
 > 🗣️ **Nguyên tắc chốt:** *"**Logic nặng đẩy lên userspace, thao tác thanh ghi mỏng giữ trong kernel.**"*
@@ -149,7 +158,7 @@
 >
 > *[vẽ nhịp 2]* *Trên chỗ hẹp có nhiều người dùng, dưới nó có hơn mười dòng chip, ở giữa là **đúng một hợp đồng**. Nên đổi chip thì app **không phải build lại**.*
 >
-> *[vẽ nhịp 3]* *Bên dưới bọn em tách làm hai nhánh, vì **lượng logic khác nhau**: dimming nặng thuật toán nên nằm ở userspace C++; FRC và TCON chỉ là lệnh mỏng xuống SoC nên nằm hẳn trong kernel.*
+> *[vẽ nhịp 3]* *Bên dưới bọn em tách làm hai nhánh, vì **lượng logic khác nhau**: dimming nặng thuật toán nên nằm ở userspace C++; còn bật tắt panel, đổi resolution, đổi frame rate chỉ là lệnh mỏng, đi thẳng xuống **panel driver** trong kernel.*
 >
 > *Nguyên tắc chung: **logic nặng đẩy lên userspace, thao tác thanh ghi mỏng giữ trong kernel**."*
 
@@ -277,7 +286,7 @@ target  ^                                                ^
 
 ---
 
-## D4 · FRC/TCON trong kernel — ba phần và ranh giới license
+## D4 · Panel driver trong kernel — ba phần và ranh giới license
 
 ⚠️ **Sơ đồ khó nhất, và ăn điểm cao nhất.** Chỉ vẽ khi họ hỏi về **kernel driver**, **bảng con trỏ hàm**, hoặc **GPL**. Đừng tự dựng lên — **D4 cần ~2 phút, cộng D4b nữa là ~4 phút**.
 
@@ -463,7 +472,7 @@ Câu này **khó**, và nó là câu thật.
 
 | Họ hỏi | Vẽ | Câu mở đầu |
 |---|---|---|
-| *"dimming là gì?"* · mặt họ ngơ | **D0** rồi **quay lại D1** | *"Cứ hình dung ba núm vặn trên một tấm panel…"* |
+| *"dimming là gì?"* · mặt họ ngơ | **D0** rồi **quay lại D1** | *"Cứ hình dung hai câu hỏi về một tấm panel: sáng bao nhiêu, và hiển thị thế nào…"* |
 | *"vì sao app không phải build lại?"* · *"API ổn định thế nào?"* | **D1 nhịp 2** (cái phễu) | *"Trên nhiều app, dưới hơn 10 chip, giữa một hợp đồng."* |
 | *"các thành phần tương tác ra sao?"* | **D1 nhịp 3** (hai nhánh) | *"Tách hai vì lượng logic khác nhau."* |
 | *"đổi chip thì sửa gì?"* | **D1 nhịp 4** (Factory) | *"Chỉ một backend mới. Không gì ở trên đổi."* |
@@ -523,15 +532,15 @@ Câu này **khó**, và nó là câu thật.
 | Từ | Nghĩa nên nói kèm lần đầu |
 |---|---|
 | **backlight** | *"the LEDs behind the panel"* |
-| **frame rate conversion** | *"filling in frames between the ones you actually have"* |
-| **timing controller (TCON)** | *"the chip that drives the rows and columns of the glass"* |
+| **frame rate** | *"how many pictures the panel draws per second"* |
+| **panel driver** | *"the kernel driver that talks to the panel hardware"* |
 
 **4. Nhãn tiếng Anh cho ranh giới — viết đúng cụm này:** `C ABI` · `user / kernel boundary` · `ioctl` · `GPL boundary` · `function pointer table`. Đây là thuật ngữ chuẩn, người nghe nhận ra ngay.
 
 ### Kịch bản tiếng Anh cho từng sơ đồ
 
-**D0 — ba núm vặn, ~30 giây**
-> *"Think of it as three knobs on one panel. **How bright** — that's dimming; there are LEDs behind the panel and we dim them per region, so dark scenes look deeper and use less power. **How smooth** — that's frame rate conversion; the content is twenty-four frames a second, the panel runs at sixty, so we generate the frames in between. And **how the glass is driven** — that's the timing controller, the chip that turns pixel data into the electrical timing the panel needs."*
+**D0 — hai câu hỏi, ~30 giây**
+> *"Think of two questions about one panel. **How bright should it be?** That's picture quality — mainly dimming. There are LEDs behind the panel, and we dim them per region based on the content, so dark scenes look deeper and use less power. That part **computes** something every frame. **How should the panel be driven?** That's panel control — turning the panel on and off, changing resolution or frame rate, writing the final brightness to the hardware. That part just **issues commands**."*
 
 **D1 — kiến trúc, ~60 giây** *(ba nhịp — vẽ tới đâu nói tới đó)*
 
@@ -542,7 +551,7 @@ Câu này **khó**, và nó là câu thật.
 > *"Let me redraw that middle part, because it's the interesting bit. **Several applications above, more than ten chip families below — and exactly one contract in the middle.** That's what we call the **narrow waist**. It's the reason the application **never gets rebuilt when we change chips**."*
 >
 > *[nhịp 3 — hai nhánh]*
-> *"Under the waist we split into two branches, because **the amount of logic is different**. **Dimming** is algorithm-heavy, so it lives in **user space, in C++**. **Frame rate conversion and the timing controller** are thin register commands, so they stay **in the kernel**.*
+> *"Under the waist we split into two branches, because **the amount of logic is different**. **Dimming** is algorithm-heavy, so it lives in **user space, in C++**. **Panel control** — power, resolution, frame rate — is just thin commands, so it goes straight down to the **panel driver in the kernel**.*
 >
 > *The rule is: **heavy logic goes up to user space, thin register work stays in the kernel**."*
 >
@@ -604,17 +613,17 @@ Câu này **khó**, và nó là câu thật.
 > Bản thu nhỏ của cả sáu sơ đồ. Không đọc để học — **liếc để nhớ hình dạng**.
 
 ```
- D0  ba núm vặn          D1.1 chồng tầng       D1.2 cái phễu
+ D0  hai câu hỏi         D1.1 chồng tầng       D1.2 cái phễu
      |                        App                 \  |  /
- sáng? mượt? điều khiển?      -- C API --          C API
-     đèn  frame   timing      libdisplay          /  |  \
+ sáng bao nhiêu?              -- C API --          C API
+ hiển thị thế nào?            libdisplay          /  |  \
                               -- ioctl --        chipA B C
                               driver / SoC
 
  D1.3 hai nhánh          D1.4 factory          D2  sequence set_power
         C API                 Factory          App  lib  core  chip
        /     \               /      \           |----->|
-  Dimming   FRC/TCON      Algo    Backend       | 1 ramp
+  Dimming   PanelCtl      Algo    Backend       | 1 ramp
    ioctl    panel_ops                           | 2 ioctl -->|
        \     /                                  |   3 blank -->|
          SoC                                    |   4 power_off->|

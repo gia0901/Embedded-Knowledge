@@ -4,7 +4,7 @@
 
 > **TL;DR**
 > - **Ràng buộc không đổi:** nhiều process cùng dùng · hơn 10 dòng chip · nhiều model · ranh giới mở bắt buộc là **C** · hợp đồng ioctl với kernel.
-> - **Giữ nguyên 6 thứ** vì chúng đã đúng: mặt tiền C · tách hai component PQ / DC · Bridge *thuật toán × backend* · chốt chip lúc build · shared memory + semaphore · Display Control **không** trừu tượng hoá.
+> - **Giữ nguyên 6 thứ** vì chúng đã đúng: mặt tiền C · tách hai component PQ / Panel Control · Bridge *thuật toán × backend* · chốt chip lúc build · shared memory + semaphore · Panel Control **không** trừu tượng hoá.
 > - **Vá 5 thứ**, gom thành hai bệnh:
 >   - **Một thứ có nhiều hơn một chủ:**
 >     - ② độ sáng có hai đường ghi ⟹ **passkey**, chỉ PQ ghi được.
@@ -43,7 +43,7 @@ Năm điểm yếu ở A1 trông rời rạc, nhưng hỏi đúng câu thì chú
 | Thứ | Hệ thật có mấy chủ | Điểm yếu |
 |---|---|---|
 | Quyết định *"model này dùng thuật toán nào"* | **M** — mỗi `DimmingFactory` của mỗi chip giữ một bản | #3 |
-| Quyền ghi độ sáng xuống phần cứng | **2** — backend của PQ, và bất kỳ `lib_api_*` nào gọi thẳng DC | #2 |
+| Quyền ghi độ sáng xuống phần cứng | **2** — backend của PQ, và bất kỳ `lib_api_*` nào gọi thẳng Panel Control | #2 |
 | Quyền chạm state trong shared memory | **2 đường** — đường API (có khoá) và vòng vsync (không khoá) | #5a |
 | Vòng vsync | **Process nạp `.so` sau cùng** — tức là không cố định | #5b |
 
@@ -147,22 +147,22 @@ Trên đường **cấu hình**, `dynamic_cast` thực tế là miễn phí. Tr�
 
 ## 3. Vá ② — độ sáng chỉ có **một chủ ghi**: passkey
 
-**Bệnh:** lệnh *"ghi độ sáng xuống phần cứng"* của Display Control là hàm tự do, ai cũng gọi được. Ranh giới *"chỉ PQ ghi độ sáng"* ([A1 §4.2](A1-baseline-libdisplay.md)) là **quy ước**. Nếu một `lib_api_*` mới đi thẳng DC để ghi độ sáng, PQ sẽ đè lại ở khung hình kế tiếp, hai bên giằng co, màn hình nhấp nháy. Lỗi kiểu này **không báo gì**, chỉ lộ khi nhìn bằng mắt.
+**Bệnh:** lệnh *"ghi độ sáng xuống phần cứng"* của Panel Control là hàm tự do, ai cũng gọi được. Ranh giới *"chỉ PQ ghi độ sáng"* ([A1 §4.2](A1-baseline-libdisplay.md)) là **quy ước**. Nếu một `lib_api_*` mới đi thẳng Panel Control để ghi độ sáng, PQ sẽ đè lại ở khung hình kế tiếp, hai bên giằng co, màn hình nhấp nháy. Lỗi kiểu này **không báo gì**, chỉ lộ khi nhìn bằng mắt.
 
-**Cám dỗ sai:** biến DC thành interface + class cho "đúng OOP". Làm vậy là thêm đúng thứ trừu tượng hoá mà [A1 §4.4](A1-baseline-libdisplay.md) đã lập luận là không cần: DC không có biến thể nào ở user-space. Vấn đề ở đây là **quyền gọi**, không phải **đa hình**.
+**Cám dỗ sai:** biến Panel Control thành interface + class cho "đúng OOP". Làm vậy là thêm đúng thứ trừu tượng hoá mà [A1 §4.4](A1-baseline-libdisplay.md) đã lập luận là không cần: Panel Control không có biến thể nào ở user-space. Vấn đề ở đây là **quyền gọi**, không phải **đa hình**.
 
-✅ **Đúng: giữ DC là hàm tự do, nhưng cho lệnh ghi độ sáng đòi một "chìa khoá" mà chỉ PQ tạo được.** Đây là **passkey idiom**: compiler kiểm quyền gọi, không tốn gì lúc chạy.
+✅ **Đúng: giữ Panel Control là hàm tự do, nhưng cho lệnh ghi độ sáng đòi một "chìa khoá" mà chỉ PQ tạo được.** Đây là **passkey idiom**: compiler kiểm quyền gọi, không tốn gì lúc chạy.
 
 ```cpp
-// display_control.h
+// panel_control.h
 class BrightnessKey {
     BrightnessKey() {}                    // ⚠️ KHÔNG dùng "= default" — xem bên dưới
     friend class DimmingBackendBase;      // CHỈ lớp cơ sở của backend PQ tạo được
 };
 
-int32_t dc_set_frequency(int32_t hz);                                // công khai — không cần khoá
-int32_t dc_set_resolution(res_info_t& info);
-int32_t dc_write_brightness(BrightnessKey, int32_t brightness);     // nội bộ — phải có khoá
+int32_t panel_ctl_set_frequency(int32_t hz);                                // công khai — không cần khoá
+int32_t panel_ctl_set_resolution(res_info_t& info);
+int32_t panel_ctl_write_brightness(BrightnessKey, int32_t brightness);     // nội bộ — phải có khoá
 
 // dimming/Backend/DimmingBackendBase.h
 class DimmingBackendBase {
@@ -174,19 +174,19 @@ protected:
 class DimmingBackendChipA_Global : public DimmingBackendBase, public IDimmingBackendGlobal {
 public:
     uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* pInputData) override {
-        return dc_write_brightness(key(), pInputData->value);           // ✅
+        return panel_ctl_write_brightness(key(), pInputData->value);           // ✅
     }
 };
 
 // src_com/lib_api.cpp
 int32_t lib_api_set_something(int32_t v) {
-    return dc_write_brightness(BrightnessKey{}, v);   // ❌ lỗi compile: constructor là private
+    return panel_ctl_write_brightness(BrightnessKey{}, v);   // ❌ lỗi compile: constructor là private
 }
 ```
 
 **Đã kiểm bằng compiler** (`g++ -std=c++17 -Wall -Wextra`):
 
-| Định nghĩa constructor | `lib_api` gọi thẳng `dc_write_brightness(BrightnessKey{}, …)` |
+| Định nghĩa constructor | `lib_api` gọi thẳng `panel_ctl_write_brightness(BrightnessKey{}, …)` |
 |---|---|
 | `BrightnessKey() {}` | ❌ `error: 'BrightnessKey::BrightnessKey()' is private within this context` |
 | `BrightnessKey() = default;` — C++17 | ⚠️ **compile sạch** — chìa khoá bị vượt qua |
@@ -198,10 +198,10 @@ int32_t lib_api_set_something(int32_t v) {
 |---|---|---|
 | Ai ghi được độ sáng | Bất kỳ ai | **Chỉ backend PQ** |
 | Ai đó lỡ thêm đường ghi thứ hai | Compile sạch, nhấp nháy ngoài hiện trường | **Lỗi compile** |
-| DC có thêm interface/class? | — | **Không** — vẫn là hàm tự do |
+| Panel Control có thêm interface/class? | — | **Không** — vẫn là hàm tự do |
 | Chi phí lúc chạy | — | **0** — `BrightnessKey` rỗng, bị tối ưu mất |
 
-> 🗣️ **Câu nói ở phỏng vấn:** *"Tôi không thêm pattern vào Display Control, vì nó không có biến thể. Tôi chỉ thêm một **quyền**: lệnh ghi độ sáng đòi một chìa khoá mà chỉ Picture Quality tạo được. Ranh giới vốn là quy ước giờ thành thứ compiler kiểm."*
+> 🗣️ **Câu nói ở phỏng vấn:** *"Tôi không thêm pattern vào Panel Control, vì nó không có biến thể. Tôi chỉ thêm một **quyền**: lệnh ghi độ sáng đòi một chìa khoá mà chỉ Picture Quality tạo được. Ranh giới vốn là quy ước giờ thành thứ compiler kiểm."*
 
 ---
 
@@ -360,11 +360,11 @@ Một câu trả lời "làm lại" mà đổi hết là tín hiệu **xấu**. 
 | Giữ | Vì sao |
 |---|---|
 | **Mặt tiền C (narrow waist)** | Quyết định đúng nhất của cả hệ: một binary phục vụ nhiều process build lệch thời gian, **miễn nhiễm** với lớp bug vtable ([A2 §3.3](A2-cpp-interface-hal.md)) |
-| **Tách PQ / DC theo lượng logic** | Đúng chỗ; chỉ thiếu **quyền ghi** (§3), không thiếu cấu trúc |
+| **Tách PQ / Panel Control theo lượng logic** | Đúng chỗ; chỉ thiếu **quyền ghi** (§3), không thiếu cấu trúc |
 | **Bridge: thuật toán × backend** | Phần đắt (thuật toán) viết đúng một lần; chỉ đổi kiểu backend cho chặt (§2, §4) |
 | **Chốt chip lúc build** | Binary không mang byte nào của chip khác; vá §4 vẫn giữ nguyên cơ chế này |
 | **Shared memory + named semaphore** | Mô hình đúng cho state đa process; chỉ đổi *chỗ đặt khoá* (§6) |
-| **Display Control KHÔNG trừu tượng hoá** | Biến thể chip đã nằm ở kernel driver; ngay cả vá §3 cũng giữ DC là hàm tự do |
+| **Panel Control KHÔNG trừu tượng hoá** | Biến thể chip đã nằm ở kernel driver; ngay cả vá §3 cũng giữ Panel Control là hàm tự do |
 
 ### 7.1 Nhắc lại phép thử trước khi trừu tượng hoá
 
@@ -374,7 +374,7 @@ Ba câu, "không" ở bất kỳ câu nào thì đừng làm:
 2. Chúng khác nhau về **hành vi**, hay chỉ khác **tham số**? *(Chỉ khác tham số ⟹ truyền dữ liệu cấu hình, không tạo lớp con.)*
 3. Có ai thật sự cần **hoán đổi** chúng không?
 
-Dimming đạt cả ba. Display Control **trượt ngay câu 1** ở user-space: biến thể theo chip đã bị kernel driver hấp thụ ⟹ để nguyên hàm gọi thẳng.
+Dimming đạt cả ba. Panel Control **trượt ngay câu 1** ở user-space: biến thể theo chip đã bị kernel driver hấp thụ ⟹ để nguyên hàm gọi thẳng.
 
 > **Cách nói ở phỏng vấn (học thuộc ý):** *"Phần chất lượng hình có logic nặng và biến thể thật nên đi qua interface + factory. Phần điều khiển panel chỉ là lệnh đơn, và khác biệt giữa các chip đã nằm trong driver, nên tôi để hàm gọi thẳng; bọc lại sẽ thêm một tầng gián tiếp mà không mua được gì. Trừu tượng hoá nên trả giá cho một biến thể **đã tồn tại**, không phải cho một biến thể tưởng tượng."*
 
@@ -401,9 +401,9 @@ flowchart TD
 
     SHM[("display_shm_info<br/><i>chạm được CHỈ qua lock_lib_shm()</i>")]
 
-    subgraph DC["DISPLAY CONTROL — vẫn là hàm tự do"]
-        PUB["dc_set_frequency · dc_set_resolution …<br/><i>công khai</i>"]
-        PRIV["dc_write_brightness(BrightnessKey, …)<br/><i>chỉ backend PQ có chìa khoá</i>"]
+    subgraph DC["PANEL CONTROL — vẫn là hàm tự do"]
+        PUB["panel_ctl_set_frequency · panel_ctl_set_resolution …<br/><i>công khai</i>"]
+        PRIV["panel_ctl_write_brightness(BrightnessKey, …)<br/><i>chỉ backend PQ có chìa khoá</i>"]
     end
 
     API -->|"cần tính toán"| MK

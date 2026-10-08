@@ -76,7 +76,7 @@ Lý do cắt — nói thẳng để lần sau không ai lặng lẽ kéo ngượ
 
 Đây là phần đáng mang vào phỏng vấn hơn cả danh sách pattern.
 
-1. **Không phải chỗ nào cũng cần pattern.** Display Control chỉ là *lệnh đơn xuống kernel* (nguồn panel, resolution, tần số…), và khác biệt giữa các chip đã nằm trong driver — trừu tượng hoá nó là chi phí thuần tuý. Nói được **chỗ mình cố tình không dùng** là tín hiệu senior rõ hơn kể tên năm pattern. Chi tiết: [A1 §4.4](A1-baseline-libdisplay.md) · [B1 §7.1](B1-redesign-architecture.md).
+1. **Không phải chỗ nào cũng cần pattern.** Panel Control chỉ là *lệnh đơn xuống kernel* (nguồn panel, resolution, tần số…), và khác biệt giữa các chip đã nằm trong driver — trừu tượng hoá nó là chi phí thuần tuý. Nói được **chỗ mình cố tình không dùng** là tín hiệu senior rõ hơn kể tên năm pattern. Chi tiết: [A1 §4.4](A1-baseline-libdisplay.md) · [B1 §7.1](B1-redesign-architecture.md).
 2. **Pattern trả lời "biến thiên ở đâu".** Trước khi chọn pattern, viết ra **trục biến thiên**: *cái gì thay đổi, cái gì đứng yên*. Dimming biến thiên theo **thuật toán**; video-enhancer biến thiên theo **SoC**. Hai trục khác nhau ⟹ hai pattern khác nhau, dù nhìn qua đều là "kế thừa từ một class gốc".
 3. **Qua ranh giới `.so`, pattern nào cũng phải trả thêm giá ABI.** Virtual interface là **hợp đồng nhị phân**, không chỉ hợp đồng biên dịch. Đã kiểm chứng thật: chèn một virtual vào giữa `IDisplay` ⟹ app gọi hàm này nhưng **destructor chạy**, không crash, exit 0 — **kể cả khi version check của hai bên khớp nhau**. Xem [A2 §3.3](A2-cpp-interface-hal.md).
 
@@ -96,7 +96,7 @@ Lý do cắt — nói thẳng để lần sau không ai lặng lẽ kéo ngượ
 
 | # | File | Nội dung |
 |---|------|----------|
-| 🅰️ | [A1-baseline-libdisplay.md](A1-baseline-libdisplay.md) | **Bắt đầu ở đây.** Kiến trúc `libdisplay`: narrow waist hai tầng · hai component **Picture Quality / Display Control** · case study **dimming = Bridge** · kernel `panel_ops` = **Bridge viết bằng C** · **5 điểm yếu tự nhận** · bản nói 75 giây |
+| 🅰️ | [A1-baseline-libdisplay.md](A1-baseline-libdisplay.md) | **Bắt đầu ở đây.** Kiến trúc `libdisplay`: narrow waist hai tầng · hai component **Picture Quality / Panel Control** · case study **dimming = Bridge** · kernel `panel_ops` = **Bridge viết bằng C** · **5 điểm yếu tự nhận** · bản nói 75 giây |
 | 🅰️ | [A2-cpp-interface-hal.md](A2-cpp-interface-hal.md) | **Tầng 0** của A1 — ranh giới C++ interface/impl: mổ từng mảnh, 3 rủi ro đã đo bằng máy, **pack code chạy được** + **5 bài lab 🧪** |
 | 🅱️ | [B1-redesign-architecture.md](B1-redesign-architecture.md) | Vá 5 điểm yếu theo luật **"mỗi thứ một chủ"**: ISP + capability · passkey cho lệnh ghi độ sáng · factory backend theo chip · `-ENOTSUP` · khoá đi cùng state + một process chủ cho vsync. Kèm **thứ tự ưu tiên theo rủi ro** |
 | 🅱️ | [B2-redesign-events.md](B2-redesign-events.md) | Observer + hysteresis · Command + `apply_at` · Memento/Preset |
@@ -108,7 +108,7 @@ App
  └─ IDisplay / DisplayImpl            ← 🅰️ A2 · ranh giới KHÉP · C++
       └─ lib_api_*                    ← chỗ hẹp · ranh giới MỞ · extern "C"
            ├─ Picture Quality         ← 🅰️ A1 (thật) · 🅱️ B1 (làm lại)
-           └─ Display Control         ← lệnh đơn, cố ý không pattern
+           └─ Panel Control         ← lệnh đơn, cố ý không pattern
                 └─ ioctl → drv_panel_core → panel_ops → drv_panel_chipX   ← 🅰️ A1 §6
 ```
 
@@ -123,10 +123,10 @@ App
 | Shared library | **`libdisplay`** |
 | Mặt tiền C của library | **`lib_api_*`** (`lib_api.h`) |
 | C++ interface Tầng 0 | **`IDisplay`** / **`DisplayImpl`** |
-| Hai component sau mặt tiền | **Picture Quality (PQ)** · **Display Control (DC)** |
+| Hai component sau mặt tiền | **Picture Quality (PQ)** · **Panel Control** *(cùng chữ "panel" với panel driver ở kernel; viết đầy đủ, không viết tắt "PC")* |
 | Hợp đồng module PQ | `lib_dimming_interface` · `lib_video_enhancement_interface` · `lib_ambient_interface` |
 | Implementation module PQ | `lib_dimming` · `lib_video_enhancement` · `lib_ambient` · khởi tạo tại `lib_init_modules()` |
-| Display Control | hàm tự do `dc_*` (`display_control.cpp`) · *(B)* lệnh ghi độ sáng đòi **`BrightnessKey`**, chỉ `DimmingBackendBase` tạo được |
+| Panel Control | hàm tự do `panel_ctl_*` (`panel_control.cpp`) · *(B)* lệnh ghi độ sáng đòi **`BrightnessKey`**, chỉ `DimmingBackendBase` tạo được |
 | Abstraction thuật toán dimming | **`IDimmingAlgo`** — `GlobalDimming` · `LocalDimming` · `OLEDDimming` *(A)* → **`IDimmingAlgo` cắt còn lõi** (`SetBacklight` · `t_vSyncCallBack` · `GetCaps`) + `ILocalDimming` · `IOLEDDimming` · `IAmbientMode` *(B)* |
 | Implementor (ghi phần cứng) | **`IDimmingBackend`** → `DimmingBackendChipA_Global` · `ChipA_Local` · … *(A)* → **`IDimmingBackendGlobal` · `IDimmingBackendLocal` · `IDimmingBackendOLED`**, giữ nguyên tên hàm `t_Set2DFinalDuty` · `t_SetLdFinalDuty` *(B)* |
 | Factory | `DimmingFactory` — mỗi chip một bản *(A)* → **`DimmingFactory` một bản chung** (`CreateDimmingObject`) + **`DimmingBackendFactoryChipX`** mỗi chip (`IDimmingBackendFactory`, `CreateDimmingBackendFactory()`) *(B)* |
@@ -136,15 +136,16 @@ App
 | **Kernel — module export + bridge** (1 `.ko`, proprietary) | **`drv_panel_shim`** *(gồm `shim_export` + `shim_bridge`)* |
 | **Kernel — driver thật theo chip** (proprietary, hơn 10 loại) | **`drv_panel_chipA`** · `chipB` · … |
 | **Bảng con trỏ hàm trong bridge** | **`panel_ops`** |
+| **Gọi chung ba module kernel ở trên** khi kể ngắn | **panel driver** — *"driver trong kernel điều khiển panel: bật tắt, resolution, frame rate, backlight"* |
 
-**Khử ở mức nội dung:** bỏ hẳn tên/phiên bản OS nền · số lượng chip làm tròn (*"hơn 10"*) · giữ `~150 virtual` (luận cứ ISP) · giữ loại sản phẩm chung (TV/Signage/Monitor) · không nhắc FRC/TCON và thuật ngữ đo sáng (APL, histogram, PWM duty) — viết *"giá trị độ sáng cuối"*.
+**Khử ở mức nội dung:** bỏ hẳn tên/phiên bản OS nền · số lượng chip làm tròn (*"hơn 10"*) · giữ `~150 virtual` (luận cứ ISP) · giữ loại sản phẩm chung (TV/Signage/Monitor) · **không nhắc FRC/TCON** (gộp vào Panel Control + panel driver, để người không làm TV vẫn hiểu) và thuật ngữ đo sáng (APL, histogram, PWM duty) — viết *"giá trị độ sáng cuối"* · **kể dimming ở mức "thuật toán + backend điều khiển phần cứng"**; chi tiết backend nhân theo chip × thuật toán chỉ là **câu dự phòng** khi bị hỏi ([A1 §5.4](A1-baseline-libdisplay.md)).
 
 ## Liên kết ngoài topic
 
 - ABI của virtual interface qua `.so`: [07/abi-versioning.md](../../07-shared-libraries/abi-versioning.md) · [07/linking-loading.md](../../07-shared-libraries/linking-loading.md)
 - Thiết kế API thư viện, Pimpl: [07/api-design.md](../../07-shared-libraries/api-design.md)
 - Chi phí virtual/heap trên hệ hạn chế: [08/constraints.md](../../08-embedded-systems/constraints.md)
-- Câu hỏi: mục **E** trong [bank/design-patterns.md](../../14-prep/mock-interview/bank/design-patterns.md) — case study `libdisplay` + HAL (`DP-021` trở đi, gồm `DP-040`…`DP-047` cho kiến trúc PQ/DC, kernel `panel_ops` và các bản vá ở B1)
+- Câu hỏi: mục **E** trong [bank/design-patterns.md](../../14-prep/mock-interview/bank/design-patterns.md) — case study `libdisplay` + HAL (`DP-021` trở đi, gồm `DP-040`…`DP-047` cho kiến trúc PQ/Panel Control, kernel `panel_ops` và các bản vá ở B1)
 
 ---
 ⬅️ [Về index topic 11](../README.md) · ➡️ Bắt đầu: [B1-redesign-architecture.md](B1-redesign-architecture.md)

@@ -441,7 +441,7 @@ enum class Status: std::uint8_t;   // forward declare + chọn size — hữu í
 
 Trường hợp unscoped enum còn hữu ích: đặt tên index cho `std::get<>` của tuple (tận dụng implicit conversion sang `size_t`).
 
-**Item 11 (tr. 74) — `= delete` thay cho "private + không định nghĩa".** Cách C++98 (khai báo private, không implement) chặn theo **hai cửa**: code **ngoài** class bị chặn lúc **compile** (access check, vì `private`); còn **member/friend** qua được access check nên chỉ bị chặn lúc **link** (thiếu định nghĩa), với thông báo `undefined reference` không chỉ ra dòng gọi. *(⚠️ Sửa 2026-10-05: bản trước ghi "chỉ chặn ở link time và chỉ với code ngoài class", tức đảo ngược. Output thật ở [CPP-045](../14-prep/mock-interview/bank/cpp.md).)* `= delete`:
+**Item 11 (tr. 74) — `= delete` thay cho "private + không định nghĩa".** Cách C++98 (khai báo private, không implement) chặn theo **hai cửa**: code **ngoài** class bị chặn lúc **compile** (access check, vì `private`); còn **member/friend** qua được access check nên chỉ bị chặn lúc **link** (thiếu định nghĩa), với thông báo `undefined reference` không chỉ ra dòng gọi. *(Output thật của cả hai trường hợp: [CPP-045](../14-prep/mock-interview/bank/cpp.md).)* `= delete`:
 - Lỗi ngay **compile time**, kể cả khi member/friend gọi.
 - Dùng được cho **hàm tự do** và **template specialization** — chặn overload/instantiation không mong muốn:
 
