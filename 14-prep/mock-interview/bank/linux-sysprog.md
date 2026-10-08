@@ -1171,10 +1171,81 @@ B: sem_timedwait -> -1 (Connection timed out)
 
 **Bẫy:**
 1. *"Kernel tự nhả khoá khi process chết"*: đúng với fd, `flock`, robust mutex; **sai** với POSIX semaphore.
-2. Sửa bằng cách *"tăng semaphore lên 1 khi thấy treo"*: không biết process cũ chết hay chỉ đang chậm ⟹ có thể cho hai bên cùng vào.
+2. Sửa bằng cách *"tăng semaphore lên 1 khi thấy treo"*: không biết process cũ chết hay chỉ đang chậm ⟹ có thể cho hai bên cùng vào. Hệ thật dùng đúng cách này (giữ quá ~7 giây thì reset) — output chạy thật và cách sửa ở [LNX-046](linux-sysprog.md).
 3. Chỉ nghĩ tới khoá, quên state trong shm đang dở dang.
 
 **Chốt:** *"Semaphore là bộ đếm không chủ nên kernel không nhả hộ được. Process chết khi giữ nó là mọi caller sau treo. Phát hiện bằng `sem_timedwait` + lịch sử người gọi; muốn khôi phục thì dùng robust mutex và phải sửa state dở dang."*
+</details>
+
+#### LNX-046 · 🟠 · concept · ⭐ · 🎤 2026-10-08 · [→ ipc-linux §4.3](../../../04-linux-system-programming/ipc-linux.md), [A1 §7.2](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
+**Library của bạn khoá liên process bằng semaphore chứ không phải mutex. Vì sao chọn vậy, và mất gì? Hệ bù bằng luật *"giữ khoá quá 7 giây thì reset semaphore để API khác chạy tiếp"* — luật đó hỏng ở đâu? Nếu được sửa, bạn làm gì với cả khoá lẫn state đang ghi dở?**
+
+<details><summary>Đáp án</summary>
+
+**Vì sao chọn semaphore — ba lý do thật, nói theo thứ tự này:**
+1. **Cần khoá liên process, và semaphore là cách ít bước nhất.** Một lời gọi là có (`sem_open` theo tên, hoặc `sem_init` với `pshared = 1` trong shm). Mutex của pthread mặc định chỉ dùng trong **một** process; muốn liên process phải đặt nó trong shm và khởi tạo với `PTHREAD_PROCESS_SHARED` — quên attribute đó thì hỏng **im lặng** ([ipc-linux §4.3](../../../04-linux-system-programming/ipc-linux.md)).
+2. **Legacy đã chạy ổn nhiều năm.** Đổi primitive đồng bộ của một library nạp vào mọi process là thay đổi rủi ro cao, lợi ích chỉ thấy ở ca hiếm (process chết khi đang giữ khoá).
+3. **Semaphore mở được từ bất kỳ đâu** ⟹ hệ tận dụng điều đó để tự cứu: quá hạn thì reset. Đây vừa là lý do, vừa là cái giá (xem dưới).
+
+**Mất gì — cả ba đều từ một gốc: semaphore KHÔNG CÓ CHỦ** ([OS-007](os.md)):
+
+| Mất | Hệ quả trong library |
+|---|---|
+| Không biết ai đang giữ | Process chết khi giữ ⟹ kernel không nhả hộ, không có `EOWNERDEAD` ⟹ mọi caller sau treo ([LNX-045](linux-sysprog.md)) |
+| Không phát hiện khoá lại chính mình | Hàm khoá gọi hàm khoá ⟹ tự deadlock, không báo lỗi ([DP-040](design-patterns.md)) |
+| Ai cũng `sem_post` được | Một lần post thừa ⟹ hai bên cùng vào vùng găng |
+| Không có priority inheritance | Caller ưu tiên cao có thể bị chặn bởi caller ưu tiên thấp |
+
+**Luật "quá 7 giây thì reset" hỏng ở hai chỗ** — chạy thật (gcc 11.4, Linux 6.8). A giữ khoá và **chỉ chậm** (3 s, không chết); B chờ 1 s rồi reset:
+```
+A: vao vung gang, ghi mode=2... (dang cham, 3 s)
+B: qua han -> reset semaphore (sem_post) roi vao
+B: vao vung gang, so process dang o trong = 2, thay mode=2 backlight=50
+A: xong, sem_post
+Cuoi cung: gia tri semaphore = 2 (khoa nhi phan le ra chi duoc la 0 hoac 1)
+```
+1. **Không phân biệt *chết* với *chậm*.** A còn sống ⟹ hai process cùng ở trong vùng găng. Sau đó A `sem_post` ⟹ semaphore lên **2** ⟹ từ giờ khoá cho **hai** bên vào cùng lúc, mãi mãi.
+2. **State dở dang vẫn nằm đó.** B đọc `mode` mới với `backlight` cũ — một tổ hợp chưa ai từng ghi.
+
+**Sửa — ba bậc, từ ít thay đổi nhất:**
+
+| Bậc | Khoá | State dở dang |
+|---|---|---|
+| ① Giữ semaphore | Ngay sau `sem_wait`, ghi **PID chủ** vào shm. Quá hạn thì kiểm PID đó: **đã chết** mới reset; **còn sống** thì log (đã có lịch sử người gọi) và chờ tiếp / trả lỗi | Cờ `dirty` bật trước khi ghi, tắt sau khi ghi. Reset mà gặp `dirty` ⟹ nạp lại state từ driver (phần cứng là nguồn thật) hoặc về mặc định |
+| ② ⭐ Robust mutex trong shm | `PTHREAD_PROCESS_SHARED` + `PTHREAD_MUTEX_ROBUST` ⟹ **chỉ** khi chủ thật sự chết mới trả `EOWNERDEAD`; chủ chậm thì cứ chờ | **Ghi kiểu commit:** chép bản đang dùng sang bản nháp → ghi vào nháp → đổi chỉ số bằng **một** phép ghi. Chết trước bước cuối ⟹ bản cũ còn nguyên |
+| ③ Một daemon sở hữu state | Client không cầm khoá nào của nhau | Chỉ daemon ghi state ⟹ client chết không để lại gì dở. Đổi lại phải sửa kiến trúc ([B1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)) |
+
+Chạy thật bậc ②: A giữ robust mutex, ghi `mode=2` rồi bị `SIGKILL` trước khi ghi `backlight` và trước khi đổi chỉ số:
+```
+A: giu khoa, ghi mode=2 backlight=80... bi kill -9 giua chung
+B: pthread_mutex_lock -> EOWNERDEAD
+B: cach ghi thang : mode=2 backlight=50  <- lan lon cu/moi
+B: cach ghi commit: mode=1 backlight=50  <- nguyen ban cu, nhat quan
+B: ghi lai tron ven -> mode=2 backlight=80
+```
+Mã nguồn hai thí nghiệm: [log R1′ 08/10](../sessions/2026-10-08--R1prime--ke-lai-kien-truc.md).
+
+**Phần lõi của bậc ②** (bên nhận `EOWNERDEAD` phải tuyên bố state đã ổn rồi mới dùng tiếp):
+```c
+int rc = pthread_mutex_lock(&shm->m);
+if (rc == EOWNERDEAD) {
+    /* bản đang dùng (slot[active]) luôn nhất quán nhờ ghi kiểu commit ⟹ không cần sửa gì */
+    pthread_mutex_consistent(&shm->m);
+}
+```
+
+**🎙️ Bản nói (~45″):**
+> *"Bọn em dùng semaphore vì cần khoá liên process và nó là cách ít bước nhất, lại là thiết kế đã chạy ổn nhiều năm. Cái giá là semaphore không có chủ: process chết khi đang giữ thì kernel không nhả hộ. Hệ bù bằng timeout: giữ quá 7 giây thì reset. Cách đó có hai lỗ: không phân biệt process chết với process chỉ chậm, nên có thể cho hai bên cùng vào; và state ghi dở vẫn nằm đó. Nếu sửa, em dùng robust mutex trong shared memory để chỉ khôi phục khi chủ thật sự chết, và ghi state kiểu commit để chết giữa chừng thì bản cũ còn nguyên. Không được đổi primitive thì ít nhất ghi PID chủ cạnh semaphore và chỉ reset khi PID đó đã chết."*
+
+> 🔺 *T3, không chấm:* kiểm PID còn sống bằng `kill(pid, 0)` (trả `ESRCH` nếu đã chết) — có lỗ hẹp khi PID bị tái dùng; robust mutex không có lỗ đó vì kernel theo dõi chủ khoá qua *robust list* của từng thread.
+
+**Bẫy:**
+1. *"Mutex không dùng được giữa các process"* — sai; dùng được với `PTHREAD_PROCESS_SHARED`. Lý do thật là **ít bước + legacy**, không phải *"không có cách khác"*.
+2. *"Semaphore nhanh hơn"* — không phải lý do chọn ở đây; cả hai đều chỉ vào kernel khi có tranh chấp.
+3. Chỉ sửa khoá, quên state ghi dở.
+4. Chê thiết kế cũ. Nói như người **hiểu đánh đổi**: lý do chọn → cái giá → hệ bù thế nào → bù chưa đủ ở đâu → sửa ra sao.
+
+**Chốt:** *"Semaphore được chọn vì đơn giản và đã chạy ổn; cái giá là không có chủ. Timeout-reset không phân biệt chết với chậm và bỏ qua state dở. Sửa: robust mutex để biết chủ chết thật, ghi kiểu commit để chết giữa chừng không để lại state nửa vời."*
 </details>
 
 ---

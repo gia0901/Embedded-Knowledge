@@ -206,6 +206,10 @@ ROBUST          lock() -> EOWNERDEAD   <-- cứu được, gọi mutex_consisten
 ```
 *(Đo bằng `pthread_mutex_timedlock` để thí nghiệm không treo thật; trong code thật `pthread_mutex_lock` sẽ không bao giờ trả về.)* Lưu ý dòng cuối: dữ liệu **vẫn còn đó** — nhưng bạn **không biết nó đã hoàn chỉnh hay đang dở dang**, nên `repair_shared_state()` không phải thủ tục cho có.
 
+**Cách làm cho `repair_shared_state()` gần như không phải làm gì — ghi kiểu commit:** giữ **hai bản** state và một chỉ số `active`. Muốn ghi: chép bản đang dùng sang bản nháp → sửa bản nháp → đổi `active` bằng **một** phép ghi. Chết ở bất kỳ bước nào trước bước cuối thì bản đang dùng vẫn là bản cũ, nguyên vẹn. Ghi thẳng từng trường thì chết giữa chừng để lại một tổ hợp **chưa ai từng ghi** (trường mới + trường cũ).
+
+**⚠️ Đừng chữa bằng "chờ quá N giây thì tự mở khoá".** Hết hạn không có nghĩa là chủ khoá đã chết — nó có thể chỉ đang chậm. Mở khoá lúc đó cho **hai** bên cùng vào vùng găng; với semaphore, lần `post` của chủ cũ sau đó còn đẩy giá trị lên 2, tức khoá hỏng vĩnh viễn. Output chạy thật của cả hai ý (timeout-reset và ghi kiểu commit): [LNX-046](../14-prep/mock-interview/bank/linux-sysprog.md).
+
 ### 4.4. Shared memory **không có cơ chế báo hiệu**
 
 `mmap` không cho bạn biết *"khi nào có dữ liệu mới"* — bạn chỉ có bộ nhớ. Ba lựa chọn: **busy-poll** (đốt CPU, chỉ hợp latency cực thấp), **semaphore/condvar process-shared** (không cắm được vào `epoll`), hoặc ⭐ **`eventfd` đi kèm** — bên ghi `write` 1 byte để đánh thức, cắm thẳng vào event loop.
@@ -358,6 +362,7 @@ Nhanh hơn TCP loopback vì **không đi qua stack TCP/IP** (không checksum, kh
 | [LNX-036](../14-prep/mock-interview/bank/linux-sysprog.md) | POSIX IPC và System V IPC khác nhau? Nên dùng cái nào? |
 | [LNX-044](../14-prep/mock-interview/bank/linux-sysprog.md) | Thread nhận nằm chặn trong `mq_receive` — tắt máy thì dừng nó bằng cách nào? |
 | [LNX-045](../14-prep/mock-interview/bank/linux-sysprog.md) ⭐ | Process chết khi đang giữ named semaphore — các process khác ra sao, vì sao không có `EOWNERDEAD`? |
+| [LNX-046](../14-prep/mock-interview/bank/linux-sysprog.md) ⭐ | Vì sao khoá liên process bằng semaphore chứ không mutex — mất gì, "quá hạn thì reset" hỏng ở đâu, sửa thế nào |
 
 ---
 ⬅️ [io-multiplexing.md](io-multiplexing.md) · ➡️ Tiếp theo: [05-drivers-device-tree/](../05-drivers-device-tree/)

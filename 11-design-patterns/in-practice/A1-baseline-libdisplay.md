@@ -616,7 +616,7 @@ Mỗi thuật toán giữ **reference** tới phần shared memory của nó, bi
 
 > 💡 `prev_called_proc` lưu lịch sử process đã gọi, để khi deadlock còn biết ai giữ khoá. Đây là chi tiết **thiết kế cho lúc debug**, rất "thực chiến" khi bị hỏi *"hệ này debug kiểu gì?"*.
 
-⚠️ **Rủi ro của chính idiom này:** named semaphore **không có chủ sở hữu**. Một process chết khi đang giữ nó (crash, bị `kill -9`) thì kernel không biết phải nhả hộ ai ⟹ mọi process khác treo ở `lib_api_*` kế tiếp. Đó là lý do `prev_called_proc` tồn tại, và là câu interviewer sẽ khoan ([LNX-045](../../14-prep/mock-interview/bank/linux-sysprog.md)). Cơ chế và ba cách xử lý: [ipc-linux §4.3](../../04-linux-system-programming/ipc-linux.md).
+⚠️ **Rủi ro của chính idiom này:** named semaphore **không có chủ sở hữu**. Một process chết khi đang giữ nó (crash, bị `kill -9`) thì kernel không biết phải nhả hộ ai ⟹ mọi process khác treo ở `lib_api_*` kế tiếp. Đó là lý do `prev_called_proc` tồn tại, và là câu interviewer sẽ khoan ([LNX-045](../../14-prep/mock-interview/bank/linux-sysprog.md)). Hệ bù thêm bằng timeout: một API giữ khoá quá **~7 giây** thì semaphore bị reset để các API khác chạy tiếp. Luật đó không phân biệt process **chết** với process chỉ **chậm**, và để nguyên state đang ghi dở — phân tích, output chạy thật và cách sửa ở [LNX-046](../../14-prep/mock-interview/bank/linux-sysprog.md). Cơ chế và ba cách xử lý: [ipc-linux §4.3](../../04-linux-system-programming/ipc-linux.md).
 
 ### 7.3 Hai khoá ở hai tầng — không thừa
 
@@ -1549,6 +1549,7 @@ TEST(PanelOps, NullSlotReturnsNotSupported) {
 | [DP-048](../../14-prep/mock-interview/bank/design-patterns.md) | Khoá ở mặt tiền rồi, driver kernel còn khoá nữa — thừa không? |
 | [DP-049](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Vòng vsync chạm shm không khoá — đổi mọi field sang `std::atomic` đủ chưa? |
 | [LNX-045](../../14-prep/mock-interview/bank/linux-sysprog.md) ⭐ | Process chết khi đang giữ named semaphore của library — chuyện gì xảy ra? |
+| [LNX-046](../../14-prep/mock-interview/bank/linux-sysprog.md) ⭐ | Vì sao khoá bằng semaphore chứ không mutex — và luật "giữ quá 7 giây thì reset" hỏng ở đâu |
 | [RES-035](../../14-prep/mock-interview/bank/resume.md) ⭐ | *"Kể anh nghe kiến trúc phần library em làm"* — bản 30 giây, rồi 90 giây (§10) |
 | [RES-034](../../14-prep/mock-interview/bank/resume.md) 🇬🇧 | *"Walk me through the architecture of the library you worked on."* |
 | [DP-024](../../14-prep/mock-interview/bank/design-patterns.md) ⭐ | Lệnh đơn để nguyên hàm gọi thẳng — vì sao không bọc cho đồng bộ? |
