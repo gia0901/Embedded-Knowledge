@@ -1004,6 +1004,8 @@ Output trên là chạy thật (gcc 11.4). Dòng cuối là chỗ ít người b
 
 **Vì sao không race:** khởi tạo chạy trong `__attribute__((constructor))`, tức **trước khi process tạo thread nào** ⟹ không có check-then-act cạnh tranh. Đây là cách chữa race khác magic statics: **dời khởi tạo ra khỏi vùng có cạnh tranh**.
 
+**Bẫy:** gộp hai hàm tên gần giống. `get_dimming_instance()` (tầng `lib_base`, câu này) là **con trỏ toàn cục** gán trong constructor của `.so` ⟹ Service Locator, chống race bằng **thời điểm khởi tạo**. `DimmingFactory::GetDimmingInstance()` (bên trong `lib_dimming`, [A1 §5.6](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)) dùng **static local** ⟹ Meyers Singleton, chống race bằng **magic static**. Trả lời *"khởi tạo bằng Meyers singleton trong constructor"* là trộn hai tầng.
+
 **Chốt:** *Object rẻ và lặp lại theo process; state là duy nhất và nằm ở shared memory — nên khoá bảo vệ state, không bảo vệ object.*
 </details>
 
@@ -1093,6 +1095,22 @@ exit=139
 | Cache build còn object cũ | "Build cùng lúc" nhưng không thật sự build lại hết |
 
 ⟹ Giữ RPM làm tuyến chính, **cộng** hai lớp rẻ ở cấu trúc: ① chỉ thêm slot vào **cuối** struct, ② trường `size`/`version` ở đầu struct, driver nền **kiểm lúc đăng ký** và từ chối bảng không khớp. *(Pin phiên bản giữa các gói con bằng `Requires: … = %{version}` trong spec cũng giúp, nhưng vẫn là quy trình.)* ⚠️ *"Rebuild toàn bộ"* không phải câu trả lời: nó không chặn được `.ko` cũ **đang còn trên máy**.
+
+**Dòng kiểm `size` viết thế nào** — thêm `get_temp` vào **cuối**, `.ko` cũ điền bảng ngắn hơn. Driver nền kiểm *"slot này có nằm trong bảng bên kia điền không, và đã điền chưa"* trước khi gọi:
+```c
+#define HAS_OP(ops, f) ((ops)->size >= offsetof(struct panel_ops, f) + sizeof((ops)->f) && (ops)->f)
+
+static int core_get_temp(const struct panel_ops *ops, int *t) {
+    if (!HAS_OP(ops, get_temp)) return -ENOTSUP;    /* bảng cũ, hoặc slot chưa điền */
+    return ops->get_temp(t);
+}
+```
+Chạy thật (gcc 11.4, mô phỏng ở user-space; `size` do bên **điền bảng** ghi bằng `sizeof` của bản header nó được build cùng):
+```
+.ko cu : size=24 -> get_temp tra -95
+.ko moi: size=32 -> get_temp tra 0, t=42
+```
+Không kiểm thì driver nền đọc 8 byte **nằm ngoài** bảng của `.ko` cũ — bất cứ thứ gì nằm sau đó trong vùng dữ liệu của `.ko` — rồi nhảy tới đó như một con trỏ hàm ⟹ oops. Thứ tự trong `HAS_OP` quan trọng: kiểm `size` **trước**, vì chỉ khi slot nằm trong bảng thì đọc `ops->f` mới hợp lệ.
 
 **"Vì sao" tách tầng:** *Nông:* "function pointer cho linh hoạt". *Sâu:* kernel viết bằng C nên **phải tự dựng** thứ C++ cho sẵn — và vì tự dựng, mọi bảo đảm (không có slot rỗng, bố cục ổn định) **cũng phải tự giữ**. Kernel đã có khuôn chuẩn cho việc này: `file_operations`, `net_device_ops`.
 

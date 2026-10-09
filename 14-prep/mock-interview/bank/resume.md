@@ -1044,7 +1044,17 @@ Người nghe có khung rồi thì ngữ pháp lệch vài chỗ cũng không c�
 3. Sau mặt tiền: Picture Quality (nặng logic, có state) và Panel Control (lệnh đơn → `ioctl`).
 4. Ý đắt nhất: **cùng một ý tưởng ở hai tầng** — Bridge bằng `virtual` ở user-space, bảng con trỏ hàm ở kernel.
 
-**Bản mẫu ~75 giây:**
+**Bản 30 giây — nói trước, cùng khung với [RES-035](resume.md):**
+> *"It's a shared library that controls the display, used across product lines and more than ten chip families. Three boundaries: apps call a **C++ interface**; that interface calls into the library through a **plain C API**; the library talks to the **panel driver in the kernel** through `ioctl`. Inside, **Picture Quality computes** the brightness from the content, and **Panel Control issues the commands**. That's the 30-second version — which part would you like me to open up?"*
+
+Sơ đồ vẽ song song — bắt đầu từ **app**, không phải từ API C:
+```
+App ──► C++ interface ──► C API ──┬──► Picture Quality ──┐
+                         (lock)   │                      ▼
+                                  └───────────────► Panel Control ──ioctl──► panel driver ──fn-ptr table──► chip driver
+```
+
+**Bản mẫu ~75 giây** (khi họ nói *"tell me more"*):
 > *"It's a display-control shared library used across several product lines and more than ten chipsets. I'd describe it through three boundaries.*
 >
 > *First, applications don't call the library directly. They call a C++ interface. That boundary is **closed** — same team, same toolchain — so C++ is fine there. The implementation of that interface calls down into the library through a **plain C API**, because the library is loaded by many processes built at different times, and only C gives a stable binary contract. Each C function is also the **single place where we take the inter-process lock**.*

@@ -1239,11 +1239,28 @@ if (rc == EOWNERDEAD) {
 
 > 🔺 *T3, không chấm:* kiểm PID còn sống bằng `kill(pid, 0)` (trả `ESRCH` nếu đã chết) — có lỗ hẹp khi PID bị tái dùng; robust mutex không có lỗ đó vì kernel theo dõi chủ khoá qua *robust list* của từng thread.
 
+**Mutex cần HAI thuộc tính, mỗi cái giải một việc:**
+
+| Thuộc tính | Thiếu thì sao |
+|---|---|
+| `PTHREAD_PROCESS_SHARED` | Mutex vẫn nằm trong shm và bit "đang khoá" vẫn dùng chung, nhưng **hàng đợi ngủ là của riêng từng process** ⟹ bên chờ ở process khác **không bao giờ được đánh thức** khi chủ nhả khoá |
+| `PTHREAD_MUTEX_ROBUST` | Chủ chết khi đang giữ ⟹ mutex kẹt y như semaphore. Mutex thường **không** tự thu hồi; chỉ robust mutex mới trả `EOWNERDEAD` |
+
+Chạy thật — A giữ mutex trong shm 1 giây rồi nhả, B (process khác) chờ tối đa 3 giây:
+```
+mac dinh (private)   B: timedlock -> Connection timed out sau 3.0 s
+PROCESS_SHARED       B: timedlock -> OK                   sau 1.0 s
+```
+Dòng đầu: A **đã** nhả sau 1 giây, nhưng B vẫn ngủ tới hết hạn — lời đánh thức của A không tới được hàng đợi của B.
+
+> 🔺 *T3, không chấm:* bên dưới là futex. Mutex private dùng futex **private**, kernel tìm hàng đợi theo *(address space, địa chỉ ảo)*; mutex shared dùng futex **shared**, tìm theo *trang vật lý + offset* ⟹ hai process mới gặp nhau ở cùng một hàng đợi.
+
 **Bẫy:**
 1. *"Mutex không dùng được giữa các process"* — sai; dùng được với `PTHREAD_PROCESS_SHARED`. Lý do thật là **ít bước + legacy**, không phải *"không có cách khác"*.
 2. *"Semaphore nhanh hơn"* — không phải lý do chọn ở đây; cả hai đều chỉ vào kernel khi có tranh chấp.
 3. Chỉ sửa khoá, quên state ghi dở.
-4. Chê thiết kế cũ. Nói như người **hiểu đánh đổi**: lý do chọn → cái giá → hệ bù thế nào → bù chưa đủ ở đâu → sửa ra sao.
+4. *"Mutex tự thu hồi khi chủ chết"* — chỉ đúng với **robust** mutex; `PROCESS_SHARED` một mình không làm việc đó.
+5. Chê thiết kế cũ. Nói như người **hiểu đánh đổi**: lý do chọn → cái giá → hệ bù thế nào → bù chưa đủ ở đâu → sửa ra sao.
 
 **Chốt:** *"Semaphore được chọn vì đơn giản và đã chạy ổn; cái giá là không có chủ. Timeout-reset không phân biệt chết với chậm và bỏ qua state dở. Sửa: robust mutex để biết chủ chết thật, ghi kiểu commit để chết giữa chừng không để lại state nửa vời."*
 </details>

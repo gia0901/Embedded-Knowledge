@@ -578,6 +578,7 @@ void lib_init_modules() {             // chạy một lần, trong constructor c
 
 ⚠️ **Gọi tên đúng:**
 - `get_*_instance()` là **Service Locator** trên con trỏ toàn cục, **không phải Singleton GoF**. Không gì *ép* tính duy nhất, chỉ có quy ước "chỉ `lib_init_modules()` gán".
+- ⚠️ **Hai hàm tên gần giống, hai cơ chế khác nhau — đừng gộp:** `get_dimming_instance()` (ở đây, tầng `lib_base`) trả **con trỏ toàn cục** gán trong constructor của `.so` ⟹ Service Locator. `DimmingFactory::GetDimmingInstance()` ([§5.6](#56-dimmingfactory--abstract-factory--meyers-singleton), bên trong `lib_dimming`) dùng **static local** ⟹ Meyers Singleton. Hai cách chống race khởi tạo khác nhau: một bên **dời khởi tạo ra trước mọi thread**, một bên **nhờ magic static** của C++11.
 - `lib_init_modules()` **không phải factory**, vì nó không lựa chọn gì. Nó chỉ là **chỗ duy nhất dựng toàn bộ object** (composition root). Lựa chọn thật nằm ở `DimmingFactory`.
 
 ⭐ **Không có data race**, khác `getInstance()` ở [A2 §3.2, Lab 1](A2-cpp-interface-hal.md) (race thật, đo được **178/200**). Lý do: khởi tạo chạy trong `__attribute__((constructor))`, **trước khi process tạo thread nào**. Đây là một cách chữa race khác magic statics: **dời khởi tạo ra khỏi vùng có cạnh tranh**.
@@ -736,6 +737,7 @@ Câu cuối là chiến thuật, không phải lịch sự: nó **trao quyền c
 | App gọi `IDisplay` → `DisplayImpl` → `lib_api_*` | App gọi thẳng `lib_api_*` | Tầng 0 đã có pack riêng ở [A2 §8](A2-cpp-interface-hal.md) |
 | ~150 virtual, Global/Local/OLED, nhiều chip | 2 method, Global + Local (rút gọn), một chip (ChipA) | Đủ để thấy Strategy · Bridge · Abstract Factory · Null Object |
 | Vòng vsync theo tín hiệu phần cứng | `std::thread` 16 ms | Giữ đúng điểm yếu: **không lấy khoá** |
+| `DimmingFactory` là **Meyers Singleton** (§5.6), `lib_dimming` lấy nó qua `GetDimmingInstance()` | `DimmingFactory` là **member** của `lib_dimming` | Lab chỉ có một `lib_dimming` nên bỏ một tầng. **Service Locator** `get_dimming_instance()` (§7.1) thì giữ nguyên |
 
 **Ánh xạ file ↔ mục trong tài liệu:**
 
@@ -1346,6 +1348,8 @@ private:
 **`src/dimming/lib_dimming.cpp`**
 
 ```cpp
+// Toan bo lib_dimming viet inline trong lib_dimming.h (moi method mot dong uy nhiem).
+// File nay giu lai de CMake co don vi dich rieng cho module, giong cau truc he that.
 #include "lib_dimming.h"
 ```
 

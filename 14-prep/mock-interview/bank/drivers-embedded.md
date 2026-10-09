@@ -344,7 +344,7 @@ static ssize_t my_write(struct file *f, const char __user *ubuf, size_t len, lof
 
 **Chú thích `__user`** trên tham số không phải trang trí — nó cho **sparse** (`make C=1`) kiểm tra tĩnh và báo lỗi nếu bạn deref nhầm. Luôn giữ.
 
-**Bẫy:** (1) tưởng giá trị trả về là số byte **đã** chép — ngược lại, **0 = thành công**; (2) quên kiểm tra `len` trước khi copy → user truyền `len` khổng lồ gây tràn buffer kernel; (3) gọi `copy_*_user` trong **ngữ cảnh atomic** (spinlock/ISR) — nó **có thể ngủ** (page fault) → deadlock; (4) **TOCTOU**: copy vào kernel rồi validate, đừng validate trên bộ nhớ user rồi mới copy — user có thể đổi giữa hai bước.
+**Bẫy:** (1) tưởng giá trị trả về là số byte **đã** chép — ngược lại, **0 = thành công**; (2) quên kiểm tra `len` trước khi copy → user truyền `len` khổng lồ gây tràn buffer kernel; (3) gọi `copy_*_user` trong **ngữ cảnh atomic** (spinlock/ISR) — nó **có thể ngủ** (page fault) → deadlock; (4) **TOCTOU**: copy vào kernel rồi validate, đừng validate trên bộ nhớ user rồi mới copy — user có thể đổi giữa hai bước. `ioctl` **không** khoá bộ nhớ user: trong lúc driver chạy, một thread khác của cùng process vẫn ghi được vào struct đó ⟹ driver đọc `level = 50` lúc kiểm, đọc lại thì thành `level = 100000`. Copy **một lần** vào bản kernel, kiểm và dùng **chính bản đó**.
 
 **Chốt:** *"Con trỏ user chỉ là một con số user đưa cho bạn. Luôn qua `copy_*_user`, luôn kiểm tra độ dài, và nhớ 0 mới là thành công."*
 </details>
