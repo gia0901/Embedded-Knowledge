@@ -4,7 +4,7 @@
 > - Tài liệu này phục vụ một mục tiêu hẹp: **trả lời được ở mức hiểu cơ bản** các câu về CI/CD, unit test, code quality — **bám đúng việc bạn đang làm**, không học dàn trải.
 > - **Việc thật của bạn** (§1): bạn là **người dùng pipeline**, không viết job. Luồng: checkout → review chéo trên Perforce → submit → integrate build → hệ thống CI/CD nội bộ → vào nhánh chính. Đó là **con đường duy nhất** — đúng mô hình *gated check-in* ([ci-and-test-farm §3](ci-and-test-farm.md)).
 > - **Unit test** (§3): GoogleTest cho library, **KUnit** cho driver. Bạn đưa *scenario* cho AI, AI sinh unit test theo bộ khung có sẵn. Câu interviewer sẽ xoáy: *"vậy em kiểm chất lượng test đó thế nào?"*
-> - **Coverage** (§4) cho biết dòng nào **chưa từng chạy**, không cho biết code **đúng**. Lab đo được 90% line coverage nhưng backend Global thật **chưa từng được test**.
+> - **Coverage** (§4) cho biết dòng nào **chưa từng chạy**, không cho biết code **đúng**. Lab đo được 89% line coverage nhưng backend Global thật **chưa từng được test**.
 > - **Code quality** (§5): mỗi công cụ bắt một **loại** lỗi khác nhau — `-Werror`, static analysis, sanitizer, unit test. Không công cụ nào thay được công cụ khác.
 > - 🧪 **Lab** (§6): chạy được trên máy dev, đối tượng là chính `libdisplay_lab` ở [A1 §11](../11-design-patterns/in-practice/A1-baseline-libdisplay.md). Pipeline 5 cổng; cổng TSan **đỏ thật** vì race vòng vsync — đúng điểm yếu #5 của hệ.
 > - ⚠️ **§7 — nói thế nào mà không nói quá:** tách rạch ròi *"đã làm ở công ty"* · *"đã thử ở lab"* · *"hiểu nhưng chưa làm"*.
@@ -125,14 +125,15 @@ kernel_sim/drv_panel_chipA.c                   4        4   100%
 kernel_sim/drv_panel_core.c                   15       13    86%   25-26
 src/dimming/DimmingBackendChipA.cpp            5        3    60%   4-5
 src/dimming/DimmingFactory.cpp                19       13    68%   11-12,21-24
-src/dimming/GlobalDimming.cpp                 18       18   100%
+src/dimming/GlobalDimming.cpp                 19       18    94%   22
+src/dimming/LocalDimming.cpp                  10       10   100%
 src/lib_api.cpp                               20       20   100%
-src/lib_base.cpp                              46       45    97%   52
+src/lib_base.cpp                              46       44    95%   52,55
 ------------------------------------------------------------------------------
-TOTAL                                        150      136    90%
+TOTAL                                        155      138    89%
 ```
 
-**Đọc ra điều quan trọng** ([BLD-041](../14-prep/mock-interview/bank/build-systems.md)): tổng 90% nghe tốt, nhưng `DimmingBackendChipA.cpp` dòng 4–5 — **backend Global thật** — **chưa từng chạy**. Unit test dùng `FakeBackend`, còn integration test chạy model `local`. Đường thật *thuật toán Global → backend ChipA → Panel Control* chưa có test nào đi qua.
+**Đọc ra điều quan trọng** ([BLD-041](../14-prep/mock-interview/bank/build-systems.md)): tổng 89% nghe tốt, nhưng `DimmingBackendChipA.cpp` dòng 4–5 — **backend Global thật** — **chưa từng chạy**. Unit test dùng `FakeBackend`, còn integration test chạy model `local`. Đường thật *thuật toán Global → backend ChipA → Panel Control* chưa có test nào đi qua. `GlobalDimming.cpp` dòng 22 (`GetBacklight`) cũng vậy: đọc mức sáng qua mặt tiền C chỉ được test ở model `local`.
 
 ⟹ Coverage **chỉ ra chỗ chưa test**; nó **không** nói chỗ đã test là đúng. 100% coverage với test không có `EXPECT` vẫn là 100%.
 
@@ -168,7 +169,7 @@ TOTAL                                        150      136    90%
 
 **Yêu cầu:** `cmake` ≥ 3.21 (cho `ctest --output-junit`), `g++`, mạng lần đầu (tải GoogleTest), `gcovr` (`pip3 install --user gcovr`, không cần root; nếu `gcovr` không nằm trong `PATH` thì chạy `GCOVR=~/.local/bin/gcovr ./run_ci.sh`). ⚠️ `clang-tidy`/`cppcheck` cần `sudo apt install` nên lab không dùng; `gcc -fanalyzer` thay vai trò phân tích tĩnh.
 
-**Bước 1 — chạy cả pipeline.** Output thật (máy dev, ~29 giây):
+**Bước 1 — chạy cả pipeline.** Output thật (máy dev, ~30 giây):
 ```
 $ ./run_ci.sh
 ...
@@ -191,17 +192,29 @@ SUMMARY: ThreadSanitizer: data race src/dimming/GlobalDimming.cpp:13 in GlobalDi
 
 | Cổng | Kết quả |
 |---|---|
-| Build Debug (`-O0`) | ❌ **im lặng**; chạy model `local` ra `backlight=60`, exit 0 |
-| Build Release (`-O2`) + `-Werror` | ✅ `warning: array subscript 4 is above array bounds of 'int32_t [4]'` ⟹ build fail |
-| ASan + UBSan | ✅ bắt lúc chạy — output bên dưới |
+| Build Debug (`-O0`) | ❌ **im lặng**; chạy model `local` ra `backlight=60`, exit 0 — nhưng phần cứng nhận `set_brightness(37)` thay vì 45 (giá trị rác đọc quá cuối mảng, mỗi máy một khác) |
+| Build Release (`-O2`) + `-Werror` | ✅ `error: array subscript 4 is above array bounds of 'int32_t [4]' … [-Werror=array-bounds]` ⟹ build fail |
+| ASan + UBSan | ✅ bắt lúc chạy, **ở hai test**: unit test `LocalDimming.StateLivesInItsOwnRegion` và integration test — output bên dưới |
 
 ```
-==9482==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7ffd05e12500 at pc 0x7a2ef539a861 bp 0x7ffd05e12460 sp 0x7ffd05e12450
-    #0 0x7a2ef539a860 in DimmingBackendChipA_Local::t_SetLdFinalDuty(BackendLdFinalDuty_t*) src/dimming/DimmingBackendChipA.cpp:8
-    #1 0x7a2ef539a2e0 in LocalDimming::SetBacklight(int) src/dimming/LocalDimming.cpp:9
-    #2 0x7a2ef5386f4b in lib_dimming::SetBacklight(int) src/dimming/lib_dimming.h:14
+==12768==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7ffd0da48fa0 at pc 0x60556f6e618d bp 0x7ffd0da48f10 sp 0x7ffd0da48f00
+    #0 0x60556f6e618c in DimmingBackendChipA_Local::t_SetLdFinalDuty(BackendLdFinalDuty_t*) src/dimming/DimmingBackendChipA.cpp:8
+    #1 0x60556f6e5a00 in LocalDimming::SetBacklight(int) src/dimming/LocalDimming.cpp:10
+    #2 0x60556f6c31ed in LocalDimming_StateLivesInItsOwnRegion_Test::TestBody() tests/test_dimming.cpp:56
 SUMMARY: AddressSanitizer: stack-buffer-overflow src/dimming/DimmingBackendChipA.cpp:8 in DimmingBackendChipA_Local::t_SetLdFinalDuty(BackendLdFinalDuty_t*)
+==12773==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7fffc0a79030 at pc 0x76539f5bfd43 bp 0x7fffc0a78fa0 sp 0x7fffc0a78f90
+    #0 0x76539f5bfd42 in DimmingBackendChipA_Local::t_SetLdFinalDuty(BackendLdFinalDuty_t*) src/dimming/DimmingBackendChipA.cpp:8
+    #1 0x76539f5bf5b6 in LocalDimming::SetBacklight(int) src/dimming/LocalDimming.cpp:10
+    #2 0x76539f5ac0e2 in lib_dimming::SetBacklight(int) src/dimming/lib_dimming.h:15
+    #3 0x76539f5aa28e in lib_api_set_backlight src/lib_api.cpp:11
 ```
+*(Rút gọn: bỏ tiền tố đường dẫn và các khung GoogleTest/`main` phía dưới.)*
+
+> 🔥 **Bài học CI có thật, từ chính lab này.** Bản đầu của `run_ci.sh` chạy `ctest` **hai lần** trong cổng ASan, và integration test dùng một tên shm **cố định**. Khi cài mutation trên: integration test bị ASan giết **đúng lúc đang ở trong `lib_api_set_backlight`, tức đang giữ semaphore** ⟹ semaphore kẹt ở 0. Lần `ctest` thứ hai mở lại cùng tên ⟹ `display_demo` treo ở `sem_wait` ngay trong constructor của `.so`, cho tới khi ctest hết hạn mặc định **1500 giây**. Cả pipeline treo 25 phút thay vì báo đỏ sau 10 giây. Đó chính là [LNX-045](../14-prep/mock-interview/bank/linux-sysprog.md) — *process chết khi giữ semaphore, mọi process sau treo* — xảy ra **trong CI** ([BLD-045](../14-prep/mock-interview/bank/build-systems.md)). Bản hiện tại sửa ba chỗ:
+> 1. **Mỗi lần chạy một tên shm riêng** (`/libdisplay_ci_$$`); integration test lấy tên từ môi trường thay vì ghi cứng trong CMake.
+> 2. **`ctest --timeout 60`** ở mọi cổng: cổng chặn **không bao giờ được treo** — treo phải thành FAIL.
+> 3. Cổng ASan chạy `ctest` **một lần** và giữ exit code của nó.
+
 ⟹ **Nhiều cổng chồng lên nhau** vì mỗi cổng có điểm mù riêng.
 
 **Bước 3 — tự làm:**
@@ -215,44 +228,45 @@ SUMMARY: AddressSanitizer: stack-buffer-overflow src/dimming/DimmingBackendChipA
 
 ```bash
 #!/usr/bin/env bash
-# run_ci.sh — NOI DUY NHAT chua logic CI. Jenkinsfile chi goi lai script nay.
-#   ./run_ci.sh            chay ca 5 stage (fail van chay tiep, cuoi cung tong ket)
-#   ./run_ci.sh <stage>    chi chay mot stage: build | test | coverage | asan | tsan
+# run_ci.sh — NƠI DUY NHẤT chứa logic CI. Jenkinsfile chỉ gọi lại script này.
+#   ./run_ci.sh            chạy cả 5 stage (fail vẫn chạy tiếp, cuối cùng tổng kết)
+#   ./run_ci.sh <stage>    chỉ chạy một stage: build | test | coverage | asan | tsan
 set -u
-export LIBDISPLAY_SHM=/libdisplay_ci_$$          # shm rieng cho lan chay nay
+export LIBDISPLAY_SHM=/libdisplay_ci_$$          # shm riêng cho lần chạy này: process chết khi giữ khoá
+                                                 # ở lần trước không làm treo lần sau
+# --timeout 60 ở mọi lần ctest: cổng CI KHÔNG BAO GIỜ được treo — treo phải thành FAIL
 GCOVR=${GCOVR:-gcovr}
 declare -a RESULT=()
-stage() {                                        # stage <ten> <lenh...>
+stage() {                                        # stage <tên> <lệnh...>
     local name=$1; shift
     echo "========== STAGE: $name =========="
     if "$@"; then RESULT+=("PASS  $name"); else RESULT+=("FAIL  $name"); fi
 }
-build_release() {   # cong 1: build Release, canh bao = loi (-O2 moi bat -Warray-bounds)
+build_release() {   # cổng 1: build Release, cảnh báo = lỗi (-O2 mới bật -Warray-bounds)
     cmake -S . -B ci/release -DCMAKE_BUILD_TYPE=Release -DLIBDISPLAY_TESTS=ON \
           -DCMAKE_CXX_FLAGS=-Werror -DCMAKE_C_FLAGS=-Werror > /dev/null &&
     cmake --build ci/release -j"$(nproc)" 2>&1 | grep -E "warning|error|Built target display$"
     test "${PIPESTATUS[0]}" -eq 0
 }
-unit_test() {       # cong 2: unit test + integration test, xuat JUnit XML cho Jenkins doc
-    (cd ci/release && ctest --output-junit junit.xml 2>&1 | tail -3)
+unit_test() {       # cổng 2: unit test + integration test, xuất JUnit XML cho Jenkins đọc
+    (cd ci/release && ctest --timeout 60 --output-junit junit.xml 2>&1 | tail -3)
     grep -q 'failures="0"' ci/release/junit.xml
 }
-coverage() {        # bao cao, KHONG chan: coverage la thong tin, khong phai nguong cung
+coverage() {        # báo cáo, KHÔNG chặn: coverage là thông tin, không phải ngưỡng cứng
     cmake -S . -B ci/cov -DLIBDISPLAY_COVERAGE=ON > /dev/null &&
     cmake --build ci/cov -j"$(nproc)" > /dev/null &&
-    (cd ci/cov && ctest > /dev/null) &&
+    (cd ci/cov && ctest --timeout 60 > /dev/null) &&
     "$GCOVR" --root . --filter 'src/' --filter 'kernel_sim/' ci/cov 2>/dev/null | grep -E "TOTAL"
 }
-asan_ubsan() {      # cong 3: loi bo nho / UB luc chay
+asan_ubsan() {      # cổng 3: lỗi bộ nhớ / UB lúc chạy
     local f="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g"
     cmake -S . -B ci/asan -DLIBDISPLAY_TESTS=ON -DCMAKE_CXX_FLAGS="$f" -DCMAKE_C_FLAGS="$f" \
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
           -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" > /dev/null &&
     cmake --build ci/asan -j"$(nproc)" > /dev/null &&
-    (cd ci/asan && ctest 2>&1 | tail -1)
-    (cd ci/asan && ctest > /dev/null 2>&1)
+    (cd ci/asan && ctest --timeout 60 2>&1 | tail -1; exit "${PIPESTATUS[0]}")   # chạy MỘT lần, giữ exit code
 }
-tsan() {            # cong 4: data race — chay app that de vong vsync va API cung chay
+tsan() {            # cổng 4: data race — chạy app thật để vòng vsync và API cùng chạy
     cmake -S . -B ci/tsan -DLIBDISPLAY_TSAN=ON -DLIBDISPLAY_TESTS=OFF > /dev/null &&
     cmake --build ci/tsan -j"$(nproc)" > /dev/null &&
     TSAN_OPTIONS="halt_on_error=1" setarch -R ci/tsan/bin/display_demo > ci/tsan.log 2>&1
@@ -271,7 +285,7 @@ case "${1:-all}" in
               stage "coverage (bao cao)"       coverage
               stage "ASan + UBSan"             asan_ubsan
               stage "TSan"                     tsan ;;
-    *)        echo "stage khong hop le: $1"; exit 2 ;;
+    *)        echo "stage không hợp lệ: $1"; exit 2 ;;
 esac
 rm -f "/dev/shm${LIBDISPLAY_SHM}" "/dev/shm/sem.${LIBDISPLAY_SHM#/}_sem"
 echo "========== KET QUA =========="
@@ -283,22 +297,22 @@ printf '%s\n' "${RESULT[@]}" | grep -q '^FAIL' && exit 1 || exit 0
 <details><summary><b>📄 <code>Jenkinsfile</code> — vỏ mỏng, mỗi stage gọi lại <code>run_ci.sh</code></b></summary>
 
 ```groovy
-// Jenkinsfile — VO MONG: moi stage chi goi ./run_ci.sh <stage>.
-// Logic nam o MOT cho (run_ci.sh) => chay lai y het tren may dev khi pipeline do.
+// Jenkinsfile — VỎ MỎNG: mỗi stage chỉ gọi ./run_ci.sh <stage>.
+// Logic nằm ở MỘT chỗ (run_ci.sh) => chạy lại y hệt trên máy dev khi pipeline đỏ.
 pipeline {
-    agent { label 'linux-build' }                 // may build co cmake, g++, gcovr
+    agent { label 'linux-build' }                 // máy build có cmake, g++, gcovr
     options { timeout(time: 30, unit: 'MINUTES') }
     stages {
         stage('Build (Release, -Werror)') { steps { sh './run_ci.sh build' } }
         stage('Unit + integration test') {
             steps { sh './run_ci.sh test' }
-            post  { always { junit 'ci/release/junit.xml' } }   // Jenkins ve bieu do pass/fail theo build
+            post  { always { junit 'ci/release/junit.xml' } }   // Jenkins vẽ biểu đồ pass/fail theo build
         }
         stage('Coverage') {
-            steps { sh './run_ci.sh coverage' }                  // bao cao, khong chan merge
+            steps { sh './run_ci.sh coverage' }                  // báo cáo, không chặn merge
         }
         stage('Sanitizers') {
-            parallel {                                          // hai bien the doc lap: chay song song
+            parallel {                                          // hai biến thể độc lập: chạy song song
                 stage('ASan + UBSan') { steps { sh './run_ci.sh asan' } }
                 stage('TSan')         { steps { sh './run_ci.sh tsan' } }
             }
@@ -343,6 +357,7 @@ pipeline {
 | [BLD-042](../14-prep/mock-interview/bank/build-systems.md) ⭐ | `-Werror`, static analysis, sanitizer, unit test — mỗi cái bắt loại lỗi nào? |
 | [BLD-043](../14-prep/mock-interview/bank/build-systems.md) ⭐ | AI sinh unit test từ scenario — bạn kiểm chất lượng test thế nào? |
 | [BLD-044](../14-prep/mock-interview/bank/build-systems.md) | GoogleTest vs KUnit — mỗi cái test cái gì, chạy ở đâu? |
+| [BLD-045](../14-prep/mock-interview/bank/build-systems.md) ⭐ | Cổng ASan treo 25 phút thay vì đỏ sau 10 giây — semaphore kẹt do test bị giết, sửa pipeline thế nào |
 
 ---
 ⬅️ [ci-and-test-farm.md](ci-and-test-farm.md) · Lab dùng mã nguồn ở [A1 §11](../11-design-patterns/in-practice/A1-baseline-libdisplay.md)

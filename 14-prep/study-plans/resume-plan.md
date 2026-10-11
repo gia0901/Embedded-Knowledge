@@ -23,7 +23,7 @@
 | **Ngân sách** | **R1–R4 × ~105′** (đọc ~30′ + mock chính ~60′, 12 câu + ⚡ rapid pool ~15′) · **R1′, R5, R6 × ~90′** (đọc/lab ~30′ + mock ~60′) |
 | **Ngôn ngữ** | Tiếng Việt, **có vòng tiếng Anh** (R1 câu 12 · R4 câu 9 và 12) |
 | **Buổi gần nhất** | ✅ **R1′ — xong 2026-10-09**, 14 câu, 35/56 = **2.50** (phần 1 08/10: 2.43 [log](../mock-interview/sessions/2026-10-08--R1prime--ke-lai-kien-truc.md) · phần 2 09/10: 2.57 [log](../mock-interview/sessions/2026-10-09--R1prime-p2--ke-lai-kien-truc.md)). Bốn câu weak lên 3 lần đầu: `DP-041`, `DP-043`, `DP-038`, `LNX-045` |
-| ▶️ **Phiên kế** | **R2 — ranh giới C++ interface / `.so`** ([§4](#4-r2--ranh-giới-c-interface--so-a2)), rồi R2-rapid |
+| ▶️ **Phiên kế** | **R5 — CI · unit test · code quality** ([§12](#12-r5--ci--unit-test--code-quality)), rồi **R6 — troubleshooting** ([§13](#13-r6--troubleshooting)), sau đó quay lại R2. *Đổi thứ tự theo yêu cầu người học (11/10): R5/R6 không phụ thuộc R2–R4; R5 trước vì lab sanitizer của R5 là nền cho `DBG-042` ở R6* |
 | **Chẩn đoán mang vào** | **R1′ (08–09/10):** đọc bank + review **có tác dụng ngay** — 4 câu weak lên 3 lần đầu, `RES-001` hết câu có/không. Hai chỗ còn hụt: ① **bản kể kiến trúc** (Việt lẫn Anh) bắt đầu từ giữa, mất tầng C++ interface và câu *"chỗ duy nhất lấy khoá"* · ② **hiểu vấn đề nhưng chưa viết được cách chữa** (`HAS_OP`, ghi kiểu commit, giá trị trả về của `copy_from_user`). Một mô hình sai lặp lại: *"mỗi process định danh khoá khác nhau"* |
 | 🔴 **Rủi ro lớn nhất** | **Bản kể kiến trúc chưa thuộc:** [`RES-035`](../mock-interview/bank/resume.md) bản 30″ kể ba **khối** thay vì ba **ranh giới**, thiếu câu trao quyền; [`RES-034`](../mock-interview/bank/resume.md) sang tiếng Anh ba ranh giới co còn một · **Nền dưới câu khoá liên process còn mỏng** (`DP-040`, `LNX-045`: chưa nối *"semaphore không có chủ"* sang hệ quả). [`RES-001`](../mock-interview/bank/resume.md) đã lần đầu đạt 3 (08/10) — còn thiếu vấn đề-bằng-hình-ảnh. Chữa bằng nói to + bấm giờ + chiến thuật ở [§10](#10--chiến-thuật-trả-lời--rút-ra-từ-r1-0610) |
 
@@ -352,10 +352,11 @@ Bảng 🔁 của weak-register có **8 câu hạn 18–23/09**, chưa hỏi. Pl
 ### 📖 Đọc + 🧪 lab (~30′, lab nên làm trước)
 
 - [06/unit-test-and-code-quality](../../06-build-systems/unit-test-and-code-quality.md) — **toàn bộ**, đặc biệt §1 (pipeline của bạn) và §7 (nói thế nào mà không nói quá)
-- [06/ci-and-test-farm](../../06-build-systems/ci-and-test-farm.md) §1, §3 (gated check-in), §5 (tháp test)
+- [06/ci-and-test-farm](../../06-build-systems/ci-and-test-farm.md) §1, §3 (gated check-in), §5 (tháp test), §10 (flaky test — câu 12)
+- Câu weak `RES-016` (câu 8, **Ⓖ bắt buộc**): đọc lại đáp án bank [RES-016](../mock-interview/bank/resume.md) + [BLD-043](../mock-interview/bank/build-systems.md); follow-up đã soạn sẵn ở weak-register
 - 🧪 **Lab pipeline 5 cổng** ở §6 của tài liệu trên: chạy `./run_ci.sh`, làm bước 2 (mutation) — mã nguồn ở [A1 §11](../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
 
-### 🎤 Mock — 12 câu, ~60′, trần T1 + một chút T2
+### 🎤 Mock — 12 câu (+1 dự phòng), ~60′, trần T1 + một chút T2
 
 | # | ID | Câu (tóm tắt) | Nguồn |
 |---|---|---|---|
@@ -371,6 +372,7 @@ Bảng 🔁 của weak-register có **8 câu hạn 18–23/09**, chưa hỏi. Pl
 | 10 | `BLD-042` | `-Werror`, static analysis, sanitizer, unit test — mỗi cái bắt gì | mới |
 | 11 | `BLD-035` | Vì sao vẫn phải test trên thiết bị thật | mới |
 | 12 | `BLD-026` | Flaky test trên cổng gated nguy hiểm thế nào | mới |
+| 13 | `BLD-045` | Cổng ASan treo 25 phút thay vì đỏ — semaphore kẹt trong CI | mới · sinh ra từ lab 11/10, nối câu 12 và [LNX-045](../mock-interview/bank/linux-sysprog.md). Thiếu giờ thì bỏ câu này trước |
 
 ⚠️ **Interviewer lưu ý:** bạn chưa viết Jenkinsfile ở công ty và không đo coverage. Câu trả lời đúng ở các câu đó là *"hiểu, đã thử ở lab"* — **không** chấm thấp vì thiếu kinh nghiệm thật; **chấm thấp** nếu nói như đã làm ([unit-test-and-code-quality §7](../../06-build-systems/unit-test-and-code-quality.md)).
 
@@ -384,7 +386,8 @@ Bảng 🔁 của weak-register có **8 câu hạn 18–23/09**, chưa hỏi. Pl
 
 - [09/crash-analysis-workflow](../../09-debugging/crash-analysis-workflow.md) — toàn bộ
 - 🧪 [`DBG-043`](../mock-interview/bank/debugging.md) (log release → `addr2line`) và [`DBG-044`](../mock-interview/bank/debugging.md) (coredump đầu tiên bằng gdb) — **làm trên máy**, mỗi bài ~15′
-- *(Nếu còn thời gian)* 🧪 [`DBG-033`](../mock-interview/bank/debugging.md), [`DBG-039`](../mock-interview/bank/debugging.md)
+- 🧪 [`DBG-033`](../mock-interview/bank/debugging.md), [`DBG-039`](../mock-interview/bank/debugging.md) — **bắt buộc trước câu 12**: weak-register ghi `DBG-042` phải làm 2 bài lab `DBG-030…041` trước khi hỏi lại
+- Câu weak `RES-008` (câu 2, **Ⓖ bắt buộc**): đọc lại mục *"cắt đôi"* ở bank [RES-008](../mock-interview/bank/resume.md) rồi **luyện phản xạ**, không chỉ đọc: với 3 ca bất kỳ, nói câu đầu tiên là *"phép đo nào chia đôi được?"*
 - [09/kernel-debugging](../../09-debugging/kernel-debugging.md) — phần oops/panic
 
 ### 🎤 Mock — 12 câu, ~60′, trần T1 + một chút T2

@@ -782,10 +782,23 @@ $ ./bin/display_demo --read          # process MỚI, không đặt gì
 backlight=60
 ```
 
+**Mỗi thuật toán một vùng state riêng** (`shmGlobalDimming`, `shmLocalDimming` trong `display_shm_info`, giống §7.2). Model `local` cũng đọc được từ process khác, vì `LocalDimming` ghi mức chung và mức từng vùng vào **vùng của nó**, không mượn vùng của Global:
+```
+$ LIBDISPLAY_MODEL=local ./bin/display_demo
+  [chipA] set_freq(120)
+set_frequency(120) -> 0
+  [chipA] set_brightness(45)
+set_backlight(60)  -> 0
+backlight=60
+$ LIBDISPLAY_MODEL=local ./bin/display_demo --read
+backlight=60
+```
+`set_brightness(45)` là trung bình 4 vùng `{60, 60, 30, 30}` mà backend ChipA ghi xuống; `backlight=60` là mức chung người dùng đặt. `lib_api_get_backlight` hỏi **thuật toán đang chạy** (`GetBacklight()`), thuật toán tự đọc vùng của nó — mặt tiền C không cần biết layout shm của từng thuật toán.
+
 **Unit test + integration test:**
 ```
 $ ctest
-100% tests passed, 0 tests failed out of 7
+100% tests passed, 0 tests failed out of 8
 ```
 
 ### 11.2 Ba thí nghiệm nên tự chạy
@@ -804,23 +817,25 @@ set_backlight(60)  -> 0
 backlight=0
 ```
 
-**Output thật của thí nghiệm 2** — báo cáo đầu tiên, bỏ 6 khung `std::thread` nội bộ (#3–#8):
+**Output thật của thí nghiệm 2** — báo cáo đầu tiên, bỏ 6 khung `std::thread` nội bộ (#3–#8) và tiền tố đường dẫn tuyệt đối:
 ```
-WARNING: ThreadSanitizer: data race (pid=8019)
+WARNING: ThreadSanitizer: data race (pid=7347)
   Read of size 4 at 0x7ffff7f73010 by thread T1:
-    #0 GlobalDimming::t_vSyncCallBack() src/dimming/GlobalDimming.cpp:13 (libdisplay.so+0x5e6a)
-    #1 lib_dimming::OnVSync() src/dimming/lib_dimming.h:15 (libdisplay.so+0x54fd)
+    #0 GlobalDimming::t_vSyncCallBack() src/dimming/GlobalDimming.cpp:13 (libdisplay.so+0x5edc)
+    #1 lib_dimming::OnVSync() src/dimming/lib_dimming.h:16 (libdisplay.so+0x54ff)
     #2 vsync_loop src/lib_base.cpp:50 (libdisplay.so+0x4ad6)
 
   Previous write of size 4 at 0x7ffff7f73010 by main thread:
-    #0 GlobalDimming::SetBacklight(int) src/dimming/GlobalDimming.cpp:9 (libdisplay.so+0x5ded)
-    #1 lib_dimming::SetBacklight(int) src/dimming/lib_dimming.h:14 (libdisplay.so+0x549a)
-    #2 lib_api_set_backlight src/lib_api.cpp:11 (libdisplay.so+0x487d)
+    #0 GlobalDimming::SetBacklight(int) src/dimming/GlobalDimming.cpp:9 (libdisplay.so+0x5e5f)
+    #1 lib_dimming::SetBacklight(int) src/dimming/lib_dimming.h:15 (libdisplay.so+0x549c)
+    #2 lib_api_set_backlight src/lib_api.cpp:11 (libdisplay.so+0x485d)
     #3 main app/main.cpp:15 (display_demo+0x13a3)
 
 SUMMARY: ThreadSanitizer: data race src/dimming/GlobalDimming.cpp:13 in GlobalDimming::t_vSyncCallBack()
 ```
 Đây chính là §5.8 và [DP-049](../../14-prep/mock-interview/bank/design-patterns.md): thread API (`main thread`) ghi `Shm.target` khi **đang giữ semaphore**, thread vsync (`T1`) đọc cùng địa chỉ **không** giữ khoá ⟹ race **ngay trong một process**. Cách vá: [B1 §6](B1-redesign-architecture.md).
+
+Báo cáo thứ hai cùng gốc: `GlobalDimming::GetBacklight()` (`GlobalDimming.cpp:22`) đọc `Shm.current` **khi giữ khoá**, còn vòng vsync ghi `Shm.current` **không khoá**. Khoá chỉ bảo vệ khi **mọi** bên chạm state đều lấy nó.
 
 **Output thật của thí nghiệm 3:**
 ```
@@ -855,6 +870,40 @@ Hai điều đọc ra:
 **`CMakeLists.txt`**
 
 ```cmake
+# ============================================================================
+# CÁCH BUILD — chạy từ thư mục gốc libdisplay_lab/
+#   -S <nguồn> -B <thư mục build>: cmake tự tạo thư mục build nếu chưa có.
+#   Đổi option (-D...) thì chạy lại lệnh cmake -S/-B; muốn build sạch thì xoá thư mục build.
+#
+# 1) Build thường (Debug, có unit test — lần đầu cần mạng để tải GoogleTest):
+#      cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+#      cmake --build build -j8                       # phải 0 warning
+#      ./build/bin/display_demo                      # đặt tần số + độ sáng, đọc lại
+#      ./build/bin/display_demo --read               # process thứ hai: chỉ đọc state trong shm
+#      (cd build && ctest --output-on-failure)       # unit test + integration test
+#    Không có mạng / không cần test: thêm -DLIBDISPLAY_TESTS=OFF
+#
+# 2) Coverage (gcovr: pip3 install --user gcovr):
+#      cmake -S . -B build_cov -DLIBDISPLAY_COVERAGE=ON && cmake --build build_cov -j8
+#      (cd build_cov && ctest) && gcovr --root . --filter src/ --filter kernel_sim/ build_cov
+#
+# 3) ThreadSanitizer — bắt race của vòng vsync:
+#      cmake -S . -B build_tsan -DLIBDISPLAY_TSAN=ON -DLIBDISPLAY_TESTS=OFF && cmake --build build_tsan -j8
+#      setarch -R ./build_tsan/bin/display_demo      # -R tắt ASLR: TSan của gcc 11 cần trên kernel 6.x
+#
+# 4) ASan + UBSan — lỗi bộ nhớ / UB lúc chạy:
+#      F="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+#      cmake -S . -B build_asan -DCMAKE_CXX_FLAGS="$F" -DCMAKE_C_FLAGS="$F" \
+#            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+#            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+#      cmake --build build_asan -j8 && (cd build_asan && ctest --output-on-failure)
+#
+# 5) Cả pipeline 5 cổng: ./run_ci.sh   (06-build-systems/unit-test-and-code-quality.md §6)
+#
+# Biến môi trường khi chạy: LIBDISPLAY_MODEL=global|local|none · LIBDISPLAY_SHM=/tên_khác
+# State lạ từ lần chạy trước (shm sống lâu hơn process):
+#      rm /dev/shm/libdisplay_lab /dev/shm/sem.libdisplay_lab_sem
+# ============================================================================
 cmake_minimum_required(VERSION 3.16)
 project(libdisplay_lab CXX C)
 
@@ -863,8 +912,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra)
 
 option(LIBDISPLAY_TESTS    "Build unit test (GoogleTest qua FetchContent)" ON)
-option(LIBDISPLAY_COVERAGE "Build voi --coverage (gcov)"                   OFF)
-option(LIBDISPLAY_TSAN     "Build voi ThreadSanitizer"                      OFF)
+option(LIBDISPLAY_COVERAGE "Build với --coverage (gcov)"                   OFF)
+option(LIBDISPLAY_TSAN     "Build với ThreadSanitizer"                      OFF)
 if(LIBDISPLAY_COVERAGE)
   add_compile_options(--coverage -O0 -g)
   add_link_options(--coverage)
@@ -877,14 +926,14 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# ---- "kernel" gia lap o user-space: drv_panel_core + panel_ops + drv_panel_chipA
-#      OBJECT library: neu la STATIC, linker se BO panel_chipA.o (khong ai tham chieu
-#      toi no, chi co constructor) => driver chip khong bao gio tu dang ky.
+# ---- "kernel" giả lập ở user-space: drv_panel_core + panel_ops + drv_panel_chipA
+#      OBJECT library: nếu là STATIC, linker sẽ BỎ panel_chipA.o (không ai tham chiếu
+#      tới nó, chỉ có constructor) => driver chip không bao giờ tự đăng ký.
 add_library(panel_sim OBJECT kernel_sim/drv_panel_core.c kernel_sim/drv_panel_chipA.c)
 set_target_properties(panel_sim PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(panel_sim PUBLIC kernel_sim)
 
-# ---- loi C++ cua library: PQ + Panel Control (unit test link thang vao day)
+# ---- lõi C++ của library: PQ + Panel Control (unit test link thẳng vào đây)
 add_library(display_core STATIC
     src/panel_control.cpp
     src/dimming/IDimmingAlgo.cpp
@@ -897,12 +946,12 @@ set_target_properties(display_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(display_core PUBLIC include src src/dimming)
 target_link_libraries(display_core PUBLIC panel_sim)
 
-# ---- libdisplay.so: mat tien C + shm/semaphore + constructor + vong vsync
+# ---- libdisplay.so: mặt tiền C + shm/semaphore + constructor + vòng vsync
 add_library(display SHARED src/lib_api.cpp src/lib_base.cpp $<TARGET_OBJECTS:panel_sim>)
 target_link_libraries(display PRIVATE display_core pthread rt)
 target_include_directories(display PUBLIC include)
 
-# ---- app: chi thay lib_api.h
+# ---- app: chỉ thấy lib_api.h
 add_executable(display_demo app/main.cpp)
 target_link_libraries(display_demo PRIVATE display)
 set_target_properties(display_demo PROPERTIES BUILD_RPATH "$ORIGIN")
@@ -918,10 +967,10 @@ if(LIBDISPLAY_TESTS)
   target_link_libraries(unit_tests PRIVATE display_core GTest::gtest_main)
   include(GoogleTest)
   gtest_discover_tests(unit_tests)
-  # integration test: chay app that, qua libdisplay.so
+  # integration test: chạy app thật, qua libdisplay.so
   add_test(NAME integration_demo COMMAND display_demo)
   set_tests_properties(integration_demo PROPERTIES
-      ENVIRONMENT "LIBDISPLAY_SHM=/libdisplay_ci_${CMAKE_BUILD_TYPE};LIBDISPLAY_MODEL=local"
+      ENVIRONMENT "LIBDISPLAY_MODEL=local"          # tên shm lấy từ môi trường (run_ci.sh đặt riêng mỗi lần chạy)
       PASS_REGULAR_EXPRESSION "backlight=60")
 endif()
 ```
@@ -929,8 +978,8 @@ endif()
 **`include/lib_api.h`**
 
 ```c
-/* lib_api.h — MAT TIEN C cong khai DUY NHAT cua libdisplay (ranh gioi MO).
- * Chi kieu C di qua day: khong class, khong std::string, khong exception. */
+/* lib_api.h — MẶT TIỀN C công khai DUY NHẤT của libdisplay (ranh giới MỞ).
+ * Chỉ kiểu C đi qua đây: không class, không std::string, không exception. */
 #pragma once
 #include <stdint.h>
 #ifdef __cplusplus
@@ -939,9 +988,9 @@ extern "C" {
 
 #define LIB_OK 0
 
-int32_t lib_api_set_backlight(int32_t level);   /* PQ: tinh theo noi dung roi moi ghi */
-int32_t lib_api_get_backlight(void);            /* doc state chung (shared memory)    */
-int32_t lib_api_set_frequency(int32_t hz);      /* Panel Control: mot lenh, di thang  */
+int32_t lib_api_set_backlight(int32_t level);   /* PQ: tính theo nội dung rồi mới ghi */
+int32_t lib_api_get_backlight(void);            /* đọc state chung (shared memory)    */
+int32_t lib_api_set_frequency(int32_t hz);      /* Panel Control: một lệnh, đi thẳng  */
 
 #ifdef __cplusplus
 }
@@ -958,16 +1007,17 @@ int32_t lib_api_set_frequency(int32_t hz);      /* Panel Control: mot lenh, di t
 
 struct display_shm_info {
     int32_t             init;
-    int32_t             ref_count;            // dem process dang nap library
+    int32_t             ref_count;            // đếm process đang nạp library
     DimmingForShm       shmDimming;
-    GlobalDimmingForShm shmGlobalDimming;
+    GlobalDimmingForShm shmGlobalDimming;     // vùng của thuật toán Global
+    LocalDimmingForShm  shmLocalDimming;      // vùng của thuật toán Local
 };
 
 display_shm_info*       get_lib_shm();
-int                     get_check_shm();                 // 0 = san sang, -1 = chua
-int                     lib_sem_lock(const char* who);   // named semaphore — MOI process
+int                     get_check_shm();                 // 0 = sẵn sàng, -1 = chưa
+int                     lib_sem_lock(const char* who);   // named semaphore — MỌI process
 void                    lib_sem_unlock(const char* who);
-lib_dimming_interface*  get_dimming_instance();          // SERVICE LOCATOR (khong phai Singleton)
+lib_dimming_interface*  get_dimming_instance();          // SERVICE LOCATOR (không phải Singleton)
 ```
 
 **`src/lib_base.cpp`**
@@ -988,13 +1038,13 @@ lib_dimming_interface*  get_dimming_instance();          // SERVICE LOCATOR (kho
 namespace {
 display_shm_info*      g_shm = nullptr;
 sem_t*                 g_sem = SEM_FAILED;
-lib_dimming_interface* dimming = nullptr;     // gan MOT lan trong lib_init_modules()
+lib_dimming_interface* dimming = nullptr;     // gán MỘT lần trong lib_init_modules()
 std::atomic<bool>      g_vsync_stop{false};
 std::thread            g_vsync;
 
 std::string shm_name() { const char* n = std::getenv("LIBDISPLAY_SHM"); return n ? n : "/libdisplay_lab"; }
 
-void lib_init_device() {                      // tao/mo shm + semaphore dung chung moi process
+void lib_init_device() {                      // tạo/mở shm + semaphore dùng chung mọi process
     const std::string name = shm_name();
     int fd = shm_open(name.c_str(), O_CREAT | O_RDWR, 0600);
     if (fd < 0) { perror("shm_open"); return; }
@@ -1006,18 +1056,18 @@ void lib_init_device() {                      // tao/mo shm + semaphore dung chu
     g_sem = sem_open((name + "_sem").c_str(), O_CREAT, 0600, 1);
     if (g_sem == SEM_FAILED) { perror("sem_open"); return; }
     lib_sem_lock(__func__);
-    if (!g_shm->init) { std::memset(g_shm, 0, sizeof(*g_shm)); g_shm->init = 1; }   // process dau tien
+    if (!g_shm->init) { std::memset(g_shm, 0, sizeof(*g_shm)); g_shm->init = 1; }   // process đầu tiên
     ++g_shm->ref_count;
     lib_sem_unlock(__func__);
 }
 
-void lib_init_modules() {                     // COMPOSITION ROOT: dung moi object, mot lan
+void lib_init_modules() {                     // COMPOSITION ROOT: dựng mọi object, một lần
     DimmingType_k type = detect_dimming_type();
     g_shm->shmDimming.m_iPlatformType = type;
-    dimming = new lib_dimming(type, g_shm->shmGlobalDimming);
+    dimming = new lib_dimming(type, g_shm->shmGlobalDimming, g_shm->shmLocalDimming);
 }
 
-void vsync_loop() {                           // ⚠️ KHONG lay semaphore (diem yeu #5 cua A1)
+void vsync_loop() {                           // ⚠️ KHÔNG lấy semaphore (điểm yếu #5 của A1)
     auto next = std::chrono::steady_clock::now();
     while (!g_vsync_stop) {
         next += std::chrono::milliseconds(16);
@@ -1036,7 +1086,7 @@ lib_dimming_interface* get_dimming_instance() {
 int  lib_sem_lock(const char*)   { return sem_wait(g_sem); }
 void lib_sem_unlock(const char*) { sem_post(g_sem); }
 
-// Tu chay khi process nap libdisplay.so — TRUOC khi main() tao thread nao => khong race khoi tao.
+// Tự chạy khi process nạp libdisplay.so — TRƯỚC khi main() tạo thread nào => không race khởi tạo.
 __attribute__((constructor)) static void lib_init() {
     lib_init_device();
     if (get_check_shm() != 0) return;
@@ -1053,7 +1103,7 @@ __attribute__((destructor)) static void lib_base_final() {
 **`src/lib_api.cpp`**
 
 ```cpp
-// lib_api.cpp — FACADE: moi ham cung mot khuon  shm -> KHOA -> dieu phoi -> MO KHOA.
+// lib_api.cpp — FACADE: mọi hàm cùng một khuôn  shm -> KHOÁ -> điều phối -> MỞ KHOÁ.
 #include "lib_api.h"
 #include "lib_base.h"
 #include "panel_control.h"
@@ -1063,21 +1113,21 @@ extern "C" int32_t lib_api_set_backlight(int32_t backlight) {
     int sem_ret = lib_sem_lock(__func__);
     int32_t ret = LIB_OK;
     if (get_dimming_instance() != nullptr)
-        ret = static_cast<int32_t>(get_dimming_instance()->SetBacklight(backlight));   // tuyen PQ
+        ret = static_cast<int32_t>(get_dimming_instance()->SetBacklight(backlight));   // tuyến PQ
     if (sem_ret == 0) lib_sem_unlock(__func__);
     return ret;
 }
 extern "C" int32_t lib_api_get_backlight(void) {
     if (get_check_shm() == -1) return -1;
     int sem_ret = lib_sem_lock(__func__);
-    int32_t v = get_lib_shm()->shmGlobalDimming.current;   // doc STATE CHUNG — process nao cung thay
+    int32_t v = (get_dimming_instance() != nullptr) ? get_dimming_instance()->GetBacklight() : 0;  // thuật toán đọc VÙNG CỦA NÓ trong shm
     if (sem_ret == 0) lib_sem_unlock(__func__);
     return v;
 }
 extern "C" int32_t lib_api_set_frequency(int32_t hz) {
     if (get_check_shm() == -1) return -1;
     int sem_ret = lib_sem_lock(__func__);
-    int32_t ret = panel_ctl_set_frequency(hz);                                         // tuyen Panel Control
+    int32_t ret = panel_ctl_set_frequency(hz);                                         // tuyến Panel Control
     if (sem_ret == 0) lib_sem_unlock(__func__);
     return ret;
 }
@@ -1086,12 +1136,12 @@ extern "C" int32_t lib_api_set_frequency(int32_t hz) {
 **`src/panel_control.h`**
 
 ```cpp
-// panel_control.h — Panel Control: ham tu do, MOT lenh -> ioctl. Co y KHONG dung pattern:
-// bien the theo chip da nam o panel driver (kernel_sim/drv_panel_chip*).
+// panel_control.h — Panel Control: hàm tự do, MỘT lệnh -> ioctl. Cố ý KHÔNG dùng pattern:
+// biến thể theo chip đã nằm ở panel driver (kernel_sim/drv_panel_chip*).
 #pragma once
 #include <cstdint>
 int32_t panel_ctl_set_frequency(int32_t hz);
-int32_t panel_ctl_write_brightness(int32_t level);    // noi bo: chi backend cua PQ goi
+int32_t panel_ctl_write_brightness(int32_t level);    // nội bộ: chỉ backend của PQ gọi
 ```
 
 **`src/panel_control.cpp`**
@@ -1106,18 +1156,20 @@ int32_t panel_ctl_write_brightness(int32_t level) { return drv_panel_core_ioctl(
 **`src/dimming/shm_types.h`**
 
 ```cpp
-// shm_types.h — state CHUNG moi process. Layout nay la ABI giua cac process.
+// shm_types.h — state CHUNG mọi process. Layout này là ABI giữa các process.
+// MỖI thuật toán MỘT vùng riêng: object nào gắn vùng nào là cố định từ constructor.
 #pragma once
 #include <cstdint>
 struct DimmingForShm       { int32_t m_iPlatformType; int32_t requested; };
 struct GlobalDimmingForShm { int32_t target; int32_t current; int32_t steps; };
+struct LocalDimmingForShm  { int32_t level; int32_t zones[4]; };   // mức chung + mức từng vùng đã ghi
 ```
 
 **`src/dimming/IDimmingAlgo.h`**
 
 ```cpp
-// IDimmingAlgo — STRATEGY (nhin tu lib_dimming) + ABSTRACTION cua Bridge (nhin sang backend).
-// Moi method CO THAN tra LIB_OK => chinh base class la NULL OBJECT (platform khong panel).
+// IDimmingAlgo — STRATEGY (nhìn từ lib_dimming) + ABSTRACTION của Bridge (nhìn sang backend).
+// Mọi method CÓ THÂN trả LIB_OK => chính base class là NULL OBJECT (platform không panel).
 #pragma once
 #include <cstdint>
 #include "lib_api.h"
@@ -1125,7 +1177,8 @@ class IDimmingAlgo {
 public:
     virtual ~IDimmingAlgo() = default;
     virtual uint32_t SetBacklight(int32_t backlight);
-    virtual void     t_vSyncCallBack();                 // vong vsync goi moi khung hinh
+    virtual void     t_vSyncCallBack();                 // vòng vsync gọi mỗi khung hình
+    virtual int32_t  GetBacklight();                    // đọc từ VÙNG STATE CỦA CHÍNH thuật toán
 };
 ```
 
@@ -1133,14 +1186,15 @@ public:
 
 ```cpp
 #include "IDimmingAlgo.h"
-uint32_t IDimmingAlgo::SetBacklight(int32_t) { return LIB_OK; }   // no-op thanh cong
+uint32_t IDimmingAlgo::SetBacklight(int32_t) { return LIB_OK; }   // no-op thành công
 void     IDimmingAlgo::t_vSyncCallBack()      {}
+int32_t  IDimmingAlgo::GetBacklight()         { return 0; }       // không panel: không có gì để đọc
 ```
 
 **`src/dimming/IDimmingBackend.h`**
 
 ```cpp
-// IDimmingBackend — Bridge IMPLEMENTOR: nua "ghi phan cung", theo chip.
+// IDimmingBackend — Bridge IMPLEMENTOR: nửa "ghi phần cứng", theo chip.
 #pragma once
 #include <cstdint>
 #include "IDimmingAlgo.h"
@@ -1150,7 +1204,7 @@ class IDimmingBackend {
 public:
     virtual ~IDimmingBackend() = default;
     virtual uint32_t t_InitGlobalDimming()                         { return LIB_OK; }
-    virtual uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t*)     { return LIB_OK; }  // than mac dinh
+    virtual uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t*)     { return LIB_OK; }  // thân mặc định
     virtual uint32_t t_InitLocalDimming()                          { return LIB_OK; }
     virtual uint32_t t_SetLdFinalDuty(BackendLdFinalDuty_t*)       { return LIB_OK; }
 };
@@ -1163,15 +1217,16 @@ public:
 #include "IDimmingAlgo.h"
 #include "IDimmingBackend.h"
 #include "shm_types.h"
-// Thuat toan GLOBAL: mot gia tri cho ca panel; tien dan toi muc tieu moi khung hinh.
+// Thuật toán GLOBAL: một giá trị cho cả panel; tiến dần tới mục tiêu mỗi khung hình.
 class GlobalDimming : public IDimmingAlgo {
 public:
     GlobalDimming(IDimmingBackend* pDimmingBackend, GlobalDimmingForShm& shm);
     uint32_t SetBacklight(int32_t backlight) override;
     void     t_vSyncCallBack() override;
+    int32_t  GetBacklight() override;
 protected:
-    GlobalDimmingForShm& Shm;                 // reference member: gan dung MOT vung state
-    IDimmingBackend*     m_pDimmingBackend;   // CAY CAU sang phan cung
+    GlobalDimmingForShm& Shm;                 // reference member: gắn đúng MỘT vùng state
+    IDimmingBackend*     m_pDimmingBackend;   // CÂY CẦU sang phần cứng
 };
 ```
 
@@ -1186,10 +1241,10 @@ GlobalDimming::GlobalDimming(IDimmingBackend* pDimmingBackend, GlobalDimmingForS
 uint32_t GlobalDimming::SetBacklight(int32_t backlight) {
     if (backlight < 0)   backlight = 0;
     if (backlight > 100) backlight = 100;
-    Shm.target = backlight;                       // chi dat muc tieu; vsync se tien dan
+    Shm.target = backlight;                       // chỉ đặt mục tiêu; vsync sẽ tiến dần
     return LIB_OK;
 }
-void GlobalDimming::t_vSyncCallBack() {           // ⚠️ cham Shm KHONG qua khoa (diem yeu #5)
+void GlobalDimming::t_vSyncCallBack() {           // ⚠️ chạm Shm KHÔNG qua khoá (điểm yếu #5)
     if (Shm.current == Shm.target) return;
     int32_t step = (Shm.target > Shm.current) ? 10 : -10;
     Shm.current += step;
@@ -1197,8 +1252,9 @@ void GlobalDimming::t_vSyncCallBack() {           // ⚠️ cham Shm KHONG qua k
         Shm.current = Shm.target;
     ++Shm.steps;
     BackendGd2DFinalDuty_t duty{Shm.current};
-    m_pDimmingBackend->t_Set2DFinalDuty(&duty);  // phan cung: moi chip mot kieu
+    m_pDimmingBackend->t_Set2DFinalDuty(&duty);  // phần cứng: mỗi chip một kiểu
 }
+int32_t GlobalDimming::GetBacklight() { return Shm.current; }   // mức đang thực sự ghi xuống
 ```
 
 **`src/dimming/LocalDimming.h`**
@@ -1208,13 +1264,14 @@ void GlobalDimming::t_vSyncCallBack() {           // ⚠️ cham Shm KHONG qua k
 #include "IDimmingAlgo.h"
 #include "IDimmingBackend.h"
 #include "shm_types.h"
-// Thuat toan LOCAL (rut gon): chia muc sang cho 4 vung, ghi ngay.
+// Thuật toán LOCAL (rút gọn): chia mức sáng cho 4 vùng, ghi ngay.
 class LocalDimming : public IDimmingAlgo {
 public:
-    LocalDimming(IDimmingBackend* pDimmingBackend, GlobalDimmingForShm& shm);
+    LocalDimming(IDimmingBackend* pDimmingBackend, LocalDimmingForShm& shm);
     uint32_t SetBacklight(int32_t backlight) override;
+    int32_t  GetBacklight() override;
 protected:
-    GlobalDimmingForShm& Shm;
+    LocalDimmingForShm& Shm;                  // vùng CỦA LOCAL — không mượn vùng của Global
     IDimmingBackend*     m_pDimmingBackend;
 };
 ```
@@ -1223,15 +1280,17 @@ protected:
 
 ```cpp
 #include "LocalDimming.h"
-LocalDimming::LocalDimming(IDimmingBackend* pDimmingBackend, GlobalDimmingForShm& shm)
+LocalDimming::LocalDimming(IDimmingBackend* pDimmingBackend, LocalDimmingForShm& shm)
     : Shm(shm), m_pDimmingBackend(pDimmingBackend) {
     m_pDimmingBackend->t_InitLocalDimming();
 }
 uint32_t LocalDimming::SetBacklight(int32_t backlight) {
-    Shm.target = Shm.current = backlight;
-    BackendLdFinalDuty_t d{{backlight, backlight, backlight / 2, backlight / 2}};  // vung duoi toi hon
+    BackendLdFinalDuty_t d{{backlight, backlight, backlight / 2, backlight / 2}};  // vùng dưới tối hơn
+    Shm.level = backlight;
+    for (int i = 0; i < 4; ++i) Shm.zones[i] = d.zones[i];   // mức từng vùng cũng nằm ở shm: process khác đọc được
     return m_pDimmingBackend->t_SetLdFinalDuty(&d);
 }
+int32_t LocalDimming::GetBacklight() { return Shm.level; }
 ```
 
 **`src/dimming/DimmingBackendChipA.h`**
@@ -1239,7 +1298,7 @@ uint32_t LocalDimming::SetBacklight(int32_t backlight) {
 ```cpp
 #pragma once
 #include "IDimmingBackend.h"
-// Backend cua ChipA, theo tung loai thuat toan: moi lop chi override nhom cua minh.
+// Backend của ChipA, theo từng loại thuật toán: mỗi lớp chỉ override nhóm của mình.
 class DimmingBackendChipA_Global : public IDimmingBackend {
 public:
     uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* p) override;
@@ -1255,7 +1314,7 @@ public:
 ```cpp
 #include "DimmingBackendChipA.h"
 #include "panel_control.h"
-// Backend KHONG tu goi ioctl: ghi gia tri cuoi qua Panel Control (cong duy nhat xuong phan cung).
+// Backend KHÔNG tự gọi ioctl: ghi giá trị cuối qua Panel Control (cổng duy nhất xuống phần cứng).
 uint32_t DimmingBackendChipA_Global::t_Set2DFinalDuty(BackendGd2DFinalDuty_t* p) {
     return static_cast<uint32_t>(panel_ctl_write_brightness(p->value));
 }
@@ -1273,17 +1332,18 @@ uint32_t DimmingBackendChipA_Local::t_SetLdFinalDuty(BackendLdFinalDuty_t* p) {
 #include "IDimmingAlgo.h"
 #include "IDimmingBackend.h"
 #include "shm_types.h"
-// ABSTRACT FACTORY: tao CA CAP thuat toan + backend khop nhau. Ban nay la cua ChipA
-// (CMake chi build thu muc chip dich). Cap sai van compile sach — nen chi tao o MOT cho.
+// ABSTRACT FACTORY: tạo CẢ CẶP thuật toán + backend khớp nhau. Bản này là của ChipA
+// (CMake chỉ build thư mục chip đích). Cặp sai vẫn compile sạch — nên chỉ tạo ở MỘT chỗ.
 enum DimmingType_k { DIMMING_NONE, DIMMING_GLOBAL, DIMMING_LOCAL };
-DimmingType_k detect_dimming_type();                  // doc model luc chay (env LIBDISPLAY_MODEL)
+DimmingType_k detect_dimming_type();                  // đọc model lúc chạy (env LIBDISPLAY_MODEL)
 
 class DimmingFactory {
 public:
-    DimmingFactory(DimmingType_k type, GlobalDimmingForShm& shm);
+    // Mỗi thuật toán nhận ĐÚNG vùng state của nó — factory là chỗ duy nhất ghép cặp.
+    DimmingFactory(DimmingType_k type, GlobalDimmingForShm& gshm, LocalDimmingForShm& lshm);
     IDimmingAlgo* GetDimmingObject() { return m_pDimmingObject.get(); }
 private:
-    std::unique_ptr<IDimmingBackend> m_pDimmingBackend;   // khai bao TRUOC: song lau hon algo
+    std::unique_ptr<IDimmingBackend> m_pDimmingBackend;   // khai báo TRƯỚC: sống lâu hơn algo
     std::unique_ptr<IDimmingAlgo>    m_pDimmingObject;
 };
 ```
@@ -1302,18 +1362,18 @@ DimmingType_k detect_dimming_type() {
     const char* m = std::getenv("LIBDISPLAY_MODEL");
     if (m && std::strcmp(m, "local") == 0) return DIMMING_LOCAL;
     if (m && std::strcmp(m, "none")  == 0) return DIMMING_NONE;
-    return DIMMING_GLOBAL;                              // default an toan
+    return DIMMING_GLOBAL;                              // mặc định an toàn
 }
 
-DimmingFactory::DimmingFactory(DimmingType_k type, GlobalDimmingForShm& shm) {
+DimmingFactory::DimmingFactory(DimmingType_k type, GlobalDimmingForShm& gshm, LocalDimmingForShm& lshm) {
     switch (type) {
     case DIMMING_LOCAL:
         m_pDimmingBackend = std::make_unique<DimmingBackendChipA_Local>();
-        m_pDimmingObject  = std::make_unique<LocalDimming>(m_pDimmingBackend.get(), shm);
+        m_pDimmingObject  = std::make_unique<LocalDimming>(m_pDimmingBackend.get(), lshm);
         break;
     case DIMMING_GLOBAL:
         m_pDimmingBackend = std::make_unique<DimmingBackendChipA_Global>();
-        m_pDimmingObject  = std::make_unique<GlobalDimming>(m_pDimmingBackend.get(), shm);
+        m_pDimmingObject  = std::make_unique<GlobalDimming>(m_pDimmingBackend.get(), gshm);
         break;
     case DIMMING_NONE:
         m_pDimmingObject = std::make_unique<IDimmingAlgo>();     // NULL OBJECT
@@ -1328,18 +1388,20 @@ DimmingFactory::DimmingFactory(DimmingType_k type, GlobalDimmingForShm& shm) {
 #pragma once
 #include <memory>
 #include "DimmingFactory.h"
-// Hop dong module (DIP) + uy nhiem. Mot implementation => chua phai Strategy o tang nay.
+// Hợp đồng module (DIP) + uỷ nhiệm. Một implementation => chưa phải Strategy ở tầng này.
 class lib_dimming_interface {
 public:
     virtual ~lib_dimming_interface() = default;
     virtual uint32_t SetBacklight(int32_t v) = 0;
     virtual void     OnVSync() = 0;
+    virtual int32_t  GetBacklight() = 0;
 };
 class lib_dimming : public lib_dimming_interface {
 public:
-    lib_dimming(DimmingType_k type, GlobalDimmingForShm& shm) : m_factory(type, shm) {}
+    lib_dimming(DimmingType_k type, GlobalDimmingForShm& gshm, LocalDimmingForShm& lshm) : m_factory(type, gshm, lshm) {}
     uint32_t SetBacklight(int32_t v) override { return m_factory.GetDimmingObject()->SetBacklight(v); }
     void     OnVSync() override               { m_factory.GetDimmingObject()->t_vSyncCallBack(); }
+    int32_t  GetBacklight() override          { return m_factory.GetDimmingObject()->GetBacklight(); }
 private:
     DimmingFactory m_factory;
 };
@@ -1348,16 +1410,16 @@ private:
 **`src/dimming/lib_dimming.cpp`**
 
 ```cpp
-// Toan bo lib_dimming viet inline trong lib_dimming.h (moi method mot dong uy nhiem).
-// File nay giu lai de CMake co don vi dich rieng cho module, giong cau truc he that.
+// Toàn bộ lib_dimming viết inline trong lib_dimming.h (mỗi method một dòng uỷ nhiệm).
+// File này giữ lại để CMake có đơn vị dịch riêng cho module, giống cấu trúc hệ thật.
 #include "lib_dimming.h"
 ```
 
 **`kernel_sim/panel_ops.h`**
 
 ```c
-/* panel_ops.h — "kernel" gia lap: bang con tro ham = vtable viet tay bang C.
- * Luat ABI: CHI them o CUOI struct, va kiem 'size' luc dang ky. */
+/* panel_ops.h — "kernel" giả lập: bảng con trỏ hàm = vtable viết tay bằng C.
+ * Luật ABI: CHỈ thêm ở CUỐI struct, và kiểm 'size' lúc đăng ký. */
 #pragma once
 #include <stddef.h>
 #ifdef __cplusplus
@@ -1365,7 +1427,7 @@ extern "C" {
 #endif
 
 struct panel_ops {
-    size_t size;                          /* = sizeof(struct panel_ops) ben DIEN bang */
+    size_t size;                          /* = sizeof(struct panel_ops) bên ĐIỀN bảng */
     int (*init)(void);
     int (*set_freq)(int hz);
     int (*set_brightness)(int level);
@@ -1373,8 +1435,8 @@ struct panel_ops {
 
 enum { PANEL_IOC_SET_FREQ = 1, PANEL_IOC_SET_BRIGHTNESS = 2 };
 
-int panel_register_ops(const struct panel_ops *ops);  /* driver chip goi luc "insmod" */
-int drv_panel_core_ioctl(int cmd, int arg);           /* thay cho ioctl() that        */
+int panel_register_ops(const struct panel_ops *ops);  /* driver chip gọi lúc "insmod" */
+int drv_panel_core_ioctl(int cmd, int arg);           /* thay cho ioctl() thật        */
 
 #ifdef __cplusplus
 }
@@ -1384,15 +1446,15 @@ int drv_panel_core_ioctl(int cmd, int arg);           /* thay cho ioctl() that  
 **`kernel_sim/drv_panel_core.c`**
 
 ```c
-/* drv_panel_core — driver nen: KHONG biet ten chip, chi goi qua bang ops. */
+/* drv_panel_core — driver nền: KHÔNG biết tên chip, chỉ gọi qua bảng ops. */
 #include <errno.h>
 #include <stdio.h>
 #include "panel_ops.h"
 
-static const struct panel_ops *g_ops;    /* bang dang dung — do driver chip dien */
+static const struct panel_ops *g_ops;    /* bảng đang dùng — do driver chip điền */
 
 int panel_register_ops(const struct panel_ops *ops) {
-    if (!ops || ops->size < sizeof(struct panel_ops)) {   /* bang cu/ngan hon => tu choi */
+    if (!ops || ops->size < sizeof(struct panel_ops)) {   /* bảng cũ/ngắn hơn => từ chối */
         fprintf(stderr, "[core] tu choi panel_ops: size=%zu < %zu\n",
                 ops ? ops->size : 0, sizeof(struct panel_ops));
         return -EINVAL;
@@ -1402,10 +1464,10 @@ int panel_register_ops(const struct panel_ops *ops) {
 }
 
 int drv_panel_core_ioctl(int cmd, int arg) {
-    if (!g_ops) return -ENODEV;                              /* chua driver chip nao dang ky */
+    if (!g_ops) return -ENODEV;                              /* chưa driver chip nào đăng ký */
     switch (cmd) {
     case PANEL_IOC_SET_FREQ:
-        return g_ops->set_freq ? g_ops->set_freq(arg) : -ENOTSUP;        /* o NULL => khong oops */
+        return g_ops->set_freq ? g_ops->set_freq(arg) : -ENOTSUP;        /* ô NULL => không oops */
     case PANEL_IOC_SET_BRIGHTNESS:
         return g_ops->set_brightness ? g_ops->set_brightness(arg) : -ENOTSUP;
     default:
@@ -1417,8 +1479,8 @@ int drv_panel_core_ioctl(int cmd, int arg) {
 **`kernel_sim/drv_panel_chipA.c`**
 
 ```c
-/* drv_panel_chipA — driver that cua mot chip: tu dang ky ham vao bang luc "insmod".
- * O day "insmod" = constructor chay khi libdisplay.so duoc nap. */
+/* drv_panel_chipA — driver thật của một chip: tự đăng ký hàm vào bảng lúc "insmod".
+ * Ở đây "insmod" = constructor chạy khi libdisplay.so được nạp. */
 #include <stdio.h>
 #include "panel_ops.h"
 
@@ -1431,16 +1493,16 @@ static const struct panel_ops chipA_ops = {
     .init = a_init, .set_freq = a_set_freq, .set_brightness = a_set_brightness,
 };
 
-__attribute__((constructor(101)))           /* 101: chay TRUOC lib_init (mac dinh 65535) */
+__attribute__((constructor(101)))           /* 101: chạy TRƯỚC lib_init (mặc định 65535) */
 static void drv_panel_chipA_insmod(void) { panel_register_ops(&chipA_ops); }
 ```
 
 **`app/main.cpp`**
 
 ```cpp
-// App chi biet lib_api.h — khong biet PQ, Panel Control, chip nao.
-//   ./display_demo          dat tan so + do sang, cho vsync tien dan, roi doc lai
-//   ./display_demo --read   CHI doc: chung minh state nam o shared memory, process nao cung thay
+// App chỉ biết lib_api.h — không biết PQ, Panel Control, chip nào.
+//   ./display_demo          đặt tần số + độ sáng, chờ vsync tiến dần, rồi đọc lại
+//   ./display_demo --read   CHỈ đọc: chứng minh state nằm ở shared memory, process nào cũng thấy
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -1453,7 +1515,7 @@ int main(int argc, char** argv) {
     }
     std::printf("set_frequency(120) -> %d\n", lib_api_set_frequency(120));
     std::printf("set_backlight(60)  -> %d\n", lib_api_set_backlight(60));
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));   // cho vong vsync tien dan
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));   // chờ vòng vsync tiến dần
     std::printf("backlight=%d\n", lib_api_get_backlight());
     return 0;
 }
@@ -1462,14 +1524,15 @@ int main(int argc, char** argv) {
 **`tests/test_dimming.cpp`**
 
 ```cpp
-// Unit test PQ: thay backend that bang FAKE de test thuat toan KHONG can phan cung.
+// Unit test PQ: thay backend thật bằng FAKE để test thuật toán KHÔNG cần phần cứng.
 #include <gtest/gtest.h>
 #include <vector>
 #include "DimmingFactory.h"
 #include "GlobalDimming.h"
+#include "LocalDimming.h"
 
 namespace {
-struct FakeBackend : IDimmingBackend {               // test double: ghi lai moi lan ghi phan cung
+struct FakeBackend : IDimmingBackend {               // test double: ghi lại mỗi lần ghi phần cứng
     std::vector<int32_t> writes;
     uint32_t t_Set2DFinalDuty(BackendGd2DFinalDuty_t* p) override { writes.push_back(p->value); return LIB_OK; }
 };
@@ -1481,7 +1544,7 @@ TEST(GlobalDimming, SetBacklightOnlySetsTarget) {
     GlobalDimming algo(&be, shm);
     algo.SetBacklight(50);
     EXPECT_EQ(shm.target, 50);
-    EXPECT_TRUE(be.writes.empty());                  // chua ghi gi cho toi khung hinh dau
+    EXPECT_TRUE(be.writes.empty());                  // chưa ghi gì cho tới khung hình đầu
 }
 
 TEST(GlobalDimming, VSyncRampsInStepsOf10) {
@@ -1490,7 +1553,7 @@ TEST(GlobalDimming, VSyncRampsInStepsOf10) {
     GlobalDimming algo(&be, shm);
     algo.SetBacklight(25);
     for (int i = 0; i < 5; ++i) algo.t_vSyncCallBack();
-    EXPECT_EQ(be.writes, (std::vector<int32_t>{10, 20, 25}));   // dung o muc tieu, khong vuot
+    EXPECT_EQ(be.writes, (std::vector<int32_t>{10, 20, 25}));   // dừng ở mục tiêu, không vượt
     EXPECT_EQ(shm.steps, 3);
 }
 
@@ -1503,33 +1566,46 @@ TEST(GlobalDimming, ClampsOutOfRange) {
 }
 
 TEST(DimmingFactory, NoPanelGivesNullObject) {
-    GlobalDimmingForShm shm{};
-    DimmingFactory f(DIMMING_NONE, shm);
-    ASSERT_NE(f.GetDimmingObject(), nullptr);        // khong bao gio nullptr
+    GlobalDimmingForShm gshm{};
+    LocalDimmingForShm  lshm{};
+    DimmingFactory f(DIMMING_NONE, gshm, lshm);
+    ASSERT_NE(f.GetDimmingObject(), nullptr);        // không bao giờ nullptr
     EXPECT_EQ(f.GetDimmingObject()->SetBacklight(80), static_cast<uint32_t>(LIB_OK));
-    EXPECT_EQ(shm.target, 0);                         // no-op that su
+    EXPECT_EQ(gshm.target, 0);                        // no-op thật sự
+    EXPECT_EQ(lshm.level, 0);
+}
+
+TEST(LocalDimming, StateLivesInItsOwnRegion) {
+    GlobalDimmingForShm gshm{};
+    LocalDimmingForShm  lshm{};
+    DimmingFactory f(DIMMING_LOCAL, gshm, lshm);
+    f.GetDimmingObject()->SetBacklight(60);
+    EXPECT_EQ(lshm.level, 60);
+    EXPECT_EQ(lshm.zones[2], 30);                     // mức từng vùng nằm trong shm, không chỉ ở backend
+    EXPECT_EQ(gshm.target, 0);                        // không đụng vào vùng của Global
+    EXPECT_EQ(f.GetDimmingObject()->GetBacklight(), 60);
 }
 ```
 
 **`tests/test_panel.cpp`**
 
 ```cpp
-// Unit test "kernel" gia lap: dang ky bang ops va kiem 'size'.
+// Unit test "kernel" giả lập: đăng ký bảng ops và kiểm 'size'.
 #include <gtest/gtest.h>
 #include <cerrno>
 #include "panel_ops.h"
 
 TEST(PanelOps, RejectsShorterTable) {
-    struct panel_ops old_ops{};                       // gia lap .ko cu: size nho hon
+    struct panel_ops old_ops{};                       // giả lập .ko cũ: size nhỏ hơn
     old_ops.size = sizeof(struct panel_ops) - sizeof(void*);
     EXPECT_EQ(panel_register_ops(&old_ops), -EINVAL);
 }
 
 TEST(PanelOps, NullSlotReturnsNotSupported) {
     struct panel_ops ops{};
-    ops.size = sizeof(struct panel_ops);              // set_freq de NULL
+    ops.size = sizeof(struct panel_ops);              // set_freq để NULL
     ASSERT_EQ(panel_register_ops(&ops), 0);
-    EXPECT_EQ(drv_panel_core_ioctl(PANEL_IOC_SET_FREQ, 60), -ENOTSUP);   // khong crash
+    EXPECT_EQ(drv_panel_core_ioctl(PANEL_IOC_SET_FREQ, 60), -ENOTSUP);   // không crash
 }
 ```
 

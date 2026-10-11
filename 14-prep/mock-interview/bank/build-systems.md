@@ -1054,11 +1054,11 @@ EXPECT_EQ(fake.writes, (std::vector<int32_t>{10, 20, 25}));   // chạy thật: 
 | Chỗ nên viết test tiếp | Test có `EXPECT` có ý nghĩa không |
 | — | Các tổ hợp cấu hình (model, chip) đã được thử chưa |
 
-**Đọc báo cáo thế nào — ví dụ chạy thật** (`libdisplay_lab`, tổng 90%):
+**Đọc báo cáo thế nào — ví dụ chạy thật** (`libdisplay_lab`, tổng 89%):
 ```
 src/dimming/DimmingBackendChipA.cpp            5        3    60%   4-5
 ```
-Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integration test chạy model `local` ⟹ đường *thuật toán Global → backend thật → Panel Control* **chưa có test nào đi qua**, dù tổng là 90%. Đọc cột **Missing**, đừng đọc cột tổng.
+Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integration test chạy model `local` ⟹ đường *thuật toán Global → backend thật → Panel Control* **chưa có test nào đi qua**, dù tổng là 89%. Đọc cột **Missing**, đừng đọc cột tổng.
 
 **"Vì sao" hai tầng:**
 - *Nông:* "coverage càng cao càng tốt".
@@ -1085,8 +1085,8 @@ Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integra
 | Unit test | Hành vi sai so với mong đợi | Chỉ những gì test đã nghĩ tới |
 
 **Bằng chứng chạy thật** (`libdisplay_lab`, cố ý đọc `zones[4]` trên mảng 4 phần tử):
-- Build **Debug `-O0`**: **im lặng**, chạy ra kết quả, exit 0.
-- Build **Release `-O2`** + `-Werror`: `warning: array subscript 4 is above array bounds` ⟹ build fail. *(Cảnh báo này cần tối ưu mới bật.)*
+- Build **Debug `-O0`**: **im lặng**, chạy ra `backlight=60`, exit 0 — trong khi phần cứng nhận giá trị rác (`set_brightness(37)` thay vì 45).
+- Build **Release `-O2`** + `-Werror`: `error: array subscript 4 is above array bounds of 'int32_t [4]'` ⟹ build fail. *(Cảnh báo này cần tối ưu mới bật.)*
 - **ASan**: `stack-buffer-overflow ... DimmingBackendChipA.cpp:8`.
 - **TSan** trên cùng lab bắt được race vòng vsync mà không công cụ nào khác thấy.
 
@@ -1124,6 +1124,37 @@ Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integra
 <details><summary>Đáp án</summary>
 
 **GoogleTest** chạy như một chương trình user-space bình thường trên máy build; test class/hàm C++ của library, cắm fake thay phần phụ thuộc. **KUnit** là framework unit test **bên trong kernel**: test built-in hoặc module, thường chạy bằng `tools/testing/kunit/kunit.py run` trên kernel UML — không cần board; test **logic** của driver (kiểm tham số, bảng ops, máy trạng thái), **không** test được phần cứng thật. Cả hai đều không thay được test trên thiết bị.
+</details>
+
+#### BLD-045 · 🟡 · concept · ⭐ · 🎤 2026-10-11 · [→ unit-test-and-code-quality §6](../../../06-build-systems/unit-test-and-code-quality.md), [LNX-045](linux-sysprog.md)
+**Một commit cài lỗi tràn mảng. Cổng ASan đáng lẽ đỏ sau 10 giây, nhưng pipeline treo 25 phút rồi mới báo timeout. Test của bạn có dùng shared memory + named semaphore của library. Chuyện gì đã xảy ra, và bạn sửa pipeline thế nào?**
+
+<details><summary>Đáp án</summary>
+
+**Cơ chế — xảy ra thật ở `libdisplay_lab` ([unit-test-and-code-quality §6](../../../06-build-systems/unit-test-and-code-quality.md)):**
+1. ASan phát hiện tràn mảng **bên trong `lib_api_set_backlight`** ⟹ giết process ngay (`-fno-sanitize-recover`). Lúc đó process **đang giữ semaphore**.
+2. Semaphore không có chủ ⟹ kernel không nhả hộ ⟹ giá trị kẹt ở 0 ([LNX-045](linux-sysprog.md)).
+3. Cổng ASan chạy `ctest` **lần hai** (để lấy exit code), integration test dùng **cùng tên shm cố định** ⟹ process mới treo ở `sem_wait` ngay trong constructor của `.so`.
+4. `ctest` không đặt timeout ⟹ chờ tới hạn mặc định **1500 giây**.
+
+**Sửa — ba lớp, mỗi lớp chặn một mắt xích:**
+
+| Lớp | Làm gì | Chặn mắt xích |
+|---|---|---|
+| Cô lập | Mỗi lần chạy pipeline một tên shm riêng (`/libdisplay_ci_$$`), dọn khi xong | Rác của lần chạy trước (hoặc test trước) không lan sang lần sau |
+| Timeout | `ctest --timeout 60` ở **mọi** cổng | Treo thành **FAIL** nhanh, không chiếm máy CI 25 phút |
+| Không chạy lặp | Cổng chạy test **một lần**, giữ exit code của chính lần đó | Không tạo ra lần chạy thứ hai để dính rác của lần đầu |
+
+**"Vì sao" hai tầng:**
+- *Nông:* "test bị treo thì thêm timeout".
+- *Sâu:* timeout chỉ biến **treo** thành **đỏ**; gốc là **trạng thái dùng chung sống lâu hơn process** (shm, semaphore, file lock, port) rò từ test này sang test khác. Test tốt phải **cô lập** tài nguyên đó. Và cùng một lỗi thiết kế của hệ thật (semaphore không có chủ) lộ ra **trong CI** trước khi lộ trên TV.
+
+**Bẫy:**
+1. Chỉ tăng timeout của job Jenkins — vẫn treo, chỉ treo lâu hơn hoặc ngắn hơn.
+2. Đổ lỗi "flaky" rồi bấm chạy lại — lần sau dùng tên shm mới thì xanh, che mất lỗi thật.
+3. Quên rằng ASan **giết** process: mọi tài nguyên process đang giữ mà kernel không tự dọn (semaphore POSIX, shm) sẽ ở lại.
+
+**Chốt:** *"Cổng chặn không bao giờ được treo — treo phải thành đỏ. Muốn vậy cần hai thứ: timeout ở mọi lần chạy test, và mỗi lần chạy một bộ tài nguyên IPC riêng."*
 </details>
 
 ---
