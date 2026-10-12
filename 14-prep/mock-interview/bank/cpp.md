@@ -146,6 +146,22 @@ public:
 
 #### CPP-006 · 🟡 · concept · ⭐ · [→ oop](../../../01-cpp-fundamentals/oop.md)
 **Đa hình runtime hoạt động thế nào (vtable/vptr)?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Có hai thứ. **vtable** là một bảng con trỏ hàm, mỗi **class** có một bảng, nằm ở vùng chỉ đọc của binary; ô nào class con override thì trỏ tới hàm của class con, ô nào không thì trỏ lại hàm của class cha. **vptr** là một con trỏ ẩn trong **mỗi object**, do constructor gán, trỏ tới vtable của class thật của object đó.*
+>
+> *Khi gọi `algo->compute(frame)` qua con trỏ lớp cơ sở, compiler **không biết** object thật là gì, nhưng nó biết `compute` nằm ở **ô số mấy** — con số đó cố định lúc compile. Nó sinh ra ba bước: đọc vptr từ object, đọc ô số đó trong bảng, gọi gián tiếp tới địa chỉ vừa đọc. Vì vậy đúng hàm của class con được chạy.*
+>
+> *Chi phí: mỗi object thêm 8 byte cho vptr trên máy 64-bit, mỗi lời gọi thêm một lần gián tiếp — nhưng cái giá lớn hơn là compiler **không inline được**. Và chính việc *"ô số mấy cố định lúc compile"* là lý do chèn hàm ảo vào giữa interface làm hỏng `.so` cũ."*
+
+**Nếu bị hỏi tiếp**
+- *"`sizeof` một class có vptr và một `int`?"* — 16 byte trên 64-bit: 8 vptr + 4 `int` + 4 padding để thẳng hàng 8.
+- *"Gọi hàm ảo trong constructor?"* — Lúc đó vptr còn trỏ vtable của class **đang dựng**, nên chạy bản của lớp cơ sở.
+
+**Móc nền tảng:** ABI và vtable qua `.so` ([DP-027](design-patterns.md)) · bảng con trỏ hàm trong kernel ([DP-043](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — hai thứ, đừng lẫn:**
@@ -910,6 +926,23 @@ DeviceHandle(DeviceHandle&& o) {
 
 #### CPP-009 · 🟡 · concept · [→ templates](../../../01-cpp-fundamentals/templates.md)
 **Template hoạt động lúc nào? Vì sao định nghĩa phải nằm trong header — và có chi phí runtime không?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Template là **bản thiết kế**, chưa phải mã. Compiler chỉ sinh mã thật khi mình **dùng** nó với một kiểu cụ thể — gọi là instantiate — và việc đó xảy ra **lúc compile**, tại chính file đang dùng.*
+>
+> *Vì vậy định nghĩa phải nằm trong header: để sinh `max<int>`, compiler cần thấy **cả thân hàm** ở file đang dùng. Nếu thân nằm trong một `.cpp` khác thì file này chỉ thấy khai báo, không sinh được mã, và lỗi hiện ra ở bước **link** là *"undefined reference"*.*
+>
+> *Với library, có một cách giữ định nghĩa trong `.cpp`: nếu biết trước tập kiểu hữu hạn thì **explicit instantiation** — viết `template class Foo<int>;` trong `.cpp`. Cách này giấu được cài đặt và giảm thời gian build.*
+>
+> *Chi phí runtime: **không có** — mã sinh ra như viết tay, inline được, khác với hàm ảo. Cái giá trả ở chỗ khác: thời gian build, binary to ra vì mỗi kiểu một bản, và thông báo lỗi khó đọc."*
+
+**Nếu bị hỏi tiếp**
+- *"Template trong API của `.so` thì sao?"* — Phần template nằm ở header nên **build vào app**, không nằm trong `.so`; đổi template là app phải build lại — một rủi ro ABI.
+
+**Móc nền tảng:** compile vs link · template vs virtual · code bloat trên thiết bị nhúng.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Template là bản THIẾT KẾ, không phải mã.** Compiler chỉ sinh mã thật khi bạn **dùng** nó với một kiểu cụ thể — gọi là **instantiation**, xảy ra **lúc biên dịch**.
@@ -1386,6 +1419,34 @@ while (running) {
     std::this_thread::sleep_for(std::chrono::milliseconds(16));
 }
 ```
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì `sleep_for(16ms)` ngủ đủ 16 ms **sau khi** `compute()` xong. Một chu kỳ thật là 3 ms tính + 16 ms ngủ + độ trễ đánh thức — khoảng 20 ms, tức chỉ hơn 48 lần mỗi giây. Thời gian làm việc **cộng dồn** vào chu kỳ thay vì nằm trong nó.*
+>
+> *Em sửa bằng cách hẹn theo **mốc tuyệt đối** trên `steady_clock`:*
+> ```cpp
+> auto next = steady_clock::now();
+> while (running) {
+>     compute();
+>     next += period;                                  // mốc kế tiếp tính từ mốc trước
+>     if (steady_clock::now() > next + period) {       // trễ quá một chu kỳ
+>         ++overruns;  next = steady_clock::now();     // bỏ nhịp, không chạy bù
+>     }
+>     std::this_thread::sleep_until(next);
+> }
+> ```
+> *Sai số không còn cộng dồn: em đo thật 120 chu kỳ, `sleep_for` ra 48,6 lần/giây, `sleep_until` ra đúng 60.*
+>
+> *Còn một chu kỳ bị kẹt 80 ms: nếu cứ `next += period` thì các mốc đã qua hết, thread chạy liền năm lần để đuổi, trên dữ liệu đã cũ. Em chọn **bỏ nhịp và đếm**: dời mốc về hiện tại, chạy tiếp đều nhịp, và tăng bộ đếm overrun để biết hệ có đang quá tải không."*
+
+**Nếu bị hỏi tiếp**
+- *"Sao không lấy 16 ms trừ thời gian compute?"* — Vẫn trôi, vì độ trễ đánh thức và làm tròn tích luỹ mỗi chu kỳ; mốc tuyệt đối thì không.
+- *"Sao `steady_clock`?"* — `system_clock` nhảy theo NTP ([LNX-029](linux-sysprog.md)).
+
+**Móc nền tảng:** `std::chrono` · `sleep_until` · thread dừng ngay ([CPP-070](cpp.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** `sleep_for(16ms)` ngủ đủ 16 ms **sau khi** `compute()` xong ⟹ một chu kỳ thật là `3 + 16 + độ trễ đánh thức` ms. Thời gian làm việc **cộng dồn** vào chu kỳ thay vì nằm trong nó. Sửa: hẹn theo **mốc tuyệt đối**.
@@ -1430,6 +1491,41 @@ sleep_until: 2000 ms  (60.0 Hz)
 
 #### CPP-070 · 🟠 · coding · ⭐ · [→ concurrency §7.1](../../../02-modern-cpp/concurrency.md), [OS-012](os.md)
 **Thread 60 Hz ở trên dùng `std::atomic<bool> stop` + `sleep_until`. Khi service tắt, systemd chỉ chờ có hạn, và có lúc chu kỳ được cấu hình dài tới 1 giây. Viết lại để thread dừng gần như ngay lập tức mà vẫn giữ nhịp. Nêu ba chỗ dễ viết sai.**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"`sleep_until` **không đánh thức được giữa chừng**, nên cờ `stop` chỉ được nhìn thấy khi hết giấc ngủ hiện tại — chu kỳ 1 giây là chờ tới 1 giây. Em thay bằng `condition_variable::wait_until(lock, next, predicate)`: vừa hẹn đúng mốc, vừa thức ngay khi có `notify`.*
+> ```cpp
+> class Ticker {
+>     std::mutex m_; std::condition_variable cv_; bool stop_ = false;
+>     std::thread th_;                                   // khai báo CUỐI CÙNG
+> public:
+>     explicit Ticker(std::chrono::milliseconds period) : th_([this, period] {
+>         std::unique_lock<std::mutex> lk(m_);
+>         auto next = std::chrono::steady_clock::now();
+>         for (;;) {
+>             next += period;
+>             if (cv_.wait_until(lk, next, [this] { return stop_; })) break;
+>             lk.unlock(); tick(); lk.lock();            // không giữ khoá khi làm việc
+>         }
+>     }) {}
+>     ~Ticker() {
+>         { std::lock_guard<std::mutex> lk(m_); stop_ = true; }
+>         cv_.notify_one();
+>         th_.join();
+>     }
+> };
+> ```
+> *Đo thật với chu kỳ 1 giây: bản `sleep_until` dừng mất 900 ms, bản condvar dừng gần như 0 ms.*
+>
+> *Ba chỗ dễ sai: một, ghi `stop_` **không giữ mutex** — `notify` có thể lọt vào khe giữa *"kiểm cờ"* và *"đi ngủ"*, thread ngủ thêm trọn một chu kỳ. Hai, khai báo `std::thread` **trước** các member nó dùng — member được dựng theo thứ tự khai báo, nên thread đã chạy khi member sau chưa dựng xong; em từng bắt được đúng lỗi này bằng TSan. Ba, gọi `tick()` khi **vẫn giữ khoá** — destructor phải chờ `tick()` xong mới ghi được cờ."*
+
+**Nếu bị hỏi tiếp**
+- *"`std::jthread` + `stop_token` thì sao?"* — `jthread` chỉ *yêu cầu* dừng; thread đang ngủ trong `sleep_until` vẫn không thấy yêu cầu đó, và phần chờ có nhận `stop_token` là C++20.
+
+**Móc nền tảng:** condvar cần mutex + predicate ([OS-012](os.md)) · vòng chu kỳ ([CPP-069](cpp.md)) · RAII.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** `sleep_until` **không đánh thức được** ⟹ cờ `stop` chỉ được nhìn thấy khi hết giấc ngủ hiện tại. `condition_variable::wait_until(lk, next, pred)` làm cả hai việc: hẹn đúng mốc **và** thức ngay khi có `notify`.
@@ -1488,6 +1584,25 @@ CvTicker 60 Hz trong 1 s: ticks=57 overruns=1      <- một chu kỳ cố ý ch�
 
 #### CPP-071 · 🟡 · design · ⭐ · 🏗️ · [→ ipc-linux §5](../../../04-linux-system-programming/ipc-linux.md), [concurrency §3, §5](../../../02-modern-cpp/concurrency.md)
 **Đọc cảm biến ánh sáng (polling, lọc nhiễu) mất 5–20 ms và đang nằm ngay trong vòng 60 Hz ⟹ vỡ nhịp. Bạn tách việc đọc sang một thread riêng. Hai thread trao giá trị lux cho nhau bằng gì — queue, `std::atomic`, hay mutex? Vì sao?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Câu quyết định là: giá trị lux là **trạng thái** hay **sự kiện**? Nó là trạng thái — vòng tính chỉ cần **giá trị mới nhất**; mẫu cũ đã sai so với hiện tại. Nên em không dùng hàng đợi: hàng đợi giữ mọi mẫu, vòng tính sẽ xử lý dữ liệu cũ. Em dùng **hộp thư một ô**: thread đọc cảm biến ghi đè, vòng tính lấy bản mới nhất.*
+>
+> *Nếu chỉ có **một số** thì `std::atomic<int32_t>` là đủ — không khoá, không chặn. Nhưng em muốn kèm **thời điểm đọc** và cờ **hợp lệ**, mà nhiều trường phải nhất quán với nhau thì hai atomic riêng không đủ — có thể đọc lux mới với thời điểm cũ. Lúc đó em dùng mutex bảo vệ một struct nhỏ, và phần khoá chỉ là **một phép copy**, gần như không tranh chấp.*
+> ```cpp
+> struct Sample { int32_t lux; steady_clock::time_point at; bool valid; };
+> Sample latest() { std::lock_guard<std::mutex> lk(m_); return s_; }
+> ```
+> *Thời điểm đọc quan trọng vì hộp thư một ô **luôn** trả về một giá trị, kể cả khi thread cảm biến đã treo mười giây. Vòng tính kiểm *"mẫu này cũ bao lâu"* để chuyển sang chế độ an toàn — giữ độ sáng hiện tại và ghi log — thay vì chỉnh theo dữ liệu đã chết."*
+
+**Nếu bị hỏi tiếp**
+- *"Hệ thật của em làm thế nào?"* — Đúng mô hình này: một library cảm biến riêng đọc I2C 60 lần mỗi giây; library của em chỉ lấy **giá trị mới nhất** mỗi 400 ms rồi lọc bằng cửa sổ ổn định 4 giây ([RES-006](resume.md)).
+- *"Lọc đặt ở đâu?"* — Khử nhiễu ở thread đọc, theo nhịp cảm biến; giới hạn tốc độ thay đổi ở vòng tính.
+
+**Móc nền tảng:** `std::atomic` vs mutex ([CPP-018](cpp.md)) · latest-value-wins ([ipc-linux §5](../../../04-linux-system-programming/ipc-linux.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — câu hỏi quyết định là: lux là *trạng thái* hay *sự kiện*?** Lux là **trạng thái**: vòng tính chỉ cần **giá trị mới nhất**. Mẫu cũ đã sai so với hiện tại ⟹ không có lý do giữ hàng đợi. Cấu trúc đúng là **hộp thư một ô** (latest-value-wins): bên đọc cảm biến ghi đè, vòng 60 Hz lấy bản mới nhất.
@@ -1627,6 +1742,27 @@ class DisplayController {
     std::vector<IObserver*>   observers_;   // raw
 };
 ```
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em chỉ hỏi một câu cho từng member: **ai giữ cho nó sống?** — không phải *ai dùng nó*.*
+>
+> *`unique_ptr<IBackend>`: đúng, nếu controller là chủ duy nhất và backend chết theo controller — đây là ca phổ biến nhất.*
+>
+> *`shared_ptr<Panel>`: chỉ đúng nếu panel thật sự có **nhiều chủ** và không biết ai chết sau cùng. Nếu chỉ là *"nhiều nơi cùng dùng"* thì sai: `shared_ptr` dùng thừa che mất lỗi vòng đời thay vì chặn nó, và tốn một bộ đếm nguyên tử ở mỗi lần copy.*
+>
+> *`Logger*` thô: đúng, với điều kiện logger **sống lâu hơn** controller — thường là đối tượng toàn cục.*
+>
+> *`vector<IObserver*>` thô: đúng nếu mỗi observer tự quản vòng đời và **chắc chắn huỷ đăng ký trước khi chết**. Nếu không bảo đảm được điều đó thì vector giữ con trỏ treo, lần thông báo sau là lỗi không xác định — lúc đó em dùng `weak_ptr` hoặc một token RAII tự huỷ đăng ký trong destructor.*
+>
+> *Gọn lại: một chủ thì `unique_ptr`; nhiều chủ không đoán được ai chết sau thì `shared_ptr`; chỉ dùng trong lúc chủ còn sống thì con trỏ thô hoặc tham chiếu; cần biết nó còn sống không thì `weak_ptr`."*
+
+**Nếu bị hỏi tiếp**
+- *"Qua ranh giới `.so` có nên trả `shared_ptr`?"* — Chỉ khi cả hai bên cùng compiler và cùng thư viện chuẩn; với biên C thì không — trả handle và hàm huỷ.
+
+**Móc nền tảng:** RAII · smart pointers · Observer và vòng đời ([DP-006](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 🔴 **Nhầm lẫn số một, và là nhầm lẫn đắt nhất:** *"chỗ khác cũng **dùng** nó ⇒ phải là `shared_ptr`"*. **SAI.**
@@ -1741,6 +1877,21 @@ Lợi: buộc khởi tạo, tránh chuyển kiểu ngầm/thu hẹp ngoài ý, g
 
 #### CPP-045 · 🟡 · concept · [→ EMC Item 11](../../../15-book-summaries/effective-modern-cpp.md)
 **`= delete` khác cách cũ (khai báo private không định nghĩa) thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Mục đích giống nhau: cấm một hàm, thường là cấm copy. Khác ở **lúc nào** và **ai** bị bắt.*
+>
+> *Cách cũ C++98 là khai báo copy constructor `private` và **không định nghĩa**. Nó có hai cửa: code **bên ngoài** class gọi vào thì bị chặn lúc **compile** vì `private`. Nhưng member và `friend` có quyền gọi hàm private, nên họ lọt qua compile, và chỉ chết ở bước **link** vì hàm không có thân — thông báo lỗi chỉ ra file `.o`, không chỉ ra dòng gọi. Em nhớ bằng câu: **private chặn người ngoài, thiếu định nghĩa chặn người nhà**.*
+>
+> *`= delete` của C++11 bắt **mọi người** ngay lúc compile, chỉ đúng dòng gọi, thông báo nói rõ *"use of deleted function"*. Nó còn xoá được hàm thường — ví dụ `void f(char) = delete;` để chặn ép kiểu ngầm từ `char` sang `int` — và nói rõ ý định ngay trong khai báo."*
+
+**Nếu bị hỏi tiếp**
+- *"Xoá copy rồi thì move còn không?"* — Khai báo copy (dù private hay `= delete`) làm compiler **không tự sinh move** ⟹ class không copy được và cũng không move được, trừ khi khai báo move tường minh.
+
+**Móc nền tảng:** Rule of 0/3/5 · special member functions · compile vs link error.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — cách cũ (C++98) đi qua HAI cửa kiểm tra, mỗi cửa bắt một nhóm người gọi:**

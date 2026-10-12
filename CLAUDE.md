@@ -66,6 +66,8 @@
    > **Vì sao (sự cố thật 2026-08-13):** rà soát đếm được **262 câu hỏi có đáp án chép thẳng vào tài liệu topic 01–13**, song song với 303 câu trong bank — tức 262 bản sao **không có cơ chế đồng bộ**. Cùng ngày, bank `LNX-005` được nâng cấp từ 277 → 2.736 ký tự (thêm cơ chế TCP luồng byte), nhưng bản sao trong `04-.../file-io.md` **vẫn y nguyên bản cũ**. Người học mở tài liệu ra ôn thì đọc đúng phiên bản đã bị kết luận là không đủ. Mâu thuẫn gốc: §4.6 (cũ) nói *"link tới bank"* còn thực tế các file chép nguyên đáp án vào — hai thế hệ quy ước cùng tồn tại.
    >
    > **Luật thi hành:** thấy `<details>` chứa đáp án trong tài liệu topic ⇒ đó là **nợ kỹ thuật**, phải chuyển về bank. Câu nào **chưa có** trong bank thì **thêm vào bank trước**, rồi mới thay bằng link — **không bao giờ xoá thẳng**.
+   >
+   > **Ngoại lệ duy nhất (người học yêu cầu 2026-10-12):** [resume-plan §14](14-prep/study-plans/resume-plan.md) là **sổ trả lời tự sinh** — chép đề + khối `🎙️ Trả lời mẫu` từ bank bằng `14-prep/study-plans/tools/build-answer-book.py`. Giữ được vì bản sao do **máy sinh**, không ai sửa tay: sửa ở bank rồi chạy lại script.
 
 ---
 
@@ -175,7 +177,7 @@ Embedded-Interview/
 │
 ├── 14-prep/                      # Chuẩn bị phỏng vấn thực tế
 │   ├── lab-setup.md              # 🔧 Hạ tầng cho bộ lab phần cứng (BeagleBone Black) — MỘT chỗ duy nhất
-│   ├── whiteboard.md             # 🖊️ 6 sơ đồ vẽ tay khi PV (2 sequence) + chiến lược chọn + kịch bản 🇻🇳/🇬🇧 + nhận định kiến trúc + trang gấp
+│   ├── whiteboard.md             # 🖊️ 7 sơ đồ vẽ tay khi PV (2 sequence, D5 = S-Box nhiều box) + chiến lược chọn + kịch bản 🇻🇳/🇬🇧 + nhận định kiến trúc + trang gấp
 │   ├── study-plans/              # Plan bám JD đang nhắm (có §📍 tracking — hiện KHÔNG có plan chạy) + archive/ + gap-register
 │   └── mock-interview/           # ⭐ Phỏng vấn thử tương tác (/mock) + NGÂN HÀNG CÂU HỎI DUY NHẤT (bank/) + sessions/weak-register/coding-arena(+reviewed/)
 │

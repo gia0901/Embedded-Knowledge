@@ -158,6 +158,23 @@ Mục tiêu ngược với trực giác: **tăng tần suất** để mỗi thí
 
 #### DBG-029 · 🟠 · design · ⭐ · 🏗️ · 📦 2026-08-13 · [→ tools](../../../09-debugging/tools.md)
 **Vì sao logging là công cụ debug quan trọng nhất ở production? Một hệ thống log tốt cần gì?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì ở hiện trường không có debugger, không dừng được hệ thống, và nhiều lỗi không tái hiện được trong lab. Log là **bằng chứng duy nhất** còn lại sau sự việc — và lỗi hiếm thì vài ngày mới có một cơ hội.*
+>
+> *Một hệ log tốt cần: **mức** chỉnh được lúc chạy, không phải build lại; **hai loại thời gian** — đồng hồ đơn điệu để đo khoảng, giờ lịch để biết lúc nào; **mã định danh** — thiết bị, phiên, yêu cầu — để nối các dòng rời thành một câu chuyện, nhất là khi nhiều thread; **cấu trúc** khoá-giá trị để lọc và đếm được; **xoay vòng có trần dung lượng** để không làm đầy bộ nhớ; và một vùng giữ riêng **phút cuối trước khi chết**, vì xoay vòng hay nuốt đúng đoạn đó.*
+>
+> *Đánh đổi: log nhiều thì **mòn flash**, **đổi thời gian** chạy, và tốn băng thông. Nên em ghi **quyết định và đầu vào của quyết định** — kiểu *"chọn nhánh B vì nhiệt độ 71 vượt ngưỡng 70"* — thay vì *"đã tới đây"*.*
+>
+> *Và log không thay được số đo: rò bộ nhớ hay rò file descriptor lộ ra ở **xu hướng**, nên phải ghi định kỳ vài chỉ số — RAM trống, số fd, độ sâu hàng đợi."*
+
+**Nếu bị hỏi tiếp**
+- *"Library của em có gì cho debug?"* — Trong shared memory có lịch sử các process đã gọi API, để khi treo biết ai đang giữ khoá ([A1 §7.2](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
+
+**Móc nền tảng:** `CLOCK_MONOTONIC` ([LNX-029](linux-sysprog.md)) · `printk` ([DBG-021](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Vì sao quan trọng nhất:** ở production bạn **không có** debugger, **không thể** dừng hệ thống, và nhiều bug **không tái hiện được** trong lab. Log là **thứ duy nhất còn lại** sau khi sự việc đã xảy ra — và bug hiếm thì bạn chỉ có **một cơ hội mỗi vài ngày** ([DBG-014](debugging.md)).
@@ -212,6 +229,28 @@ Cả hai chạy một dòng. `step` đi **vào trong** hàm được gọi; `nex
 
 #### DBG-003 · 🟢 · concept · [→ gdb](../../../09-debugging/gdb.md)
 **Core dump là gì và dùng để làm gì? Phân tích thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Core dump là **ảnh chụp bộ nhớ của process tại lúc crash** — stack, heap, thanh ghi — ghi ra file. Giá trị của nó là phân tích **sau sự việc** mà không cần tái hiện lỗi; rất quý với lỗi hiếm hoặc lỗi ngoài hiện trường.*
+>
+> *Phân tích: mở bằng gdb cùng **đúng binary** đã sinh ra nó, có symbol:*
+> ```
+> gdb ./app core
+> (gdb) bt               # chuỗi hàm tại lúc chết
+> (gdb) frame 1          # lên khung của hàm đã gọi xuống
+> (gdb) info locals      # biến cục bộ ở khung đó
+> ```
+> *Ở lab em làm đúng như vậy: không có symbol thì khung chỉ hiện `?? () from libsensor.so`; nạp đúng file symbol thì ra `sum_samples (buf=0x0, n=4) at sensor.c:8` — thấy ngay con trỏ `NULL` được truyền từ khung trên xuống.*
+>
+> *Điều kiện để có core: giới hạn kích thước core khác 0 (`ulimit -c`), và biết hệ thống đang gửi core đi đâu — trên Ubuntu là apport. Ở công ty, core của bản release do hệ thống nội bộ thu và phân tích."*
+
+**Nếu bị hỏi tiếp**
+- *"Binary đã bỏ symbol thì sao?"* — Giữ file symbol riêng theo từng bản build; gdb nạp nó qua liên kết debug ([DBG-045](debugging.md)).
+
+**Móc nền tảng:** gdb · symbol · [DBG-044](debugging.md).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Ảnh chụp bộ nhớ process lúc crash (stack, heap, register), lưu ra file. Nạp vào gdb (`gdb ./app core`) để phân tích post-mortem (`bt`, `print`) mà không cần tái hiện — cực giá trị cho bug khó tái hiện hoặc crash ở field. Cần binary có symbol (`-g`) và `ulimit -c unlimited`.
@@ -219,6 +258,21 @@ Cả hai chạy một dòng. `step` đi **vào trong** hàm được gọi; `nex
 
 #### DBG-004 · 🟡 · concept · [→ gdb](../../../09-debugging/gdb.md), [memory-bugs](../../../09-debugging/memory-bugs.md)
 **Chương trình segfault. Bạn điều tra thế nào — và làm gì khi backtrace toàn `??`?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Bốn bước. **Lấy được crash đã**: bật core dump, hoặc chạy dưới gdb nếu tái hiện được. **Xem backtrace, đọc từ dưới lên**: khung trên cùng là chỗ nổ, thường không phải chỗ sai — đi xuống tới khung code **của mình** gần nhất. **In các con trỏ** ở khung đó: `0x0` hay địa chỉ lung tung là dấu hiệu. Và bước tìm ra bug thật: hỏi **"con trỏ này đến từ đâu?"** — giá trị trả về không được kiểm, thành viên của object đã huỷ, hay phần tử của vector vừa cấp phát lại.*
+>
+> *Backtrace toàn `??` có ba nguyên nhân. **Thiếu symbol** — binary đã bỏ symbol hoặc không đúng bản build: lấy đúng file symbol. Vài khung `??` xen kẽ: thư viện bên thứ ba không có symbol, cài gói debug của nó. Và nguy hiểm nhất: backtrace **vô lý** — hàm không thể gọi nhau mà lại nằm chồng lên nhau — nghĩa là **stack đã bị ghi đè**. Lúc đó đừng cố đọc nữa; backtrace vô lý chính là bằng chứng của tràn bộ đệm, chuyển sang ASan.*
+>
+> *Nếu không tái hiện được thì em không ngồi đoán: segfault chỉ là hậu quả muộn của một vi phạm xảy ra trước đó, nên bật ASan/UBSan để bắt nó ngay tại chỗ."*
+
+**Nếu bị hỏi tiếp**
+- *"Segfault trong library nhưng lỗi ở app?"* — Thường gặp: app truyền con trỏ đã giải phóng; đi ngược backtrace qua ranh giới API.
+
+**Móc nền tảng:** core dump ([DBG-003](debugging.md)) · ASan ([DBG-042](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Trình tự:**
@@ -273,6 +327,25 @@ Cả hai chạy một dòng. `step` đi **vào trong** hàm được gọi; `nex
 
 #### DBG-010 · 🟠 · concept · [→ gdb](../../../09-debugging/gdb.md)
 **Chương trình bị treo (hang). Điều tra thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Lợi thế của lỗi treo là **hiện trường còn nguyên** — đừng khởi động lại process. Bước đầu em xem **CPU**: `top -H -p <pid>` để biết nó đứng yên ở 0% hay quay ở 100% — câu đó chia đôi chẩn đoán ngay.*
+>
+> *Rồi gắn gdb vào và lấy backtrace của **mọi thread**: `gdb -p <pid>` rồi `thread apply all bt`.*
+>
+> *CPU gần 0%: nhiều thread kẹt ở khoá, thread này chờ khoá thread kia đang giữ — **deadlock**, truy thứ tự lấy khoá; một thread kẹt ở `read`, `recv` hay `poll` — **chờ I/O** mà thiếu timeout; kẹt ở chờ condition variable — có thể là **lost wakeup**. CPU gần 100%: lấy backtrace hai lần cách nhau vài giây — giống hệt thì **vòng lặp vô tận**, đổi qua lại vài trạng thái thì **livelock**.*
+>
+> *Thêm hai nguồn: `strace -p` cho biết đang kẹt ở system call nào, và `/proc/<pid>/wchan` hay stack của thread cho biết kernel đang chờ gì.*
+>
+> *Ở library của em có một ca đặc thù: process khác chết khi đang giữ semaphore dùng chung, mọi process sau treo ở `sem_wait` — backtrace của mọi thread chỉ thẳng vào đó."*
+
+**Nếu bị hỏi tiếp**
+- *"Treo hay chỉ chậm?"* — Hai backtrace cách nhau vài giây khác nhau thì nó đang chạy, chỉ chậm — chuyển sang `perf`.
+
+**Móc nền tảng:** deadlock · condvar ([OS-012](os.md)) · semaphore kẹt ([LNX-045](linux-sysprog.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Lợi thế của bug treo: nó *đứng yên*.** Không cần tái hiện, không cần log — trạng thái lỗi đang nằm sẵn đó, cứ attach vào mà đọc. **Không khởi động lại process** (làm vậy là mất hiện trường).
@@ -306,6 +379,28 @@ cat /proc/<PID>/wchan     # kernel đang chờ gì
 
 #### DBG-018 · 🟡 · concept · ⭐ · [→ gdb](../../../09-debugging/gdb.md)
 **Debug binary chạy trên thiết bị target không có GDB đầy đủ thì sao?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em **tách đôi** công việc. Trên thiết bị chạy `gdbserver` — rất nhẹ, chỉ biết dừng, chạy, đọc ghi bộ nhớ. Trên máy host chạy **gdb đầy đủ** cùng **symbol và source**; hai bên nói chuyện qua mạng hoặc cổng serial.*
+> ```
+> # trên thiết bị
+> gdbserver :2345 ./app            # hoặc: gdbserver :2345 --attach <pid>
+> # trên host
+> arm-linux-gnueabihf-gdb ./app
+> (gdb) set sysroot /path/to/target/rootfs
+> (gdb) target remote 192.168.1.10:2345
+> ```
+> *Ba điều kiện phải đúng: gdb trên host phải là gdb của **toolchain đúng kiến trúc** của thiết bị; binary trên host có symbol, binary trên thiết bị có thể đã bỏ symbol, nhưng **cùng một lần build**; và `sysroot` trỏ tới rootfs của thiết bị, nếu không thì thư viện hệ thống ra toàn `??`.*
+>
+> *Nếu ngay cả `gdbserver` cũng không chạy được thì em lấy **core dump** về host và phân tích sau; mức thấp hơn nữa — bootloader, trước khi có hệ điều hành — thì dùng JTAG."*
+
+**Nếu bị hỏi tiếp**
+- *"Biến hiện `<optimized out>`?"* — Bản build có tối ưu; cần thì build một bản debug riêng.
+
+**Móc nền tảng:** cross toolchain · core dump ([DBG-003](debugging.md)) · symbol khớp bản build ([DBG-045](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Remote debug — tách đôi công việc:** `gdbserver` (rất nhẹ, vài trăm KB, chỉ biết dừng/chạy/đọc-ghi bộ nhớ) chạy **trên target**; **GDB đầy đủ** cùng với **symbol + source** chạy **trên host**, hai bên nói chuyện qua **GDB Remote Serial Protocol** (TCP hoặc serial).
@@ -447,6 +542,21 @@ Toàn bộ thiết kế xoay quanh một câu: *"lần crash tới, thiết bị
 
 #### DBG-045 · 🟡 · concept · ⭐ · 🏗️ · [→ crash-analysis-workflow §1–2](../../../09-debugging/crash-analysis-workflow.md)
 **Library của bạn crash trên TV. Ba tình huống: bản debug, bản release, và máy không boot lên được. Với mỗi tình huống, bạn có bằng chứng gì, dùng công cụ gì — và cần thêm thứ gì để ra được dòng code?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Crash chỉ để lại **địa chỉ**. Đổi địa chỉ thành *"hàm nào, dòng nào"* luôn cần ba thứ: **offset** trong file — không phải địa chỉ tuyệt đối, vì mỗi lần chạy thư viện được nạp ở chỗ khác; **file symbol khớp đúng bản build** đó; và nhớ địa chỉ trả về chỉ vào lệnh **sau** lệnh gọi, nên lùi một.*
+>
+> *Ba tình huống ở chỗ em. **Bản debug**: log tự in backtrace kèm tên hàm — đọc là thấy; riêng hàm `static` vẫn chỉ hiện offset, nên vẫn cần `addr2line`. **Bản release**: binary đã bỏ symbol để nhỏ; có coredump, và **hệ thống nội bộ** phân tích nó — bên trong là gdb cùng symbol của đúng image đó. Em hiểu nó làm gì, và đã tự làm lại bằng gdb ở lab. **Không khởi động được**: chỉ có trace log — kernel oops dạng `hàm+offset/kích_thước`, hoặc log crash của user-space dạng `thư_viện(+offset)`; em dùng `addr2line` với file symbol của đúng image.*
+>
+> *Coredump cho nhiều hơn một điểm: cho cả **chuỗi giá trị** — biến sai từ khung nào truyền xuống — để đi ngược tới chỗ sai thật, không chỉ chỗ nổ."*
+
+**Nếu bị hỏi tiếp**
+- *"Dùng symbol của bản build khác thì sao?"* — Ra dòng **sai mà không báo lỗi** — nguy hiểm hơn ra `??`.
+
+**Móc nền tảng:** coredump ([DBG-003](debugging.md)) · đọc oops ([DBG-015](debugging.md)) · lab `addr2line` và core ([DBG-043](debugging.md), [DBG-044](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế chung:** crash chỉ để lại **địa chỉ**. Biến địa chỉ thành *hàm + dòng* luôn cần ba thứ: **offset** trong file (không phải địa chỉ tuyệt đối — ASLR đổi địa chỉ gốc mỗi lần chạy) · **file symbol khớp đúng bản build** · nhớ **địa chỉ trả về** lệch một lệnh.
@@ -591,6 +701,26 @@ TSan dựng quan hệ **happens-before** giữa các truy cập: nó ghi nhận 
 
 #### DBG-042 · 🟡 · concept · ⭐ · 🎤 2026-09-13 · [→ memory-bugs](../../../09-debugging/memory-bugs.md)
 **"Bạn có ba lỗi: (a) đọc vượt biên mảng, (b) use-after-free, (c) data race giữa hai luồng. Với mỗi lỗi, bạn bật sanitizer nào? Cái nào bắt được cái gì?"**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em nhớ bằng một câu: **ASan trông địa chỉ, TSan trông thứ tự giữa các thread.**
+>
+> *(a) **Đọc vượt biên mảng** → **ASan**. Nó đặt vùng cấm quanh mỗi khối nhớ, chạm vào là báo ngay đúng dòng. TSan **không** bắt được lỗi này — em đã đo: TSan chạy qua vượt biên, in kết quả và thoát bình thường.*
+>
+> *(b) **Dùng sau khi giải phóng** → **ASan**, mặc định cho lỗi bộ nhớ. TSan cũng bắt được vì nó theo dõi vòng đời heap, nhưng đó không phải việc chính của nó.*
+>
+> *(c) **Data race** → **TSan**. Chỉ nó theo dõi được hai thread chạm cùng một địa chỉ mà không có đồng bộ. Ở lab em dùng TSan bắt đúng race giữa vòng cập nhật định kỳ và hàm API trong library.*
+>
+> *Ba điều thực tế: ASan và TSan **không bật chung** trong một lần build — phải build hai bản. Chúng tốn nhiều RAM — ASan khoảng ba lần, TSan nhiều hơn — nên thường chạy trên máy build chứ không trên thiết bị. Và trên kernel 6.x, TSan của gcc 11 cần chạy kèm `setarch -R` để tắt ngẫu nhiên hoá địa chỉ."*
+
+**Nếu bị hỏi tiếp**
+- *"Biến chưa khởi tạo?"* — MSan (của clang) hoặc valgrind memcheck.
+- *"Lỗi chỉ xảy ra trên thiết bị thật?"* — Sanitizer không cứu được; dùng log ở ranh giới và core dump.
+
+**Móc nền tảng:** sanitizer trong CI ([BLD-042](build-systems.md)) · segfault ([DBG-004](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 | | Vượt biên (buffer overflow) | Use-after-free / double free | Data race |
@@ -631,6 +761,21 @@ TSan **có** allocator riêng nên theo dõi được vòng đời heap ⇒ bắ
 
 #### DBG-019 · 🟡 · concept · [→ kernel-debugging](../../../09-debugging/kernel-debugging.md)
 **Phân biệt kernel oops và panic?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"**Oops** là kernel gặp lỗi nghiêm trọng — ví dụ một driver dereference con trỏ `NULL` — nó in thông tin lỗi ra log, giết tác vụ đang chạy đoạn code đó, và **cố chạy tiếp**. **Panic** là kernel **không thể chạy tiếp** an toàn — lỗi trong ngữ cảnh ngắt, lỗi ở phần lõi, hoặc hệ được cấu hình *"oops thì panic"* — nên dừng hẳn hoặc khởi động lại.*
+>
+> *Hai điều em lưu ý. Một, sau oops hệ vẫn chạy nhưng **trạng thái không còn tin được** — một khoá có thể đang bị giữ mãi, dữ liệu có thể đã hỏng — nên thu log xong thì khởi động lại. Hai, trên sản phẩm thường cấu hình **oops thì panic** rồi tự khởi động lại, kèm cơ chế lưu log lần chết, vì một thiết bị chạy tiếp ở trạng thái hỏng còn tệ hơn khởi động lại.*
+>
+> *Cả hai đều in thông tin ra log kernel: loại lỗi, hàm và offset, chuỗi gọi — đọc theo [DBG-015](debugging.md)."*
+
+**Nếu bị hỏi tiếp**
+- *"Khi máy không khởi động được thì lấy log ở đâu?"* — Console serial, hoặc vùng nhớ giữ log qua lần khởi động lại.
+
+**Móc nền tảng:** đọc oops ([DBG-015](debugging.md)) · ngữ cảnh ngắt.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Oops: lỗi nghiêm trọng nhưng kernel cố tiếp tục (kill process lỗi). Panic: không thể tiếp tục, dừng hệ thống. Cả hai in stack trace ra `dmesg`.
@@ -663,6 +808,23 @@ Oops: lỗi nghiêm trọng nhưng kernel cố tiếp tục (kill process lỗi)
 
 #### DBG-021 · 🟡 · concept · 📦 2026-08-13 · [→ kernel-debugging](../../../09-debugging/kernel-debugging.md)
 **`printk`/`dmesg` dùng thế nào trong driver? Vì sao nó khác `printf`, và khi nào KHÔNG được dùng?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"`printk` ghi vào một **bộ đệm vòng trong kernel** có kích thước cố định; `dmesg` chỉ là công cụ đọc bộ đệm đó. Vì là vòng nên đầy thì **log cũ bị đè**.*
+>
+> *Khác `printf` ở ba điểm. Có **mức ưu tiên** — lỗi, cảnh báo, thông tin, debug — và console chỉ hiện các mức trên một ngưỡng; in mức debug mà không thấy gì thường là do ngưỡng, không phải code không chạy. Không có bộ đệm của thư viện C, ghi thẳng vào bộ đệm kernel nên sống sót tốt hơn khi crash. Và in ra console serial là thao tác **chậm và đồng bộ** — hàng mili giây cho một dòng.*
+>
+> *Nên em **không dùng** `printk` trong đường nóng hay trong ngắt: ngắt phải xong trong micro giây, một dòng in làm trễ cả hệ; và việc in **làm đổi thời gian**, có thể che mất chính lỗi đang tìm. Trong vòng lặp tần suất cao, log tự đè mất thông tin hữu ích.*
+>
+> *Thay vào đó: `printk_ratelimited` cho thông điệp có thể lặp; bật tắt log động thay vì build lại; và ftrace cho chỗ cần chi phí rất thấp."*
+
+**Nếu bị hỏi tiếp**
+- *"Ở resume em ghi debug bằng `dmesg/printk` — dùng thế nào?"* — Đặt log ở **ranh giới** — đầu hàm `ioctl`, chỗ ghi xuống phần cứng — để chia đôi lỗi ([RES-008](resume.md)).
+
+**Móc nền tảng:** ngữ cảnh ngắt · heisenbug · logging ([DBG-029](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** `printk` ghi vào một **ring buffer trong kernel** (kích thước cố định); `dmesg` chỉ là công cụ đọc buffer đó. Vì là ring buffer nên **log cũ bị đè** khi đầy — thông điệp quan trọng có thể biến mất trước khi bạn kịp xem.
@@ -706,6 +868,25 @@ Oops: lỗi nghiêm trọng nhưng kernel cố tiếp tục (kill process lỗi)
 
 #### DBG-015 · 🔴 · concept · ⭐ · [→ kernel-debugging](../../../09-debugging/kernel-debugging.md)
 **Kernel oops: bạn đọc thông tin gì để tìm nguyên nhân?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em đọc theo thứ tự năm thứ. Một, **loại lỗi và địa chỉ**: `NULL pointer dereference` với địa chỉ gần 0 là con trỏ chưa khởi tạo; địa chỉ dạng mẫu lặp như `6b6b6b6b` là dùng vùng đã giải phóng. Hai, **dòng PC** — dạng `my_driver_read+0x2c/0x80 [my_driver]`: chết ở hàm nào, offset bao nhiêu trong hàm, thuộc module nào. Đây là điểm neo. Ba, **Call Trace**: đường đi tới đó — vào từ system call nào, hay từ ngắt. Bốn, danh sách module đang nạp, xác nhận driver của mình có mặt. Năm, cờ **Tainted**: kernel đã oops trước đó chưa — nếu rồi thì dữ liệu lần này có thể không tin được.*
+>
+> *Bước quyết định là đổi `hàm+offset` ra dòng source, dùng **đúng file `.ko`** đã nạp, có debug info:*
+> ```
+> gdb my_driver.ko -ex 'list *(my_driver_read+0x2c)'
+> ```
+> *Lệch một lần build là offset chỉ sai hàm và dẫn đi lạc hoàn toàn.*
+>
+> *Hai bẫy: các dòng có dấu `?` trong Call Trace chỉ là đoán từ stack cũ; và oops trong **ngữ cảnh ngắt** gợi ý một kiểu lỗi khác hẳn — gọi hàm có thể ngủ trong ngắt."*
+
+**Nếu bị hỏi tiếp**
+- *"Bắt lỗi bộ nhớ trong kernel sớm hơn?"* — KASAN, bản kernel của ASan; LOCKDEP cho lỗi thứ tự khoá.
+
+**Móc nền tảng:** oops vs panic ([DBG-019](debugging.md)) · `addr2line` ([DBG-045](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Oops = "core dump của kernel in ra dmesg".** Nó chứa đủ để truy về **đúng dòng source**, chỉ cần đọc theo thứ tự.
@@ -746,6 +927,23 @@ gdb my_driver.ko -ex 'list *(my_driver_read+0x2c)'
 
 #### DBG-016 · 🟠 · design · ⭐ · [→ kernel-debugging](../../../09-debugging/kernel-debugging.md)
 **Bạn debug một lỗi cross-layer thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Nguyên tắc của em là **chia đôi theo tầng**, không nhảy vào tầng mình quen nhất. Với một lỗi đi qua app, library, `ioctl`, driver và phần cứng, em **xác nhận dữ liệu ở từng ranh giới**: chỉ cần biết dữ liệu **đúng ở tầng N** và **sai ở tầng N+1** là khoanh được lỗi.*
+>
+> *Ở mỗi ranh giới em có một câu hỏi và một công cụ. App gửi đi đúng giá trị chưa — log, gdb, `strace` để xem system call thật sự phát ra. Lời gọi có xuống tới driver với tham số còn nguyên không — log ở đầu hàm `ioctl`. Driver nhận gì, ghi gì xuống thanh ghi — `dmesg`, ftrace, sysfs. Phần cứng có nhận đúng không — đọc lại thanh ghi.*
+>
+> *Nghi phạm hay gặp ở ranh giới user–kernel: sai kích thước khi copy, struct có padding khác nhau giữa hai bên, sai mã lệnh `ioctl`.*
+>
+> *Hai kỷ luật: **mỗi lần chỉ đổi một thứ** — sửa nhiều chỗ cùng lúc mà hết lỗi thì không biết cái nào chữa; và sửa xong thì **chạy lại từ app xuống tới phần cứng**, không chỉ test tầng vừa sửa. Với lỗi về thời gian, thêm log có thể làm lỗi biến mất — lúc đó dùng ftrace thay vì in log."*
+
+**Nếu bị hỏi tiếp**
+- *"Một ca cụ thể?"* — Xem [RES-008](resume.md).
+
+**Móc nền tảng:** chia đôi ([09/mindset](../../../09-debugging/mindset.md)) · `copy_from_user` ([DRV-006](drivers-embedded.md)) · `printk` ([DBG-021](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Nguyên tắc: bisect theo *tầng*, không đoán.** Với lỗi xuyên app → driver → phần cứng, sai lầm kinh điển là nhảy thẳng vào tầng mình quen nhất. Thay vào đó, **xác nhận dữ liệu ở từng ranh giới** để thu hẹp: chỉ cần biết dữ liệu **đúng ở tầng N** và **sai ở tầng N+1** là khoanh được vùng lỗi.

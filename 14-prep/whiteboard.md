@@ -1,13 +1,13 @@
 # 🖊️ Whiteboard — bộ sơ đồ vẽ tay khi phỏng vấn
 
-> **Mục đích:** **sáu** sơ đồ vẽ được **bằng tay, trong 30–90 giây**, đủ để kể hệ thống của bạn cho một người **chưa từng nghe về display enhancement**.
+> **Mục đích:** **bảy** sơ đồ vẽ được **bằng tay, trong 30–90 giây**, đủ để kể hệ thống của bạn cho một người **chưa từng nghe về display enhancement**.
 > Kèm **chiến lược chọn sơ đồ** (vẽ cái nào trước, mở rộng theo hướng nào) và **bản tiếng Anh** cho từng cái.
 >
 > ⚠️ **Tên trong file là TÊN TÀI LIỆU đã khử nhạy cảm**, theo [bộ từ vựng chuẩn](../11-design-patterns/in-practice/README.md). **Kiến trúc giữ nguyên 100%.** File này **tự chứa** — không link tới tư liệu nội bộ.
 
 ---
 
-## 🎯 Luật vàng — đọc trước, quan trọng hơn cả sáu sơ đồ
+## 🎯 Luật vàng — đọc trước, quan trọng hơn cả bảy sơ đồ
 
 **1. Vẽ ÍT, nói NHIỀU.** Whiteboard không phải để trình bày đủ, mà để **cho người nghe một cái neo**. Bốn ô và ba mũi tên là đủ cho 5 phút nói. Vẽ 12 ô là mất người nghe.
 
@@ -38,14 +38,14 @@
    (Picture Quality — dimming)          (Panel Control)
              |                                 |
    TÍNH độ sáng theo nội dung       RA LỆNH cho panel: bật/tắt,
-   từng khung hình                  resolution, frame rate, ghi độ sáng
+   đang chiếu                       độ phân giải, ghi độ sáng
 ```
 
 **Một câu cho mỗi câu hỏi — dùng phép so sánh, đừng dùng định nghĩa:**
 
 | Câu hỏi | Câu nói (≤ 15 giây) |
 |---|---|
-| **Sáng bao nhiêu** — Picture Quality | *"Đằng sau tấm panel là một dàn đèn LED. Cảnh tối thì mình hạ đèn ở đúng vùng đó xuống — đen sâu hơn, tốn ít điện hơn. Phần này phải **tính toán** theo từng khung hình."* |
+| **Sáng bao nhiêu** — Picture Quality | *"Đằng sau tấm panel là một dàn đèn LED. Cảnh tối thì mình hạ đèn ở đúng vùng đó xuống — đen sâu hơn, tốn ít điện hơn. Phần này phải **tính toán** theo nội dung đang chiếu."* |
 | **Hiển thị thế nào** — Panel Control | *"Bật tắt panel, đổi độ phân giải, đổi số hình mỗi giây, ghi độ sáng đã tính xuống phần cứng. Phần này chỉ là **ra lệnh**, không phải tính."* |
 
 **Mini-glossary — mỗi từ một câu đời thường:**
@@ -54,7 +54,6 @@
 |---|---|
 | **Backlight** | *"Dàn đèn LED phía sau tấm panel."* |
 | **Dimming** | *"Hạ hoặc tăng độ sáng đèn nền theo nội dung hình."* |
-| **Frame rate** | *"Số hình panel vẽ mỗi giây — 60 hay 120."* |
 | **Panel driver** | *"Driver trong kernel nói chuyện trực tiếp với phần cứng của panel."* |
 | **SoC** | *"Con chip chính của TV — CPU và các khối phần cứng trên cùng một chip."* |
 
@@ -158,7 +157,7 @@
 >
 > *[vẽ nhịp 2]* *Trên chỗ hẹp có nhiều người dùng, dưới nó có hơn mười dòng chip, ở giữa là **đúng một hợp đồng**. Nên đổi chip thì app **không phải build lại**.*
 >
-> *[vẽ nhịp 3]* *Bên dưới bọn em tách làm hai nhánh, vì **lượng logic khác nhau**: dimming nặng thuật toán nên nằm ở userspace C++; còn bật tắt panel, đổi resolution, đổi frame rate chỉ là lệnh mỏng, đi thẳng xuống **panel driver** trong kernel.*
+> *[vẽ nhịp 3]* *Bên dưới bọn em tách làm hai nhánh, vì **lượng logic khác nhau**: dimming nặng thuật toán nên nằm ở userspace C++; còn bật tắt panel, đổi độ phân giải chỉ là lệnh mỏng, đi thẳng xuống **panel driver** trong kernel.*
 >
 > *Nguyên tắc chung: **logic nặng đẩy lên userspace, thao tác thanh ghi mỏng giữ trong kernel**."*
 
@@ -237,20 +236,21 @@
 > *"Đường tắt phải **đi hết**, kể cả khi một bước lỗi — dừng giữa chừng để lại phần cứng ở trạng thái nửa vời còn tệ hơn. Bọn em ghi lỗi lại, đi tiếp, rồi trả mã lỗi tổng hợp lên trên."*
 
 ---
-## D3 · vsync & adaptive brightness — hai hằng số thời gian
+## D3 · Adaptive brightness — hai lớp thời gian chống nháy
 
 **Đây là sơ đồ trả lời câu *"làm sao không bị nháy?"*.** Nó là một **thang thời gian**, không phải sơ đồ khối — và chính vì thế nó gây ấn tượng: ít ai vẽ trục thời gian trên whiteboard.
 
 ```
-vsync   ||||||||||||||||||||||||||||||||||||||||||||   60 Hz  -> 16.7 ms
-        <------------------ 400 ms ------------------>
-step    ^                       ^                       ^        mỗi 400 ms
-        |                       |                       |        = 24 vsync
-        độ sáng nhích MỘT NẤC về phía target
+đọc     o    o    o    o    o    o    o    o    o    o      mỗi 400 ms lấy lux mới nhất
+        <------------- 10 lần liên tiếp = 4 s ------------->
+        cả 10 lần rơi vào CÙNG MỘT khoảng?
+           có    -> ổn định -> tính target MỚI
+           không -> đếm lại từ đầu, target giữ nguyên
 
-        <-------------------- 4 s (10 step) -------------------->
-target  ^                                                ^
-        ĐỌC sensor, TÍNH target mới
+target  ----------------------------------+
+                                          +-------------    chỉ đổi khi ổn định 4 s
+độ sáng                                  /
+                              bò dần từng nấc nhỏ tới target
 ```
 
 **Và cái mắt người thật sự thấy:**
@@ -258,31 +258,107 @@ target  ^                                                ^
 ```
 độ sáng
   ^
-  |        target mới
-  |            .- - - - - - - - - -
-  |         _-'
-  |      _-'          <-- 10 nấc, mỗi nấc 400 ms
-  |   _-'
-  |_-'
-  +-------------------------------------> t
-   0        1s        2s        3s       4s
+  |                 target mới
+  |                     .- - - - - - - -
+  |                  _-'
+  |               _-'      <-- từng nấc nhỏ, không nhảy bậc
+  |  ____________-'
+  |  ánh sáng phòng đổi, chờ đủ 4 s ổn định
+  +--------------------------------------> t
 ```
 
 ### 🗣️ Kịch bản nói — ~45 giây
 
-> *"Có **hai hằng số thời gian** tách biệt, và đó chính là chỗ chống nháy.*
+> *"Có **hai lớp thời gian** tách biệt, và đó chính là chỗ chống nháy.*
 >
-> *Cứ **4 giây** bọn em mới **đọc cảm biến và tính lại target** — đủ lâu để một cú chớp đèn phòng không kéo được target đi.*
+> *Lớp chậm là **quyết định**: cứ 400 mili giây em lấy giá trị cảm biến mới nhất và xem nó rơi vào **khoảng** sáng nào. Chỉ khi **10 lần liên tiếp — 4 giây — cùng một khoảng** thì mới tính target mới; lệch một lần là đếm lại. Một bàn tay lướt qua hay đèn flash không đủ 4 giây nên không kéo được target đi.*
 >
-> *Còn giữa hai lần đó, độ sáng **bò dần** tới target theo **10 nấc, mỗi nấc 400 mili giây** — nên mắt không bắt được bước nhảy nào.*
->
-> *400 mili giây là **24 chu kỳ vsync** ở 60 Hz, nên mỗi nấc rơi đúng vào ranh giới khung hình — không có nấc nào rơi vào giữa lúc panel đang quét."*
+> *Lớp nhanh là **chuyển động**: khi target đổi, độ sáng **bò dần từng nấc nhỏ** tới đó, nên mắt không bắt được bước nhảy nào."*
 
 ### Đánh đổi — phải tự nêu, đừng đợi họ hỏi
 
-> *"Cái giá là **phản ứng chậm 4 giây**. Bọn em chấp nhận vì thiết bị đặt cố định trong phòng họp, độ sáng môi trường vốn ổn định. Nếu là thiết bị cầm tay thì đánh đổi này **sai** — lúc đó em sẽ lấy mẫu nhanh rồi **lọc trung bình trượt**, để phản ứng nhanh với thay đổi bền mà vẫn bỏ qua xung."*
+> *"Cái giá là **phản ứng chậm ít nhất 4 giây**. Bọn em chấp nhận vì biển quảng cáo đặt cố định, ánh sáng môi trường đổi chậm. Nếu là thiết bị cầm tay thì đánh đổi này **sai** — lúc đó em sẽ lấy mẫu nhanh rồi **lọc trung bình trượt**, để phản ứng nhanh với thay đổi bền mà vẫn bỏ qua xung."*
 
 > ⭐ Câu cuối là câu senior: nó cho thấy bạn biết **quyết định của mình phụ thuộc bối cảnh nào**, và biết **phương án khác là gì**.
+
+---
+
+## D5 · S-Box nhiều box — một bức tường, một mức sáng
+
+**Đây là sơ đồ trả lời *"kể về S-Box"* và *"đồng bộ nhiều box thế nào?"*.** Ba box là đủ để thấy ý; router, bộ chia, cáp quang chi tiết thì bỏ.
+
+### Nhịp 1 — vấn đề, 10 giây · *"Nếu mỗi box tự chỉnh thì thế này."*
+
+```
+   KHÔNG đồng bộ                        CÓ đồng bộ
+ +-------+-------+-------+          +-------+-------+-------+
+ |▓▓▓▓▓▓▓|░░░░░░░|▒▒▒▒▒▒▒|          |▒▒▒▒▒▒▒|▒▒▒▒▒▒▒|▒▒▒▒▒▒▒|
+ |▓▓▓▓▓▓▓|░░░░░░░|▒▒▒▒▒▒▒|          |▒▒▒▒▒▒▒|▒▒▒▒▒▒▒|▒▒▒▒▒▒▒|
+ +-------+-------+-------+          +-------+-------+-------+
+  mỗi ô sáng một kiểu                 nhìn như MỘT màn
+```
+> Vẽ nhanh bằng cách tô đậm/nhạt ba ô. Hình này **chính là bài toán** — tài liệu lắp đặt của sản phẩm cũng ghi: box không liên kết thì độ sáng mỗi box có thể khác nhau.
+
+### Nhịp 2 — hệ thống, 30 giây · *"Một box làm master, các box còn lại nghe theo."*
+
+```
+               PC (nguồn nội dung)
+                  |
+       =====+=====+=====+===========+======  mạng LAN
+            | ②         |           |        PC -> mọi box: nội dung
+            |           v           v        ② Box 1 -> Box 2, 3: mức sáng
+sensor +---------+ +---------+ +---------+
+ (*)-> |  Box 1  | |  Box 2  | |  Box 3  |
+   ①   | MASTER  | |         | |         |
+       +----+----+ +----+----+ +----+----+
+            | ③         | ③         | ③
+            v           v           v
+      +-----------+-----------+-----------+
+      |   cab 1   |   cab 2   |   cab 3   |  <- MỘT bức tường LED
+      +-----------+-----------+-----------+
+```
+**Đánh số rồi chỉ tay:** ① cảm biến chỉ cắm vào **box master** · ② master tính **một** mức sáng, phát qua mạng cho các box còn lại — cùng đường mạng mà PC dùng để đưa nội dung xuống · ③ mỗi box ghi mức đó xuống phần tường của mình — kể cả master.
+
+> Vẽ theo thứ tự: **tường trước** (đáy bảng) → ba box → đường mạng + PC → cảm biến cuối cùng. Cảm biến vẽ sau cùng để câu *"chỉ box này có cảm biến"* rơi đúng lúc tay đang vẽ nó.
+
+### Nhịp 3 — chỉ vẽ khi họ hỏi *"bên trong box chạy gì?"*
+
+```
+ Box 1 (MASTER)                                Box 2, Box 3
++--------------------------------------+      +------------------------+
+| sensor --I2C--> libsensor (60 lần/s) |      |                        |
+|                   | lux mới nhất     |      |                        |
+|                   v mỗi 400 ms       |      |                        |
+| libdisplay: lọc 4 s -> mức sáng      |      |                        |
+|    |                                 |  LAN |                        |
+|    +--POSIX mq--> app ---------------+----->+--> app                 |
+|    |                                 |      |     |                  |
+|    v                                 |      |     v                  |
+| cabinet 1                            |      | libdisplay -> cabinet  |
++--------------------------------------+      +------------------------+
+```
+> Hai chặng, hai lựa chọn: **trong box** dùng POSIX message queue (một chiều, bản tin nhỏ — [RES-005](mock-interview/bank/resume.md)); **giữa các box** dùng mạng, vì message queue chỉ chạy trong một máy.
+
+### 🗣️ Kịch bản nói — ~45 giây
+
+> *"Nhiều box ghép thành một bức tường; nếu mỗi box tự chỉnh theo cảm biến riêng thì mỗi ô sáng một kiểu *(chỉ hình nhịp 1)*.*
+>
+> *Nên bọn em cho **một box làm master** *(vẽ Box 1)*: chỉ nó cắm cảm biến *(①)*. Nó lọc nhiễu, tính ra **một** mức sáng, rồi phát qua mạng cho các box còn lại *(②)*. Mỗi box ghi đúng mức đó xuống phần tường của mình *(③)* — nên cả bức tường đổi sáng cùng lúc, cùng mức.*
+>
+> *Và vẫn là **một binary**: box nào bật tính năng thì thành master, box còn lại chỉ nghe và áp. Anh muốn em kể phần lọc nhiễu, hay bên trong một box?"*
+
+### Đánh đổi — tự nêu trước khi bị hỏi
+
+> *"Một master thì đơn giản và không bao giờ có hai nguồn mức sáng cãi nhau. Cái giá là **master mất thì cả tường đứng ở mức sáng cuối cùng** — bọn em chấp nhận, vì đó là thiết bị cố định có người vận hành; muốn tự bầu master mới thì phải thêm heartbeat và xử lý hai bên cùng tưởng mình là master, không đáng với sản phẩm này."* — chi tiết ở [RES-027](mock-interview/bank/resume.md).
+
+### Câu đuổi hay gặp
+
+| Họ hỏi | Trả lời một câu |
+|---|---|
+| *"Sao không để mỗi box tự đọc cảm biến rồi lấy trung bình?"* | Mỗi box phải nghe tất cả box khác và mọi box phải chạy cùng một phép tính trên cùng một dữ liệu đúng lúc — phức tạp hơn hẳn mà vẫn có thể lệch; một nguồn duy nhất thì hết lệch từ gốc. |
+| *"Lệch thời gian giữa các box bao nhiêu?"* | Giá trị trùng nhau; thời điểm chỉ lệch trong một nhịp cập nhật 1/60 giây — mắt không thấy. Kiểm bằng nhìn và so log từng box. |
+| *"Mất cảm biến thì sao?"* | Giữ độ sáng ở mức mặc định. |
+| *"Thêm box thứ tư?"* | Không đổi gì ở master: thêm một bên nghe trên mạng. |
 
 ---
 
@@ -477,12 +553,13 @@ Câu này **khó**, và nó là câu thật.
 | *"các thành phần tương tác ra sao?"* | **D1 nhịp 3** (hai nhánh) | *"Tách hai vì lượng logic khác nhau."* |
 | *"đổi chip thì sửa gì?"* | **D1 nhịp 4** (Factory) | *"Chỉ một backend mới. Không gì ở trên đổi."* |
 | *"kể một luồng cụ thể"* · *"tắt màn hình thì sao?"* | **D2** (sequence) | *"Em kẻ bốn bên ra, thời gian chạy xuống."* |
-| 🔆 *"kể về S-Box"* · *"adaptive brightness làm sao?"* · **"sao không bị nháy?"** | **D3** (thang thời gian) | *"Có hai hằng số thời gian, và đó chính là chỗ chống nháy."* |
+| 🔆 *"kể về S-Box"* · *"đồng bộ nhiều box thế nào?"* | **D5** (nhiều box) | *"Nếu mỗi box tự chỉnh thì thế này — để em vẽ."* |
+| *"adaptive brightness làm sao?"* · **"sao không bị nháy?"** | **D3** (thang thời gian) | *"Có hai lớp thời gian, và đó chính là chỗ chống nháy."* |
 | *"phần kernel thế nào?"* · *"function pointer table?"* · *"GPL?"* | **D4** (ba module) | *"Hai tầng con trỏ, hai lý do khác nhau."* |
 | *"nạp sai thứ tự thì sao?"* | **D4b** (sequence nạp) | *"Cái này dễ thấy hơn trên trục thời gian."* |
 | *"em sẽ làm khác chỗ nào?"* | **không vẽ** — nói | §🔧 *Nếu được làm lại* ở trên |
 
-> 📌 **D3 là sơ đồ dễ bị bỏ quên nhất** vì nó không nằm trên trục kiến trúc — nhưng **S-Box là project bạn tự chọn để kể** ở câu mở màn, nên xác suất bị hỏi vào nó rất cao. Đừng để nó là sơ đồ duy nhất bạn chưa tập.
+> 📌 **D3 và D5 là hai sơ đồ dễ bị bỏ quên nhất** vì chúng không nằm trên trục kiến trúc — nhưng **S-Box là project bạn tự chọn để kể** ở câu mở màn, nên xác suất bị hỏi vào nó rất cao. Đừng để nó là sơ đồ duy nhất bạn chưa tập.
 
 ### Bốn quy tắc điều hướng
 
@@ -499,6 +576,7 @@ Câu này **khó**, và nó là câu thật.
 | D1 | *"Chỗ hẹp làm app khỏi build lại, nhưng nó **khoá** hình dạng API — thêm khả năng mới cho một chip là chuyện khó."* |
 | D2 | *"Thứ tự do **ràng buộc vật lý**, không phải do phần mềm."* |
 | D3 | *"Đổi độ trễ 4 giây lấy khả năng chống nhiễu. Thiết bị cầm tay thì đánh đổi này sai."* |
+| D5 | *"Một master thì không bao giờ có hai nguồn mức sáng; mất master thì cả tường đứng ở mức cuối — chấp nhận được."* |
 | D4 | *"Hai tầng con trỏ trả giá bằng **một lần gọi gián tiếp nữa** và **khó debug hơn** — đổi lại là đi qua được ranh giới license."* |
 | D4b | *"Nạp động cho phép một driver nền chạy với hơn 10 chip — cái giá là **một cửa sổ mà bảng còn rỗng**, và bọn em phải chặn nó bằng stub mặc định."* |
 
@@ -532,7 +610,6 @@ Câu này **khó**, và nó là câu thật.
 | Từ | Nghĩa nên nói kèm lần đầu |
 |---|---|
 | **backlight** | *"the LEDs behind the panel"* |
-| **frame rate** | *"how many pictures the panel draws per second"* |
 | **panel driver** | *"the kernel driver that talks to the panel hardware"* |
 
 **4. Nhãn tiếng Anh cho ranh giới — viết đúng cụm này:** `C ABI` · `user / kernel boundary` · `ioctl` · `GPL boundary` · `function pointer table`. Đây là thuật ngữ chuẩn, người nghe nhận ra ngay.
@@ -540,7 +617,7 @@ Câu này **khó**, và nó là câu thật.
 ### Kịch bản tiếng Anh cho từng sơ đồ
 
 **D0 — hai câu hỏi, ~30 giây**
-> *"Think of two questions about one panel. **How bright should it be?** That's picture quality — mainly dimming. There are LEDs behind the panel, and we dim them per region based on the content, so dark scenes look deeper and use less power. That part **computes** something every frame. **How should the panel be driven?** That's panel control — turning the panel on and off, changing resolution or frame rate, writing the final brightness to the hardware. That part just **issues commands**."*
+> *"Think of two questions about one panel. **How bright should it be?** That's picture quality — mainly dimming. There are LEDs behind the panel, and we dim them per region based on the content, so dark scenes look deeper and use less power. That part **computes** something as the picture changes. **How should the panel be driven?** That's panel control — turning the panel on and off, changing the resolution, writing the final brightness to the hardware. That part just **issues commands**."*
 
 **D1 — kiến trúc, ~60 giây** *(ba nhịp — vẽ tới đâu nói tới đó)*
 
@@ -551,7 +628,7 @@ Câu này **khó**, và nó là câu thật.
 > *"Let me redraw that middle part, because it's the interesting bit. **Several applications above, more than ten chip families below — and exactly one contract in the middle.** That's what we call the **narrow waist**. It's the reason the application **never gets rebuilt when we change chips**."*
 >
 > *[nhịp 3 — hai nhánh]*
-> *"Under the waist we split into two branches, because **the amount of logic is different**. **Dimming** is algorithm-heavy, so it lives in **user space, in C++**. **Panel control** — power, resolution, frame rate — is just thin commands, so it goes straight down to the **panel driver in the kernel**.*
+> *"Under the waist we split into two branches, because **the amount of logic is different**. **Dimming** is algorithm-heavy, so it lives in **user space, in C++**. **Panel control** — power, resolution — is just thin commands, so it goes straight down to the **panel driver in the kernel**.*
 >
 > *The rule is: **heavy logic goes up to user space, thin register work stays in the kernel**."*
 >
@@ -574,12 +651,16 @@ Câu này **khó**, và nó là câu thật.
 
 > 💬 **Nếu họ hỏi *"what if step three fails?"*** — *"We **run the rest of the path anyway**. Stopping halfway leaves the hardware in a half-off state, which is worse. We record the failure, finish the sequence, and return an aggregated error code."*
 
-**D3 — vsync, ~45 giây**
+**D3 — two time layers, ~45 giây**
 > *"There are **two separate time constants**, and that's what removes the flicker.*
-> *Every **four seconds** we read the sensor and compute a new target — long enough that someone flicking a light switch doesn't move it.*
-> *In between, brightness **walks toward the target in ten steps of four hundred milliseconds** each, so your eye never catches a jump.*
-> *Four hundred milliseconds is **twenty-four vsync periods** at sixty hertz, so every step lands on a frame boundary.*
-> *The cost is a **four-second reaction time**. We accepted that because the device is fixed in a meeting room. For a handheld device that trade-off would be wrong — there I'd sample fast and use a moving average instead."*
+> *Every **four hundred milliseconds** we take the latest sensor value and check which brightness band it falls into. Only when **ten readings in a row — four seconds — stay in the same band** do we compute a new target; one reading outside resets the count. A hand waving past the sensor never lasts four seconds, so it can't move the target.*
+> *Once the target changes, brightness **walks toward it in small steps**, so your eye never catches a jump.*
+> *The cost is **at least a four-second reaction time**. We accepted that because signage is fixed and ambient light changes slowly. For a handheld device that trade-off would be wrong — there I'd sample fast and use a moving average instead."*
+
+**D5 — multi-box wall, ~45 giây**
+> *"Several boxes drive one LED wall. If each box adjusts to its own light sensor, every tile ends up a different brightness *(point at the 'not synced' picture)*.*
+> *So **one box is the master** — only it has the sensor ①. It filters the readings, computes **one** brightness level, and sends it over the network to the other boxes ②. Every box writes that same level to its part of the wall ③, so the whole wall changes together.*
+> *It's still **a single binary**: whichever box has the feature enabled becomes the master; the others just listen and apply. If the master goes down, the wall simply stays at the last level — an accepted trade-off for a fixed installation."*
 
 **D4 — kernel, ~70 giây**
 > *"There are **three modules**. The first one loaded is a **proprietary shim**: it exports a set of function pointers, and it holds an **ops table** that starts out empty.*
@@ -610,7 +691,7 @@ Câu này **khó**, và nó là câu thật.
 
 ## 📄 Trang gấp — liếc 10 phút trước khi vào phòng
 
-> Bản thu nhỏ của cả sáu sơ đồ. Không đọc để học — **liếc để nhớ hình dạng**.
+> Bản thu nhỏ của cả bảy sơ đồ. Không đọc để học — **liếc để nhớ hình dạng**.
 
 ```
  D0  hai câu hỏi         D1.1 chồng tầng       D1.2 cái phễu
@@ -628,21 +709,27 @@ Câu này **khó**, và nó là câu thật.
        \     /                                  |   3 blank -->|
          SoC                                    |   4 power_off->|
 
- D3  hai hằng số thời gian        D4  ba module            D4b nạp
- vsync |||||||||| 16.7ms              shim                 1 shim (RỖNG)
- step  ^      ^      ^  400ms      (export+bridge)         2 core extern
- target^             4s          core(GPL)  chipA(prop)    3 core->chipA
-       đọc sensor, tính lại        (a)extern  (b)đăng ký   4 chipA đăng ký
+ D3  hai lớp thời gian            D4  ba module            D4b nạp
+ đọc   o o o o o o o o o o  400ms       shim                 1 shim (RỖNG)
+       10 lần cùng khoảng = 4s      (export+bridge)         2 core extern
+ target ---+                       core(GPL)  chipA(prop)    3 core->chipA
+           +--- bò dần từng nấc     (a)extern  (b)đăng ký   4 chipA đăng ký
                                                            ^ CỬA SỔ RỖNG
+
+ D5  nhiều box
+ sensor->[Box1 MASTER]--LAN-->[Box2] [Box3]
+             |                  |      |
+           [cab1]            [cab2] [cab3]   = MỘT bức tường
 ```
 
-**Một câu đánh đổi cho mỗi sơ đồ — thuộc đúng sáu câu này:**
+**Một câu đánh đổi cho mỗi sơ đồ — thuộc đúng bảy câu này:**
 
 | | Câu |
 |---|---|
 | D1 | *Chỗ hẹp làm app khỏi build lại, nhưng nó **khoá** hình dạng API.* |
 | D2 | *Thứ tự do **ràng buộc vật lý**, không phải do phần mềm.* |
 | D3 | *Đổi **độ trễ 4 giây** lấy khả năng chống nhiễu. Thiết bị cầm tay thì sai.* |
+| D5 | *Một master: không bao giờ có hai nguồn mức sáng — mất master thì tường **đứng ở mức cuối**.* |
 | D4 | *Hai tầng con trỏ: một cho **license**, một cho **đa hình**.* |
 | D4b | *Nạp động đổi lại bằng **một cửa sổ bảng còn rỗng** — chặn bằng stub mặc định.* |
 | D0 | *(không có đánh đổi — chỉ để người nghe bắt kịp)* |
@@ -659,7 +746,8 @@ Câu này **khó**, và nó là câu thật.
 - [ ] Vẽ được **D1 nhịp 2 (cái phễu)** và nói được câu *"nhiều app trên, hơn 10 chip dưới, một hợp đồng ở giữa"*
 - [ ] **D2: kẻ HẾT 4 đường đời TRƯỚC**, rồi mới điền mũi tên từ trên xuống — tập đúng thứ tự này 3 lần
 - [ ] Nói được **vì sao thứ tự 4 bước của D2 không đổi chỗ được** (ràng buộc vật lý, không phải phần mềm)
-- [ ] Nói được **hai hằng số thời gian** của D3 kèm **đánh đổi**
+- [ ] Nói được **hai lớp thời gian** của D3 (đọc 400 ms, ổn định 4 s, bò dần) kèm **đánh đổi**
+- [ ] Vẽ được **D5** trong 30 giây: hình *có/không đồng bộ* trước, rồi 3 box + sensor + LAN + tường, **đánh số ① ② ③**
 - [ ] Nói được **hai lý do khác nhau** cho hai tầng con trỏ hàm ở D4
 - [ ] Vẽ được **D4b** và chỉ ra được **cửa sổ nguy hiểm** giữa bước (2) và (4)
 - [ ] Thuộc **một câu đánh đổi** cho mỗi sơ đồ

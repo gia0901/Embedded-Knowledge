@@ -128,6 +128,31 @@ Khi vấn đề đơn giản và code ổn định, không có nhu cầu thay đ
 
 #### DP-002 · 🟢 · concept · [→ creational](../../../11-design-patterns/creational.md)
 **Singleton là gì? Cách hiện đại trong C++?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Singleton bảo đảm một class chỉ có **một instance** và có một điểm truy cập chung. Cách hiện đại trong C++11 là **Meyers Singleton**: một biến `static` cục bộ trong hàm `instance()`.*
+> ```cpp
+> class Config {
+> public:
+>     static Config& instance() { static Config c; return c; }   // dựng ở lần gọi đầu, thread-safe
+>     Config(const Config&) = delete;
+>     Config& operator=(const Config&) = delete;
+> private:
+>     Config() = default;
+> };
+> ```
+> *Từ C++11, chuẩn bảo đảm biến static cục bộ được khởi tạo **đúng một lần** kể cả khi nhiều thread gọi cùng lúc — compiler tự sinh một cờ bảo vệ. Constructor để private, copy thì `= delete`.*
+>
+> *Hai điều em luôn nói thêm. Một: chỉ phần **khởi tạo** là an toàn; gọi method của singleton từ nhiều thread vẫn cần khoá riêng. Hai: *"một instance"* là trong **một process** — library của em nạp vào năm process thì có năm bản; muốn một state cho cả hệ thì state phải nằm ở shared memory."*
+
+**Nếu bị hỏi tiếp**
+- *"Nhược điểm của Singleton?"* — Là biến toàn cục trá hình: phụ thuộc ẩn, khó test (không thay được bằng bản giả), thứ tự huỷ khó kiểm soát.
+- *"Header chứa singleton được hai `.so` cùng include?"* — Số instance lúc đó do dynamic linker quyết định, không do C++ ([DP-020](design-patterns.md)).
+
+**Móc nền tảng:** magic static ([DP-014](design-patterns.md)) · race ở `getInstance()` tự viết ([DP-026](design-patterns.md)) · object theo process, state theo hệ ([DP-041](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Đảm bảo một class chỉ có một instance + điểm truy cập toàn cục. C++11+ dùng Meyers' Singleton: `static` local trong hàm `instance()` — khởi tạo **lazy** (chỉ dựng lần gọi đầu) và **thread-safe theo chuẩn** (compiler sinh guard variable, xem [DP-014](design-patterns.md)). Cấm copy (`= delete`), constructor private.
@@ -352,6 +377,23 @@ Logic phía trên **không biết** có cache — đó chính là giá trị c�
 
 #### DP-038 · 🟡 · concept · 🎤 2026-09-09 · [→ structural §Bridge](../../../11-design-patterns/structural.md)
 **Bridge pattern giải quyết vấn đề gì? Nó khác Strategy chỗ nào khi code trông giống hệt nhau?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Bridge giải bài toán **có hai trục thay đổi độc lập** mà kế thừa chỉ mô tả được một: tách một trục ra thành interface riêng, rồi giữ con trỏ tới nó. Không có Bridge thì số lớp nhân lên theo tích hai trục.*
+>
+> *Code của Bridge và Strategy giống hệt — đều là giữ con trỏ tới interface rồi uỷ nhiệm — nên em phân biệt bằng một phép thử: **bỏ phần được cắm vào đi, phần còn lại có còn là một thứ hoàn chỉnh không?**
+>
+> *Trong hệ dimming của em: bỏ `IDimmingAlgo` thì module dimming vẫn là một module hoàn chỉnh, chỉ mất khả năng đổi thuật toán — đó là **Strategy**. Bỏ `IDimmingBackend` thì thuật toán tính xong mà **không chạm được phần cứng** — backend là nửa còn lại của chính thuật toán — đó là **Bridge**.*
+>
+> *Lợi ích thực tế của Bridge với em là test: thay backend thật bằng một backend giả ghi lại các giá trị, là test được thuật toán trên máy build mà không cần phần cứng."*
+
+**Nếu bị hỏi tiếp**
+- *"Strategy đổi lúc chạy, Bridge thì sao?"* — Strategy thường đổi lúc chạy; Bridge thường gắn một lần lúc dựng object. Nhưng đó là hệ quả, không phải định nghĩa.
+
+**Móc nền tảng:** composition · Abstract Factory tạo cặp ([DP-022](design-patterns.md)) · fake backend ([BLD-040](build-systems.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — Bridge giải gì:** khi có **hai chiều biến thiên độc lập**, kế thừa cả hai cho N × M lớp. Bridge giữ một chiều ở cây kế thừa (**abstraction**), đẩy chiều kia ra một interface riêng (**implementor**), abstraction **giữ con trỏ** tới implementor. Phần đắt nhất không bị nhân bản. *(Sách nói "còn N + M lớp" — ở hệ thật của bạn backend còn nhân theo thuật toán, xem [DP-042](design-patterns.md); đừng lặp con số N + M khi kể hệ thật.)*
@@ -445,6 +487,23 @@ Output thật (`g++ -std=c++17 -Wall -Wextra`, gcc 11.4): `linear: 50` · `step:
 
 #### DP-006 · 🟡 · concept · [→ behavioral](../../../11-design-patterns/behavioral.md)
 **Observer pattern dùng khi nào? Rủi ro?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Observer là: một nguồn sự kiện giữ **danh sách callback** đã đăng ký; trạng thái đổi thì gọi lần lượt từng cái. Nguồn không cần biết ai đang nghe, nên thêm người nghe mới không phải sửa nguồn. Mọi API kiểu `register_callback()` đều là Observer.*
+>
+> *Dùng khi một nguồn mà **nhiều** bên quan tâm, và số bên đó thay đổi. Chỉ có một người nghe thì gọi thẳng là đủ.*
+>
+> *Rủi ro số một là **vòng đời**: người nghe bị huỷ mà quên huỷ đăng ký, nguồn vẫn giữ con trỏ và lần thông báo sau gọi vào object đã chết. Em giữ `weak_ptr` thay cho con trỏ thô: trước khi gọi thì `lock()`, chết rồi thì tự gỡ khỏi danh sách — biến crash thành tự dọn. Rủi ro thứ hai là đăng ký hay huỷ **ngay trong lúc** đang thông báo, làm hỏng vòng lặp trên danh sách — thông báo trên một bản sao.*
+>
+> *Một bẫy theo miền của em: nối thẳng *"cảm biến đổi → đặt độ sáng"* thì đúng pattern nhưng sai sản phẩm — màn sẽ nhấp nháy theo từng mẫu nhiễu; phía sau vẫn cần lọc và đi dần."*
+
+**Nếu bị hỏi tiếp**
+- *"Thông báo từ ngắt phần cứng?"* — Ngắt chỉ đẩy sự kiện vào hàng đợi; một thread thường mới gọi các callback.
+
+**Móc nền tảng:** `weak_ptr` · ownership ([CPP-067](cpp.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** subject giữ **danh sách callback** đã đăng ký; trạng thái đổi ⟹ duyệt danh sách, gọi từng cái. Subject **không biết** ai đang nghe ⟹ thêm người nghe mới không sửa subject. Bạn đã dùng nó nhiều lần dù không gọi tên: mọi API kiểu `register_callback()`, vsync callback, sự kiện sensor/GPIO/nút bấm đều là Observer.
@@ -525,6 +584,21 @@ Trong embedded: hàng đợi lệnh giữa thread/process/core. Qua ranh giới 
 
 #### DP-036 · 🟡 · concept · ⭐ · 🎤 2026-09-09 · [→ behavioral §Null Object](../../../11-design-patterns/behavioral.md)
 **Null Object pattern là gì? Nó đổi lấy điều gì, và khi nào KHÔNG nên dùng?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Null Object là trả về một object **hợp lệ nhưng không làm gì** thay vì `nullptr`, để chỗ gọi không phải kiểm `null` ở mọi nơi. Trong library của em, trên sản phẩm không có tấm màn cần chỉnh độ sáng thì factory trả về chính lớp cơ sở — mọi hàm của nó trả thành công mà không làm gì. Hàng trăm chỗ gọi không cần một dòng `if` nào, và không bao giờ segfault vì quên kiểm.*
+>
+> *Cái giá là **lỗi không còn nổ ngay**: một việc không được làm sẽ trôi qua im lặng. Nên em không dùng nó khi việc bỏ qua âm thầm là nguy hiểm — lệnh phải chắc chắn tới phần cứng, ghi cấu hình an toàn — ở đó phải báo lỗi to.*
+>
+> *Và có một quyết định đi kèm: trả `OK` hay trả *"không hỗ trợ"*. Library của em trả `OK` vì hàng trăm chỗ gọi có sẵn sẽ bắt đầu báo lỗi nếu đổi; HAL phía C++ interface thì trả `-ENOTSUP` để caller phân biệt được *"đã làm"* với *"không làm được"*. Em thấy cách thứ hai đúng hơn cho code mới."*
+
+**Nếu bị hỏi tiếp**
+- *"Null Object có giúp tương thích khi interface thêm hàm mới không?"* — Ở mức mã nguồn có; ở mức nhị phân thì không — `.so` cũ có bảng hàm ảo ngắn hơn ([DP-028](design-patterns.md)).
+
+**Móc nền tảng:** virtual function có thân mặc định · `-ENOTSUP` · tương thích nguồn vs nhị phân ([DP-028](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Trả về một object **hợp lệ nhưng không làm gì** (báo trạng thái bằng mã lỗi) thay vì `nullptr`, để caller không phải kiểm ở mọi lời gọi.
@@ -588,13 +662,30 @@ std::unique_ptr<IDimming> ChipAFactory::createDimming() {
 </details>
 
 #### DP-022 · 🔴 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ B1 §4](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
-**Đồng nghiệp đề xuất: thay vì một `IPlatformFactory`, chỉ cần vài hàm rời — `makeEnhancer(ChipType)`, `makeDimming(ChipType)`, `makeFrc(ChipType)`. Ngắn hơn, không thêm class nào. Code compile sạch và chạy được trên bàn. Bạn phản đối bằng lý do gì? Nêu CỤ THỂ lỗi mà thiết kế đó cho phép xảy ra.**
+**Đồng nghiệp đề xuất: thay vì một `IPlatformFactory`, chỉ cần vài hàm rời — `makeDimmingAlgo(ChipType)`, `makeDimmingBackend(ChipType)`, `makePanelOps(ChipType)`. Ngắn hơn, không thêm class nào. Code compile sạch và chạy được trên bàn. Bạn phản đối bằng lý do gì? Nêu CỤ THỂ lỗi mà thiết kế đó cho phép xảy ra.**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em phản đối vì thiết kế đó **cho phép một lỗi compile sạch**: mỗi hàm nhận `ChipType` riêng, nên không gì buộc ba lời gọi dùng **cùng** một chip. Chỉ cần một đường khởi tạo truyền sai cho một trong ba — một nhánh sản phẩm, một bản merge — là bộ xử lý của chip A chạy cùng phần ghi phần cứng của chip B. Compiler không thấy gì sai, linker cũng không, board đang test có khi vẫn đúng.*
+>
+> *Ngoài hiện trường nó hiện ra thành sai màu hoặc một tính năng im lặng không chạy, trên **đúng một model**, không crash, không log — loại lỗi đắt nhất.*
+>
+> *Với một factory object, mỗi chip là một lớp factory tạo **cả họ**; có đúng một chỗ chọn factory, sau đó **không còn tham số nào để truyền sai**. Ràng buộc *"cả họ phải cùng chip"* chuyển từ kỷ luật sang hệ thống kiểu.*
+>
+> *Em nhượng bộ một điểm: nếu chỉ có **một** thứ cần tạo thì Abstract Factory là thừa — nó chỉ đáng khi có ít nhất hai thứ phải khớp nhau."*
+
+**Nếu bị hỏi tiếp**
+- *"Factory Method khác Abstract Factory?"* — Factory Method tạo **một** sản phẩm, lớp con quyết định loại; Abstract Factory tạo **một họ** sản phẩm phải khớp nhau.
+
+**Móc nền tảng:** Abstract Factory ([DP-037](design-patterns.md)) · `DimmingFactory` tạo cặp thuật toán + backend ([A1 §5.6](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế của lỗi — theo từng bước:**
 1. Mỗi hàm nhận `ChipType` **độc lập** ⟹ không gì buộc ba lời gọi phải dùng **cùng một** giá trị.
 2. Một chỗ khởi tạo (đường init khác, code nhánh product, một bản merge) truyền thiếu/sai `soc` cho **một** trong ba.
-3. Kết quả: enhancer của chip-A chạy cùng dimming backend của chip-B.
+3. Kết quả: thuật toán của chip-A chạy cùng backend của chip-B.
 4. Trình biên dịch **không thấy gì sai** — kiểu đều đúng. Linker cũng vậy. Test trên board đang dùng có thể vẫn đúng.
 
 **Triệu chứng ngoài hiện trường:** sai màu / nhấp nháy / một feature im lặng không hoạt động, **trên đúng một model board**, không crash, không log. Đây là lớp bug đắt nhất: không phát hiện được ở CI, chỉ lộ ở giai đoạn tích hợp hoặc tệ hơn là ở khách.
@@ -617,6 +708,23 @@ std::unique_ptr<IDimming> ChipAFactory::createDimming() {
 
 #### DP-023 · 🔴 · design · ⭐ · 🏗️ · 🎤 2026-09-09 · [→ A1 §5.3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [structural §1](../../../11-design-patterns/structural.md)
 **Bạn có 3 thuật toán dimming (global/local/oled) và 3 chip, mỗi chip ghi duty xuống phần cứng một kiểu khác nhau. Cách làm ngây thơ cho ra 9 class (`LocalDimmingChipA`, `OledDimmingChipB`…). Thiết kế lại thế nào? Và: pattern bạn dùng khác Strategy chỗ nào, khi code của chúng trông giống hệt nhau?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Ở đây có **hai trục thay đổi độc lập**: thuật toán (global, local, oled) và cách ghi xuống phần cứng theo chip. Kế thừa chỉ mô tả được một trục; ép cả hai vào kế thừa thì ra 3 × 3 = 9 lớp, và mỗi lớp chép lại cả thuật toán.*
+>
+> *Em dùng **Bridge**: giữ thuật toán là cây kế thừa, đẩy phần ghi phần cứng ra một interface riêng — `IDimmingBackend` — và mỗi thuật toán **giữ một con trỏ** tới backend. Trên sách là 3 + 3 = 6 lớp, ghép tổ hợp lúc chạy; thêm chip là thêm backend, không chép thuật toán.*
+>
+> *Khác Strategy chỗ nào khi code giống hệt: Strategy cắm vào một **thuật toán thay thế được** — bỏ nó ra, context vẫn là một thứ hoàn chỉnh. Bridge cắm vào **nửa còn lại của cùng một thứ** — bỏ backend ra thì thuật toán tính xong mà không chạm được phần cứng. Trong hệ của em có cả hai: thuật toán là Strategy của module dimming, còn backend là nửa Bridge của thuật toán.*
+>
+> *Em nói thêm cho đúng hệ thật: backend của em còn nhân theo thuật toán, vì phần cứng ghi một giá trị và ghi từng vùng khác nhau thật. Cái Bridge giữ được là **thuật toán chỉ viết một lần cho mọi chip**."*
+
+**Nếu bị hỏi tiếp**
+- *"Vậy backend nhân chip × thuật toán, vẫn là N×M?"* — Xem [DP-042](design-patterns.md): thứ không bị nhân là thuật toán, phần đắt nhất.
+
+**Móc nền tảng:** Bridge vs Strategy ([DP-038](design-patterns.md)) · composition thay kế thừa · test thuật toán bằng fake backend ([BLD-040](build-systems.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — Bridge: tách hai trục, nối bằng con trỏ.**
@@ -661,7 +769,22 @@ auto d = std::make_unique<LocalDimming>(std::make_unique<DimmingBackendChipA>())
 </details>
 
 #### DP-024 · 🟡 · concept · ⭐ · 🎤 2026-09-09 · [→ B1 §7.1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
-**Trong library, dimming đi qua interface + factory. Còn Panel Control (bật tắt panel, đổi resolution, đổi frame rate) chỉ là lệnh cố định xuống panel driver, và bạn để nguyên hàm tự do gọi thẳng. Vì sao không bọc chúng cho đồng bộ? Nêu cái giá cụ thể.**
+**Trong library, dimming đi qua interface + factory. Còn Panel Control (bật tắt panel, đổi độ phân giải, đổi chế độ hiển thị) chỉ là lệnh cố định xuống panel driver, và bạn để nguyên hàm tự do gọi thẳng. Vì sao không bọc chúng cho đồng bộ? Nêu cái giá cụ thể.**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì trừu tượng hoá phải trả tiền cho một biến thể **đã có thật**, không phải biến thể tưởng tượng. Lệnh của Panel Control — bật tắt màn, đổi chế độ hiển thị — không có thuật toán, không có state, và phần khác nhau theo chip **đã nằm trong driver của kernel**: một bộ `ioctl` chung, mỗi chip một driver. Bọc thêm interface và factory ở user-space thì không mua được gì.*
+>
+> *Cái giá thì cụ thể: thêm ba file và một lần gọi gián tiếp mà người đọc phải lần qua chỉ để thấy nó gọi đúng **một** `ioctl`; thêm một object và một bảng hàm ảo cho mỗi lệnh; và nặng nhất, thêm một **hợp đồng nhị phân** qua ranh giới `.so` phải giữ mãi mãi. Người đọc sau còn đi tìm một biến thể không tồn tại.*
+>
+> *Em dùng ba câu hỏi trước khi trừu tượng hoá: đã có **ít nhất hai** biến thể thật chưa; chúng khác nhau về **hành vi** hay chỉ khác **tham số**; có ai cần **hoán đổi** chúng không. Panel Control trượt cả ba; dimming đạt cả ba."*
+
+**Nếu bị hỏi tiếp**
+- *"Sau này có chip cần logic riêng ở user-space thì sao?"* — Lúc đó có biến thể thật thì mới tách ra interface; tách khi cần rẻ hơn mang abstraction rỗng từ đầu.
+
+**Móc nền tảng:** YAGNI / chi phí của abstraction · ABI của virtual interface ([DP-027](design-patterns.md)) · `ioctl` ([DRV-006](drivers-embedded.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Vì trừu tượng hoá phải **trả giá cho một biến thể đã tồn tại**, không phải cho một biến thể tưởng tượng. Các lệnh Panel Control không có thuật toán, không state, và **biến thể theo chip đã được panel driver trong kernel hấp thụ** (một bộ `ioctl` chung, mỗi chip một driver) — bọc thêm ở user-space thì mua được **số không**.
@@ -682,6 +805,21 @@ Cái giá cụ thể, không nói chung chung:
 
 #### DP-025 · 🟡 · concept · 🎤 2026-09-09 · [→ A2 §3.1](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md)
 **Trong HAL của bạn, `IDisplayBuilder` chỉ có đúng một hàm `buildNewDisplayHandle()` trả về `IDisplay*`. Nó tên là "Builder" — nhưng theo GoF thì đó là pattern nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Theo GoF thì đó là **Factory Method**, không phải Builder, dù tên là `IDisplayBuilder`.*
+>
+> *Builder giải bài toán *"object có nhiều tham số, dựng qua nhiều bước"*: nhiều hàm đặt từng phần, cuối cùng gọi `build()`. Còn ở đây chỉ có **một lời gọi** trả về object hoàn chỉnh, và **lớp con** của builder — nằm trong `.so` — quyết định tạo class cụ thể nào. Đó đúng là định nghĩa Factory Method.*
+>
+> *Em nói rõ điều này vì nếu em nói *"em dùng Builder"*, câu tiếp theo chắc chắn là *"Builder khác Factory thế nào"*, và code em vừa kể sẽ không khớp. Tên `Builder` là quy ước có sẵn trong codebase."*
+
+**Nếu bị hỏi tiếp**
+- *"Vì sao cần factory ở đây, sao không `new` thẳng?"* — App không biết class cụ thể nằm trong `.so` nào; factory do `.so` cung cấp là cách duy nhất để app tạo object mà không phụ thuộc vào cài đặt.
+
+**Móc nền tảng:** Factory Method vs Abstract Factory ([DP-037](design-patterns.md)) · self-registration ([DP-029](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Là **Factory Method**, không phải Builder. GoF Builder giải bài toán *object có nhiều tham số / dựng nhiều bước* — hình dạng của nó là nhiều setter nối chuỗi rồi `build()`. Ở đây chỉ **một lời gọi ra object hoàn chỉnh**, và **lớp con của factory** (nằm trong `.so`) quyết định tạo class nào — đúng định nghĩa Factory Method.
@@ -702,6 +840,29 @@ IDisplay* IDisplay::getInstance() {
     return p_instance;
 }
 ```
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Đây là mẫu **kiểm-rồi-làm** không có khoá: hai thread cùng gọi lần đầu, cả hai đều thấy `p_instance` còn `nullptr`, và cả hai cùng đi tạo. Kết quả là factory chạy **hai lần**: hai object cùng điều khiển một thiết bị, mỗi cái mở file thiết bị riêng, rò mất một file descriptor. TSan báo đúng một data race giữa dòng `if` và dòng gán.*
+>
+> *Chữ `static` không cứu vì bảo đảm thread-safe của C++11 chỉ áp cho **việc khởi tạo** biến static. Ở đây khởi tạo là `= nullptr` — một hằng số, compiler không cần cờ bảo vệ nào. Toàn bộ `if` và phép gán phía dưới là **code thường**.*
+>
+> *Sửa bằng cách để magic static làm việc: đưa toàn bộ logic tạo vào **biểu thức khởi tạo** của biến static.*
+> ```cpp
+> static IDisplay* p_instance = [] {
+>     loadlib(LIB_PATH);
+>     return builder ? builder->buildNewDisplayHandle() : new (std::nothrow) IDisplay();
+> }();
+> return p_instance;
+> ```
+> *Sau lần đầu, mỗi lần gọi chỉ còn một phép đọc nguyên tử — gọi triệu lần vẫn rẻ."*
+
+**Nếu bị hỏi tiếp**
+- *"Sao không dùng mutex?"* — Được, nhưng mỗi lần gọi đều phải khoá; magic static làm đúng việc đó mà chỉ trả giá ở lần đầu. Hoặc `std::call_once`.
+
+**Móc nền tảng:** magic static ([DP-014](design-patterns.md)) · TSan ([DBG-042](debugging.md)) · khởi tạo trong constructor của `.so` ([DP-041](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — vì sao `static` không cứu:** bảo đảm thread-safe của C++11 ("magic statics") chỉ áp cho **việc khởi tạo** biến static. Ở đây khởi tạo là `= nullptr` — một **constant initialization**, compiler **không sinh guard variable** nào cả. Toàn bộ `if` + phép gán bên dưới là **code thường**, không được bảo vệ. Đây là mẫu **check-then-act** kinh điển: thread A đọc `p_instance` (còn null) trong lúc thread B đang ghi.
@@ -733,6 +894,23 @@ Kiểm chứng: TSan im lặng, và `g++ -S | grep cxa_guard` cho thấy `__cxa_
 
 #### DP-027 · 🔴 · concept · ⭐ · 🎤 2026-09-09 · [→ A2 §3.3](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md), [abi-versioning](../../../07-shared-libraries/abi-versioning.md)
 **Bạn thêm API mới `virtual int setBrightness(int)` vào `IDisplay`, đặt TRƯỚC `setPower` cho gọn nhóm. Rebuild app, giữ nguyên `libdisplay.so` cũ. Chạy: dòng log của `setPower` biến mất, thay vào đó destructor chạy, exit code 0, không crash. Giải thích chuyện gì đã xảy ra và rút ra luật.**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Lời gọi hàm ảo được compiler dịch thành *"nhảy tới **ô số k** của bảng hàm ảo"*, và con số k **đóng băng vào binary** lúc compile.*
+>
+> *`.so` cũ được build khi `setPower` ở ô 0 và destructor ở ô 1. App mới được build với header đã chèn `setBrightness` lên trước, nên trong mắt app `setPower` giờ là ô 1. App gọi `setPower` thì nhảy tới ô 1 của object đến từ `.so` cũ — mà ô 1 ở đó là **destructor**. Nên destructor chạy, log của `setPower` biến mất, chương trình vẫn thoát êm với mã 0.*
+>
+> *Đáng sợ là **không có gì phát hiện được**: không thiếu symbol nào nên link sạch, nạp sạch, không cảnh báo — chỉ là một con số sai. Ngoài hiện trường nó hiện ra thành *"board này bật màn không lên"*.*
+>
+> *Luật rút ra: qua ranh giới `.so`, **bảng hàm ảo là ABI**. Hàm ảo mới chỉ được thêm vào **cuối**; không chèn giữa, không xoá, không đổi thứ tự, không thêm data member vào interface. Đó cũng là lý do người ta dùng biên `extern "C"` hoặc Pimpl."*
+
+**Nếu bị hỏi tiếp**
+- *"Bảng con trỏ hàm trong kernel có dính luật này không?"* — Có, y hệt: chèn một ô vào giữa struct ops thì driver build trước đó gọi nhầm hàm ([DP-043](design-patterns.md)).
+
+**Móc nền tảng:** vtable/vptr ([CPP-006](cpp.md)) · API vs ABI ([SD-017](system-design.md)) · version không cứu được slot đảo ([DP-033](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — vtable là một mảng, lời gọi virtual là một CHỈ MỤC vào mảng đó.** Compiler dịch `p->setPower(x)` thành *"nhảy tới slot số k"*, với `k` **đóng băng vào binary lúc biên dịch**.
@@ -773,6 +951,21 @@ App gọi `setPower` ⟹ nhảy slot 1 ⟹ ở object đến từ `.so` cũ, slo
 
 #### DP-028 · 🟠 · concept · 🎤 2026-09-09 · [→ A2 §2.1](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md)
 **Trong HAL của bạn, các API của `IDisplay` là `virtual` thường chứ không phải pure virtual, và bản base trả `-ENOTSUP`; khi không nạp được `.so` thì `getInstance()` trả về một object `IDisplay` dummy thay vì `nullptr`. Đó là pattern gì, và nó mua được HAI thứ nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Đó là **Null Object**: thay vì trả `nullptr` khi không nạp được `.so`, `getInstance()` trả một object hợp lệ mà mọi hàm của nó trả `-ENOTSUP`.*
+>
+> *Nó mua **hai thứ**. Thứ nhất, **an toàn phía người gọi**: không phải kiểm `null` ở mọi chỗ, quên kiểm cũng không segfault, và người gọi phân biệt được *"không hỗ trợ"* với *"lỗi thật"*. Thứ hai, vì các hàm là virtual **có thân** chứ không pure, khi interface thêm hàm mới thì cài đặt cũ **không phải sửa code** — hàm nào nó chưa override thì rơi về bản trả `-ENOTSUP`.*
+>
+> *Nhưng em phải nói chính xác thứ hai: đó là tương thích ở mức **mã nguồn** — `.so` build lại với header mới mà không sửa dòng nào. **Không phải** mức nhị phân: một `.so` đã build từ trước có bảng hàm ảo **ngắn hơn**, app mới gọi hàm mới là nhảy ra ngoài bảng và crash. Muốn gọi hàm mới an toàn trên `.so` cũ thì phải có cơ chế hỏi khả năng — version hay capability — có từ phiên bản đầu."*
+
+**Nếu bị hỏi tiếp**
+- *"Tương thích nguồn và nhị phân khác nhau thế nào, một câu?"* — Nguồn: build lại là chạy; nhị phân: không build lại vẫn chạy.
+
+**Móc nền tảng:** Null Object ([DP-036](design-patterns.md)) · vtable là ABI ([DP-027](design-patterns.md)) · API vs ABI ([SD-017](system-design.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Null Object pattern** — trả về một object **hợp lệ nhưng không làm gì**, báo trạng thái bằng mã lỗi, thay vì trả `nullptr`.
@@ -804,6 +997,25 @@ App gọi `setPower` ⟹ nhảy slot 1 ⟹ ở object đến từ `.so` cũ, slo
 
 #### DP-029 · 🟠 · design · 🏗️ · 🎤 2026-09-09 · [→ A2 §4](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md), [linking-loading](../../../07-shared-libraries/linking-loading.md)
 **HAL của bạn: `.so` có một hàm `__attribute__((constructor))`, khi được `dlopen` thì tự gọi ngược lên app để đăng ký factory của mình. Vì sao làm vòng vèo vậy thay vì link thẳng `.so` vào app? Đánh đổi là gì — và điều kiện kỹ thuật nào khiến `.so` gọi được symbol nằm trong app?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Cơ chế là **tự đăng ký**: app `dlopen` cái `.so` của board; loader chạy hàm constructor của `.so`; hàm đó gọi ngược lên app để nộp factory của nó. Interface trong app **không hề biết** có bao nhiêu cài đặt; thêm cài đặt mới là thêm một `.so`, không sửa dòng nào của app.*
+>
+> *Vì sao vòng vèo: **một binary app chạy được trên nhiều board**. Board nào thì nạp `.so` của board đó, chọn lúc khởi động theo cấu hình. Thiếu `.so` thì app vẫn chạy ở chế độ Null Object chứ không chết ngay.*
+>
+> *Cái giá: lỗi mà link thẳng sẽ bắt **lúc link** — thiếu symbol, sai chữ ký — giờ chỉ lộ **lúc chạy**. ABI giữa app và `.so` phải giữ bằng tay. Debug cũng khó hơn một chút vì breakpoint trong `.so` chưa nạp chỉ là *pending*.*
+>
+> *Điều kiện kỹ thuật để `.so` gọi được hàm nằm trong app: app phải **xuất symbol** của nó cho dynamic linker — cờ `-rdynamic`, trong CMake là `ENABLE_EXPORTS`. Thiếu thì `dlopen` vẫn thành công nhưng `.so` không tìm thấy hàm đăng ký.*
+>
+> *Em tóm lại: đổi **an toàn lúc link** lấy **linh hoạt lúc khởi động** — đáng khi một binary phục vụ nhiều board."*
+
+**Nếu bị hỏi tiếp**
+- *"Constructor của `.so` có rủi ro gì?"* — Chạy trước `main`, thứ tự giữa các `.so` khó kiểm soát; không nên làm việc nặng hay phụ thuộc vào object toàn cục của `.so` khác.
+
+**Móc nền tảng:** `dlopen`/`dlsym` ([SD-029](system-design.md)) · `__attribute__((constructor))` ([DP-041](design-patterns.md)) · Null Object ([DP-028](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế (self-registration / Inversion of Control), theo bước:** `dlopen` ⟹ loader chạy hàm constructor của `.so` ⟹ hàm đó gọi `IDisplay::injectBuilder(new DisplayBuilderImpl)` — một symbol nằm trong **app** ⟹ con trỏ builder static trong app khác NULL ⟹ app gọi builder để lấy object thật. Interface **không hề biết** có bao nhiêu implementation tồn tại; thêm impl mới = thêm một `.so`, **không sửa một dòng nào** của interface.
@@ -880,6 +1092,25 @@ struct BrightnessCmd {
 
 #### DP-032 · 🟡 · concept · 🎤 2026-09-09 · [→ B2 §3](../../../11-design-patterns/in-practice/B2-redesign-events.md)
 **Feature "Preset" (lưu cấu hình màn hình, khôi phục sau restart, export sang màn hình khác) về bản chất là Memento. Memento sách vở thiếu ba thứ gì cho yêu cầu "export sang màn hình khác"?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Memento trong sách sống trong **một process, một phiên chạy** — để undo/redo: object tự chụp, tự khôi phục, người giữ bản chụp không đọc bên trong. Export sang màn hình khác sinh thêm ba việc pattern không nói tới.*
+>
+> *Một, **phiên bản**: preset lưu bằng app 1.0, mở bằng app 1.2. Phải ghi số phiên bản vào file, chỉ thêm trường mới chứ không đổi nghĩa trường cũ, trường thiếu thì lấy mặc định.*
+>
+> *Hai, **khả năng của màn đích**: màn kia không hỗ trợ một setting, hoặc dải giá trị khác. Em áp từng phần và **báo lại** những setting đã bỏ qua, thay vì thất bại cả gói hay lặng lẽ bỏ.*
+>
+> *Ba, **tính nguyên tử**: áp mười setting, cái thứ bảy hỏng — dừng và khôi phục lại, hay đi tiếp và báo cáo? Không có đáp án duy nhất; điều cần là **một quyết định rõ ràng và nhất quán**.*
+>
+> *Tóm lại Memento cho mình **đóng gói** — người giữ không cần biết bên trong; nó không cho **tính khả chuyển** — phần đó là phiên bản, khả năng và chính sách lỗi."*
+
+**Nếu bị hỏi tiếp**
+- *"Ghi file thế nào để mất điện giữa chừng không hỏng?"* — Ghi ra file tạm, flush, rồi `rename` đè lên file cũ — reader chỉ thấy bản cũ hoặc bản mới hoàn chỉnh ([RES-020](resume.md)).
+
+**Móc nền tảng:** versioning (cùng luật ABI: chỉ thêm ở cuối) · Null Object / `-ENOTSUP` cho setting không hỗ trợ.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Memento cổ điển sống **trong một process, một phiên chạy** (undo/redo): originator tự chụp/tự nạp, caretaker giữ mà không đọc bên trong. Export sang máy khác đẻ thêm ba vấn đề pattern không nói tới:
@@ -893,6 +1124,23 @@ Memento cổ điển sống **trong một process, một phiên chạy** (undo/r
 
 #### DP-033 · 🔴 · concept · ⭐ · 🎤 2026-09-09 · [→ A2 §3.3 + §7 Lab 3a](../../../11-design-patterns/in-practice/A2-cpp-interface-hal.md)
 **Bạn đã thêm `IDisplayBuilder::abiVersion()` để app hỏi `.so` xem nó build với header phiên bản nào, và app chỉ gọi API mới khi version đủ. Một hôm app in ra `impl ABI version = 2 (interface = 2)` — khớp hoàn toàn — nhưng gọi `setBrightness()` thì destructor chạy và hàm trả về số rác. Vì sao cơ chế version không cứu được?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì version chỉ nói *"tôi biết bao nhiêu API"*, nó **không nói bố cục** của các API đó.*
+>
+> *Ở đây cả app lẫn `.so` đều là *"phiên bản 2"*, cùng có `setBrightness`, nhưng hai bên build từ hai header khác nhau về **thứ tự**: một bên đặt `setBrightness` sau destructor, bên kia đặt trước. App dịch `setBrightness` thành *"ô số 1"*, còn ô số 1 trong `.so` là destructor. Version khớp hoàn toàn mà vẫn gọi nhầm hàm.*
+>
+> *Em phân biệt hai lớp lỗi: `.so` **thiếu** API mới thì version hay capability check chặn được. `.so` **đủ** API nhưng **thứ tự ô khác** thì không có cơ chế lúc chạy nào chặn được — chỉ chặn được ở **review** và ở **build**: luật *"chỉ thêm hàm ảo ở cuối, sau destructor"*, và một bước trong CI so bố cục bảng hàm ảo giữa hai bản. Hoặc tránh hẳn bằng biên C với struct có version.*
+>
+> *Triệu chứng đặc trưng đáng nhớ: hỏng **có chọn lọc** — hàm nằm trước chỗ chèn vẫn đúng, chỉ hàm phía sau lệch, không crash."*
+
+**Nếu bị hỏi tiếp**
+- *"Công cụ nào so ABI?"* — `abidiff` / `abi-compliance-checker` (tên công cụ là T3, chỉ cần biết là có bước đó trong CI).
+
+**Móc nền tảng:** vtable là ABI ([DP-027](design-patterns.md)) · hợp đồng nội dung vs hợp đồng bố cục.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** version chỉ nói *"tôi biết bao nhiêu API"*, nó **không mô tả BỐ CỤC** của những API đó. Ở đây `.so` được build từ header có `setBrightness` khai báo **sau** destructor, còn app build từ header có nó **trước** destructor. Cùng gọi là "v2", cùng số lượng API — nhưng **thứ tự slot vtable khác nhau**.
@@ -925,6 +1173,25 @@ App dịch `setBrightness` thành *"nhảy slot 1"*; slot 1 của `.so` là **de
 
 #### DP-040 · 🟠 · concept · ⭐ · [→ A1 §3](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
 **App của bạn viết C++, bên trong library cũng là C++ đa hình, nhưng giữa hai bên là một API `extern "C"` thuần. Đồng nghiệp chê "C++ → C → C++ vòng vo, phơi thẳng C++ interface cho gọn". Bảo vệ thiết kế này bằng HAI lý do độc lập — và nêu một ngoại lệ mà chính hệ của bạn có.**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em bảo vệ bằng **hai lý do độc lập**.*
+>
+> *Một là **ABI**. Library được nạp vào nhiều process, do nhiều team build ở những thời điểm khác nhau. Một C++ interface đưa qua ranh giới cả bố cục class, thứ tự hàm ảo, tên đã được compiler mã hoá — đổi một chút là app cũ gọi nhầm hàm mà không ai báo lỗi. Hàm C thì hợp đồng chỉ là **tên hàm và vài kiểu đơn giản**, giữ ổn định được nhiều năm.*
+>
+> *Hai là **khoá**. State của library nằm trong **shared memory** dùng chung cho mọi process. Mỗi hàm C là **cửa duy nhất** vào library và theo một khuôn: kiểm shared memory, lấy khoá, gọi xuống C++ bên trong, nhả khoá. Object C++ bên trong không ai ở ngoài với tới được, nên **không có đường nào đi vòng qua khoá** — cấu trúc ép, không phải kỷ luật. Nếu phơi thẳng C++ rồi khoá trong từng method thì method gọi method sẽ tự khoá lại chính mình, còn method mới quên khoá vẫn compile sạch.*
+>
+> *Ngoại lệ em tự nêu: vòng cập nhật định kỳ chạy **bên trong** library không đi qua cửa C, nên không được khoá đó bảo vệ. Đó là một điểm yếu em biết và có cách sửa."*
+
+**Nếu bị hỏi tiếp**
+- *"Chỉ xoá `extern "C"` thì sao?"* — Tên hàm bị mã hoá kèm kiểu tham số; app tìm tên trơn thì không thấy ⟹ lỗi **lúc nạp** (`undefined symbol`), lộ ngay. Ngược lại, với `extern "C"` mà đổi kiểu tham số thì **không ai báo** — lỗi im lặng. Nên ở biên C phải giữ chữ ký như hợp đồng.
+- *"`extern "C"` có chặn truyền `std::string` qua không?"* — Không. Nó chỉ tắt việc mã hoá tên; quy tắc *"chỉ kiểu C qua biên"* là việc của người viết.
+- *"ABI là gì, nói đơn giản?"* — *"API là hợp đồng bằng **tên**, ABI là hợp đồng bằng **vị trí**: byte nào ở offset nào, hàm nào ở ô thứ mấy."*
+
+**Móc nền tảng:** ABI vs API ([SD-017](system-design.md)) · name mangling ([SD-028](system-design.md)) · mutex vs semaphore ([OS-007](os.md)) · process chết khi giữ khoá ([LNX-045](linux-sysprog.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — đồng hồ cát (narrow waist):** hai đầu rộng, dùng đủ C++; chỗ hẹp ở giữa là hợp đồng duy nhất phải giữ vĩnh viễn.
@@ -988,6 +1255,22 @@ Output trên là chạy thật (gcc 11.4). Dòng cuối là chỗ ít người b
 
 #### DP-041 · 🟡 · concept · ⭐ · [→ A1 §7](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
 **Library của bạn được nạp vào 5 process. Mỗi process có `get_dimming_instance()` trả về một con trỏ toàn cục. Hỏi: có bao nhiêu object dimming? Bao nhiêu bản state thật? Thứ đó là Singleton à? Và vì sao chỗ khởi tạo không có data race?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Có **5 object**, mỗi process một bản, vì vùng dữ liệu của `.so` được map riêng cho từng process. Nhưng chỉ có **một state thật**: mức sáng và trạng thái thuật toán nằm trong **shared memory**, cả hệ một bản, được bảo vệ bằng một semaphore dùng chung. Em gói lại là: *object theo process, state theo hệ thống*.*
+>
+> *Nó **không phải Singleton**: `get_dimming_instance()` chỉ trả về một con trỏ toàn cục, không có gì **ép** chỉ có một object — chỉ là quy ước *"chỉ hàm khởi tạo được gán"*. Tên đúng là **Service Locator**.*
+>
+> *Khởi tạo không race vì nó chạy trong hàm `__attribute__((constructor))` của `.so`: hàm đó tự chạy **khi process nạp library, trước khi `main` tạo thread nào**. Không có hai thread cùng kiểm *"đã tạo chưa"*, nên không cần khoá hay magic static. Đó là một cách chữa race khác: **dời khởi tạo ra khỏi vùng có tranh chấp**."*
+
+**Nếu bị hỏi tiếp**
+- *"Bên trong có `DimmingFactory::GetDimmingInstance()` dùng static local — khác gì?"* — Đó là Meyers Singleton ở tầng dưới; nó an toàn nhờ magic static của C++11. Hai hàm tên gần giống nhưng hai cơ chế khác nhau.
+- *"`.so` được `dlopen` lúc đã có nhiều thread?"* — Constructor chạy trong thread gọi `dlopen`, xong trước khi `dlopen` trả về; thread khác chưa có con trỏ tới hàm của library nên chưa gọi được.
+
+**Móc nền tảng:** Meyers Singleton ([DP-014](design-patterns.md)) · race ở `getInstance()` ([DP-026](design-patterns.md)) · shared memory + semaphore.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** dữ liệu của `.so` được map **riêng cho từng process** ⟹ 5 process = **5 con trỏ, 5 object C++**. Nhưng state thật (mức độ sáng, trạng thái thuật toán) nằm trong **POSIX shared memory** ⟹ **một bản cho cả hệ**, bảo vệ bằng **named semaphore**.
@@ -1011,6 +1294,21 @@ Output trên là chạy thật (gcc 11.4). Dòng cuối là chỗ ít người b
 
 #### DP-042 · 🔴 · design · ⭐ · 🏗️ · [→ A1 §5.4](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
 **Bạn kể dimming là Bridge: thuật toán (Global/Local/OLED) × backend theo chip. Interviewer chỉ vào tên lớp `DimmingBackendChipA_Global`, `DimmingBackendChipA_Local`… và nói: "backend của bạn nhân theo chip × thuật toán — vẫn là N×M, đâu phải Bridge". Trả lời thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Anh nói đúng một nửa, và em nói luôn trước: backend của em **nhân theo chip × thuật toán**, và **không mỏng** — backend cho thuật toán chia vùng dày ngang chính thuật toán. Lý do là phần cứng khác nhau thật: một kiểu ghi **một** giá trị cho cả màn, kiểu kia ghi **từng vùng**, và cách ghi từng vùng mỗi chip một khác.*
+>
+> *Nhưng thước đo của Bridge không phải con số N + M. Thứ Bridge bảo vệ là **thuật toán chỉ viết một lần cho mọi chip**. Không có Bridge, mỗi lớp kiểu `GlobalDimmingChipX` phải chứa cả thuật toán — hàng nghìn dòng bị chép theo từng chip, sửa một lỗi thuật toán phải sửa ở mọi chip. Có Bridge thì sửa một chỗ.*
+>
+> *Và chip được chốt **lúc build**, nên trong một binary chỉ có backend của đúng chip đó. Nếu làm lại, em tách interface backend riêng cho từng loại thuật toán, để ghép nhầm thuật toán với backend thành **lỗi compile**."*
+
+**Nếu bị hỏi tiếp**
+- *"Vậy sao không gọi là Bridge 'không chuẩn'?"* — Gọi vậy cũng được; điều quan trọng là nói đúng cái nó mua: thuật toán không bị nhân bản, hai trục đổi được độc lập.
+
+**Móc nền tảng:** Bridge ([DP-023](design-patterns.md)) · chốt lúc build bằng CMake · biến lỗi runtime thành lỗi compile.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 > 📏 *Cỡ thật của hệ (đếm source, làm tròn):* thuật toán Global khoảng 7,6 nghìn dòng, Local khoảng 8,6 nghìn dòng, mỗi cái viết một lần. Backend Global khoảng 0,8–1,1 nghìn dòng mỗi chip; backend Local khoảng 4–8,5 nghìn dòng mỗi chip × biến thể panel, tức **dày ngang thuật toán**. Lập luận bảo vệ Bridge phải đứng được **mà không cần** backend mỏng.
@@ -1043,6 +1341,26 @@ Output trên là chạy thật (gcc 11.4). Dòng cuối là chỗ ít người b
 
 #### DP-043 · 🟠 · concept · ⭐ · [→ A1 §6](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
 **Trong kernel, driver nền không biết tên chip nào; nó gọi driver chip qua một struct con trỏ hàm `panel_ops` mà driver chip tự điền vào lúc init. So với `virtual` trong C++: giống gì, khác gì — và nó thừa hưởng HAI rủi ro nào của vtable?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Giống ở **ý tưởng**: driver nền gọi qua một bảng con trỏ hàm mà không biết chip nào ở phía sau — đúng như gọi hàm ảo qua con trỏ lớp cơ sở. Khác ở chỗ **ai làm**: với `virtual`, compiler tự dựng bảng, tự điền mọi ô, tự gắn bảng vào object. Với `panel_ops`, người viết driver tự khai báo struct, tự điền, tự đăng ký.*
+>
+> *Vì tự làm, nó thừa hưởng **hai rủi ro** của bảng hàm ảo mà không có compiler đỡ. Một: **ô chưa điền** — một chip không hỗ trợ một tính năng thì ô đó là `NULL`, gọi vào là kernel oops; driver nền phải kiểm và trả `-ENOTSUP`. Hai: **lệch ô** — ai đó chèn một hàm vào giữa struct; driver chip build trước đó vẫn điền theo bố cục cũ, nên driver nền gọi ô thứ hai lại chạy nhầm hàm khác, không báo lỗi gì.*
+>
+> *Cách chặn: chỉ thêm hàm vào **cuối** struct, và đặt một trường `size` ở đầu — driver nền kiểm lúc đăng ký, và trước mỗi lần gọi hàm mới thì kiểm ô đó có nằm trong bảng bên kia điền hay không."*
+
+**Nếu bị hỏi tiếp**
+- *"Thêm `get_temp` vào cuối, `.ko` cũ chưa build lại — gọi thì sao?"* — Bảng của `.ko` cũ ngắn hơn; đọc ô đó là đọc **ngoài** bảng, nhảy tới địa chỉ rác ⟹ oops. Kiểm trước khi gọi:
+  ```c
+  #define HAS_OP(ops, f) ((ops)->size >= offsetof(struct panel_ops, f) + sizeof((ops)->f) && (ops)->f)
+  if (!HAS_OP(ops, get_temp)) return -ENOTSUP;
+  ```
+- *"HAL và driver build chung một RPM, cài một lần — đủ chưa?"* — Chặn được đường thường. Vẫn lọt khi hotfix một `.ko` lẻ, rollback một phần gói, hoặc `.ko` cũ còn sót trên máy. RPM là bảo đảm của **quy trình**; `size` là bảo đảm của **cấu trúc** — nên có cả hai.
+
+**Móc nền tảng:** vtable ([CPP-006](cpp.md)) · chèn virtual vào giữa ([DP-027](design-patterns.md)) · kernel oops ([DBG-015](debugging.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** `panel_ops` là **vtable viết tay bằng C**. Driver nền gọi `ops->set_freq(...)` y như C++ gọi `p->setFreq(...)` qua vtable; driver chip là "lớp con" điền slot của mình.
@@ -1120,7 +1438,24 @@ Không kiểm thì driver nền đọc 8 byte **nằm ngoài** bảng của `.ko
 </details>
 
 #### DP-044 · 🟠 · concept · [→ A1 §5.8](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md), [B1 §6](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
-**Mọi lời gọi API của library đều đi qua một named semaphore ở mặt tiền C. Ngoài ra library còn một vòng chạy mỗi khung hình (vsync): khởi động khi `.so` được nạp, đi thẳng thuật toán → phần cứng, và khi một process khác nạp `.so` thì vòng này reset, chạy lại trong process mới. Nêu hai vấn đề thiết kế của vòng này và cách sửa.**
+**Mọi lời gọi API của library đều đi qua một named semaphore ở mặt tiền C. Ngoài ra library còn một vòng cập nhật định kỳ chạy theo nhịp màn hình: khởi động khi `.so` được nạp, đi thẳng thuật toán → phần cứng, và khi một process khác nạp `.so` thì vòng này reset, chạy lại trong process mới. Nêu hai vấn đề thiết kế của vòng này và cách sửa.**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Ngoài đường gọi API, library còn **một vòng chạy định kỳ theo nhịp màn hình** để độ sáng bám nội dung. Vòng này có hai vấn đề.*
+>
+> *Một: nó **chạm state ngoài khoá**. Vòng định kỳ và các hàm API cùng đọc ghi một state trong shared memory, nhưng chỉ đường API đi qua khoá ở mặt tiền C. Tức là an toàn của state đang phụ thuộc vào **đường gọi**, không phụ thuộc vào **state**. Em chạy TSan trên bản lab và nó báo đúng data race đó. Sửa: đưa khoá về **đi cùng state** — chỉ lấy được state qua một đối tượng RAII đã giữ khoá; vẫn một semaphore, chỉ đổi chỗ đặt.*
+>
+> *Hai: vòng này **không có chủ cố định**. Nó khởi động khi `.so` được nạp, nên nó chạy trong process nạp library **sau cùng** — một tool test mở library là kéo vòng đó về phía mình, tool thoát thì vòng đi theo. Sửa: constructor của `.so` không tự khởi động gì; chỉ **một service chủ** sống suốt đời thiết bị mới gọi hàm khởi động vòng đó.*
+>
+> *Hai vấn đề cùng một gốc: state và vòng chạy đều có **nhiều hơn một chủ**."*
+
+**Nếu bị hỏi tiếp**
+- *"Vì sao đổi process mà thuật toán không mất trí nhớ?"* — Vì state nằm trong shared memory; đó là luận cứ cho việc đặt state ở đó.
+
+**Móc nền tảng:** data race · RAII lock guard ([DP-047](design-patterns.md)) · TSan ([DBG-042](debugging.md)) · `__attribute__((constructor))` ([DP-041](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Vấn đề 1 — chạm state ngoài khoá:** vòng vsync và đường API cùng đọc/ghi **một** state trong shared memory, nhưng chỉ đường API được khoá (khoá nằm ở mặt tiền). An toàn của state đang phụ thuộc vào **đường gọi**, không phụ thuộc vào **state**. Hôm nay chưa vỡ không có nghĩa là có gì ngăn nó vỡ.
@@ -1185,7 +1520,22 @@ int32_t lib_api_set_something(int32_t v) {
 </details>
 
 #### DP-046 · 🔴 · design · 🏗️ · [→ B1 §1, §9](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)
-**Bạn liệt kê 5 điểm yếu của hệ: interface ~150 method; ranh giới "chỉ PQ ghi độ sáng" chỉ là quy ước; logic chọn thuật toán lặp ở mỗi chip; base trả `LIB_OK` cho việc không làm; vòng vsync chạm state ngoài khoá. Interviewer: "năm cái này có chung gốc không? Nếu chỉ được sửa hai cái trong quý này, bạn chọn cái nào?"**
+**Bạn liệt kê 5 điểm yếu của hệ: interface ~150 method; ranh giới "chỉ PQ ghi độ sáng" chỉ là quy ước; logic chọn thuật toán lặp ở mỗi chip; base trả `LIB_OK` cho việc không làm; vòng cập nhật định kỳ chạm state ngoài khoá. Interviewer: "năm cái này có chung gốc không? Nếu chỉ được sửa hai cái trong quý này, bạn chọn cái nào?"**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Năm điểm yếu gom về **hai bệnh**. Bệnh một: **một thứ có nhiều hơn một chủ** — độ sáng có hai đường ghi xuống phần cứng, logic chọn thuật toán lặp lại ở mỗi chip, và state dùng chung có một đường chạm vào mà không qua khoá. Bệnh hai: **hợp đồng không nói thật** — interface khoảng 150 hàm mà phần lớn không làm gì, và lớp cơ sở trả `OK` cho việc nó không làm.*
+>
+> *Nếu chỉ được sửa hai cái trong quý này, em chọn theo **rủi ro thấp mà chặn được cả một lớp lỗi**: thứ nhất, đưa khoá về **đi cùng state** — chỉ lấy được state qua một đối tượng RAII đã giữ khoá — đóng đúng đường đang chạm state ngoài khoá. Thứ hai, làm cho lệnh ghi độ sáng chỉ gọi được từ đúng một nơi, bằng một tham số kiểu mà chỉ nơi đó tạo được — compiler sẽ tự chỉ ra mọi chỗ đang vi phạm.*
+>
+> *Tách interface lớn thì làm dần vì nó là chuyện bảo trì; đổi `OK` thành *"không hỗ trợ"* thì để cuối vì nó **đổi hành vi** của API đang chạy, phải đo trước. Tóm lại: em không đập kiến trúc, em đổi **ai được làm gì**, theo thứ tự rủi ro tăng dần."*
+
+**Nếu bị hỏi tiếp**
+- *"Vì sao không sửa interface 150 hàm trước — nó trông tệ nhất?"* — Nó tệ về bảo trì, không gây sai; hai cái em chọn chặn lỗi đúng/sai.
+
+**Móc nền tảng:** RAII lock guard · passkey idiom · ownership của state ([B1](../../../11-design-patterns/in-practice/B1-redesign-architecture.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Gom về hai bệnh — đây là phần tính điểm:**

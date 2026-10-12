@@ -650,6 +650,21 @@ void g() { std::scoped_lock lk(m2, m1); }   // thứ tự tham số KHÔNG còn 
 
 #### OS-007 · 🟡 · concept · ⭐ · [→ sync-primitives](../../../03-operating-system/sync-primitives.md#L74), [scheduling §6](../../../03-operating-system/scheduling.md)
 **Mutex và semaphore khác nhau?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Khác nhau ở **mục đích**, và từ mục đích sinh ra khác biệt về **chủ sở hữu**. Mutex để **bảo vệ** một đoạn code dùng chung: thread nào khoá thì chính thread đó mở — mutex **có chủ**. Semaphore là **bộ đếm để báo hiệu**: một bên chờ, bên kia báo, hoặc quản lý N tài nguyên — ai cũng tăng được, nó **không có chủ**.*
+>
+> *Ví dụ semaphore đúng chỗ: ngắt phần cứng báo có dữ liệu mới, task xử lý đang ngủ chờ trên semaphore thì thức dậy — bên báo và bên chờ là hai bên khác nhau.*
+>
+> *Vì mutex có chủ, hệ điều hành làm được **priority inheritance**: thread ưu tiên thấp đang giữ khoá mà thread ưu tiên cao phải chờ, thì kernel tạm nâng ưu tiên cho thread thấp để nó nhả khoá nhanh. Semaphore không biết ai đang giữ nên không làm được. Dùng semaphore nhị phân thay mutex để bảo vệ critical section là mất cái đó, và mất luôn khả năng phát hiện ai đó mở khoá nhầm."*
+
+**Nếu bị hỏi tiếp**
+- *"Library của em dùng semaphore làm khoá — vì sao, mất gì?"* — Xem [LNX-046](linux-sysprog.md): chọn vì đơn giản và legacy ổn định; mất chủ sở hữu ⟹ process chết khi giữ khoá thì không ai nhả.
+
+**Móc nền tảng:** priority inversion · process chết khi giữ khoá ([LNX-045](linux-sysprog.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Khác biệt gốc là *mục đích*, không phải cơ chế** — nhiều người trả lời "semaphore đếm được, mutex thì không" và dừng ở đó; đó mới là phần vỏ.
@@ -679,6 +694,26 @@ Với **mutex**, OS biết *ai đang giữ* (nhờ ownership) nên **tạm nâng
 
 #### OS-012 · 🟠 · concept · ⭐ · [→ sync-primitives](../../../03-operating-system/sync-primitives.md), [concurrency §7](../../../02-modern-cpp/concurrency.md)
 **Condition variable: vì sao phải đi kèm mutex và predicate (dùng while)?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"`wait()` làm ba việc: **nhả mutex** rồi đưa thread đi ngủ — không tốn CPU; ngủ tới khi được đánh thức; **giành lại mutex** rồi mới trả về.*
+>
+> *Cần mutex vì hai lý do. Một, điều kiện mình chờ là dữ liệu dùng chung — hàng đợi, cờ — nên phải được bảo vệ. Hai, sâu hơn: cặp *"kiểm điều kiện rồi đi ngủ"* phải là **một bước**. Không có mutex thì `notify` của bên kia có thể lọt đúng vào khe giữa hai bước — mình thấy điều kiện sai, tín hiệu bay qua, rồi mình mới ngủ, và ngủ mãi. Đó là **lost wakeup**.*
+>
+> *Cần vòng `while` — hay predicate — vì `wait()` trả về **không có nghĩa** điều kiện đã đúng. Có thể là đánh thức giả mà chuẩn cho phép; hoặc phổ biến hơn, có `notify` thật nhưng thread khác giành khoá trước và lấy mất dữ liệu. Dùng `if` thì mình rơi thẳng vào đọc hàng đợi rỗng.*
+> ```cpp
+> std::unique_lock<std::mutex> lk(m);
+> cv.wait(lk, [] { return !q.empty(); });   // tương đương while (q.empty()) cv.wait(lk);
+> ```
+> *Em mặc định dùng bản có predicate: nó kiểm điều kiện **trước** khi ngủ lần đầu, và không viết nhầm thành `if` được."*
+
+**Nếu bị hỏi tiếp**
+- *"Notify khi đang giữ khoá hay sau khi nhả?"* — Đều đúng; nhả trước rồi notify thì bên kia không phải thức dậy để chờ khoá. Điều bắt buộc là **ghi điều kiện khi giữ khoá**.
+
+**Móc nền tảng:** thread dừng ngay ([CPP-070](cpp.md)) · producer–consumer ([OS-018](os.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế `wait()`** — ba bước, hiểu bước 1 là hiểu vì sao cần mutex:

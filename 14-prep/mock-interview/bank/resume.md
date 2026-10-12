@@ -16,6 +16,27 @@
 #### RES-001 · 🟡 · concept · ⭐ · 🏗️ · [→ RESUME §Work Experience]
 **"Em giới thiệu qua về công việc hiện tại và một project em tâm đắc nhất."**
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em là kỹ sư phần mềm hệ thống, ba năm viết C/C++ trên Linux cho TV và màn hình doanh nghiệp, chạy trên SoC ARM. Việc của em đi xuyên tầng: từ **C++ interface** mà shared library đưa cho ứng dụng, xuống **library**, xuống **driver trong kernel** nói chuyện với phần cứng.*
+>
+> *Project em tâm đắc nhất là độ sáng tự động trên S-Box — hộp điều khiển màn hình LED quảng cáo; nhiều box ghép lại để chiếu một bức tường lớn. **Bài toán là nếu mỗi box tự chỉnh sáng theo cảm biến riêng thì mỗi ô sáng một kiểu, đổi sáng ở một lúc khác nhau — đứng xa nhìn ra rõ từng ô vuông.** Chính tài liệu lắp đặt của sản phẩm cũng ghi: các box không liên kết với nhau thì độ sáng mỗi box có thể khác nhau.*
+>
+> *Em làm thuật toán đọc cảm biến ánh sáng và phần đồng bộ: một box làm master, tính ra **một** mức sáng chung rồi phát qua mạng cho các box còn lại; mức sáng đổi dần từng bước nên mắt không thấy giật. Phần em tự quyết định là các lúc **chuyển trạng thái** — bật, tắt tính năng, và khởi động lại khi tính năng đang bật — những chỗ spec ban đầu bỏ trống.*
+>
+> *Kết quả là cả bức tường đổi sáng cùng lúc, cùng mức, nhìn như **một màn duy nhất**, và chỉ **một binary** chạy được cả chế độ một box lẫn chế độ ghép. Anh muốn em kể kỹ phần nào — thuật toán, phần đồng bộ, hay kiến trúc library bên dưới?"*
+
+**Nếu bị hỏi tiếp**
+- *"Không đồng bộ thì người xem thấy gì?"* — Mỗi ô đổi sáng ở một thời điểm và một mức khác nhau, bức tường loang lổ như bàn cờ.
+- *"Em biết nó chạy đúng bằng cách nào?"* — Hai cách: **nhìn** — đổi ánh sáng phòng, các ô đổi cùng lúc và cùng mức; và **so log** mức sáng ghi xuống ở từng box — giá trị trùng nhau, thời điểm chỉ lệch trong một nhịp cập nhật của màn hình (1/60 giây), mắt không thấy được. Đó là phần em kiểm được ở tầng của mình; phía ứng dụng có thể còn cách kiểm khác.
+- *"Phần nào là em tự quyết?"* — Chuyển trạng thái: bật thì chuyển dần chứ không nhảy; tắt thì giữ hay trả về mức cũ; khởi động lại khi đang bật thì khôi phục thế nào. Em kẻ bảng trạng thái × sự kiện để không sót ô nào ([RES-031](resume.md)).
+
+**Vẽ:** [whiteboard D5](../../whiteboard.md#d5--s-box-nhiều-box--một-bức-tường-một-mức-sáng) — ba box, một master có cảm biến, một đường mạng, một bức tường.
+
+**Móc nền tảng:** thread chạy theo chu kỳ + condition variable ([CPP-069](cpp.md), [CPP-070](cpp.md)) · POSIX message queue ([RES-005](resume.md)) · kiến trúc shared library ([RES-035](resume.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ① bạn có **sở hữu** một mảng nào thật không, hay chỉ làm task được giao · ② khả năng kể một hệ thống **từ trên xuống** (bối cảnh → vấn đề → việc bạn làm → kết quả) · ③ chọn project nào — nó lộ ra bạn tự hào về cái gì.
@@ -124,6 +145,25 @@ SoC / panel hardware
 
 > 📌 *Resume **đã tự nói ra cơ chế** (chọn lúc boot + bảng con trỏ hàm), nên câu hỏi dịch trọng tâm sang **hệ quả và chế độ hỏng** — đó mới là chỗ interviewer khoan.*
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Bài toán: cùng một chức năng nhưng mỗi dòng chip ghi xuống phần cứng một kiểu. Nếu để khác biệt đó lộ lên trên thì mỗi lần thêm chip là ứng dụng phải sửa.*
+>
+> *Bọn em giải ở **hai tầng**, cùng một ý tưởng. Ở user-space, ứng dụng chỉ thấy **một C++ interface**. Lúc khởi động, library đọc **cấu hình của board** để biết đây là model nào, rồi dựng đúng bộ cài đặt cho model đó — ứng dụng không biết và không cần biết. Ở kernel, driver chung không biết tên chip; nó gọi xuống driver của chip qua một **bảng con trỏ hàm** mà driver chip tự điền vào khi được nạp — giống bảng hàm ảo của C++ nhưng viết tay bằng C.*
+>
+> *Thêm một chip mới thì thêm một bộ cài đặt và một driver, **không sửa code đang chạy tốt**, và ứng dụng không phải build lại.*
+>
+> *Còn chế độ hỏng thì em nói thẳng: cấu hình **thiếu** thì library rơi về mặc định an toàn — thuật toán phổ biến nhất. Nhưng cấu hình **sai giá trị** thì library **nạp nhầm** cài đặt và **vẫn chạy tiếp**, không dừng lại. Lỗi khi đó có hai nguồn: phía phần cứng đưa spec sai, hoặc phía mình đọc cấu hình sai. Triệu chứng là hiển thị sai trên đúng một model — không crash, không log."*
+
+**Nếu bị hỏi tiếp**
+- *"Vậy em cải thiện thế nào?"* — Ba việc rẻ: **log rõ** cấu hình và cài đặt đã chọn ngay lúc khởi động, để lỗi lộ ở lần đọc log đầu tiên; **kiểm chéo** khi có thể — thông tin chip mà driver báo lên có khớp với cấu hình không, lệch thì cảnh báo; và đưa việc kiểm cấu hình vào **test nhà máy**. Dữ liệu cấu hình còn **sửa được** bằng dữ liệu giả, nên bring-up và test board mới không phải chờ phần cứng chuẩn.
+- *"Sao không `if (chip == …)`?"* — Mỗi lần thêm chip là sửa vào file đang chạy tốt ở mọi chỗ có `if`; quên một chỗ là lỗi chỉ trên đúng model đó.
+- *"Thêm hàm ảo vào interface đã phát hành được không?"* — Chỉ thêm ở **cuối**; chèn giữa làm lệch bảng hàm ảo, app cũ gọi nhầm hàm ([DP-027](design-patterns.md)).
+
+**Móc nền tảng:** đa hình runtime / vtable ([CPP-006](cpp.md)) · Abstract Factory ([DP-022](design-patterns.md)) · bảng con trỏ hàm trong kernel ([DP-043](design-patterns.md)) · ABI ([SD-017](system-design.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** đây là **câu quan trọng nhất trong resume của bạn** với JD này — nó chính là *"thiết kế C++ shared library"*. Họ dò: bạn hiểu **abstraction** hay chỉ viết `if (chipset == A)`?
@@ -139,7 +179,7 @@ SoC / panel hardware
 **⭐ Chế độ hỏng — phần resume KHÔNG nói, và là chỗ ăn điểm** *(đã hỏi 2026-08-29, đạt 4đ)*:
 - **Dimming:** không có config khớp ⇒ rơi về **default an toàn** là *Global Dimming*, vốn chiếm hầu hết tỉ trọng sản phẩm. Nêu được *"có default an toàn"* quan trọng hơn nêu tên default.
 - **Panel driver:** driver thật xác định **lúc chạy** từ **factory data / board config**, vì một board ghép được với nhiều loại panel. ⭐ Và data đó **thay đổi được** để bring-up/test bằng data giả — chi tiết này cho thấy bạn hiểu nhu cầu vận hành thật, không chỉ đường happy path.
-- ⚠️ **Câu còn hụt lúc trả lời:** nếu **config sai giá trị** (không phải thiếu) thì sao — load nhầm driver, hay từ chối load? Chốt sẵn câu này.
+- **Config sai giá trị** (không phải thiếu): hệ thật **nạp nhầm và chạy tiếp**, không có bước từ chối. Nguồn lỗi là spec phần cứng sai hoặc phía mình đọc cấu hình sai. Nói thẳng điều đó rồi nêu cách cải thiện (log cấu hình đã chọn, kiểm chéo với thông tin chip, test nhà máy) — xem trả lời mẫu.
 
 **Bẫy:** ① nói *"em dùng OOP"* rồi hết — phải nêu **ai chọn implementation, chọn lúc nào** · ② thổi phồng thành kiến trúc plugin động nếu thực tế chỉ là `#ifdef` — hỏi hai tầng là lộ · ③ quên rằng đây là **shared library**: thêm virtual function vào class đang phát hành là **phá ABI** ⇒ nêu được ý này là ghi điểm senior.
 </details>
@@ -183,6 +223,22 @@ p->ops->set_brightness(p, 50);          // <-- gọi ảo
 #### RES-004 · 🟠 · concept · ⭐ · 🏗️ · [→ RESUME: "kernel migration (Linux 5.10 → 6.12)"]
 **Em có làm kernel migration 5.10 lên 6.12. Cái gì vỡ? Em phát hiện và xử lý thế nào?**
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em làm migration từ 5.10 lên 6.12 cho mảng driver hiển thị của em, với yêu cầu **vẫn chạy trên nhánh 5.10** cho sản phẩm đang bán.*
+>
+> *Cái vỡ em chia bốn nhóm. **Đổi chữ ký hàm**: một số hàm đăng ký và tạo thiết bị đổi tham số — compiler báo hết, sửa dần. **Hàm bị xoá**: có API cũ bị gỡ hẳn, phải tìm cách thay. **Cảnh báo bị siết**: nhiều thứ trước chỉ là warning giờ thành lỗi build. Và nhóm khó nhất là **đổi hành vi ngầm** — thứ tự khởi tạo, thời điểm, mặc định của subsystem — compiler không báo gì, chỉ lộ lúc chạy, nên phải so log khởi động hai kernel và đọc lịch sử thay đổi của subsystem đó.*
+>
+> *Tương thích ngược em làm bằng **một source duy nhất** build được cho cả hai kernel: kiểm phiên bản bằng `LINUX_VERSION_CODE` so với `KERNEL_VERSION(...)`, tách nhánh cài đặt ở đúng chỗ khác nhau, phần chung giữ nguyên. Cái giá là nhánh nào cũng phải test riêng, và `#if` càng nhiều code càng khó đọc — nên chỉ hợp khi khác biệt ít và có hạn."*
+
+**Nếu bị hỏi tiếp**
+- *"Vì sao kernel không giữ ABI cho driver như glibc giữ cho app?"* — Cố ý: để kernel tự do sửa nội bộ, và khuyến khích driver vào mainline; module ngoài cây phải theo từng phiên bản.
+- *"Khi nào nên tách hai nhánh thay vì `#if`?"* — Khi khác biệt lan ra kiến trúc chứ không còn là vài API.
+
+**Móc nền tảng:** kernel module · device tree · kernel không có ABI ổn định cho module.
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** 🎯 **Món ngon nhất trong resume của bạn cho JD Datalogic** (họ làm kernel/BSP). Câu này lộ ra bạn **có thật sự chạm kernel** hay chỉ sửa vài dòng. Kể được một ca cụ thể là ăn điểm rất mạnh.
@@ -217,6 +273,25 @@ p->ops->set_brightness(p, 50);          // <-- gọi ảo
 
 #### RES-005 · 🟠 · design · ⭐ · 🏗️ · [→ RESUME: "POSIX message queue… synchronize brightness across multiple S-Box devices"]
 **Em dùng POSIX message queue để đồng bộ độ sáng giữa nhiều thiết bị. Vì sao chọn message queue mà không phải socket hay shared memory?**
+
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em làm rõ phạm vi trước: message queue của POSIX chỉ chạy **trong một máy**. Ở S-Box có hai chặng. Chặng một **trong một box**: library của em đưa mức sáng chuẩn vào message queue, process ứng dụng trên cùng box nhận về. Chặng hai **giữa các box**: các box nối với nhau qua mạng LAN, mỗi box một IP; đường mạng đó mang cả nội dung hiển thị lẫn lệnh điều khiển, và mức sáng tự động là một trong các lệnh điều khiển. Phần mạng do tầng ứng dụng đảm nhận.*
+>
+> *Cho chặng library → ứng dụng, em chọn message queue vì bản tin **nhỏ và thưa** — một mức sáng, chỉ khi thay đổi. Message queue giữ **ranh giới bản tin** — không phải tự cắt gói như socket luồng byte; có **độ ưu tiên** cho từng bản tin; và có **hàng đợi sẵn** — bên nhận bận thì bản tin vẫn nằm đó chờ.*
+>
+> *Shared memory nhanh hơn nhưng **không có cơ chế báo hiệu** — phải tự thêm semaphore hay eventfd, tự đồng bộ, và một bên chết khi giữ khoá là bên kia kẹt; quá đắt cho vài byte. Socket trong máy thì dùng được, nhưng phải tự định khung bản tin và thừa cho giao tiếp một chiều trong một box."*
+
+**Nếu bị hỏi tiếp**
+- *"Hàng đợi đầy thì sao?"* — Mặc định chỉ khoảng 10 bản tin; đầy thì `mq_send` chặn, hoặc trả `EAGAIN` nếu mở non-blocking. Với mức sáng — một trạng thái — em ưu tiên bản tin mới nhất, bỏ bản cũ.
+- *"Sao không dùng luôn socket cho cả hai chặng?"* — Mỗi chặng chọn theo bản chất của nó: trong máy thì message queue đơn giản và có sẵn ranh giới bản tin; giữa các máy thì bắt buộc là mạng.
+- *"Máy con biết mình là con thế nào; master chết thì sao?"* — Xem [RES-027](resume.md).
+
+**Vẽ:** [whiteboard D5](../../whiteboard.md#d5--s-box-nhiều-box--một-bức-tường-một-mức-sáng) — ba box, một master có cảm biến, một đường mạng, một bức tường.
+
+**Móc nền tảng:** chọn IPC ([LNX-017](linux-sysprog.md)) · dừng thread đang chặn trong `mq_receive` ([LNX-044](linux-sysprog.md)) · shared memory + khoá ([LNX-045](linux-sysprog.md)).
+
+</details>
 
 <details><summary>Khung trả lời</summary>
 
@@ -254,6 +329,25 @@ Chốt sẵn ba câu này trước khi đi phỏng vấn:
 #### RES-006 · 🟡 · concept · ⭐ · [→ RESUME: "adaptive brightness control based on Ambient Light Sensor"]
 **Kể luồng dữ liệu từ cảm biến ánh sáng tới lúc màn hình đổi độ sáng. Làm sao để màn không nhấp nháy liên tục?**
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Chuỗi dữ liệu có bốn khúc. Một, **cảm biến ánh sáng nối qua I2C**; một library cảm biến riêng đọc nó theo nhịp của họ, 60 lần mỗi giây. Hai, phía library của em **lấy giá trị mới nhất mỗi 400 ms**. Ba, **lọc nhiễu**. Bốn, tính mức sáng mục tiêu rồi **đi dần** tới đó và ghi xuống phần cứng.*
+>
+> *Cách lọc nhiễu: em chia độ sáng môi trường thành **các khoảng** bằng một mảng ngưỡng. Mỗi lần đọc, giá trị rơi vào khoảng nào thì đếm cho khoảng đó. Nếu **10 lần đọc liên tiếp — tức 4 giây — cùng rơi vào một khoảng** thì coi là ổn định, lấy mức sáng của khoảng đó để tính mục tiêu mới; chỉ cần một lần rơi sang khoảng khác là đặt lại bộ đếm và bắt đầu một cửa sổ 4 giây mới. Một bàn tay lướt qua hay đèn flash không đủ 4 giây nên không làm đổi mục tiêu, và việc chia thành khoảng giúp giá trị dao động nhẹ quanh một mức không làm đổi sáng.*
+>
+> *Chống nhấp nháy thì có hai lớp: mục tiêu chỉ đổi khi ánh sáng đã ổn định 4 giây, và khi đổi thì một thread chạy theo chu kỳ đưa độ sáng **tiến từng bước nhỏ**, nên mắt thấy màn sáng lên từ từ chứ không nhảy bậc.*
+>
+> *Đánh đổi là **mượt hay nhạy**: bật đèn phòng thì màn phải mất ít nhất 4 giây mới bắt đầu đổi theo. Với biển quảng cáo, nơi ánh sáng thay đổi chậm, em chọn mượt."*
+
+**Nếu bị hỏi tiếp**
+- *"Ánh sáng dao động ngay ranh giới hai khoảng thì sao?"* — Cửa sổ cứ bị đặt lại nên mục tiêu giữ nguyên — đó là hành vi mong muốn, màn không nhảy qua lại. Cải tiến được nữa là dùng **hysteresis**: ngưỡng đi lên khác ngưỡng đi xuống.
+- *"Mất liên lạc với cảm biến?"* — Độ sáng được giữ ở **mức mặc định** — tài liệu lắp đặt của sản phẩm cũng ghi đúng hành vi này; kiểm lại cáp và khởi động lại box thì chức năng chạy lại.
+- *"Sao library của em không tự đọc I2C luôn?"* — Đọc cảm biến là việc của library cảm biến, chạy theo nhịp riêng; library của em chỉ cần **giá trị mới nhất** — đúng mô hình hộp thư một ô ([CPP-071](cpp.md)).
+
+**Móc nền tảng:** thread chu kỳ + condvar ([CPP-069](cpp.md), [CPP-070](cpp.md)) · latest-value ([CPP-071](cpp.md)) · I2C · polling vs interrupt.
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ① bạn nắm **cả chuỗi** hay chỉ một khúc · ② có nghĩ tới **chất lượng trải nghiệm** không, hay chỉ "đọc được giá trị là xong". Câu *"chống nhấp nháy"* là câu phân loại.
@@ -282,6 +376,23 @@ ALS (I2C) -> driver đọc định kỳ / interrupt -> lọc & làm mượt
 #### RES-007 · 🟢 · concept · ⭐ · [→ RESUME: "picture quality (dimming) and panel control (resolution, frame rate, backlight)"]
 **Picture quality (dimming) và panel control — em giải thích ngắn gọn cho người ngoài ngành hiểu được không?**
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Màn hình có hai câu hỏi.*
+>
+> *Câu một: **sáng bao nhiêu?** Đằng sau tấm màn là dàn đèn. Phần **picture quality** — chỗ em làm là dimming — tính xem đèn nên sáng bao nhiêu theo nội dung đang chiếu: cảnh tối thì hạ đèn ở vùng tối, nên màu đen sâu hơn và tốn ít điện hơn. Phần này là **tính toán**, mỗi dòng sản phẩm một thuật toán.*
+>
+> *Câu hai: **hiển thị thế nào?** Bật tắt màn, đổi chế độ hiển thị, và ghi con số độ sáng vừa tính xuống phần cứng. Đó là **panel control** — chỉ là **ra lệnh**, xuống driver của tấm màn trong kernel.*
+>
+> *Vì một bên là tính toán, một bên là ra lệnh, nên trong library em tách làm hai phần — đó cũng là hai nhánh của kiến trúc. Phần em viết là thuật toán dimming và đường đi của nó từ C++ interface xuống tới driver."*
+
+**Nếu bị hỏi tiếp**
+- *"Sao không để mỗi tính năng tự ghi thẳng xuống phần cứng?"* — Có **một cổng** xuống phần cứng thì dễ kiểm soát, dễ log, dễ khoá. Lệnh đơn đi thẳng panel control; tính năng nặng thuật toán thì tính xong mới đưa xuống cổng đó.
+
+**Móc nền tảng:** kiến trúc library ([RES-035](resume.md)) · `ioctl` ([DRV-006](drivers-embedded.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ① bạn **hiểu** hay chỉ chép từ khoá vào resume · ② **năng lực diễn đạt** — giải thích được cho người không làm TV là dấu hiệu senior rõ nhất.
@@ -298,6 +409,26 @@ ALS (I2C) -> driver đọc định kỳ / interrupt -> lọc & làm mượt
 
 #### RES-008 · 🟠 · concept · ⭐ · 🏗️ · [→ RESUME: "cross-layer debugging (user-space & kernel-space)"]
 **Resume ghi em debug xuyên tầng user–kernel. Kể một ca cụ thể: triệu chứng ban đầu là gì, em khoanh vùng ra sao, gốc rễ nằm ở đâu?**
+
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Ca em hay kể là **TV khởi động lên hình chậm** trên model mới. Triệu chứng ở tầng người dùng, nhưng nguyên nhân có thể ở bất kỳ tầng nào: ứng dụng ra lệnh bật màn muộn, library chậm, hay driver trong kernel chưa sẵn sàng.*
+>
+> *Việc đầu tiên em làm là **một phép đo chia đôi**: đặt mốc thời gian ở hai phía ranh giới — lúc user-space phát lệnh bật màn, và lúc driver của màn được nạp xong trong log kernel. Kết quả: lệnh tới đúng giờ, nhưng **driver chưa nạp xong** — tức là lỗi nằm ở phía kernel, khỏi phải soi ứng dụng.*
+>
+> *Chia tiếp ở phía kernel: phần code khởi tạo của driver chạy nhanh, nhưng **thời điểm bắt đầu** của nó bị trễ. Log và tải CPU cho thấy từ giây thứ tư có một tiến trình **ưu tiên thời gian thực** chiếm CPU, trong khi các driver nền được nạp **lần lượt từng cái** với ưu tiên thường — nên bị chen ngang. Thời gian nạp từ dưới nửa giây thành 3–4 giây.*
+>
+> *Em sửa bằng cách nạp song song kết hợp nâng ưu tiên, nhờ team hiệu năng đánh giá tác động lên phần khởi động khác, và nghiệm thu qua **100 lần khởi động**. Để lần sau lộ sớm, mốc thời gian nạp driver được giữ trong log khởi động để so giữa các bản build."*
+
+**Ca thứ hai (ngắn), nếu được hỏi thêm:** *màn bật, đèn nền sáng, nhưng hình **đen hoàn toàn**.* Đo ở ranh giới: lệnh bật đèn đã xuống tới phần cứng và đèn sáng thật — nên không phải lỗi đường bật màn. Gốc rễ là một khối xử lý hình phía trước vẫn đang bật **lớp che màu đen** — lớp dùng để che nhiễu lúc khởi động — vì thiếu lệnh gỡ lớp che trong trình tự bật. Sửa: thêm bước đó vào trình tự bật màn.
+
+**Nếu bị hỏi tiếp**
+- *"Ca treo, không crash, không log thì sao?"* — Vẫn là chia đôi: treo ở user hay kernel? `/proc/<pid>/wchan` và stack của thread cho biết nó đang chờ gì trong kernel; `gdb -p` + backtrace mọi thread cho phía user ([DBG-010](debugging.md)).
+- *"Công cụ ở từng tầng?"* — User: log, gdb, core dump, strace. Ranh giới: giá trị trả về của `ioctl`, `errno`, sysfs. Kernel: `dmesg`/`printk` có mốc thời gian, ftrace.
+
+**Móc nền tảng:** chia đôi không gian nghi ngờ ([09/mindset](../../../09-debugging/mindset.md)) · debug cross-layer ([DBG-016](debugging.md)) · scheduling: ưu tiên thường vs thời gian thực ([RES-015](resume.md)).
+
+</details>
 
 <details><summary>Khung trả lời</summary>
 
@@ -350,6 +481,24 @@ Tình huống điển hình: *userspace gọi API set độ sáng, **hàm trả 
 **Em ghi tool porting giảm hơn 50% công sức thủ công. Con số đó đo bằng cách nào?**
 
 > 📌 *Neo lại 2026-09-04: con số cũ **"giảm 70% thời gian làm việc" đã bị gỡ khỏi resume**. Câu hỏi giữ nguyên giá trị — chỉ đổi sang con số còn sống. **Không xoá ID**: kỹ năng *bảo vệ một con số mình tự viết ra* vẫn là câu lọc.*
+
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Bài toán: mỗi năm có chip mới, phải port driver và library sang — phần lớn là việc **lặp lại**: chép source gốc, đổi tên theo chip mới, thêm nhánh cho chip mới vào các chỗ rẽ nhánh, sửa CMake, Makefile và cấu hình build. Nhiều file, hàng chục nghìn dòng, rất dễ sót.*
+>
+> *Tool Python của em làm phần lặp lại đó. Và em **cố ý để lại cho con người** những gì phụ thuộc phần cứng: địa chỉ thanh ghi, bus, device tree, phần porting kernel, và việc tạo tổ hợp chip với tấm màn.*
+>
+> *Con số **1–2 ngày xuống 2–3 giờ** là cho **phần thủ công của một lần port**, không phải cả dự án, và em nói thẳng đó là **ước lượng** của em qua các lần làm cả hai cách, không phải số đo chính thức.*
+>
+> *Kiểm tra bản port: review và build; ra đúng file driver cho tổ hợp mới là bước đầu; sau đó test trên model mới — khởi động được và nạp đúng cài đặt. Nếu làm tiếp, em cho tool **tự kiểm** ngay sau khi sinh: tên chip cũ phải biến mất hết, mọi tổ hợp khai báo đều có phần tương ứng; và chạy tool trên một chip đã port tay rồi so khác biệt."*
+
+**Nếu bị hỏi tiếp**
+- *"Sao không để AI làm?"* — Việc này phải chạy **y hệt** cho hàng chục tổ hợp và phải **review được từng dòng**; cần phép biến đổi xác định nên là script. AI hợp khi cần phán đoán.
+- *"Ước lượng thì sao dám ghi vào resume?"* — Vì phạm vi đã ghi hẹp (*"manual effort"*) và em nói rõ cách ước lượng khi được hỏi; em không trình bày nó như một phép đo.
+
+**Móc nền tảng:** CMake/Makefile · build nhiều tổ hợp trong CI ([BLD-021](build-systems.md)).
+
+</details>
 
 <details><summary>Khung trả lời</summary>
 
@@ -484,6 +633,21 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 #### RES-017 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-04 · [→ RESUME: "Preset feature … users can save their preferred display settings"]
 **"Khi người dùng đang sửa một Preset rồi bấm Cancel, em quay lại trạng thái cũ bằng cách nào? Vì sao không cho sửa trên một bản nháp trong bộ nhớ cho an toàn?"**
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Phương án đầu tiên em làm là **bản nháp**: sửa vào một bản sao trong bộ nhớ, bấm Save mới ghi xuống màn hình. Nghe an toàn, nhưng em bỏ vì hai lý do khác loại nhau. Về **trải nghiệm**: người dùng kéo thanh độ sáng mà màn **không sáng lên**, tức là đang chỉnh mù — với app mà mục đích là nhìn thấy kết quả thì không chấp nhận được. Về **code**: mọi hàm đọc ghi setting phải rẽ nhánh *"đang sửa hay không"*, rải khắp nơi, rất dễ sót một chỗ.*
+>
+> *Phương án em chốt: **sửa thẳng lên màn hình thật**, nhưng trước khi vào chế độ sửa thì **chụp lại** cấu hình đang dùng; bấm Cancel thì ghi bản chụp đó trở lại.*
+>
+> *Cái giá em nhận: trạng thái cần khôi phục giờ nằm **trên phần cứng**, nên **mọi đường thoát** khỏi chế độ sửa phải được kiểm soát — Cancel, đóng app, rút cáp, chuyển sang màn khác. Em xử lý bằng cờ trạng thái; đúng nhưng dễ quên ở chỗ thêm mới. Sau này team chuyển sang **state machine**, và em thấy đó là lời giải tốt hơn: thêm một đường thoát mới thì bảng trạng thái buộc mình trả lời nó phải làm gì."*
+
+**Nếu bị hỏi tiếp**
+- *"Vì sao cờ không đủ?"* — Cờ đúng ở lúc viết, hỏng ở lúc người sau thêm đường thoát mới mà không biết phải xử lý cờ.
+
+**Móc nền tảng:** snapshot/rollback (giống bản A/B khi cập nhật firmware) · State pattern · Memento ([DP-032](design-patterns.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ⭐ Đây là câu **đáng giá nhất** của cả project — vì nó là một quyết định thiết kế mà ứng viên **đã tự đảo ngược**. Họ dò: ① bạn có tự đánh giá lại thiết kế của mình không · ② bạn có nêu được **cái giá** của phương án mình chọn không · ③ bạn có biết **lời giải tốt hơn** mà mình đã không dùng không. Rất ít ứng viên mid-level trả lời được cả ba.
@@ -614,6 +778,21 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 #### RES-021 · 🟡 · concept · ⭐ · 🎤 2026-09-04 · [→ RESUME: "Samsung Display Manager"; khung kể chung ở [RES-011](resume.md)]
 **"Save và Load có chạy khác thread không? Nếu sau này có, em bảo vệ thế nào — đặt một `std::mutex` làm member của class quản lý file là đủ chưa?"**
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Ở bản 1.0, Save và Load **không** chạy khác thread, và em không đặt khoá. Lý do không phải *"chưa gặp lỗi"* mà là **thiết kế**: mọi thao tác preset đi qua luồng giao diện, không có đường nào chạy song song. Đó là giả định em đang dựa vào, và em ghi nó ra.*
+>
+> *Nếu sau này giả định vỡ — có auto-save chạy nền, hay hai cửa sổ — thì một `std::mutex` làm member **chưa đủ**. Mutex member chỉ tuần tự hoá những lời gọi **đi qua đúng object đó**. Thứ cần bảo vệ là **cái file**, nằm ngoài object: hai object khác nhau có hai mutex khác nhau, và hai process — chạy app hai lần — thì mutex trong bộ nhớ không thấy nhau.*
+>
+> *Em chọn khoá theo **phạm vi của tài nguyên**: trong một object thì mutex member; toàn process thì một chủ sở hữu duy nhất giữ khoá; liên process thì khoá của hệ điều hành trên file. Và rẻ nhất là làm cho việc ghi **nguyên tử**: ghi ra file tạm rồi `rename` đè lên — người đọc không bao giờ thấy file dở dang, nên nhu cầu khoá giảm hẳn."*
+
+**Nếu bị hỏi tiếp**
+- *"Liên hệ với library Linux của em?"* — Cùng bài học: khoá phải cùng phạm vi với tài nguyên. State library nằm trong shared memory dùng chung mọi process, nên khoá là semaphore dùng chung, không phải mutex trong một object ([LNX-046](linux-sysprog.md)).
+
+**Móc nền tảng:** phạm vi của khoá · `flock`/`fcntl` · ghi nguyên tử bằng `rename`.
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ① bạn có phân biệt *"chưa gặp lỗi"* với *"đã an toàn"* không · ② ⭐ bạn có hiểu **phạm vi của một mutex** không — đây là chỗ phân biệt thật.
@@ -724,6 +903,24 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 #### RES-015 · 🟠 · design · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME: "measuring two solutions — loading in parallel and raising scheduling priority"]
 **"Em thử hai giải pháp: nạp song song và nâng scheduling priority. Cuối cùng chọn cái nào, vì sao, và rủi ro của phương án bị loại?"**
 
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Trước hết là chẩn đoán: thời gian nạp driver tăng từ dưới nửa giây lên 3–4 giây trên model mới. Log kernel cho thấy đoạn chậm không phải code của driver; cùng lúc đó CPU ở 100% vì một tiến trình **ưu tiên thời gian thực** của hệ thống chạy từ giây thứ tư, trong khi driver nền được nạp **lần lượt từng cái** với ưu tiên thường — nên bị chen ngang.*
+>
+> *Hai phương án sửa **hai nửa khác nhau**: nạp **song song** bỏ được phần tuần tự nhưng vẫn ưu tiên thường nên vẫn bị chen; **nâng ưu tiên** thì thắng được tranh chấp nhưng vẫn nạp lần lượt. Em đo từng cái: riêng lẻ chỉ đạt khoảng **7 trên 10** lần khởi động. Nên em **kết hợp cả hai**.*
+>
+> *Trước khi áp, em nhờ team hiệu năng đánh giá, vì song song cộng ưu tiên thời gian thực có thể thành điểm nghẽn cho phần khởi động khác. Nghiệm thu bằng **100 lần khởi động**, tất cả dưới nửa giây.*
+>
+> *Rủi ro của từng phương án: song song thì thứ tự phụ thuộc giữa driver không còn được bảo đảm — driver cần cái chưa sẵn sàng sẽ phải hoãn; ưu tiên thời gian thực thì task đó không bị chen, nếu nó bận lâu hoặc kẹt sẽ bỏ đói phần còn lại."*
+
+**Nếu bị hỏi tiếp**
+- *"Phát hiện bị chen ngang bằng cách nào?"* — Đặt mốc thời gian trong log kernel, rồi xem tải CPU và các tiến trình chạy ở đúng khoảng đó ([RES-014](resume.md)).
+- *"Vì sao 100 lần là đủ?"* — Lỗi xuất hiện khoảng 3/10 lần; 100 lần sạch thì xác suất lỗi còn sót là rất nhỏ ([RES-029](resume.md)).
+
+**Móc nền tảng:** scheduling: ưu tiên thường vs thời gian thực ([scheduling](../../../03-operating-system/scheduling.md)) · priority inversion ([OS-007](os.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ① có **đo** từng phương án hay chọn theo cảm tính · ② có nhìn ra **tác động lên phần còn lại của hệ thống** không — đây là ranh giới mid → senior · ③ có dám nói *"cả hai đều chưa đủ"* không.
@@ -749,6 +946,23 @@ Góc hỏi: *"Bạn ứng tuyển Embedded Linux. Vì sao trong resume lại đ�
 
 #### RES-016 · 🟡 · concept · ⭐ · 🏗️ · 🎤 2026-08-29 · [→ RESUME Skills: "AI-assisted Development: Claude Code, internal AI — unit-test generation, code implementation"]
 **"Dòng về AI trong resume — nếu interviewer đọc nó theo hướng bất lợi cho em thì họ nghĩ gì? Em nói thêm câu nào để chặn?"**
+
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Họ có thể nghĩ: *phần nào là em làm, bỏ AI đi thì còn lại gì?* Em trả lời bằng cách **phân vai rõ**.*
+>
+> *AI giúp em ở phần **lặp lại**: sinh unit test từ scenario em viết, theo bộ khung có sẵn của dự án; đổi tên, thêm khai báo hàm, soát cú pháp khi port code. Phần **của em** là chỗ AI không làm thay được: đọc tài liệu chip, trao đổi với người sở hữu module, device tree, bootloader, quyết định thiết kế, và chẩn đoán — AI không đọc hộ em `dmesg` để thấy một tiến trình ưu tiên cao chen vào ở giây thứ tư khi em tối ưu thời gian nạp driver.*
+>
+> *Với test do AI sinh, em kiểm ba thứ: test có **kiểm kết quả** không hay chỉ gọi hàm cho chạy qua; **làm hỏng code** thì test có đỏ không; và scenario có **ca lỗi** không. Và một thay đổi chạy trên rất nhiều model nên test xanh vẫn phải qua test trên thiết bị.*
+>
+> *Còn việc nào cần **đúng y như lần trước** cho hàng chục tổ hợp — như porting — em viết **script**, không dùng AI, vì em cần một phép biến đổi xác định và review được từng dòng."*
+
+**Nếu bị hỏi tiếp**
+- *"AI sinh một hàm kernel chạy đúng nhưng em không hiểu hết — merge hay chặn?"* — **Chặn**. Code em không giải thích được thì em không bảo trì được và không debug được lúc nó hỏng ngoài hiện trường; em viết lại hoặc đọc tới khi hiểu rồi mới merge.
+
+**Móc nền tảng:** chất lượng test AI sinh ([BLD-043](build-systems.md)) · test double ([BLD-040](build-systems.md)) · porting tool ([RES-009](resume.md)).
+
+</details>
 
 <details><summary>Khung trả lời</summary>
 
@@ -780,6 +994,24 @@ Với công ty đang tuyển **kỹ sư C++ nhúng**, dòng đó có thể đọ
 
 #### RES-023 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ RESUME: "the kernel driver dispatches through a function-pointer table"]
 **"CV nói kernel driver dispatch qua function-pointer table. Vì sao cần tới HAI tầng bảng đó? Ai điền bảng, điền lúc nào?"**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Hai tầng vì **hai lý do khác nhau**.*
+>
+> *Tầng một là **ranh giới license**: driver nền của nền tảng là GPL, còn driver của từng chip là phần proprietary. Phần proprietary không được dùng trực tiếp các hàm kernel chỉ xuất cho GPL, nên giữa hai bên cần một lớp gọi qua bảng hàm thay vì link thẳng.*
+>
+> *Tầng hai là **đa hình theo chip**: driver nền không biết tên chip nào. Lúc khởi động, hệ thống xác định board dùng chip gì rồi nạp driver của chip đó; driver chip **tự điền hàm của nó vào bảng** — gọi là tự đăng ký. Từ đó mọi lời gọi từ driver nền đi qua bảng và tự tới đúng chip. Giống bảng hàm ảo của C++, chỉ là viết tay bằng C.*
+>
+> *Ai điền: chính driver chip, lúc nó được nạp. Driver nền chỉ cung cấp hàm đăng ký và gọi qua bảng."*
+
+**Nếu bị hỏi tiếp**
+- *"Bảng do người viết tay thì rủi ro gì?"* — Hai rủi ro của bảng hàm ảo: ô chưa điền (`NULL`) và chèn hàm vào giữa làm lệch ô ([DP-043](design-patterns.md)).
+- *"Vì sao kernel không giữ ABI cho module?"* — Cố ý, để kernel được tự do sửa nội bộ; module phải build lại theo từng phiên bản.
+
+**Móc nền tảng:** `EXPORT_SYMBOL` vs `EXPORT_SYMBOL_GPL` · self-registration ([DP-029](design-patterns.md)) · vtable ([CPP-006](cpp.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** bạn có phân biệt được **cơ chế** với **lý do tồn tại của cơ chế** không. Ai cũng mô tả được function pointer; ít người nói được vì sao có *hai* tầng.
@@ -868,6 +1100,23 @@ Tự nêu ⇒ **chính xác hoá**. Bị moi ra ⇒ **bắt lỗi**. Cùng một
 
 #### RES-027 · 🟡 · design · 🏗️ · 🎤 2026-09-12 · [→ RESUME: "a single binary serving both standalone and synchronized modes"]
 **"Một binary hai mode: nó biết mình ở mode nào bằng cách nào, ai là master? Hai unit cùng bật adaptive thì sao? Master mất điện thì sao?"**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Binary biết mình ở chế độ nào nhờ một **cờ cấu hình** do ứng dụng gửi xuống lúc chạy — chính là mục bật tính năng đồng bộ trên thiết bị. Máy nào bật độ sáng tự động thì thành **master**: nó đo, tính ra mức chuẩn và **đẩy** xuống các máy còn lại. Máy con không tự tính, chỉ áp giá trị nhận được.*
+>
+> *Vì luồng điều khiển là **đẩy từ master** chứ không phải mỗi máy tự kéo, nên *"hai master"* không phải là một chế độ hỏng thật: ứng dụng ở máy con không đọc hàng đợi của chính nó.*
+>
+> *Master mất điện: bọn em **chủ động chấp nhận không có failover**. Bức tường là thiết bị cố định, có người vận hành; mất master thì cả bức tường đứng ở mức sáng cuối cùng — sai lệch nhìn thấy được nhưng không nguy hiểm. Làm bầu master tự động thì phải thêm heartbeat và xử lý trường hợp hai bên cùng tưởng mình là master — chi phí không tương xứng với lợi ích ở sản phẩm này."*
+
+**Nếu bị hỏi tiếp**
+- *"Muốn có failover thì làm gì?"* — Heartbeat định kỳ từ master; mất heartbeat quá N giây thì máy con quay về tự chỉnh theo cảm biến của mình, hoặc một máy được chỉ định trước lên thay.
+
+**Vẽ:** [whiteboard D5](../../whiteboard.md#d5--s-box-nhiều-box--một-bức-tường-một-mức-sáng) — ba box, một master có cảm biến, một đường mạng, một bức tường.
+
+**Móc nền tảng:** POSIX message queue ([RES-005](resume.md)) · thiết kế chế độ hỏng · split-brain.
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Phần cơ chế:** cờ cấu hình (vd `multi_sbox`) rẽ nhánh luồng logic; bật adaptive ⇒ unit đó thành master, tính giá trị chuẩn rồi **đẩy lệnh xuống slave**.
@@ -957,6 +1206,23 @@ Cùng một sự thật: một bên nghe như **chưa nghĩ tới**, một bên 
 
 #### RES-031 · 🟠 · concept · ⭐ · 🏗️ · 🎤 2026-09-12 · [→ JD: "Solicit, generate and manage requirements"]
 **"Kể một lần requirement đến tay em ở dạng chưa dùng được. Nó hổng ở đâu, em tìm ra bằng phương pháp gì?"**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Ở tính năng độ sáng tự động của S-Box, requirement ban đầu chỉ có **đường thành công**: bật tính năng, đọc cảm biến, tính giá trị, gửi đi — hết.*
+>
+> *Em không đợi lúc code mới gặp, mà **kẻ bảng trạng thái nhân sự kiện**: hàng là trạng thái — tắt, đang chuyển, đã ổn định; cột là sự kiện — bật, tắt, người dùng chỉnh tay, khởi động lại, mất cảm biến. Mỗi ô buộc phải có câu trả lời; **ô trống là một câu hỏi gửi lại bên yêu cầu**.*
+>
+> *Bảng tự sinh ra ba câu hỏi requirement bỏ trống: đang tắt mà bật thì nhảy ngay hay chuyển dần; tắt đi thì giữ mức hiện tại hay quay về mức trước khi bật; và bật rồi khởi động lại thì khôi phục thế nào. Nó còn chỉ ra hai ô mà cách *"gặp đâu xử lý đó"* không tìm ra: đang chuyển dở thì người dùng chỉnh tay, và cảm biến hỏng giữa chừng — ô này sản phẩm chốt là **giữ độ sáng ở mức mặc định**.*
+>
+> *Em mang bảng đó đi chốt lại với người viết spec, rồi mới code."*
+
+**Nếu bị hỏi tiếp**
+- *"Sao không hỏi lúc gặp?"* — Gặp lúc code thì đã muộn: quyết định bị đẩy cho người code đưa ra ngầm, và QA tìm thấy ở cuối.
+
+**Móc nền tảng:** state machine · thiết kế theo chế độ hỏng ([RES-027](resume.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** JD có *"anticipate needs and potential technical issues **in the development phase**"*. Họ muốn biết bạn phát hiện lỗ hổng **trước khi code** hay **sau khi QA báo**.
@@ -985,6 +1251,24 @@ Bảng **tự sinh ra** cả ba lỗ hổng trên, **cộng thêm** hai ô mà c
 
 #### RES-032 · 🟡 · concept · ⭐ · 🎤 2026-09-12 · [→ 🇬🇧 phiên 50% tiếng Anh]
 🇬🇧 **"Could you introduce yourself and walk me through what you're working on?"** — trả lời bằng tiếng Anh, ≤ 90 giây.
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"I'm a software engineer at Samsung — three years building system software for TVs and enterprise display products on ARM SoCs.*
+>
+> *My work spans the full stack: from the **C++ interface** our shared library exposes, down to the **kernel drivers** talking to the hardware.*
+>
+> *Three things I'd highlight. First, **one C++ interface across many chipsets**: the library picks its implementation at boot from the board configuration, and the kernel driver dispatches through a function-pointer table, so applications above never change. Second, I **cut driver load time from three-to-four seconds to under half a second** — I measured two options and verified the fix over a hundred boot cycles. Third, I **port drivers to new chip generations** every year, including a kernel migration to 6.12 while keeping the older branch working.*
+>
+> *I'd like to go deeper on the system side and work in a more structured product process. **Which of those would you like me to go into?**"*
+
+**If they follow up in English**
+- *"What exactly is your part in the library?"* — *"The brightness algorithm and its path from the C++ interface down to the driver, plus porting and bring-up on new chips."*
+- Tránh: *"I developed"* cho việc đang làm (dùng *"I develop / I've been developing"*); tránh kết bằng câu có/không.
+
+**Móc nền tảng:** cùng ba móc với [RES-001](resume.md) Bản C.
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 ⚠️ **Hiện tượng đã đo (12/09):** bản Việt 120s có đủ bring-up/porting + ba thành tựu; bản Anh **không có móc nào**. Sang tiếng Anh, ứng viên **thu mình về phần an toàn nhất**. Đây là chuyện bình thường và **cách chữa là kịch bản viết sẵn**, không phải "cải thiện tiếng Anh".
@@ -1011,6 +1295,23 @@ Bảng **tự sinh ra** cả ba lỗ hổng trên, **cộng thêm** hai ô mà c
 
 #### RES-033 · 🟠 · concept · ⭐ · 🎤 2026-09-12 · [→ 🇬🇧 giải thích kỹ thuật bằng tiếng Anh]
 🇬🇧 **"You mentioned the kernel driver dispatches through a function-pointer table. Why do you need two levels of that? Walk me through it."**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"There are two levels because they solve **two different problems** — one is a **license boundary**, the other is **polymorphism**.*
+>
+> *The first level sits between the platform's core driver, which is GPL, and the proprietary part. The proprietary side can't use GPL-only kernel symbols directly, so the two talk through a table of function pointers instead of linking to each other.*
+>
+> *The second level is about chips. The core driver doesn't know which chip is on the board. At boot the system figures out the chip and loads its driver, and that chip-specific driver **registers its functions into the table**. From then on every call goes through the table and lands in the right chip. It's the same idea as a C++ vtable — just written by hand in C.*
+>
+> *So: one level for the license boundary, one level for polymorphism."*
+
+**If they follow up**
+- *"What can go wrong with a hand-written table?"* — *"Two things a compiler would protect you from: an empty slot — so we check for NULL and return 'not supported' — and inserting a function in the middle, which shifts every slot after it. We only append at the end and check a size field at registration."*
+
+**Móc nền tảng:** [RES-023](resume.md) · [DP-043](design-patterns.md).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Nội dung: giống [RES-023](resume.md).** Câu này đo thêm một thứ khác — **nội dung có sống sót qua đổi ngôn ngữ không**.
@@ -1034,6 +1335,24 @@ Người nghe có khung rồi thì ngữ pháp lệch vài chỗ cũng không c�
 
 #### RES-034 · 🟠 · concept · ⭐ · 🏗️ · [→ A1 §10](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
 🇬🇧 **"Walk me through the architecture of the library you worked on."** — trả lời bằng tiếng Anh, ≤ 90 giây, vẽ sơ đồ song song.
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+**Bản 30 giây — nói trước:**
+> *"It's a shared library that controls the display, used across product lines and more than ten chip families. Three boundaries: apps call a **C++ interface**; that interface calls into the library through a **plain C API**; the library talks to the **panel driver in the kernel** through `ioctl`. Inside, **Picture Quality computes** the brightness from the content, and **Panel Control issues the commands**. That's the 30-second version — which part would you like me to open up?"*
+
+**Bản dài — khi được bảo *"tell me more"*, mỗi ranh giới thêm một câu "why":**
+> *"First, apps call a C++ interface. That boundary is closed — same team, same toolchain — so C++ is fine there. Below it is a **plain C API**, because the library is loaded by many processes built at different times, and only C gives a **stable binary contract**. Each C entry point is also **the single place where we take the lock**, because the shared state lives in shared memory.*
+>
+> *Second, behind that C facade there are two parts: Picture Quality is algorithm-heavy and keeps state; Panel Control is simple commands that go straight down through `ioctl`. Picture Quality also writes its final brightness through Panel Control, so there is one path to the hardware.*
+>
+> *Third, in the kernel, a core driver that knows nothing about the chip **dispatches through a function-pointer table**, and each chip driver **registers itself** into that table when it loads. So the same idea appears twice: polymorphism with virtual functions in user space, and a hand-written vtable in the kernel."*
+
+**If they ask** *"Why not expose the C++ classes directly?"* — *"Two independent reasons: the **ABI** — a C++ class leaks layout and vtable order across the boundary; and **locking** — the C functions are the only door into the library, so no caller can skip the lock."*
+
+**Móc nền tảng:** cùng móc với [RES-035](resume.md) và [DP-040](design-patterns.md).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** ① bạn nhìn hệ thống theo **ranh giới và quyết định**, hay theo danh sách class · ② bạn có tự nói ra **vì sao** ở mỗi ranh giới không · ③ tiếng Anh kỹ thuật có giữ được mạch khi không còn đọc thuộc.
@@ -1087,6 +1406,22 @@ App ──► C++ interface ──► C API ──┬──► Picture Quality �
 **"Kể anh nghe kiến trúc phần library em làm."** — bắt đầu bằng bản **30 giây**; interviewer nói *"kể thêm"* thì mở sang bản **90 giây**.
 
 > *Nguyên tắc: người không làm TV vẫn hiểu · kể ngắn trước, mở dần · mỗi câu thả một móc vào kiến thức nền. Bản tiếng Anh: [RES-034](resume.md).*
+
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+**Bản 30 giây — thuộc nguyên văn:**
+> *"Em làm một shared library điều khiển màn hình, dùng chung cho nhiều dòng sản phẩm và hơn mười dòng chip. Em kể theo **ba ranh giới**: app gọi một **C++ interface**; interface đó gọi xuống library qua **một API C**; library ra lệnh xuống **panel driver trong kernel** bằng `ioctl`. Trong library có hai phần: **Picture Quality tính độ sáng** theo nội dung hình, **Panel Control ra lệnh** cho tấm màn. Đó là bản 30 giây — phần nào anh muốn em mở ra thì em mở."*
+
+**Bản 90 giây — khi được bảo *"kể thêm"*, mỗi ranh giới thêm một câu "vì sao":**
+> *"Thứ nhất, app không gọi thẳng library mà gọi một C++ interface. Ranh giới đó **khép** — cùng team, cùng build — nên dùng C++ được. Nhưng library được nạp vào **nhiều process build lệch thời gian**, nên giữa interface và library em giữ một **API C thuần**: C là hợp đồng nhị phân ổn định. Mỗi hàm C đó còn là **chỗ duy nhất lấy khoá**, vì state dùng chung giữa các process nằm trong **shared memory**.*
+>
+> *Thứ hai, trong library: Picture Quality nặng thuật toán và có state; Panel Control chỉ là lệnh đơn đi thẳng xuống `ioctl`. Picture Quality ghi kết quả cuối cũng qua Panel Control, nên chỉ có **một đường** xuống phần cứng. Thuật toán tách khỏi phần ghi phần cứng theo chip, nên thêm chip không phải viết lại thuật toán.*
+>
+> *Thứ ba, trong kernel: driver chung không biết chip nào; nó gọi qua một **bảng con trỏ hàm** mà driver của chip **tự điền** khi được nạp. Cùng một ý tưởng xuất hiện hai lần: hàm ảo ở user-space, bảng hàm viết tay ở kernel."*
+
+**Móc đã thả — chuẩn bị ở mức cơ bản:** `extern "C"`/ABI ([DP-040](design-patterns.md)) · shared memory + khoá ([LNX-045](linux-sysprog.md)) · library tự khởi tạo khi được nạp ([DP-041](design-patterns.md)) · `ioctl`/`copy_from_user` ([DRV-006](drivers-embedded.md)) · bảng con trỏ hàm ([DP-043](design-patterns.md)) · `virtual` ([CPP-006](cpp.md)).
+
+</details>
 
 <details><summary>Khung trả lời</summary>
 

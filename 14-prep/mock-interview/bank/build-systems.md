@@ -645,6 +645,21 @@ Gộp code vào nhánh chung **thường xuyên** (≥1 lần/ngày), và mỗi 
 
 #### BLD-031 · 🟡 · concept · [→ ci-and-test-farm §1.2](../../../06-build-systems/ci-and-test-farm.md)
 **Phân biệt CI, Continuous Delivery và Continuous Deployment. Ở embedded thường dừng ở đâu, vì sao?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"**CI** — tích hợp liên tục: mỗi thay đổi được gộp, build và test tự động. **Continuous Delivery**: thêm bước đóng gói thành một bản phát hành **sẵn sàng**, nhưng **người** bấm nút phát hành. **Continuous Deployment**: tự đưa ra môi trường thật luôn, không ai bấm.*
+>
+> *Ở embedded, *"đưa ra thật"* nghĩa là cập nhật firmware xuống **thiết bị của khách**. Web có lỗi thì đổi lại bản cũ trong vài giây; còn thiết bị mất điện giữa lúc cập nhật có thể thành **cục gạch** và phải thu hồi. Nên embedded gần như luôn dừng ở **Continuous Delivery**: máy lo tới mức *"đã build, đã ký, đã test, sẵn sàng"*, còn phát hành là quyết định của người, thường theo từng đợt nhỏ trước.*
+>
+> *Phần em chạm hằng ngày là CI: build tích hợp và các cổng kiểm tra trước khi vào nhánh chính."*
+
+**Nếu bị hỏi tiếp**
+- *"Phát hành theo đợt là gì?"* — Đưa cho một nhóm nhỏ thiết bị trước, theo dõi, ổn rồi mới mở rộng.
+
+**Móc nền tảng:** gated check-in ([BLD-021](build-systems.md)) · cập nhật A/B và rollback.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 | Thuật ngữ | Tự động tới đâu | Bước cuối do ai |
@@ -670,6 +685,19 @@ Gộp code vào nhánh chung **thường xuyên** (≥1 lần/ngày), và mỗi 
 
 #### BLD-032 · 🟡 · concept · [→ ci-and-test-farm §1.3](../../../06-build-systems/ci-and-test-farm.md)
 **Giải thích các thuật ngữ pipeline: stage, job, runner, artifact, trigger, gate, DUT, HIL — và chúng là cái gì trong ngữ cảnh embedded?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"**Pipeline** là chuỗi bước tự động chạy sau một sự kiện — với em là: submit, build cho các nền tảng, rồi test. **Trigger** là cái làm nó chạy: một lần submit, lịch hằng đêm, hay người gọi tay. **Stage** là một nhóm bước, xong nhóm này mới sang nhóm sau — build, rồi test nhanh, rồi test dài. **Job** là một việc chạy độc lập, chạy song song được — ví dụ *"build cho nền tảng A"*. **Runner** hay agent là **máy** chạy job — máy build thường là x86, không chạy được binary ARM. **Artifact** là thứ giữ lại sau job: image, kernel, gói có symbol. **Gate** là điều kiện phải qua mới đi tiếp. **DUT** là thiết bị đang được test; **HIL** là test có phần cứng thật trong vòng lặp.*
+>
+> *Ở embedded em nhấn vào **artifact**: thiết bị bán ra sống năm đến mười năm. Hai năm sau có crash ngoài hiện trường thì cần **đúng image đó** và **đúng file symbol** của bản build đó để đọc backtrace. Không lưu artifact thì không điều tra được."*
+
+**Nếu bị hỏi tiếp**
+- *"Jenkinsfile là gì?"* — Mô tả pipeline dưới dạng code, nằm trong repo. Em chưa viết ở công ty; ở lab em giữ nó là vỏ mỏng, mỗi stage chỉ gọi một script trong repo để chạy lại y hệt trên máy mình ([unit-test-and-code-quality §2](../../../06-build-systems/unit-test-and-code-quality.md)).
+
+**Móc nền tảng:** symbol và crash ([DBG-045](debugging.md)) · test trên thiết bị thật ([BLD-035](build-systems.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 | Từ | Nghĩa chung | Ở embedded |
@@ -691,6 +719,25 @@ Gộp code vào nhánh chung **thường xuyên** (≥1 lần/ngày), và mỗi 
 
 #### BLD-033 · 🟡 · concept · [→ ci-and-test-farm §1.5](../../../06-build-systems/ci-and-test-farm.md)
 **Unit / integration / system test và smoke / regression / soak test — quan hệ giữa hai bộ khái niệm này là gì?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Đó là **hai trục khác nhau**, không phải hai mức của cùng một thang.*
+>
+> *Trục **phạm vi** trả lời *"test cái gì"*: **unit** là một hàm, một class, tách khỏi phụ thuộc; **integration** là vài phần ghép lại — ví dụ app thật gọi qua `.so` thật; **system** là cả thiết bị.*
+>
+> *Trục **mục đích** trả lời *"test để biết gì"*: **smoke** — còn sống không, khởi động được và chức năng chính chạy không; **regression** — thứ trước đây đúng có còn đúng sau thay đổi; **soak** hay stress — chạy lâu, chạy nặng có rò rỉ hay treo không.*
+>
+> *Mỗi bài test có một vị trí trên cả hai trục: smoke thường ở mức system; regression có thể là unit hoặc system; soak gần như luôn là system. Hỏi *"smoke là unit hay system"* là hỏi nhầm trục.*
+>
+> *Ở chỗ em: unit test cho library và driver chạy trên máy build; sau đó test trên thiết bị, vì một thay đổi chạy trên rất nhiều model."*
+
+**Nếu bị hỏi tiếp**
+- *"Tầng nào nhiều test nhất?"* — Tháp test: nhiều unit test rẻ ở đáy, ít test hệ thống đắt ở đỉnh; cổng rẻ chạy trước.
+
+**Móc nền tảng:** GoogleTest/KUnit ([BLD-044](build-systems.md)) · test trên thiết bị ([BLD-035](build-systems.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 Chúng là **hai trục vuông góc**, không phải hai mức của cùng một thang:
@@ -718,6 +765,23 @@ Mỗi bài test có **một toạ độ trên mỗi trục**: *smoke* thường 
 
 #### BLD-035 · 🟡 · concept · ⭐ · [→ ci-and-test-farm §1.4](../../../06-build-systems/ci-and-test-farm.md)
 **Vì sao embedded bắt buộc phải test trên board thật? Test trên host và QEMU không đủ ở chỗ nào — và nên chia việc thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì phần mềm embedded chỉ đúng khi đứng **cùng phần cứng** của nó. Có những lớp lỗi không thể lộ trên máy build: thời gian thật, ngắt thật, cảm biến và tấm màn thật, nhiệt độ, nguồn điện.*
+>
+> *Test trên máy build — unit test, sanitizer — bắt được logic thuần và lỗi bộ nhớ, rẻ và nhanh. Máy giả lập chạy được khởi động và phần lớn user-space, nhưng không có thời gian thật và ngoại vi thật. Chỉ thiết bị thật cho **hành vi thật và số đo thật** — đổi lại chậm, đắt, và thiết bị có thể hỏng.*
+>
+> *Nên em chia việc: **đẩy càng nhiều test xuống máy build càng tốt**, để dành thiết bị cho thứ chỉ phần cứng mới trả lời được. Thiết bị là tài nguyên đắt nhất trong pipeline; dùng nó cho việc máy build làm được là lãng phí, và còn làm hàng đợi dài thêm.*
+>
+> *Ở chỗ em, một thay đổi trong library chạy trên rất nhiều model, nên sau unit test luôn có bước test trên thiết bị."*
+
+**Nếu bị hỏi tiếp**
+- *"Chỉ vì ARM khác x86 thôi à?"* — Không; giả lập giải được chuyện kiến trúc CPU mà vẫn không thay được board.
+
+**Móc nền tảng:** tháp test ([BLD-033](build-systems.md)) · gated check-in ([BLD-021](build-systems.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Bản chất:** phần mềm embedded chỉ **đúng khi đứng cùng phần cứng của nó**. Nhiều lớp lỗi **không thể** lộ trên máy build: timing thật, ngắt thật, tín hiệu thật, panel/cảm biến thật, nhiệt, nguồn.
@@ -768,6 +832,21 @@ Ba khác biệt, mỗi cái ép ra một yêu cầu hạ tầng:
 
 #### BLD-021 · 🟠 · concept · ⭐ · [→ ci-and-test-farm §3](../../../06-build-systems/ci-and-test-farm.md)
 **Dự án bắt buộc mọi thay đổi phải qua pipeline mới vào được source chính, không có đường submit tay. Mô hình này tên gì, được lợi gì, và cái giá là gì?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Mô hình đó gọi là **gated check-in** — kiểm tra trước khi gộp. Ở chỗ em, em là **người dùng** pipeline: lấy code, đưa lên review chéo trên Perforce, submit; thay đổi đi vào build tích hợp và hệ thống CI/CD nội bộ; chỉ khi qua hết mới vào nhánh chính. Không có đường nào khác.*
+>
+> *Được: **nhánh chính gần như không bao giờ hỏng**. Với nhiều nền tảng và nhiều team, nhánh chính hỏng không phải là một người build lỗi, mà là **cả chục kỹ sư bị chặn**, cộng thời gian đi tìm ai gây ra — người gây hỏng thường không phải người phát hiện.*
+>
+> *Cái giá: một là **chờ** — mỗi thay đổi phải đợi trọn pipeline, và hàng đợi giới hạn số thay đổi vào được mỗi ngày. Hai là khi gom nhiều thay đổi test một lượt cho nhanh, hỏng thì **không biết cái nào** gây ra, phải chia đôi lô để tìm. Ba là bị chặn oan khi lỗi là của người khác trong cùng lô. Và nếu cổng chậm quá, người ta sẽ đòi đường tắt cho *"bản gấp"* — lúc đó cổng bắt đầu mất tác dụng."*
+
+**Nếu bị hỏi tiếp**
+- *"Đối lập với gated là gì?"* — Gộp trước, hỏng thì revert. Hợp khi ít nền tảng và revert rẻ.
+
+**Móc nền tảng:** flaky test trên cổng chặn ([BLD-026](build-systems.md)) · các tầng test ([BLD-033](build-systems.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế** — gọi là **pre-merge gating / gated check-in**: thay đổi vào **hàng đợi** → build toàn bộ matrix + test → **pass mới chạm trunk**. Đối lập là **post-merge**: vào trunk trước, hỏng thì revert.
@@ -907,6 +986,23 @@ Ba lý do, và cả ba đều là lý do **thiết kế phép đo**, không ph�
 
 #### BLD-026 · 🟠 · concept · [→ ci-and-test-farm §10](../../../06-build-systems/ci-and-test-farm.md)
 **Flaky test là gì, và vì sao trên một cổng chặn (gated) nó nguy hiểm hơn hẳn trên CI thường? Xử lý thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Flaky test là test cho kết quả khác nhau trên **cùng một code** — lúc xanh lúc đỏ.*
+>
+> *Trên cổng chặn, nó nguy hiểm không phải vì chặn nhầm, mà vì nó làm cổng **ngừng chặn**. Chuỗi diễn ra thế này: test hỏng ngẫu nhiên chặn oan người vô tội; mọi người học được *"cứ bấm chạy lại"*; chạy lại thành phản xạ với **mọi** lỗi; đến khi có lỗi thật, nó cũng được chạy lại cho qua. Và nó cộng dồn rất nhanh: 200 test, mỗi cái chỉ 0,5% flaky, thì khoảng 63% số lần chạy có ít nhất một lỗi oan.*
+>
+> *Nguồn flaky đặc trưng ở embedded: dùng `sleep` cố định thay vì chờ một điều kiện; trạng thái còn sót từ job trước; một board trong dàn test hỏng dần; cáp lỏng, ánh sáng phòng.*
+>
+> *Cách xử lý: **đo** tỉ lệ pass/fail theo thời gian trước đã; **cách ly** test đó khỏi cổng, chuyển sang chạy hằng đêm, có hạn sửa; thay `sleep` bằng **chờ theo điều kiện** có timeout; kiểm sức khoẻ board trước mỗi job, board hỏng tự rút khỏi dàn; và tách *"hỏng do hạ tầng"* khỏi *"hỏng do code"* trên báo cáo."*
+
+**Nếu bị hỏi tiếp**
+- *"Một ví dụ trạng thái sót lại?"* — Ở lab của em: test bị giết khi đang giữ semaphore trong shared memory; lần chạy sau mở lại cùng tên và treo ([BLD-045](build-systems.md)).
+
+**Móc nền tảng:** gated check-in ([BLD-021](build-systems.md)) · cô lập tài nguyên giữa các test.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Định nghĩa:** test cho kết quả khác nhau trên **cùng một code**.
@@ -1011,7 +1107,24 @@ SRCREV = "a1b2c3d4"   # ghim commit → build tái lập được
 ## F — Unit test & code quality (bám việc thật, mức cơ bản)
 
 #### BLD-040 · 🟡 · concept · ⭐ · [→ unit-test-and-code-quality §3](../../../06-build-systems/unit-test-and-code-quality.md)
-**Bạn muốn unit test thuật toán dimming (tính độ sáng theo từng khung hình) trên máy build, không có panel, không có chip. Làm thế nào? Fake, mock, stub khác nhau ở đâu?**
+**Bạn muốn unit test thuật toán dimming (tính độ sáng theo nội dung hình) trên máy build, không có panel, không có chip. Làm thế nào? Fake, mock, stub khác nhau ở đâu?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Muốn test một phần mà không có phần cứng thì phần đó phải **gọi phần cứng qua một interface**. Thuật toán độ sáng của em giữ con trỏ tới `IDimmingBackend` — interface ghi xuống phần cứng — nên trong test em cắm vào một **backend giả** chỉ ghi lại các giá trị thuật toán yêu cầu ghi, rồi kiểm danh sách đó.*
+>
+> *Ba loại bản giả: **stub** chỉ trả một giá trị cố định để code chạy qua; **fake** là một cài đặt đơn giản nhưng chạy thật — như backend ghi vào vector — dùng khi muốn kiểm **kết quả**; **mock** kiểm **lời gọi** — được gọi mấy lần, với tham số gì — dùng khi muốn kiểm **tương tác**.*
+>
+> *Điểm em muốn nhấn: **test được hay không là hệ quả của thiết kế**. Nếu thuật toán gọi thẳng `ioctl` thì không test được khi không có thiết bị. Tách thuật toán khỏi phần ghi phần cứng là thứ tạo ra chỗ cắm.*
+>
+> *Hai bẫy: mock mọi thứ thì test chỉ kiểm lại cách cài đặt — đổi code là vỡ test dù hành vi vẫn đúng; và fake chạy đúng **không** chứng minh backend thật đúng — vẫn cần test trên thiết bị."*
+
+**Nếu bị hỏi tiếp**
+- *"Coverage sau khi dùng fake?"* — Backend thật sẽ không được chạy trong unit test; coverage chỉ ra đúng chỗ đó ([BLD-041](build-systems.md)).
+
+**Móc nền tảng:** Bridge / dependency inversion ([DP-038](design-patterns.md)) · GoogleTest ([BLD-044](build-systems.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** muốn test một phần tách khỏi phần cứng thì phần đó phải **gọi phần cứng qua một interface**, để test **cắm thay** được. Thuật toán dimming giữ `IDimmingBackend*` (Bridge) ⟹ test đưa vào một backend giả, rồi kiểm **những gì thuật toán đã yêu cầu ghi**.
@@ -1044,6 +1157,21 @@ EXPECT_EQ(fake.writes, (std::vector<int32_t>{10, 20, 25}));   // chạy thật: 
 
 #### BLD-041 · 🟡 · concept · ⭐ · [→ unit-test-and-code-quality §4](../../../06-build-systems/unit-test-and-code-quality.md)
 **Báo cáo coverage của library ghi 90% line coverage. Con số đó nói lên điều gì, KHÔNG nói lên điều gì? Bạn đọc báo cáo thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Line coverage 90% nghĩa là **90% số dòng đã chạy ít nhất một lần** trong lúc test. Nó cho biết **dòng nào chưa từng chạy** — tức chỗ chắc chắn chưa được test. Nó **không** nói những dòng đã chạy là đúng: một test không có kiểm tra nào vẫn làm coverage tăng.*
+>
+> *Nên em đọc cột *"dòng chưa chạy"*, không đọc con số tổng. Ở lab em đo được 89%, nghe tốt, nhưng mấy dòng chưa chạy lại chính là **backend thật** ghi xuống phần cứng: unit test dùng backend giả, còn integration test chạy model khác. Con đường thật *"thuật toán → backend → phần cứng"* chưa có test nào đi qua.*
+>
+> *Em cũng nói thẳng: ở công ty em không đo coverage; em hiểu nó đo gì và đã thử bằng gcov/gcovr ở lab. Em không đặt chỉ tiêu cứng như *"phải trên 80%"*, vì nó dễ sinh ra test chỉ để chạy qua code."*
+
+**Nếu bị hỏi tiếp**
+- *"Line khác branch coverage?"* — Line: dòng đã chạy; branch: mỗi nhánh `if`/`switch` đã đi qua chưa — một dòng `if` chạy rồi nhưng có thể mới đi một nhánh.
+
+**Móc nền tảng:** chất lượng test ([BLD-043](build-systems.md)) · `--coverage` / gcov.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** build với `--coverage`, compiler chèn bộ đếm vào mỗi dòng/nhánh; chạy test xong, `gcov`/`gcovr` đọc bộ đếm. Kết quả trả lời **một** câu hỏi: *dòng nào đã chạy ít nhất một lần khi test*.
@@ -1071,6 +1199,21 @@ Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integra
 
 #### BLD-042 · 🟡 · concept · ⭐ · [→ unit-test-and-code-quality §5](../../../06-build-systems/unit-test-and-code-quality.md)
 **`-Werror`, static analysis, sanitizer, unit test, code review — mỗi cái bắt loại lỗi nào? Vì sao không chọn một cái là đủ?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Mỗi công cụ bắt một **loại** lỗi và có điểm mù riêng, nên phải chồng lên nhau. **Review** bắt logic, thiết kế, đặt tên — thứ máy không hiểu. **`-Wall -Wextra -Werror`** bắt code đáng ngờ mà compiler nhìn thấy được lúc build. **Phân tích tĩnh** bắt mẫu lỗi qua luồng code — rò rỉ, dereference `NULL` — nhưng hay báo nhầm. **ASan/UBSan** bắt lỗi bộ nhớ và hành vi không xác định **lúc chạy**, chỉ trên đường code đã chạy. **TSan** bắt data race đã xảy ra khi chạy. **Unit test** bắt hành vi sai so với mong đợi — chỉ những gì test đã nghĩ tới.*
+>
+> *Em có một bằng chứng tự đo ở lab: cố ý đọc phần tử thứ năm của một mảng bốn phần tử. Build Debug thì **im lặng**, chạy vẫn ra kết quả; build Release có tối ưu cộng `-Werror` thì compiler báo vượt biên và build hỏng; ASan thì bắt lúc chạy, chỉ đúng dòng. Và TSan trên cùng library bắt được một data race mà không công cụ nào khác thấy.*
+>
+> *Thứ tự em xếp theo **chi phí**: rẻ thì chạy mọi lần — warning, unit test; đắt thì chạy sau hoặc định kỳ — sanitizer, test trên thiết bị."*
+
+**Nếu bị hỏi tiếp**
+- *"Coding standard ở chỗ em?"* — Không có bộ quy tắc riêng: library theo Modern C++, driver theo kernel coding style; kernel có `checkpatch.pl` để kiểm tự động.
+
+**Móc nền tảng:** chọn sanitizer ([DBG-042](debugging.md)) · `-Warray-bounds` chỉ bật khi có tối ưu.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** mỗi công cụ nhìn code từ một góc khác nhau ⟹ mỗi cái có **điểm mù riêng**.
@@ -1101,6 +1244,25 @@ Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integra
 
 #### BLD-043 · 🟡 · concept · ⭐ · 🏗️ · [→ unit-test-and-code-quality §3](../../../06-build-systems/unit-test-and-code-quality.md), [RES-016](resume.md)
 **"Mỗi lần submit em đưa scenario cho AI, AI sinh unit test theo bộ khung có sẵn." — Vậy em kiểm chất lượng của test đó thế nào? Test xanh có nghĩa là gì?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"AI viết nhanh, nhưng quyết định test **đủ hay chưa** vẫn là của em. Em kiểm ba thứ.*
+>
+> *Một, test có **kiểm kết quả** không: em đọc các dòng `EXPECT` — chúng kiểm kết quả mong đợi của scenario, hay chỉ gọi hàm cho chạy qua? Test không có kiểm tra vẫn xanh, và vẫn làm coverage tăng.*
+>
+> *Hai, **làm hỏng code thì test có đỏ không**: em cố ý đổi một điều kiện, ví dụ `>` thành `>=`, rồi chạy lại. Vẫn xanh thì test không bảo vệ gì.*
+>
+> *Ba, scenario có **ca lỗi** không: AI viết theo scenario em đưa; scenario chỉ có đường thành công thì test chỉ có đường thành công. Tham số sai, phần cứng trả lỗi — đó là trách nhiệm của người viết scenario, tức là em.*
+>
+> *Còn *"test xanh"* chỉ có nghĩa là code làm đúng những gì test kiểm. Một thay đổi của em chạy trên rất nhiều model, nên unit test xanh vẫn phải qua test trên thiết bị."*
+
+**Nếu bị hỏi tiếp**
+- *"Làm hỏng code để kiểm test có tên gì?"* — Mutation testing; ở lab em thử bằng tay — đổi `zones[3]` thành `zones[4]` và xem cổng nào bắt được ([unit-test-and-code-quality §6](../../../06-build-systems/unit-test-and-code-quality.md)).
+
+**Móc nền tảng:** dòng AI trên resume ([RES-016](resume.md)) · coverage ([BLD-041](build-systems.md)).
+
+</details>
+
 <details><summary>Khung trả lời</summary>
 
 **Interviewer đang dò gì:** bạn **sở hữu** chất lượng hay chỉ chuyển tiếp output của công cụ (cùng gốc với [RES-016](resume.md)).
@@ -1121,6 +1283,32 @@ Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integra
 
 #### BLD-044 · 🟢 · concept · [→ unit-test-and-code-quality §3](../../../06-build-systems/unit-test-and-code-quality.md)
 **GoogleTest ở library và KUnit ở driver — mỗi cái test cái gì, chạy ở đâu?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"**GoogleTest** dành cho library C++: test là một chương trình user-space bình thường chạy trên máy build, gọi thẳng các class và hàm của library, và thay phần phụ thuộc phần cứng bằng bản giả. Ví dụ em test thuật toán độ sáng bằng một backend giả ghi lại các giá trị được yêu cầu ghi.*
+>
+> *Ví dụ test của library:*
+> ```cpp
+> TEST(GlobalDimming, VSyncRampsInStepsOf10) {
+>     GlobalDimmingForShm shm{};  FakeBackend be;
+>     GlobalDimming algo(&be, shm);
+>     algo.SetBacklight(25);
+>     for (int i = 0; i < 5; ++i) algo.t_vSyncCallBack();
+>     EXPECT_EQ(be.writes, (std::vector<int32_t>{10, 20, 25}));
+> }
+> ```
+>
+> *Code trong kernel không chạy được như một chương trình thường, nên driver dùng **KUnit** — framework test **bên trong kernel**. Test được build cùng kernel hoặc thành module và thường chạy trên một kernel giả lập, không cần board. KUnit test được **logic** của driver — kiểm tham số, bảng hàm, máy trạng thái — **không** test được phần cứng thật.*
+>
+> *Cả hai đều không thay được test trên thiết bị."*
+
+**Nếu bị hỏi tiếp**
+- *"Ai viết test ở chỗ em?"* — Em viết scenario, AI sinh test theo bộ khung có sẵn, em kiểm lại ([BLD-043](build-systems.md)).
+
+**Móc nền tảng:** test double ([BLD-040](build-systems.md)) · Bridge tạo chỗ cắm cho test ([DP-038](design-patterns.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **GoogleTest** chạy như một chương trình user-space bình thường trên máy build; test class/hàm C++ của library, cắm fake thay phần phụ thuộc. **KUnit** là framework unit test **bên trong kernel**: test built-in hoặc module, thường chạy bằng `tools/testing/kunit/kunit.py run` trên kernel UML — không cần board; test **logic** của driver (kiểm tham số, bảng ops, máy trạng thái), **không** test được phần cứng thật. Cả hai đều không thay được test trên thiết bị.
@@ -1128,6 +1316,21 @@ Dòng 4–5 là **backend Global thật**. Unit test dùng fake backend, integra
 
 #### BLD-045 · 🟡 · concept · ⭐ · 🎤 2026-10-11 · [→ unit-test-and-code-quality §6](../../../06-build-systems/unit-test-and-code-quality.md), [LNX-045](linux-sysprog.md)
 **Một commit cài lỗi tràn mảng. Cổng ASan đáng lẽ đỏ sau 10 giây, nhưng pipeline treo 25 phút rồi mới báo timeout. Test của bạn có dùng shared memory + named semaphore của library. Chuyện gì đã xảy ra, và bạn sửa pipeline thế nào?**
+
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Chuyện này em gặp thật ở lab của mình. Commit cài lỗi tràn mảng **bên trong một hàm API của library**. ASan phát hiện và **giết process ngay**, đúng lúc nó **đang giữ semaphore** dùng chung. Semaphore không có chủ, nên kernel không nhả hộ — nó kẹt ở 0. Cổng ASan lúc đó chạy test **lần thứ hai** để lấy mã thoát, và integration test dùng **cùng một tên shared memory cố định**, nên process mới treo ở `sem_wait` ngay lúc library khởi tạo. Test không có timeout, nên chờ tới hạn mặc định 1500 giây — 25 phút.*
+>
+> *Em sửa ba lớp, mỗi lớp chặn một mắt xích: **mỗi lần chạy pipeline một tên shared memory riêng** và dọn khi xong, để rác của lần trước không lan sang lần sau; **timeout 60 giây cho mọi lần chạy test**, để treo biến thành đỏ nhanh; và cổng chỉ chạy test **một lần**, giữ mã thoát của chính lần đó.*
+>
+> *Bài học: timeout chỉ biến *treo* thành *đỏ*; gốc là **trạng thái dùng chung sống lâu hơn process** rò từ test này sang test khác. Và cùng một điểm yếu thiết kế của library — semaphore không có chủ — đã lộ ra trong CI trước khi lộ trên thiết bị."*
+
+**Nếu bị hỏi tiếp**
+- *"Sao không chỉ tăng timeout của job Jenkins?"* — Vẫn treo, chỉ treo lâu hơn hoặc ngắn hơn; và che mất lỗi thật.
+
+**Móc nền tảng:** process chết khi giữ semaphore ([LNX-045](linux-sysprog.md)) · flaky test ([BLD-026](build-systems.md)).
+
+</details>
 
 <details><summary>Đáp án</summary>
 

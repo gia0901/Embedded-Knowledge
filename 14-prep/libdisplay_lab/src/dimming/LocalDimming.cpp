@@ -11,6 +11,7 @@ uint32_t LocalDimming::SetBacklight(int32_t backlight) {
     for (int i = 0; i < 4; ++i) Shm.zones[i] = d.zones[i];   // muc tung vung cung nam o shm: process khac doc duoc
     return m_pDimmingBackend->t_SetLdFinalDuty(&d);
 }
+
 int32_t LocalDimming::GetBacklight() {
     return Shm.level;
 }

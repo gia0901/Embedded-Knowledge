@@ -64,6 +64,8 @@
   - **Không chấm điểm, không vào weak-register.** Theo dõi *đã làm hay chưa* ở **§📍 plan đang chạy**; không có plan ⇒ thêm `· ✅ <ngày>` vào cuối dòng metadata của chính câu lab.
 - **→ nguồn** = link tài liệu để ôn lại (dùng khi review).
 - ⚠️ **`RES` có dạng đáp án RIÊNG.** Chỉ ứng viên mới biết họ đã làm gì, nên đáp án **không phải "lời giải"** mà là **khung 4 phần**: *interviewer đang dò gì · câu trả lời tốt gồm · nền kỹ thuật phải nắm · bẫy*. Chấm theo **khung tiếp cận** (🏗️), không theo đáp án duy nhất.
+- 🎙️ **Khối `Trả lời mẫu`** — đặt **ngay dưới đề, trước** `<details>` đáp án/khung: `<details><summary>🎙️ Trả lời mẫu</summary> … </details>`. Là **lời nói** của ứng viên (~60–90″, ngôi "em"), không phải phân tích: câu chốt trước → giải thích bằng ví dụ đời thường → một chi tiết từ việc thật → đánh đổi → dừng; tiếp theo là **Nếu bị hỏi tiếp** (2–3 câu đuổi hay gặp) và **Móc nền tảng**. Viết cho **người không làm TV**: không FRC/TCON, vsync/hsync, frame-rate. Chỗ thiếu dữ kiện thật ghi ⚠️ *[cần bạn xác nhận]*, không bịa.
+  - Đã có cho mọi câu mock chính của [resume-plan](../../study-plans/resume-plan.md); [§14 của plan](../../study-plans/resume-plan.md) là **bản sao tự sinh** từ các khối này bằng `14-prep/study-plans/tools/build-answer-book.py` — sửa ở đây rồi chạy lại script, **không** sửa trong plan.
 
 ## ✍️ Tiêu chí viết đáp án (áp cho câu mới **và** khi sửa câu cũ)
 

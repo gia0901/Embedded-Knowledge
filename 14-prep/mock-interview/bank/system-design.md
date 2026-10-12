@@ -371,6 +371,21 @@ void     scanner_destroy(Scanner* s);           /* đối xứng với create */
 
 #### SD-024 · 🟠 · design · 📦 2026-08-13 · [→ api-design](../../../07-shared-libraries/api-design.md)
 **Thư viện của bạn nên báo lỗi bằng exception hay mã lỗi? Vì sao phải chọn NHẤT QUÁN?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Em chọn theo ngữ cảnh. Library có **biên C** — như library của em — thì bắt buộc **mã lỗi**: exception đi qua hàm C là hành vi không xác định. Firmware hoặc dự án cấm exception cũng vậy. Library C++ thuần cho ứng dụng thường thì exception cho lỗi **thật sự bất thường**, còn lỗi **được mong đợi** — không tìm thấy, hết dữ liệu — thì trả `std::optional` hoặc kiểu kết quả.*
+>
+> *Nhưng điều quan trọng hơn là **nhất quán**. Trộn hai kiểu thì người dùng phải kiểm cả hai đường ở mọi lời gọi; thực tế họ sẽ quên một trong hai, và lỗi lọt qua im lặng. Một library dùng toàn mã lỗi, dù kém hơn, vẫn an toàn hơn library *"phần lớn trả mã lỗi nhưng vài hàm ném"*.*
+>
+> *Dù chọn cách nào em giữ ba quy tắc: hàm trả mã lỗi gắn `[[nodiscard]]` để compiler cảnh báo khi bị bỏ qua; constructor không trả được mã lỗi thì dùng factory trả kết quả; và destructor không bao giờ ném."*
+
+**Nếu bị hỏi tiếp**
+- *"Exception tốn gì?"* — Gần như không tốn khi không có lỗi; khi ném thì đắt và thời gian khó đoán — lý do hệ nhúng thời gian thực hay cấm.
+
+**Móc nền tảng:** biên C ([DP-040](design-patterns.md)) · `-ENOTSUP` / mã lỗi kiểu kernel · `[[nodiscard]]`.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 | | **Exception** | **Mã lỗi / `expected`** |
@@ -402,6 +417,28 @@ void     scanner_destroy(Scanner* s);           /* đối xứng với create */
 
 #### SD-017 · 🟡 · concept · ⭐ · 📦 2026-08-13 · [→ abi-versioning](../../../07-shared-libraries/abi-versioning.md)
 **Phân biệt API và ABI. Cho một thay đổi **giữ nguyên API** nhưng **phá ABI**.**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"**API** là hợp đồng ở mức **mã nguồn**: tên hàm, kiểu tham số, ý nghĩa. **ABI** là hợp đồng ở mức **nhị phân**: kích thước và bố cục struct, offset từng trường, thứ tự bảng hàm ảo, tên symbol đã mã hoá, cách truyền tham số. Em hay nói gọn: *API là hợp đồng bằng tên, ABI là hợp đồng bằng vị trí*.*
+>
+> *Phá API thì **build lại là hỏng**, có lỗi compile rõ ràng. Phá ABI thì **vẫn build, vẫn chạy**, rồi hỏng im lặng — và nó chỉ quan trọng với người **thay `.so` mà không build lại app**.*
+>
+> *Ví dụ giữ API mà phá ABI: thêm một trường vào struct.*
+> ```cpp
+> struct Config { int timeout; };               // v1 — app build với bản này
+> struct Config { int timeout; int retries; };  // v2 — mã nguồn dùng y hệt
+> ```
+> *`sizeof` từ 4 thành 8. App cũ cấp 4 byte, library mới ghi 8 byte ⟹ ghi đè bộ nhớ, crash ở chỗ chẳng liên quan. Ví dụ khác là chèn hàm ảo vào giữa interface.*
+>
+> *Dấu hiệu nhận ra ngoài thực tế: *"chép `.so` mới vào thì crash, chép lại bản cũ thì hết"*."*
+
+**Nếu bị hỏi tiếp**
+- *"Giữ ABI thế nào?"* — Biên C với struct mờ (opaque pointer) hoặc Pimpl; chỉ thêm hàm ảo ở cuối; soname đổi khi buộc phải phá.
+
+**Móc nền tảng:** vì sao biên C ([DP-040](design-patterns.md)) · vtable là ABI ([DP-027](design-patterns.md)) · Pimpl ([SD-021](system-design.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 | | **API** (Application Programming Interface) | **ABI** (Application Binary Interface) |

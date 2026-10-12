@@ -309,6 +309,25 @@ return 0;
 
 #### DRV-006 · 🟡 · concept · ⭐ · [→ kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)
 **Vì sao driver không được dereference con trỏ user trực tiếp? (`copy_from_user`/`copy_to_user`)**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì con trỏ từ user-space là **một con số user đưa cho mình**, không phải một địa chỉ đáng tin. Có bốn vấn đề. Nó có thể **không hợp lệ** — chưa map, đã giải phóng — và kernel đọc vào là oops, sập cả hệ chứ không chỉ một process. Nó có thể hợp lệ nhưng **trang nhớ chưa nằm trong RAM**. Nó có thể **cố ý trỏ vào vùng của kernel** — kernel đọc ghi hộ thì user vừa sửa được bộ nhớ kernel. Và nó chỉ có nghĩa trong không gian địa chỉ của đúng process đó.*
+>
+> *`copy_from_user` làm ba việc: kiểm địa chỉ thuộc user-space; xử lý page fault an toàn — nó nằm trong bảng ngoại lệ của kernel nên fault ở đó thì nạp trang hoặc dừng sạch, không oops; và trả về **số byte chưa chép được**. Code đúng là:*
+> ```c
+> if (copy_from_user(&cfg, uarg, sizeof(cfg))) return -EFAULT;   // khác 0 = lỗi
+> if (cfg.level < 0 || cfg.level > 100)          return -EINVAL;   // kiểm trên BẢN KERNEL
+> ```
+> *Thứ tự quan trọng: **chép trước, kiểm sau, rồi chỉ dùng bản đã chép**."*
+
+**Nếu bị hỏi tiếp**
+- *"Đọc `uarg->level` để kiểm rồi mới copy thì sao?"* — `ioctl` không khoá bộ nhớ user; thread khác cùng process có thể đổi struct giữa lúc kiểm và lúc copy ⟹ kiểm một giá trị, dùng một giá trị khác (TOCTOU).
+- *"Gọi `copy_from_user` khi đang giữ spinlock?"* — Không được: nó có thể ngủ vì page fault.
+
+**Móc nền tảng:** `ioctl` · page fault · ranh giới user/kernel ([kernel-userspace](../../../05-drivers-device-tree/kernel-userspace.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Nguyên tắc nền: con trỏ từ user là *dữ liệu không tin được*, không phải địa chỉ.** Bốn lý do, hai về đúng đắn và hai về bảo mật:

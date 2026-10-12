@@ -1112,6 +1112,22 @@ Trả lời theo **bốn trục** ([ipc-linux.md §2](../../../04-linux-system-p
 
 #### LNX-044 · 🟡 · concept · [→ ipc-linux §5.1](../../../04-linux-system-programming/ipc-linux.md)
 **S-Box: một thread nằm chặn trong `mq_receive()` để nhận lệnh đồng bộ độ sáng từ unit khác. Khi service tắt, code đặt `stop = true` rồi `join()` — và treo. Vì sao? Dừng thread đó thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì `mq_receive()` chặn **trong kernel** cho tới khi có bản tin. Cờ `stop` là một biến trong bộ nhớ, kernel không biết tới nó; thread không bao giờ quay lại vòng lặp để đọc cờ, nên `join()` chờ mãi. Muốn dừng thì phải **đánh thức nó bằng chính thứ nó đang chờ**.*
+>
+> *Cách em chọn là **bản tin sentinel**: gửi một bản tin *"QUIT"* với **độ ưu tiên cao nhất** — nó vượt lên trước mọi bản tin đang chờ, thread nhận được thì thoát vòng lặp. Đo thật: `join` xong trong khoảng 170 micro giây. Nếu hàng đợi đang đầy thì chính lệnh gửi sentinel bị chặn, nên em gửi bằng `mq_timedsend` hoặc một descriptor mở non-blocking riêng.*
+>
+> *Cách khác: `mq_timedreceive` thức dậy định kỳ để kiểm cờ — đơn giản nhưng dừng chậm bằng độ dài timeout, và hạn chót của nó tính theo giờ lịch nên dính vụ NTP chỉnh giờ. Nếu đã có event loop thì trên Linux message queue là một file descriptor, chờ chung với một `eventfd` dành cho việc dừng là sạch nhất."*
+
+**Nếu bị hỏi tiếp**
+- *"Sao không `pthread_cancel`?"* — Huỷ giữa chừng có thể bỏ qua destructor của object trên stack ⟹ rò tài nguyên, khoá bị giữ.
+- *"Tính hạn chót `mq_timedreceive` từ `CLOCK_MONOTONIC`?"* — Sai: kernel hiểu nó là giờ lịch, hạn nằm trong quá khứ, hàm trả `ETIMEDOUT` ngay, vòng lặp quay tít đốt CPU.
+
+**Móc nền tảng:** POSIX message queue ([RES-005](resume.md)) · clock ([LNX-029](linux-sysprog.md)) · `epoll` + `eventfd`.
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế:** `mq_receive()` chặn trong kernel tới khi **có message**. Cờ `stop` là biến trong bộ nhớ, kernel không biết tới nó ⟹ thread không bao giờ quay lại vòng lặp để đọc cờ ⟹ `join()` chờ mãi. Phải **đánh thức nó bằng chính cái nó đang chờ**, hoặc cho nó chờ thêm một nguồn thứ hai.
@@ -1139,6 +1155,22 @@ mq_timedreceive (hang rong, han +1s REALTIME): ret=-1 errno=Connection timed out
 
 #### LNX-045 · 🟠 · concept · ⭐ · [→ ipc-linux §4.3](../../../04-linux-system-programming/ipc-linux.md), [A1 §7.2](../../../11-design-patterns/in-practice/A1-baseline-libdisplay.md)
 **Library của bạn được nạp vào nhiều process; mọi hàm `lib_api_*` bọc giữa `sem_wait`/`sem_post` trên một named semaphore. Một tool test bị `kill -9` đúng lúc đang ở trong một hàm API. Các process còn lại ra sao? Vì sao không có `EOWNERDEAD` như robust mutex? Bạn xử lý thế nào?**
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Tool bị kill khi đã `sem_wait` mà chưa kịp `sem_post`, nên semaphore kẹt ở 0. Kernel dọn file, bộ nhớ của process đó, nhưng **không đụng tới semaphore**, vì semaphore là **bộ đếm không có chủ**: kernel không biết lần `wait` nào thuộc về ai, nên không biết nhả hộ cho ai. Process kế tiếp gọi bất kỳ hàm API nào sẽ **treo** ở `sem_wait`, rồi lần lượt cả hệ đứng hình.*
+>
+> *Robust mutex thì khác: mutex có chủ, kernel ghi nhận chủ chết, nên lần khoá sau trả `EOWNERDEAD` thay vì treo.*
+>
+> *Hệ thật của em bù bằng **timeout**: một API giữ khoá quá khoảng 7 giây thì semaphore bị reset để các API khác chạy tiếp, và trong shared memory có lịch sử process đã gọi để biết ai đang giữ. Em biết cách đó có lỗ: nó không phân biệt process **chết** với process chỉ **chậm**, và state đang ghi dở vẫn nằm đó. Nếu sửa, em dùng robust mutex trong shared memory, hoặc ít nhất ghi PID chủ cạnh semaphore và chỉ reset khi PID đó đã chết."*
+
+**Nếu bị hỏi tiếp**
+- *"Chủ không chết mà chỉ chậm 8 giây?"* — Luật 7 giây cho process thứ hai vào trong lúc chủ vẫn ở trong ⟹ hai bên cùng ghi; chủ xong thì `post` ⟹ semaphore lên **2**, từ đó khoá cho hai bên vào cùng lúc. Chạy thật ở [LNX-046](linux-sysprog.md).
+- *"Chủ còn sống thì B làm gì?"* — **Không vào**: chờ tiếp hoặc trả lỗi, và log PID đang giữ.
+
+**Móc nền tảng:** mutex vs semaphore ([OS-007](os.md)) · robust mutex, ghi state kiểu commit ([LNX-046](linux-sysprog.md)).
+
+</details>
+
 <details><summary>Đáp án</summary>
 
 **Cơ chế — bốn bước:**
@@ -1281,6 +1313,24 @@ while (!scan_done()) {
 ```
 - ① Đôi khi **timeout ngay lập tức** dù module trả lời bình thường.
 - ② Đôi khi **treo hàng giờ** mới chịu timeout.
+
+<details><summary>🎙️ Trả lời mẫu</summary>
+
+> *"Vì `time()` đọc **giờ theo lịch** — `CLOCK_REALTIME` — mà giờ theo lịch **nhảy được**. Thiết bị không có pin nuôi đồng hồ, nên lúc mới boot đồng hồ ở một mốc mặc định; 30 đến 60 giây sau NTP đồng bộ và **chỉnh giờ** đột ngột. Nếu cú chỉnh rơi vào giữa hai lần đọc `time()`:*
+> - *chỉnh **tiến** ⟹ hiệu số vọt lên hàng nghìn giây ⟹ **timeout ngay lập tức** dù module trả lời bình thường;*
+> - *chỉnh **lùi** ⟹ hiệu số âm hoặc rất nhỏ ⟹ **chờ hàng giờ** mới timeout.*
+>
+> *Hai triệu chứng ngược nhau từ một dòng code chính là dấu hiệu *"có ai sửa đồng hồ giữa chừng"*.*
+>
+> *Sửa: đo **khoảng thời gian** thì dùng **`CLOCK_MONOTONIC`** — đếm đều từ lúc boot, không ai chỉnh được, không bao giờ lùi; trong C++ là `std::chrono::steady_clock`. Quy tắc một câu: hỏi *"mấy giờ"* — để ghi log, hạn chứng chỉ — thì dùng giờ lịch; hỏi *"bao lâu"* — timeout, đo hiệu năng, chạy định kỳ — thì dùng monotonic."*
+
+**Nếu bị hỏi tiếp**
+- *"Máy ngủ (suspend) thì monotonic có đếm không?"* — Không; cần đếm cả lúc ngủ thì dùng `CLOCK_BOOTTIME`.
+- *"Ở S-Box em dùng clock nào cho vòng chu kỳ?"* — `steady_clock`, cùng lý do ([CPP-069](cpp.md)).
+
+**Móc nền tảng:** `steady_clock` vs `system_clock` · NTP · timeout của `condition_variable` ([CPP-070](cpp.md)).
+
+</details>
 
 <details><summary>Đáp án</summary>
 
