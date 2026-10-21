@@ -1,0 +1,1782 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="fonts/fonts.css">
+<title>System Design cho Embedded</title>
+<style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
+:root {
+  --bg: #F4F6F5;
+  --surface: #FFFFFF;
+  --fg: #172022;
+  --muted: #56656A;
+  --line: #D3DCDA;
+  --line-strong: #B5C3C0;
+  --accent: #0B6B55;
+  --accent-weak: #E0EFEA;
+  --copper: #9E531A;
+  --copper-weak: #F5E8DC;
+  --ok: #1D7A47;
+  --ok-weak: #E1F2E8;
+  --bad: #B23A26;
+  --bad-weak: #F8E4DF;
+  --code-bg: #EDF2F0;
+  --code-fg: #1E2A2C;
+  --sx-kw: #8A2F8F;
+  --sx-type: #0B6B55;
+  --sx-str: #9E531A;
+  --sx-com: #75868A;
+  --sx-num: #1F5FA8;
+  --sx-pp: #A33A1E;
+  --sx-fn: #1E4E79;
+
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1413; --surface: #141C1B; --fg: #E1E8E6; --muted: #92A29F; --line: #263331; --line-strong: #3A4B48;
+    --accent: #4FC3A1; --accent-weak: #15302A; --copper: #E39A62; --copper-weak: #33241A;
+    --ok: #5BCB8C; --ok-weak: #15301F; --bad: #F08A72; --bad-weak: #3A1C16;
+    --code-bg: #101918; --code-fg: #D9E3E1;
+    --sx-kw: #D79BE0; --sx-type: #4FC3A1; --sx-str: #E39A62; --sx-com: #6E817E; --sx-num: #82B4EF; --sx-pp: #F08A6A; --sx-fn: #9CC8F0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1413; --surface: #141C1B; --fg: #E1E8E6; --muted: #92A29F; --line: #263331; --line-strong: #3A4B48;
+  --accent: #4FC3A1; --accent-weak: #15302A; --copper: #E39A62; --copper-weak: #33241A;
+  --ok: #5BCB8C; --ok-weak: #15301F; --bad: #F08A72; --bad-weak: #3A1C16;
+  --code-bg: #101918; --code-fg: #D9E3E1;
+  --sx-kw: #D79BE0; --sx-type: #4FC3A1; --sx-str: #E39A62; --sx-com: #6E817E; --sx-num: #82B4EF; --sx-pp: #F08A6A; --sx-fn: #9CC8F0;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-body); font-size: 16px; line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.mono { font-family: var(--f-mono); font-size: 13px; }
+
+/* masthead */
+.masthead { background: var(--surface); border-bottom: 1px solid var(--line); }
+.masthead .wrap { padding-block: var(--s-5) var(--s-5); display: grid; gap: var(--s-3); }
+.crumb { display: flex; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap;
+  font-family: var(--f-mono); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.crumb .sep { margin: 0 .6em; color: var(--line-strong); }
+.crumb-link { color: var(--muted); text-decoration: none; }
+.crumb-link:hover { color: var(--accent); }
+.rev { white-space: nowrap; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(32px, 5vw, 52px); line-height: 1.05;
+  letter-spacing: -.01em; margin: var(--s-2) 0 0; text-wrap: balance; }
+h1 .h1-sub { display: block; line-height: 1.3; font-weight: 500; color: var(--muted); font-size: .5em; letter-spacing: 0; margin-top: var(--s-2); }
+.lede { max-width: 68ch; margin: 0; color: var(--muted); font-size: 17px; }
+.meta { display: grid; gap: var(--s-2); margin-top: var(--s-2); border-top: 1px dashed var(--line); padding-top: var(--s-3); }
+.meta-row { display: grid; grid-template-columns: 84px 1fr; gap: var(--s-3); align-items: baseline; }
+.meta-k { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.meta-v { font-size: 14px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--f-mono); font-size: 12px; padding: 1px 8px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--fg); }
+
+/* tabs */
+.tabbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: var(--s-1); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 14px 12px 12px; white-space: nowrap;
+  font-family: var(--f-display); font-weight: 600; font-size: 16px; letter-spacing: .01em; color: var(--muted); text-decoration: none;
+  border-bottom: 3px solid transparent; }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab-n { font-family: var(--f-mono); font-size: 11px; font-weight: 400; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; line-height: 18px; }
+
+.main { padding-block: var(--s-6) var(--s-7); }
+.foot { padding-block: var(--s-5); color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+
+/* reading layout */
+.md-wrap { display: grid; gap: var(--s-6); }
+.md-wrap.has-toc { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) {
+  .md-wrap.has-toc { grid-template-columns: minmax(0, 1fr) 240px; }
+  .toc { position: sticky; top: calc(72px + env(safe-area-inset-top, 0px)); align-self: start; max-height: calc(100vh - 100px); overflow: auto; }
+}
+@media (max-width: 999px) { .toc { order: -1; } }
+.toc { font-size: 13.5px; border-left: 2px solid var(--line); padding-left: var(--s-4); }
+.toc-label { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: var(--s-2); }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: t; }
+.toc li { counter-increment: t; display: grid; grid-template-columns: 22px 1fr; }
+.toc li::before { content: counter(t, decimal-leading-zero); font-family: var(--f-mono); font-size: 11px; color: var(--muted); padding-top: 2px; }
+.toc a { color: var(--fg); text-decoration: none; line-height: 1.4; }
+.toc a:hover, .toc a.active { color: var(--accent); }
+
+/* prose */
+.prose { min-width: 0; max-width: 76ch; }
+.prose > .sec, .prose > .intro { padding-bottom: var(--s-5); }
+.prose > .sec + .sec { border-top: 1px solid var(--line); padding-top: var(--s-5); }
+.prose h2 { font-family: var(--f-display); font-weight: 700; font-size: 28px; line-height: 1.2; margin: 0 0 var(--s-3); text-wrap: balance; }
+.prose h3 { font-family: var(--f-display); font-weight: 600; font-size: 20px; line-height: 1.3; margin: var(--s-5) 0 var(--s-2); }
+.prose h4 { font-size: 15px; font-weight: 700; margin: var(--s-4) 0 var(--s-1); }
+.prose p { margin: 0 0 var(--s-3); }
+.prose ul, .prose ol { margin: 0 0 var(--s-3); padding-left: 1.3em; }
+.prose li { margin: 3px 0; }
+.prose li > p { margin: 0; }
+.prose strong { font-weight: 650; }
+.prose code { font-family: var(--f-mono); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; color: var(--code-fg); overflow-wrap: anywhere; }
+.prose hr { border: 0; border-top: 1px dashed var(--line); margin: var(--s-5) 0; }
+.hl { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r); margin: var(--s-3) 0 var(--s-4); overflow-x: auto; }
+.hl pre { margin: 0; padding: 12px 14px; font-family: var(--f-mono); font-size: 13.2px; line-height: 1.55; color: var(--code-fg); }
+.hl pre code, .hl code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.prose pre:not(.hl pre) { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; overflow-x: auto; font-family: var(--f-mono); font-size: 13.2px; }
+/* pygments tokens */
+.hl .k, .hl .kd, .hl .kn, .hl .kr, .hl .kc, .hl .ow { color: var(--sx-kw); font-weight: 600; }
+.hl .kt, .hl .nc, .hl .nn { color: var(--sx-type); }
+.hl .s, .hl .s1, .hl .s2, .hl .sc, .hl .sa, .hl .se, .hl .sb, .hl .sd { color: var(--sx-str); }
+.hl .c, .hl .c1, .hl .cm, .hl .cs, .hl .ch { color: var(--sx-com); font-style: italic; }
+.hl .cp, .hl .cpf { color: var(--sx-pp); }
+.hl .m, .hl .mi, .hl .mh, .hl .mf, .hl .mo, .hl .mb, .hl .il { color: var(--sx-num); }
+.hl .nf, .hl .fm { color: var(--sx-fn); }
+.hl .err { color: inherit; background: none; border: 0; }
+
+.tbl { overflow-x: auto; margin: var(--s-3) 0 var(--s-4); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+
+/* callouts */
+.callout { margin: var(--s-4) 0; padding: var(--s-3) var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.callout > p:last-child, .callout > ul:last-child { margin-bottom: 0; }
+.callout-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2); margin-bottom: var(--s-1); }
+.callout-tag { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; padding: 1px 7px; border-radius: 3px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.callout-title { font-weight: 650; }
+.c-mcu .callout-tag, .c-linux .callout-tag, .c-emb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-pv .callout-tag { color: var(--copper); background: var(--copper-weak); border-color: transparent; }
+.c-pv { border-color: color-mix(in srgb, var(--copper) 35%, var(--line)); }
+.c-warn .callout-tag { color: var(--bad); background: var(--bad-weak); border-color: transparent; }
+.c-tip .callout-tag { color: var(--ok); background: var(--ok-weak); border-color: transparent; }
+
+/* badges */
+.badge { display: inline-block; vertical-align: middle; font-family: var(--f-mono); font-size: 11px; font-weight: 600; letter-spacing: .03em; padding: 0 6px; line-height: 19px; border-radius: 3px; margin-left: 6px; white-space: nowrap; }
+.badge.must { background: var(--accent); color: var(--surface); }
+.badge.skim { background: var(--accent-weak); color: var(--accent); }
+.badge.skip { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.badge.hot { background: var(--copper-weak); color: var(--copper); }
+.badge.std { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.pg { display: inline-block; vertical-align: middle; font-family: var(--f-mono); font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px; white-space: nowrap; letter-spacing: 0; }
+h2 .badge, h3 .badge { font-family: var(--f-mono); }
+
+/* Q&A */
+.qa-tools, .fc-tools, .quiz-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin-bottom: var(--s-5); }
+#qa-search { flex: 1 1 240px; min-width: 0; font: inherit; font-size: 15px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--surface); color: var(--fg); }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.btn { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.ghost { background: transparent; }
+.btn.ok { background: var(--ok-weak); color: var(--ok); border-color: transparent; }
+.btn.warn { background: var(--copper-weak); color: var(--copper); border-color: transparent; }
+.qa { display: grid; gap: var(--s-6); max-width: 860px; }
+.qa-gh { font-family: var(--f-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0 0 var(--s-2); }
+.qa-group { display: grid; }
+.qa-item { border-top: 1px solid var(--line); }
+.qa-group .qa-item:last-child { border-bottom: 1px solid var(--line); }
+.qa-item summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 34px 1fr auto; gap: var(--s-2); align-items: baseline; padding: 12px 0; }
+.qa-item summary::-webkit-details-marker { display: none; }
+.qn { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.qt { font-weight: 600; min-width: 0; }
+.qt code { font-family: var(--f-mono); font-size: .88em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+.qa-item[open] summary .qt { color: var(--accent); }
+.qa-a { padding: 0 0 var(--s-4) 42px; max-width: none; }
+@media (max-width: 560px) { .qa-a { padding-left: 0; } }
+
+/* quiz */
+.score { font-family: var(--f-mono); font-size: 14px; font-weight: 600; }
+.meter { flex: 1 1 160px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 80px; }
+.meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.quiz { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--s-5); max-width: 860px; counter-reset: q; }
+.qz { counter-increment: q; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s-4); }
+.qz-stem { display: grid; grid-template-columns: 34px 1fr; gap: var(--s-2); }
+.qz-stem::before { content: counter(q, decimal-leading-zero); font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 4px; }
+.qz-stem .prose p:last-child { margin-bottom: var(--s-2); }
+.qz-opts { display: grid; gap: var(--s-2); margin: var(--s-2) 0 0 42px; }
+@media (max-width: 560px) { .qz-opts { margin-left: 0; } }
+.qz-opt { text-align: left; font: inherit; font-size: 15px; padding: 9px 12px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg); cursor: pointer; display: grid; grid-template-columns: 22px 1fr; gap: 6px; }
+.qz-opt code { font-family: var(--f-mono); font-size: .88em; }
+.qz-opt .k { font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.qz-opt:hover:not(:disabled) { border-color: var(--accent); }
+.qz-opt:disabled { cursor: default; }
+.qz-opt.right { background: var(--ok-weak); border-color: var(--ok); }
+.qz-opt.wrong { background: var(--bad-weak); border-color: var(--bad); }
+.qz-exp { margin: var(--s-3) 0 0 42px; padding-top: var(--s-3); border-top: 1px dashed var(--line); font-size: 15px; }
+@media (max-width: 560px) { .qz-exp { margin-left: 0; } }
+.qz-verdict { font-weight: 700; margin-right: 6px; }
+.qz-verdict.ok { color: var(--ok); } .qz-verdict.no { color: var(--bad); }
+
+/* flashcards */
+.fc { max-width: 760px; min-height: 280px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; padding: var(--s-6) var(--s-5); cursor: pointer; display: grid; position: relative; }
+.fc::after { content: ""; position: absolute; inset: 8px; border: 1px dashed var(--line); border-radius: 6px; pointer-events: none; }
+.fc-face { position: relative; z-index: 1; display: grid; align-content: center; gap: var(--s-3); }
+.fc-group { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.fc-q { font-family: var(--f-display); font-size: clamp(20px, 3vw, 26px); font-weight: 600; line-height: 1.3; text-wrap: balance; }
+.fc-q code { font-family: var(--f-mono); font-size: .8em; }
+.fc-hint { font-size: 13px; color: var(--muted); }
+.fc-back { max-width: none; align-content: start; }
+.fc.known { border-color: var(--ok); }
+.fc-nav { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); max-width: 760px; }
+.fc-nav .btn { flex: 1 1 120px; }
+
+/* cheatsheet */
+.cheat { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--s-4); align-items: start; }
+.cheat > .intro { grid-column: 1 / -1; max-width: 76ch; }
+.cheat .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s-4); min-width: 0; font-size: 14.5px; line-height: 1.55; }
+.cheat .card.wide { grid-column: 1 / -1; }
+.cheat h2 { font-family: var(--f-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 0 0 var(--s-3); padding-bottom: var(--s-2); border-bottom: 1px solid var(--line); }
+.cheat h3 { font-size: 14px; margin: var(--s-3) 0 var(--s-1); }
+.cheat p, .cheat ul, .cheat ol { margin: 0 0 var(--s-2); }
+.cheat ul, .cheat ol { padding-left: 1.2em; }
+.cheat code { font-family: var(--f-mono); font-size: .86em; background: var(--code-bg); padding: 0 4px; border-radius: 3px; overflow-wrap: anywhere; }
+.cheat .hl { margin: var(--s-2) 0; }
+.cheat .hl pre { font-size: 12.5px; padding: 8px 10px; }
+.cheat .tbl { margin: var(--s-2) 0; }
+.cheat table { font-size: 13px; }
+.cheat th, .cheat td { padding: 5px 8px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+@media (max-width: 560px) {
+  body { font-size: 15.5px; }
+  .prose h2 { font-size: 24px; }
+  .meta-row { grid-template-columns: 1fr; gap: 2px; }
+  .fc { padding: var(--s-5) var(--s-4); }
+}
+td code, th code { white-space: nowrap; overflow-wrap: normal; }
+.toc li.l3 { counter-increment: none; grid-template-columns: 22px 1fr; font-size: 12.5px; }
+.toc li.l3::before { content: ""; }
+.toc li.l3 a { color: var(--muted); }
+.toc li.l3 a:hover, .toc li.l3 a.active { color: var(--accent); }
+.toc li.l2 + li.l2, .toc li.l3 + li.l2 { margin-top: 4px; }
+
+/* ---------- book reader ---------- */
+.book { display: grid; gap: var(--s-6); }
+@media (min-width: 1000px) {
+  .book { grid-template-columns: 280px minmax(0, 1fr); }
+  .bk-nav { position: sticky; top: calc(64px + env(safe-area-inset-top, 0px)); align-self: start; max-height: calc(100vh - 90px); overflow: auto; }
+  .bk-nav > summary { pointer-events: none; }
+  .bk-nav > summary::-webkit-details-marker { display: none; }
+}
+.bk-nav { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: var(--s-3); }
+.bk-nav > summary { cursor: pointer; font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 2px 4px var(--s-2); list-style: none; }
+.bk-nav > summary #bk-prog { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.bk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.bk-ch > a { display: grid; grid-template-columns: minmax(0, 1fr) 16px; gap: 6px; align-items: baseline; padding: 7px 6px; border-radius: 4px; color: var(--fg); text-decoration: none; font-size: 14px; line-height: 1.35; }
+.bk-ch > a:hover { background: var(--bg); }
+.bk-ch.cur > a { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+.bk-n { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.bk-ch.read .bk-done::before { content: "✓"; color: var(--ok); font-weight: 700; }
+.bk-sub { display: none; list-style: none; margin: 2px 0 6px 10px; padding: 0; border-left: 1px solid var(--line); }
+.bk-ch.cur .bk-sub { display: grid; }
+.bk-sub a { display: block; padding: 3px 8px; font-size: 12.5px; color: var(--muted); text-decoration: none; line-height: 1.35; }
+.bk-sub a:hover { color: var(--accent); }
+.bk-body { min-width: 0; }
+.chap { max-width: 74ch; font-size: 16.5px; line-height: 1.75; }
+.chap h2 { font-size: 34px; margin-bottom: var(--s-4); }
+.chap h3 { font-size: 23px; margin-top: var(--s-7); padding-top: var(--s-4); border-top: 1px solid var(--line); }
+.chap h4 { font-size: 17px; margin-top: var(--s-5); }
+.chap-end { margin-top: var(--s-7); padding-top: var(--s-5); border-top: 2px solid var(--fg); display: grid; gap: var(--s-4); }
+.chap-end .mark-read { justify-self: start; }
+.chap-pager { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.pg-btn { display: grid; gap: 2px; padding: var(--s-3) var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r); text-decoration: none; color: var(--fg); background: var(--surface); }
+.pg-btn:hover { border-color: var(--accent); }
+.pg-btn span { font-family: var(--f-mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.pg-btn b { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.pg-btn.next { grid-column: 2; text-align: right; }
+@media (max-width: 560px) { .chap-pager { grid-template-columns: 1fr; } .pg-btn.next { grid-column: 1; } .chap h2 { font-size: 27px; } .chap h3 { font-size: 20px; } .chap { font-size: 16px; } }
+
+/* self-check */
+.selfcheck { margin: var(--s-4) 0; border: 1px dashed var(--line-strong); border-radius: var(--r); padding: 0 var(--s-4); background: var(--surface); }
+.selfcheck > summary { cursor: pointer; padding: var(--s-3) 0; font-weight: 600; list-style: none; display: flex; gap: var(--s-2); align-items: baseline; flex-wrap: wrap; }
+.selfcheck > summary::-webkit-details-marker { display: none; }
+.selfcheck > summary::after { content: "Xem đáp án"; margin-left: auto; font-family: var(--f-mono); font-size: 11px; color: var(--accent); font-weight: 400; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck[open] { padding-bottom: var(--s-2); }
+.sc-tag { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 1px 7px; border-radius: 3px; background: var(--copper-weak); color: var(--copper); font-weight: 600; }
+.c-key { border-color: var(--accent); }
+.c-key .callout-tag { background: var(--accent); color: var(--surface); border-color: transparent; }
+.c-why .callout-tag, .c-ex .callout-tag { color: var(--fg); }
+.qz-g { list-style: none; font-family: var(--f-display); font-weight: 700; font-size: 22px; padding-top: var(--s-4); border-top: 2px solid var(--fg); }
+
+.bk-nav > summary { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
+@media (min-width: 1000px) { .bk-cur { display: none; } }
+@media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="crumb"><span class="crumb-path"><a class="crumb-link" href="00-trang-chu.html">Embedded Knowledge</a><span class="sep">/</span><span>Module 09 · Design pattern &amp; System design</span></span><span class="rev">Rev 1.0 · 2026-10-21</span></div>
+    <h1>System Design cho Embedded</h1>
+    <p class="lede">Thiết kế ở mức hệ thống: từ yêu cầu tới ngân sách tài nguyên, thiết kế ngắt, giao thức truyền thông, bootloader và cập nhật firmware an toàn, độ tin cậy (watchdog, fault handling), logging và chẩn đoán, quản lý năng lượng, và một bài system design hoàn chỉnh theo kiểu phỏng vấn.</p>
+    <div class="meta">
+      <div class="meta-row"><span class="meta-k">Phạm vi</span><span class="meta-v chips"><span class="chip">Cortex-M</span><span class="chip">RTOS</span><span class="chip">Embedded Linux</span><span class="chip">OTA / Secure boot</span><span class="chip">Mức Mid</span></span></div>
+      <div class="meta-row"><span class="meta-k">Nguồn</span><span class="meta-v">Kiến thức tổng hợp · ARMv7-M / ARMv8-M Architecture Reference Manual · MCUboot, Zephyr, FreeRTOS documentation · Elecia White, Making Embedded Systems</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabbar" role="tablist" aria-label="Phần">
+  <div class="wrap tabs"><a class="tab" href="#hoc-sau" data-tab="hoc-sau" role="tab">Học sâu<span class="tab-n">8</span></a><a class="tab" href="#phong-van" data-tab="phong-van" role="tab">Phỏng vấn<span class="tab-n">22</span></a><a class="tab" href="#quiz" data-tab="quiz" role="tab">Quiz<span class="tab-n">18</span></a><a class="tab" href="#flashcard" data-tab="flashcard" role="tab">Flashcard<span class="tab-n">22</span></a><a class="tab" href="#cheatsheet" data-tab="cheatsheet" role="tab">Cheatsheet</a></div>
+</nav>
+
+<main class="wrap main"><section class="panel" id="p-hoc-sau" data-panel="hoc-sau" role="tabpanel" hidden><div class="book"><details class="bk-nav" open><summary><span class="bk-lab">Bài</span><span class="bk-cur" id="bk-cur"></span><span class="mono" id="bk-prog"></span></summary><ol class="bk-list"><li class="bk-ch" data-chap="c-bai-1-quy-trinh-thiet-ke-he-thong-embedded"><a href="#c-bai-1-quy-trinh-thiet-ke-he-thong-embedded"><span class="bk-t">Bài 1 · Quy trình thiết kế hệ thống Embedded</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-buoc-1-lam-ro-yeu-cau">Bước 1: làm rõ yêu cầu</a></li><li><a href="#c-buoc-2-phan-chia-phan-cung-va-phan-mem">Bước 2: phân chia phần cứng và phần mềm</a></li><li><a href="#c-buoc-3-chon-nen-tang">Bước 3: chọn nền tảng</a></li><li><a href="#c-buoc-4-lap-ngan-sach-tai-nguyen">Bước 4: lập ngân sách tài nguyên</a></li><li><a href="#c-buoc-5-kien-truc-phan-mem">Bước 5: kiến trúc phần mềm</a></li><li><a href="#c-buoc-6-loi-bao-mat-cap-nhat-san-xuat">Bước 6: lỗi, bảo mật, cập nhật, sản xuất</a></li></ol></li><li class="bk-ch" data-chap="c-bai-2-thiet-ke-ngat"><a href="#c-bai-2-thiet-ke-ngat"><span class="bk-t">Bài 2 · Thiết kế ngắt</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-co-che-ngat-tren-cortex-m-nvic">Cơ chế ngắt trên Cortex-M (NVIC)</a></li><li><a href="#c-gan-priority-cho-ngat">Gán priority cho ngắt</a></li><li><a href="#c-quy-tac-viet-isr">Quy tắc viết ISR</a></li><li><a href="#c-do-tre-va-jitter">Độ trễ và jitter</a></li><li><a href="#c-interrupt-storm-va-ngat-canh-nhieu">Interrupt storm và ngắt cạnh nhiễu</a></li><li><a href="#c-dma-giam-so-ngat">DMA: giảm số ngắt</a></li></ol></li><li class="bk-ch" data-chap="c-bai-3-thiet-ke-giao-thuc-truyen-thong"><a href="#c-bai-3-thiet-ke-giao-thuc-truyen-thong"><span class="bk-t">Bài 3 · Thiết kế giao thức truyền thông</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-cac-tang-can-nghi-toi">Các tầng cần nghĩ tới</a></li><li><a href="#c-framing">Framing</a></li><li><a href="#c-parser-la-mot-state-machine">Parser là một state machine</a></li><li><a href="#c-do-tin-cay-ack-retry-sequence-number">Độ tin cậy: ACK, retry, sequence number</a></li><li><a href="#c-ma-hoa-du-lieu-trong-payload">Mã hóa dữ liệu trong payload</a></li><li><a href="#c-dac-diem-cac-bus-tren-board">Đặc điểm các bus trên board</a></li></ol></li><li class="bk-ch" data-chap="c-bai-4-bootloader-va-cap-nhat-firmware"><a href="#c-bai-4-bootloader-va-cap-nhat-firmware"><span class="bk-t">Bài 4 · Bootloader và cập nhật firmware</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-cortex-m-khoi-dong-the-nao">Cortex-M khởi động thế nào</a></li><li><a href="#c-bootloader-la-gi">Bootloader là gì</a></li><li><a href="#c-bo-tri-flash">Bố trí Flash</a></li><li><a href="#c-image-header">Image header</a></li><li><a href="#c-nhay-tu-bootloader-sang-ung-dung">Nhảy từ bootloader sang ứng dụng</a></li><li><a href="#c-cap-nhat-an-toan-chong-mat-dien-va-tu-phuc-hoi">Cập nhật an toàn: chống mất điện và tự phục hồi</a></li><li><a href="#c-secure-boot-va-chuoi-tin-cay">Secure boot và chuỗi tin cậy</a></li><li><a href="#c-cac-giai-phap-co-san">Các giải pháp có sẵn</a></li></ol></li><li class="bk-ch" data-chap="c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu"><a href="#c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu"><span class="bk-t">Bài 5 · Độ tin cậy: watchdog, fault handling và phòng thủ</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-watchdog">Watchdog</a></li><li><a href="#c-cho-an-watchdog-dung-cach">Cho ăn watchdog đúng cách</a></li><li><a href="#c-fault-handler-tren-cortex-m">Fault handler trên Cortex-M</a></li><li><a href="#c-brown-out-va-mat-dien">Brown-out và mất điện</a></li><li><a href="#c-bao-ve-du-lieu-luu-tru">Bảo vệ dữ liệu lưu trữ</a></li><li><a href="#c-lap-trinh-phong-thu">Lập trình phòng thủ</a></li></ol></li><li class="bk-ch" data-chap="c-bai-6-logging-va-chan-doan"><a href="#c-bai-6-logging-va-chan-doan"><span class="bk-t">Bài 6 · Logging và chẩn đoán</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-vi-sao-logging-trong-firmware-kho">Vì sao logging trong firmware khó</a></li><li><a href="#c-thiet-ke-mot-he-thong-log">Thiết kế một hệ thống log</a></li><li><a href="#c-kenh-xuat-log">Kênh xuất log</a></li><li><a href="#c-log-song-sot-qua-reset">Log sống sót qua reset</a></li><li><a href="#c-crash-dump-va-core-dump">Crash dump và core dump</a></li><li><a href="#c-metrics-va-chan-doan-tu-xa">Metrics và chẩn đoán từ xa</a></li></ol></li><li class="bk-ch" data-chap="c-bai-7-quan-ly-nang-luong"><a href="#c-bai-7-quan-ly-nang-luong"><span class="bk-t">Bài 7 · Quản lý năng lượng</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-dong-trung-binh-quyet-dinh-tuoi-tho-pin">Dòng trung bình quyết định tuổi thọ pin</a></li><li><a href="#c-cac-che-do-nang-luong-cua-mcu">Các chế độ năng lượng của MCU</a></li><li><a href="#c-ky-thuat-giam-nang-luong">Kỹ thuật giảm năng lượng</a></li><li><a href="#c-do-nang-luong">Đo năng lượng</a></li></ol></li><li class="bk-ch" data-chap="c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin"><a href="#c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin"><span class="bk-t">Bài 8 · Case study: thiết kế node cảm biến IoT chạy pin</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-1-lam-ro-yeu-cau-va-noi-ro-gia-dinh">1. Làm rõ yêu cầu (và nói rõ giả định)</a></li><li><a href="#c-2-phan-cung">2. Phần cứng</a></li><li><a href="#c-3-kien-truc-phan-mem">3. Kiến trúc phần mềm</a></li><li><a href="#c-4-ngan-sach-nang-luong">4. Ngân sách năng lượng</a></li><li><a href="#c-5-do-tin-cay-va-cac-che-do-loi">5. Độ tin cậy và các chế độ lỗi</a></li><li><a href="#c-6-bao-mat">6. Bảo mật</a></li><li><a href="#c-7-san-xuat-va-van-hanh">7. Sản xuất và vận hành</a></li><li><a href="#c-cach-trinh-bay-trong-phong-van">Cách trình bày trong phỏng vấn</a></li></ol></li></ol></details><div class="bk-body"><section class="chap prose" data-chap="c-bai-1-quy-trinh-thiet-ke-he-thong-embedded" hidden><h2 id="c-bai-1-quy-trinh-thiet-ke-he-thong-embedded">Bài 1 · Quy trình thiết kế hệ thống Embedded</h2>
+<p>Câu hỏi system design trong phỏng vấn Embedded (và công việc thật ở mức Mid trở lên) không hỏi "viết hàm này", mà hỏi "thiết kế một thiết bị làm việc này". Bài này đưa ra một quy trình có cấu trúc để trả lời.</p>
+<h3 id="c-buoc-1-lam-ro-yeu-cau">Bước 1: làm rõ yêu cầu</h3>
+<p>Đừng bắt đầu bằng chọn chip. Hãy hỏi (và ghi lại) trước:</p>
+<p><strong>Yêu cầu chức năng</strong>: thiết bị làm gì? Đo gì, điều khiển gì, giao tiếp với ai, giao diện người dùng thế nào?</p>
+<p><strong>Yêu cầu phi chức năng</strong> (thường quyết định kiến trúc):</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Nhóm</th>
+<th>Câu hỏi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Thời gian</td>
+<td>Deadline cứng hay mềm? Tần số lấy mẫu? Độ trễ phản hồi tối đa?</td>
+</tr>
+<tr>
+<td>Năng lượng</td>
+<td>Nguồn lưới hay pin? Tuổi thọ pin mục tiêu? Dòng ngủ cho phép?</td>
+</tr>
+<tr>
+<td>Kết nối</td>
+<td>BLE, Wi-Fi, LTE-M/NB-IoT, LoRa, Ethernet, CAN, RS-485? Băng thông, khoảng cách?</td>
+</tr>
+<tr>
+<td>Môi trường</td>
+<td>Nhiệt độ, độ ẩm, rung, nhiễu điện từ?</td>
+</tr>
+<tr>
+<td>An toàn và tiêu chuẩn</td>
+<td>Có chuẩn an toàn chức năng (IEC 61508, ISO 26262, IEC 62304 cho thiết bị y tế)? Chứng nhận vô tuyến (FCC, CE)?</td>
+</tr>
+<tr>
+<td>Bảo mật</td>
+<td>Dữ liệu nhạy cảm? Chống giả mạo firmware? Kết nối Internet?</td>
+</tr>
+<tr>
+<td>Vòng đời</td>
+<td>Sản lượng, giá thành mục tiêu (BOM), thời gian bảo trì, cập nhật từ xa?</td>
+</tr>
+</tbody>
+</table></div>
+<p>Trong phỏng vấn, dành vài phút hỏi các câu này cho thấy tư duy hệ thống. Nếu người phỏng vấn để bạn tự giả định, hãy <strong>nói rõ giả định</strong> ("tôi giả định thiết bị chạy pin, cần 2 năm, gửi dữ liệu mỗi 15 phút").</p>
+<h3 id="c-buoc-2-phan-chia-phan-cung-va-phan-mem">Bước 2: phân chia phần cứng và phần mềm</h3>
+<p>Việc nào làm bằng phần cứng, việc nào bằng phần mềm?</p>
+<ul>
+<li>Bộ lọc analog trước ADC (anti-aliasing) hay lọc số?</li>
+<li>Đếm xung encoder bằng ngoại vi timer (quadrature mode) hay bằng ngắt GPIO? (Ngoại vi: không tốn CPU, không mất xung ở tốc độ cao.)</li>
+<li>PWM, CRC, mã hóa AES: dùng khối phần cứng nếu MCU có.</li>
+<li>Có cần FPGA hoặc MCU thứ hai cho phần realtime cứng?</li>
+</ul>
+<p>Nguyên tắc: đẩy việc <strong>tần số cao, tất định</strong> xuống phần cứng (timer, DMA, khối chuyên dụng), giữ việc <strong>linh hoạt, thay đổi</strong> ở phần mềm.</p>
+<h3 id="c-buoc-3-chon-nen-tang">Bước 3: chọn nền tảng</h3>
+<p><strong>MCU hay MPU (chạy Linux)?</strong></p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Tiêu chí</th>
+<th>MCU (Cortex-M, RISC-V, ESP32)</th>
+<th>MPU + Linux (Cortex-A)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Realtime cứng</td>
+<td>Tốt (µs)</td>
+<td>Cần PREEMPT_RT hoặc co-processor</td>
+</tr>
+<tr>
+<td>Khởi động</td>
+<td>Mili giây</td>
+<td>Vài giây</td>
+</tr>
+<tr>
+<td>Năng lượng</td>
+<td>µA khi ngủ</td>
+<td>mA đến hàng trăm mA</td>
+</tr>
+<tr>
+<td>Bộ nhớ</td>
+<td>KB đến vài MB</td>
+<td>Hàng trăm MB, cần DDR</td>
+</tr>
+<tr>
+<td>Phần mềm sẵn có</td>
+<td>Hạn chế, tự viết nhiều</td>
+<td>Rất phong phú (mạng, đồ họa, ngôn ngữ cao)</td>
+</tr>
+<tr>
+<td>Giá, độ phức tạp board</td>
+<td>Thấp</td>
+<td>Cao (DDR, PMIC, eMMC, nhiều lớp PCB)</td>
+</tr>
+<tr>
+<td>Bảo trì bảo mật</td>
+<td>Ít bề mặt tấn công</td>
+<td>Phải cập nhật kernel, thư viện liên tục</td>
+</tr>
+</tbody>
+</table></div>
+<p>Nhiều sản phẩm dùng <strong>cả hai</strong>: MPU chạy Linux cho giao diện, mạng, ứng dụng; MCU (hoặc lõi Cortex-M tích hợp sẵn trên SoC như i.MX8M, STM32MP1) lo realtime, giao tiếp với MPU qua UART/SPI/RPMsg.</p>
+<p><strong>Chọn MCU cụ thể</strong>: số lượng và loại ngoại vi (bao nhiêu UART, ADC mấy bit, có CAN-FD không), Flash/RAM (có dư cho OTA và phát triển sau này), FPU nếu xử lý tín hiệu, dòng ngủ, khối bảo mật (TrustZone, secure element, khóa debug), hệ sinh thái (toolchain, HAL, RTOS hỗ trợ, cộng đồng), <strong>nguồn cung và vòng đời</strong> (bài học từ thời khan hiếm chip 2021–2022).</p>
+<p><strong>Hệ điều hành</strong>: bare-metal, RTOS (FreeRTOS, Zephyr, ThreadX), hay Linux (Module 8, Bài 2).</p>
+<h3 id="c-buoc-4-lap-ngan-sach-tai-nguyen">Bước 4: lập ngân sách tài nguyên</h3>
+<p>Thiết kế hệ thống là <strong>cân đối ngân sách</strong>. Lập bảng ước lượng sớm và cập nhật trong suốt dự án:</p>
+<p><strong>Flash</strong>: bootloader + ứng dụng + <strong>chỗ cho bản cập nhật</strong> (A/B cần gấp đôi) + cấu hình + log + dự phòng tăng trưởng (để dư 30–50% lúc thiết kế).</p>
+<p><strong>RAM</strong>: biến toàn cục (<code>.data</code>, <code>.bss</code>) + stack mỗi task + heap/pool + buffer (DMA, mạng, hiển thị) + kernel RTOS.</p>
+<p><strong>CPU</strong>: mức sử dụng U = Σ Cᵢ/Tᵢ (Module 7, Bài 7) cho mọi tác vụ định kỳ và ISR, giữ dưới 60–70%.</p>
+<p><strong>Năng lượng</strong>: dòng trung bình theo chu kỳ hoạt động (Bài 7).</p>
+<p><strong>Băng thông bus</strong>: SPI 10 MHz có đủ cho màn hình và flash cùng lúc? DMA có tranh chấp bus với CPU?</p>
+<h3 id="c-buoc-5-kien-truc-phan-mem">Bước 5: kiến trúc phần mềm</h3>
+<p>Vẽ sơ đồ khối: các lớp (Module 8, Bài 1), các task/active object, luồng dữ liệu giữa chúng (queue, event), priority của task và ngắt, các trạng thái chính của hệ thống (khởi động, hoạt động, ngủ, lỗi, cập nhật firmware).</p>
+<h3 id="c-buoc-6-loi-bao-mat-cap-nhat-san-xuat">Bước 6: lỗi, bảo mật, cập nhật, sản xuất</h3>
+<p>Những phần hay bị quên nhưng quyết định sản phẩm có sống được ngoài thực tế:</p>
+<ul>
+<li><strong>Chế độ lỗi</strong>: cảm biến hỏng, mất kết nối, mất điện giữa chừng, bộ nhớ đầy. Hệ thống phản ứng thế nào? Trạng thái an toàn là gì?</li>
+<li><strong>Cập nhật firmware</strong> từ xa an toàn (Bài 4).</li>
+<li><strong>Bảo mật</strong>: secure boot, mã hóa kết nối, khóa cổng debug khi xuất xưởng, quản lý khóa.</li>
+<li><strong>Chẩn đoán</strong> khi thiết bị ở hiện trường (Bài 6).</li>
+<li><strong>Sản xuất</strong>: nạp firmware hàng loạt, test cuối dây chuyền, ghi số serial và dữ liệu hiệu chuẩn, truy xuất nguồn gốc.</li>
+</ul>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 1</span></div>
+<ul>
+<li>Bắt đầu bằng yêu cầu, đặc biệt phi chức năng (thời gian, năng lượng, kết nối, an toàn, bảo mật, vòng đời); nói rõ giả định.</li>
+<li>Đẩy việc tần số cao, tất định xuống phần cứng; linh hoạt ở phần mềm.</li>
+<li>MCU hay MPU (hay cả hai); chọn chip theo ngoại vi, bộ nhớ dư, năng lượng, bảo mật, hệ sinh thái, nguồn cung.</li>
+<li>Lập ngân sách Flash, RAM, CPU, năng lượng, băng thông.</li>
+<li>Đừng quên chế độ lỗi, OTA, bảo mật, chẩn đoán, sản xuất.</li>
+</ul>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao nên để dư Flash khi chọn MCU dù firmware hiện tại vừa đủ?</summary>
+<p>Cần chỗ cho bản cập nhật (A/B cần gấp đôi), cho tính năng thêm sau này và bản sửa lỗi trong nhiều năm; đổi chip giữa chừng vì hết Flash rất tốn kém.</p>
+</details>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-1-quy-trinh-thiet-ke-he-thong-embedded">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-2-thiet-ke-ngat" hidden><h2 id="c-bai-2-thiet-ke-ngat">Bài 2 · Thiết kế ngắt</h2>
+<h3 id="c-co-che-ngat-tren-cortex-m-nvic">Cơ chế ngắt trên Cortex-M (NVIC)</h3>
+<p>Khi ngoại vi báo ngắt, <strong>NVIC</strong> (<em>Nested Vectored Interrupt Controller</em>) quyết định có xử lý ngay không dựa trên <strong>priority</strong>. Nếu được, phần cứng tự động:</p>
+<ol>
+<li><strong>Lưu ngữ cảnh</strong>: đẩy 8 thanh ghi (R0–R3, R12, LR, PC, xPSR) lên stack (thêm 18 thanh ghi FPU nếu có dùng FPU, có thể trì hoãn bằng <em>lazy stacking</em>).</li>
+<li>Đọc địa chỉ ISR từ <strong>bảng vector</strong> và nhảy tới đó.</li>
+<li>Khi ISR trả về, khôi phục ngữ cảnh.</li>
+</ol>
+<p>Độ trễ vào ngắt khoảng <strong>12 chu kỳ</strong> (Cortex-M3/M4), là một lý do ISR trên Cortex-M viết được bằng C thường mà không cần hàm bọc assembly. Cơ chế <strong>tail-chaining</strong>: nếu có ngắt khác đang chờ khi ISR kết thúc, chuyển thẳng sang ISR đó mà không khôi phục rồi lưu lại ngữ cảnh (chỉ ~6 chu kỳ).</p>
+<p><strong>Priority</strong>: số <strong>nhỏ hơn</strong> = ưu tiên <strong>cao hơn</strong> (0 là cao nhất). Số bit priority thực tế tùy chip (STM32 thường 4 bit: 16 mức). Priority được chia thành:</p>
+<ul>
+<li><strong>Preemption priority</strong> (group priority): quyết định ngắt này có <strong>chen ngang</strong> ngắt đang chạy không (ngắt lồng nhau, <em>nesting</em>).</li>
+<li><strong>Subpriority</strong>: chỉ quyết định thứ tự khi <strong>nhiều ngắt cùng chờ</strong>, không gây chen ngang.</li>
+</ul>
+<p>Cách chia số bit giữa hai phần do <strong>priority grouping</strong> (thanh ghi AIRCR, hàm <code>NVIC_SetPriorityGrouping</code>) quyết định. FreeRTOS khuyên dùng tất cả bit cho preemption priority (không subpriority) để dễ suy luận.</p>
+<aside class="callout c-warn">
+<div class="callout-head"><span class="callout-tag">Cẩn thận</span><span class="callout-title">Bẫy với FreeRTOS</span></div>
+<p>Mọi ISR <strong>gọi API FreeRTOS</strong> (<code>...FromISR</code>) phải có priority <strong>số lớn hơn hoặc bằng</strong> <code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code> (tức ưu tiên <strong>thấp hơn hoặc bằng</strong> ngưỡng). ISR ưu tiên cao hơn ngưỡng không bị critical section của kernel chặn (độ trễ thấp nhất) nhưng <strong>không được</strong> gọi API kernel. Mặc định sau reset mọi ngắt có priority 0 (cao nhất), nên quên cấu hình priority là lỗi rất phổ biến, gây crash ngẫu nhiên. Bật <code>configASSERT</code> để FreeRTOS phát hiện lỗi này.</p>
+</aside>
+<h3 id="c-gan-priority-cho-ngat">Gán priority cho ngắt</h3>
+<p>Nguyên tắc tương tự <strong>rate monotonic</strong>: ngắt có <strong>deadline ngắn hơn</strong> (phải phản ứng nhanh hơn) có priority <strong>cao hơn</strong>.</p>
+<p>Ví dụ một bộ điều khiển động cơ:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Ngắt</th>
+<th>Deadline</th>
+<th>Priority</th>
+<th>Ghi chú</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bảo vệ quá dòng (comparator)</td>
+<td>&lt; 1 µs</td>
+<td>0</td>
+<td>Không gọi RTOS, thường tắt PWM bằng phần cứng (break input)</td>
+</tr>
+<tr>
+<td>ADC xong (vòng dòng điện 20 kHz)</td>
+<td>50 µs</td>
+<td>1</td>
+<td>Không gọi RTOS</td>
+</tr>
+<tr>
+<td>UART RX (921600 baud)</td>
+<td>~11 µs/byte nếu không có FIFO/DMA</td>
+<td>5</td>
+<td>Dùng DMA để nới deadline</td>
+</tr>
+<tr>
+<td>Timer 1 kHz (vòng tốc độ)</td>
+<td>1 ms</td>
+<td>6</td>
+<td>Gọi API FreeRTOS (notify task)</td>
+</tr>
+<tr>
+<td>CAN RX</td>
+<td>vài ms (FIFO phần cứng)</td>
+<td>7</td>
+<td></td>
+</tr>
+<tr>
+<td>SysTick / PendSV (RTOS)</td>
+<td>–</td>
+<td>15 (thấp nhất)</td>
+<td>RTOS yêu cầu</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="c-quy-tac-viet-isr">Quy tắc viết ISR</h3>
+<ol>
+<li><strong>Ngắn</strong>: đọc phần cứng, lưu dữ liệu, xóa cờ, báo task, thoát. Đo bằng DWT hoặc GPIO.</li>
+<li><strong>Không chặn</strong>: không chờ mutex, không <code>delay</code>, không vòng chờ phần cứng không giới hạn.</li>
+<li><strong>Không làm việc chậm hay không tất định</strong>: không <code>printf</code>, không <code>malloc</code>, không tính toán dài, không ghi flash.</li>
+<li><strong>Xóa cờ ngắt đúng cách và đúng lúc</strong>: quên xóa thì ngắt lặp lại vô hạn (CPU kẹt trong ISR). Trên Cortex-M có write buffer: xóa cờ ở cuối ISR có thể chưa kịp có hiệu lực khi ISR thoát, khiến ngắt kích hoạt lại một lần thừa; xóa ở đầu ISR, hoặc đọc lại thanh ghi / dùng <code>__DSB()</code> sau khi xóa.</li>
+<li><strong>Dữ liệu chia sẻ</strong> với code chính: dùng mẫu phù hợp (Module 8, Bài 8): atomic/volatile cho một word, ring buffer SPSC, critical section ngắn ở phía task.</li>
+<li><strong>Chỉ dùng API an toàn với ISR</strong> (<code>...FromISR</code>), và <code>portYIELD_FROM_ISR</code> khi đánh thức task ưu tiên cao.</li>
+<li><strong>Reentrancy</strong>: hàm gọi từ cả ISR và task phải reentrant (không dùng biến static chung, hoặc có bảo vệ).</li>
+</ol>
+<h3 id="c-do-tre-va-jitter">Độ trễ và jitter</h3>
+<p><strong>Interrupt latency</strong> (độ trễ ngắt) = thời gian từ sự kiện phần cứng tới lệnh đầu tiên của ISR. Gồm: độ trễ phần cứng (~12 chu kỳ), cộng thời gian <strong>ngắt bị chặn</strong> (critical section dài nhất ở bất kỳ đâu trong code, kể cả trong RTOS và thư viện), cộng thời gian chạy của các ISR <strong>ưu tiên cao hơn</strong> đang chạy, cộng wait state Flash.</p>
+<p><strong>Jitter</strong>: độ dao động của độ trễ. Vòng điều khiển cần jitter thấp. Giảm bằng: critical section ngắn, dùng BASEPRI thay vì tắt hết ngắt, đặt ISR quan trọng ở priority cao, chạy ISR từ RAM/TCM, và với những việc cần thời điểm chính xác thì để <strong>phần cứng</strong> làm (timer kích hoạt ADC trực tiếp, DMA ghi vào timer).</p>
+<h3 id="c-interrupt-storm-va-ngat-canh-nhieu">Interrupt storm và ngắt cạnh nhiễu</h3>
+<p>Nguồn ngắt gửi ngắt quá nhanh (nút dội, tín hiệu nhiễu nối vào chân EXTI, ngoại vi lỗi liên tục) có thể chiếm 100% CPU. Phòng ngừa:</p>
+<ul>
+<li>Lọc phần cứng (RC, Schmitt trigger) cho tín hiệu ngoài.</li>
+<li>Với nút bấm: lấy mẫu định kỳ thay vì ngắt cạnh (Module 7, Bài 4).</li>
+<li><strong>Giới hạn tốc độ</strong>: ISR tự tắt ngắt của nguồn đó, task bật lại sau một khoảng thời gian.</li>
+<li>Đếm số ngắt mỗi giây làm chỉ số chẩn đoán; vượt ngưỡng thì báo lỗi.</li>
+</ul>
+<h3 id="c-dma-giam-so-ngat">DMA: giảm số ngắt</h3>
+<p>Thay vì một ngắt mỗi byte (UART 1 Mbaud là 100.000 ngắt/giây), dùng <strong>DMA</strong> chuyển cả khối và chỉ ngắt khi xong (hoặc nửa khối, hoặc khi đường truyền rảnh). Giảm tải CPU và nới deadline. Lưu ý với DMA:</p>
+<ul>
+<li><strong>Cache coherency</strong> trên Cortex-M7/Cortex-A: CPU ghi vào cache, DMA đọc RAM, thấy dữ liệu cũ. Trước khi DMA đọc buffer: <strong>clean</strong> cache vùng đó; sau khi DMA ghi xong: <strong>invalidate</strong> cache trước khi CPU đọc. Hoặc đặt buffer DMA ở vùng <strong>non-cacheable</strong> (cấu hình MPU). Buffer nên căn lề theo cache line (32 byte).</li>
+<li><strong>Vùng nhớ DMA truy cập được</strong>: trên một số chip (STM32H7), DTCM không truy cập được bằng DMA thường.</li>
+<li>Buffer DMA không được nằm trên <strong>stack</strong> của hàm đã trả về.</li>
+</ul>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 2</span></div>
+<ul>
+<li>NVIC: lưu ngữ cảnh tự động (~12 chu kỳ), tail-chaining; số nhỏ = ưu tiên cao; preemption priority và subpriority.</li>
+<li>FreeRTOS: ISR gọi API phải có priority thấp hơn hoặc bằng <code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code>.</li>
+<li>Gán priority theo deadline; ISR ngắn, không chặn, xóa cờ đúng lúc, dùng API FromISR.</li>
+<li>Latency = phần cứng + critical section dài nhất + ISR ưu tiên cao hơn; giảm jitter bằng phần cứng và critical section ngắn.</li>
+<li>Chống interrupt storm; dùng DMA để giảm ngắt, nhớ cache coherency.</li>
+</ul>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>ISR UART không xóa cờ ngắt (hoặc không đọc thanh ghi dữ liệu). Chuyện gì xảy ra?</summary>
+<p>Ngắt vẫn pending nên ISR được gọi lại ngay khi thoát, lặp vô hạn; CPU kẹt trong ngắt, code chính và các ngắt ưu tiên thấp hơn không chạy (thường dẫn tới watchdog reset).</p>
+</details>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Một ngắt ưu tiên 2 gọi `xQueueSendFromISR` trong hệ thống có `configMAX_SYSCALL_INTERRUPT_PRIORITY` = 5 (dạng số chưa dịch). Có vấn đề gì?</summary>
+<p>Có: priority 2 cao hơn ngưỡng 5, ngắt có thể chạy giữa critical section của kernel và làm hỏng cấu trúc dữ liệu của RTOS. Phải đặt priority số ≥ 5, hoặc không gọi API RTOS trong ISR đó.</p>
+</details>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-2-thiet-ke-ngat">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-3-thiet-ke-giao-thuc-truyen-thong" hidden><h2 id="c-bai-3-thiet-ke-giao-thuc-truyen-thong">Bài 3 · Thiết kế giao thức truyền thông</h2>
+<h3 id="c-cac-tang-can-nghi-toi">Các tầng cần nghĩ tới</h3>
+<p>Kể cả giao thức đơn giản giữa MCU và PC qua UART cũng cần trả lời:</p>
+<ol>
+<li><strong>Framing</strong>: làm sao biết một gói bắt đầu và kết thúc ở đâu trong dòng byte?</li>
+<li><strong>Toàn vẹn</strong>: làm sao phát hiện byte bị lỗi?</li>
+<li><strong>Độ tin cậy</strong>: gói bị mất thì sao? Gửi lại thế nào? Gói trùng?</li>
+<li><strong>Ngữ nghĩa</strong>: lệnh, phản hồi, sự kiện; định dạng dữ liệu; thứ tự byte.</li>
+<li><strong>Tiến hóa</strong>: phiên bản mới của firmware có nói chuyện được với phiên bản cũ của phần mềm PC không?</li>
+</ol>
+<h3 id="c-framing">Framing</h3>
+<p>UART, TCP, USB CDC cho một <strong>dòng byte</strong> liên tục, không có ranh giới gói. Ba cách phổ biến:</p>
+<p><strong>1. Header với byte bắt đầu và độ dài:</strong></p>
+<div class="hl"><pre><span></span><code> ┌──────┬──────┬───────┬────────────┬─────────┐
+ │ SOF  │ LEN  │ TYPE  │ PAYLOAD    │ CRC16   │
+ │ 0xA5 │ 1 B  │ 1 B   │ LEN byte   │ 2 B     │
+ └──────┴──────┴───────┴────────────┴─────────┘
+</code></pre></div>
+
+<p>Bên nhận tìm byte <code>0xA5</code>, đọc độ dài, đọc đủ payload, kiểm tra CRC. Vấn đề: byte <code>0xA5</code> cũng có thể xuất hiện <strong>trong payload</strong>. Nếu bị mất đồng bộ (mất một byte, hoặc bắt đầu nghe giữa chừng), parser có thể nhận nhầm một byte payload là SOF. CRC sẽ phát hiện, và parser phải <strong>tìm lại SOF tiếp theo</strong> (resync) từ byte sau SOF giả. Thêm <strong>timeout giữa các byte</strong> (gói phải đến liền mạch) giúp resync nhanh.</p>
+<p><strong>2. Byte stuffing (SLIP, HDLC):</strong> dùng một byte đặc biệt làm ranh giới gói (END = 0xC0 trong SLIP), và <strong>thay thế</strong> mọi lần byte đó xuất hiện trong dữ liệu bằng chuỗi escape (0xDB 0xDC). Ranh giới không bao giờ xuất hiện trong dữ liệu, nên resync tức thì. Nhược điểm: kích thước gói thay đổi, xấu nhất gấp đôi.</p>
+<p><strong>3. COBS (Consistent Overhead Byte Stuffing):</strong> mã hóa dữ liệu để <strong>không còn byte 0x00 nào</strong>, rồi dùng 0x00 làm ranh giới gói. Overhead <strong>cố định và nhỏ</strong>: tối đa 1 byte cho mỗi 254 byte dữ liệu. Được dùng nhiều trong giao thức nhúng hiện đại.</p>
+<p>Ý tưởng COBS: mỗi byte 0 trong dữ liệu được thay bằng <strong>khoảng cách tới byte 0 tiếp theo</strong>, và thêm một byte đầu chứa khoảng cách tới byte 0 đầu tiên:</p>
+<div class="hl"><pre><span></span><code> Dữ liệu:  11 22 00 33
+ COBS:     03 11 22 02 33 00
+           ↑ "2 byte dữ liệu rồi tới một số 0"   ↑ "1 byte dữ liệu rồi hết"   ↑ ranh giới
+</code></pre></div>
+
+<div class="hl"><pre><span></span><code><span class="cm">/* Mã hóa COBS; out cần len + len/254 + 1 byte; trả độ dài (không gồm byte 0 kết thúc) */</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">cobs_encode</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">in</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">code_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">len</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">in</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">out</span><span class="p">[</span><span class="n">code_idx</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">code</span><span class="p">;</span><span class="w"> </span><span class="n">code_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">o</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">out</span><span class="p">[</span><span class="n">o</span><span class="o">++</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">in</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">++</span><span class="n">code</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mh">0xFF</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">out</span><span class="p">[</span><span class="n">code_idx</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">code</span><span class="p">;</span><span class="w"> </span><span class="n">code_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">o</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">out</span><span class="p">[</span><span class="n">code_idx</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">code</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">o</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="c-parser-la-mot-state-machine">Parser là một state machine</h3>
+<p>Parser nhận từng byte (từ ring buffer, Module 6) và <strong>không bao giờ chặn</strong>: một state machine (Module 8, Bài 3) là cách tự nhiên.</p>
+<div class="hl"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">P_WAIT_SOF</span><span class="p">,</span><span class="w"> </span><span class="n">P_LEN</span><span class="p">,</span><span class="w"> </span><span class="n">P_TYPE</span><span class="p">,</span><span class="w"> </span><span class="n">P_PAYLOAD</span><span class="p">,</span><span class="w"> </span><span class="n">P_CRC_HI</span><span class="p">,</span><span class="w"> </span><span class="n">P_CRC_LO</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="n">pstate_t</span><span class="p">;</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">pstate_t</span><span class="w"> </span><span class="n">st</span><span class="p">;</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="p">,</span><span class="w"> </span><span class="n">idx</span><span class="p">;</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">crc_rx</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w">  </span><span class="n">buf</span><span class="p">[</span><span class="mi">64</span><span class="p">];</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">last_byte_ms</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">parser_t</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">parser_feed</span><span class="p">(</span><span class="n">parser_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">now_ms</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">P_WAIT_SOF</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)(</span><span class="n">now_ms</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">last_byte_ms</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">20u</span><span class="p">)</span>
+<span class="w">        </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_WAIT_SOF</span><span class="p">;</span><span class="w">                                     </span><span class="cm">/* timeout giữa byte: resync */</span>
+<span class="w">    </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">last_byte_ms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">now_ms</span><span class="p">;</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">P_WAIT_SOF</span><span class="p">:</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mh">0xA5</span><span class="p">)</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_LEN</span><span class="p">;</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">P_LEN</span><span class="p">:</span><span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">buf</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_WAIT_SOF</span><span class="p">;</span><span class="w"> </span><span class="k">break</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="cm">/* độ dài vô lý */</span>
+<span class="w">                     </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_TYPE</span><span class="p">;</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">P_TYPE</span><span class="p">:</span><span class="w">     </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_PAYLOAD</span><span class="p">;</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">P_PAYLOAD</span><span class="p">:</span><span class="w">  </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">buf</span><span class="p">[</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">idx</span><span class="o">++</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">idx</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_CRC_HI</span><span class="p">;</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">P_CRC_HI</span><span class="p">:</span><span class="w">   </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">crc_rx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint16_t</span><span class="p">)(</span><span class="n">b</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">);</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_CRC_LO</span><span class="p">;</span><span class="w"> </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">P_CRC_LO</span><span class="p">:</span>
+<span class="w">        </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">crc_rx</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">b</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">crc_rx</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">crc16_frame</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">type</span><span class="p">,</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">))</span><span class="w"> </span><span class="n">handle_frame</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">type</span><span class="p">,</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">);</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">crc_errors</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">P_WAIT_SOF</span><span class="p">;</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Điểm phòng thủ: <strong>kiểm tra độ dài</strong> trước khi ghi vào buffer (không tin dữ liệu từ bên ngoài: chống tràn buffer), timeout giữa byte, đếm lỗi để chẩn đoán.</p>
+<h3 id="c-do-tin-cay-ack-retry-sequence-number">Độ tin cậy: ACK, retry, sequence number</h3>
+<p>Với kênh có thể mất gói (radio, RS-485 nhiễu), dùng mẫu <strong>stop-and-wait ARQ</strong>:</p>
+<ul>
+<li>Mỗi gói có <strong>sequence number</strong> (số thứ tự).</li>
+<li>Bên nhận gửi <strong>ACK</strong> kèm số thứ tự đã nhận.</li>
+<li>Bên gửi chờ ACK với <strong>timeout</strong>; hết hạn thì <strong>gửi lại</strong> (giới hạn số lần, có thể tăng dần thời gian chờ: <em>exponential backoff</em>).</li>
+<li>Bên nhận dùng sequence number để <strong>bỏ gói trùng</strong> (ACK bị mất nên bên gửi gửi lại gói đã nhận), nhưng vẫn ACK lại.</li>
+</ul>
+<p>Thao tác có tác dụng phụ (ví dụ "tăng giá trị", "nhả thuốc") phải <strong>idempotent</strong> hoặc được bảo vệ bởi sequence number, để gửi lại không làm thực hiện hai lần.</p>
+<p>Cần thông lượng cao hơn thì dùng <strong>sliding window</strong> (nhiều gói chưa ACK cùng lúc), như TCP.</p>
+<h3 id="c-ma-hoa-du-lieu-trong-payload">Mã hóa dữ liệu trong payload</h3>
+<ul>
+<li><strong>Thứ tự byte</strong>: quy định rõ (thường little-endian cho giao thức nội bộ với MCU ARM, big-endian cho giao thức mạng). Đọc ghi bằng dịch bit (Module 1), <strong>không cast struct</strong> lên buffer: struct có padding và phụ thuộc endianness, alignment của compiler.</li>
+<li><strong>Định dạng</strong>: struct nhị phân tự định nghĩa (gọn, nhanh, dễ vỡ khi thay đổi); <strong>TLV</strong> (type-length-value: thêm trường mới mà bên cũ bỏ qua được); <strong>CBOR</strong>, <strong>MessagePack</strong> (nhị phân, tự mô tả); <strong>Protocol Buffers</strong> với <strong>nanopb</strong> (có schema, sinh code, tương thích tiến/lùi, phổ biến cho thiết bị IoT); JSON chỉ khi băng thông và CPU dư.</li>
+<li><strong>Phiên bản</strong>: gói đầu tiên (handshake) trao đổi phiên bản giao thức và khả năng hỗ trợ.</li>
+</ul>
+<h3 id="c-dac-diem-cac-bus-tren-board">Đặc điểm các bus trên board</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Bus</th>
+<th>Đặc điểm</th>
+<th>Lưu ý thiết kế</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>UART</strong></td>
+<td>2 dây, không clock, điểm-điểm</td>
+<td>Baud lệch tối đa ~2–3%; cần framing; RS-485 cho xa, nhiều điểm (half-duplex, điều khiển chân DE)</td>
+</tr>
+<tr>
+<td><strong>I2C</strong></td>
+<td>2 dây, nhiều thiết bị, địa chỉ 7-bit, 100k/400k/1M</td>
+<td>Pull-up; clock stretching; bus có thể <strong>treo</strong> khi slave giữ SDA thấp (reset bus bằng 9 xung SCL); trùng địa chỉ</td>
+</tr>
+<tr>
+<td><strong>SPI</strong></td>
+<td>4 dây, nhanh (hàng chục MHz), full-duplex</td>
+<td>Mỗi slave một chân CS; 4 mode (CPOL/CPHA) phải khớp; không có ACK, không phát hiện slave vắng mặt</td>
+</tr>
+<tr>
+<td><strong>CAN / CAN-FD</strong></td>
+<td>Vi sai, nhiều node, ưu tiên theo ID, có CRC và ACK phần cứng</td>
+<td>Arbitration không phá hủy (ID nhỏ thắng); thiết kế bảng ID theo ưu tiên; bus-off recovery</td>
+</tr>
+<tr>
+<td><strong>USB</strong></td>
+<td>Phức tạp, cần stack</td>
+<td>CDC-ACM cho cổng serial ảo; DFU cho cập nhật firmware</td>
+</tr>
+<tr>
+<td><strong>Ethernet</strong></td>
+<td>Cần stack TCP/IP (lwIP)</td>
+<td>RAM cho buffer; bảo mật (TLS) tốn tài nguyên</td>
+</tr>
+</tbody>
+</table></div>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 3</span></div>
+<ul>
+<li>Framing: SOF + độ dài + CRC (cần resync và timeout), byte stuffing (SLIP/HDLC), hoặc COBS (overhead cố định, 0x00 làm ranh giới).</li>
+<li>Parser là state machine không chặn; kiểm tra độ dài, timeout giữa byte, đếm lỗi.</li>
+<li>Độ tin cậy: sequence number, ACK, timeout, retry có giới hạn và backoff, lọc trùng, thao tác idempotent.</li>
+<li>Payload: quy định endianness, không cast struct; TLV/CBOR/protobuf để tiến hóa được; trao đổi phiên bản.</li>
+<li>Hiểu đặc điểm từng bus: I2C treo bus, SPI không ACK, CAN arbitration theo ID.</li>
+</ul>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không nên `memcpy` buffer nhận được vào một struct C để đọc các trường?</summary>
+<p>Struct có padding và layout phụ thuộc compiler; thứ tự byte phụ thuộc CPU; đọc thẳng có thể unaligned. Nên đọc từng trường bằng dịch bit theo thứ tự byte đã quy định.</p>
+</details>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Bên gửi gửi lại một gói vì không nhận được ACK, nhưng thực ra bên nhận đã xử lý gói đó. Làm sao tránh thực hiện hai lần?</summary>
+<p>Bên nhận nhớ sequence number của gói đã xử lý gần nhất; gói trùng số thì không xử lý lại nhưng vẫn gửi ACK. Thiết kế lệnh idempotent khi có thể.</p>
+</details>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-3-thiet-ke-giao-thuc-truyen-thong">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-4-bootloader-va-cap-nhat-firmware" hidden><h2 id="c-bai-4-bootloader-va-cap-nhat-firmware">Bài 4 · Bootloader và cập nhật firmware</h2>
+<h3 id="c-cortex-m-khoi-dong-the-nao">Cortex-M khởi động thế nào</h3>
+<p>Hiểu quá trình khởi động là nền tảng để viết bootloader:</p>
+<ol>
+<li>Sau reset, CPU đọc <strong>word đầu tiên</strong> của bảng vector (thường ở đầu Flash, địa chỉ 0x08000000 trên STM32, được ánh xạ về 0x0) làm giá trị khởi đầu của <strong>stack pointer</strong> (MSP).</li>
+<li>Đọc <strong>word thứ hai</strong> làm địa chỉ của <strong>Reset_Handler</strong> và nhảy tới đó.</li>
+<li>Reset_Handler (startup code, thường viết bằng assembly hoặc C): cấu hình clock cơ bản (<code>SystemInit</code>), copy <code>.data</code> từ Flash sang RAM, xóa <code>.bss</code> (Module 1), gọi các constructor toàn cục (C++), rồi gọi <code>main()</code>.</li>
+</ol>
+<div class="hl"><pre><span></span><code> Flash 0x08000000:
+   [0x00] Initial MSP      = 0x20020000 (đỉnh RAM)
+   [0x04] Reset_Handler    = 0x080001A1 (bit 0 = 1: Thumb mode)
+   [0x08] NMI_Handler
+   [0x0C] HardFault_Handler
+   ...
+</code></pre></div>
+
+<h3 id="c-bootloader-la-gi">Bootloader là gì</h3>
+<p><strong>Bootloader</strong> là một chương trình nhỏ chạy <strong>trước</strong> ứng dụng, nằm ở đầu Flash (vị trí CPU khởi động). Nhiệm vụ:</p>
+<ul>
+<li>Kiểm tra ứng dụng có hợp lệ không (CRC, chữ ký).</li>
+<li>Nhận và ghi firmware mới (qua UART, USB DFU, CAN, Bluetooth, hoặc từ vùng Flash mà ứng dụng đã tải về).</li>
+<li>Chọn bản firmware nào để chạy, xử lý rollback.</li>
+<li>Nhảy sang ứng dụng.</li>
+</ul>
+<p>Nhiều MCU có sẵn <strong>ROM bootloader</strong> của hãng (STM32 system memory bootloader qua UART/USB/CAN, kích hoạt bằng chân BOOT0). Nó hữu ích để nạp lần đầu và cứu thiết bị hỏng, nhưng không đủ cho cập nhật từ xa an toàn; sản phẩm thường có bootloader riêng.</p>
+<h3 id="c-bo-tri-flash">Bố trí Flash</h3>
+<div class="hl"><pre><span></span><code> Single-slot + bootloader:               Dual-slot (A/B):
+ ┌───────────────┐ 0x08000000            ┌───────────────┐
+ │ Bootloader    │ 32 KB                 │ Bootloader    │
+ ├───────────────┤                       ├───────────────┤
+ │ Application   │                       │ Slot A (đang  │
+ │               │                       │  chạy)        │
+ │               │                       ├───────────────┤
+ │               │                       │ Slot B (bản   │
+ ├───────────────┤                       │  mới/dự phòng)│
+ │ Config / data │                       ├───────────────┤
+ └───────────────┘                       │ Config / data │
+                                         └───────────────┘
+</code></pre></div>
+
+<p><strong>Single-slot</strong>: bootloader xóa vùng ứng dụng và ghi bản mới trực tiếp. Tiết kiệm Flash, nhưng <strong>trong lúc ghi</strong> không có ứng dụng hợp lệ: mất điện giữa chừng thì thiết bị chỉ còn bootloader (vẫn cứu được nếu bootloader tự nhận firmware qua một kênh). Nếu bản mới bị lỗi logic, không có đường quay lại.</p>
+<p><strong>Dual-slot (A/B)</strong>: ứng dụng đang chạy tải bản mới vào <strong>slot không dùng</strong>, kiểm tra đầy đủ, rồi đánh dấu "lần khởi động tới hãy thử slot mới". Mất điện lúc tải: slot cũ vẫn nguyên. Bản mới lỗi: quay về slot cũ (<strong>rollback</strong>). Tốn gấp đôi Flash. Có hai cách:</p>
+<ul>
+<li><strong>Swap</strong>: bootloader <strong>hoán đổi</strong> nội dung hai slot (dùng một vùng đệm, ghi trạng thái từng bước để tiếp tục được sau mất điện). Ứng dụng luôn chạy ở cùng địa chỉ. MCUboot dùng cách này.</li>
+<li><strong>Execute in place từ slot nào cũng được</strong>: ứng dụng được link (hoặc relocate) để chạy ở cả hai địa chỉ; bootloader chỉ chọn slot. Một số MCU có <strong>dual-bank Flash</strong> với khả năng hoán đổi bank bằng phần cứng (STM32 bank swap), rất tiện.</li>
+</ul>
+<p>Vùng ngoài (Flash SPI) cũng dùng được làm slot tải về, rồi bootloader copy vào Flash trong.</p>
+<h3 id="c-image-header">Image header</h3>
+<p>Mỗi image firmware nên có một <strong>header</strong> để bootloader kiểm tra:</p>
+<div class="hl"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">magic</span><span class="p">;</span><span class="w">            </span><span class="cm">/* 0x464D5754 'FMWT': nhận dạng image hợp lệ */</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">header_version</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">hw_id</span><span class="p">;</span><span class="w">            </span><span class="cm">/* chặn nạp nhầm firmware của board khác */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">fw_version</span><span class="p">;</span><span class="w">       </span><span class="cm">/* major.minor.patch, chống hạ phiên bản (anti-rollback) */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">image_size</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">load_addr</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">crc32</span><span class="p">;</span><span class="w">            </span><span class="cm">/* toàn vẹn */</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w">  </span><span class="n">signature</span><span class="p">[</span><span class="mi">64</span><span class="p">];</span><span class="w">    </span><span class="cm">/* ECDSA P-256 / Ed25519: xác thực nguồn gốc */</span>
+<span class="p">}</span><span class="w"> </span><span class="n">fw_header_t</span><span class="p">;</span>
+</code></pre></div>
+
+<p>Kiểm tra trước khi nhảy: magic đúng, <code>hw_id</code> khớp board, kích thước hợp lý, CRC đúng, <strong>chữ ký đúng</strong> (nếu có secure boot), phiên bản không thấp hơn mức tối thiểu cho phép.</p>
+<h3 id="c-nhay-tu-bootloader-sang-ung-dung">Nhảy từ bootloader sang ứng dụng</h3>
+<div class="hl"><pre><span></span><code><span class="cp">#define APP_ADDR 0x08008000u</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">reset_fn_t</span><span class="p">)(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">jump_to_app</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">vt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">APP_ADDR</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vt</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="n">reset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vt</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">((</span><span class="n">sp</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFFF00000u</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mh">0x20000000u</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span><span class="w">     </span><span class="cm">/* kiểm tra sơ bộ: SP phải trỏ vào RAM */</span>
+
+<span class="w">    </span><span class="n">__disable_irq</span><span class="p">();</span>
+<span class="w">    </span><span class="n">SysTick</span><span class="o">-&gt;</span><span class="n">CTRL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">                                  </span><span class="cm">/* dừng SysTick */</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">                       </span><span class="cm">/* tắt và xóa mọi ngắt pending trong NVIC */</span>
+<span class="w">        </span><span class="n">NVIC</span><span class="o">-&gt;</span><span class="n">ICER</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xFFFFFFFFu</span><span class="p">;</span>
+<span class="w">        </span><span class="n">NVIC</span><span class="o">-&gt;</span><span class="n">ICPR</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xFFFFFFFFu</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">deinit_peripherals_and_clocks</span><span class="p">();</span><span class="w">                    </span><span class="cm">/* trả ngoại vi, clock về trạng thái reset */</span>
+
+<span class="w">    </span><span class="n">SCB</span><span class="o">-&gt;</span><span class="n">VTOR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">APP_ADDR</span><span class="p">;</span><span class="w">                               </span><span class="cm">/* bảng vector của ứng dụng */</span>
+<span class="w">    </span><span class="n">__DSB</span><span class="p">();</span><span class="w"> </span><span class="n">__ISB</span><span class="p">();</span>
+<span class="w">    </span><span class="n">__set_MSP</span><span class="p">(</span><span class="n">sp</span><span class="p">);</span><span class="w">                                      </span><span class="cm">/* stack của ứng dụng */</span>
+<span class="w">    </span><span class="n">__enable_irq</span><span class="p">();</span><span class="w">                                     </span><span class="cm">/* hoặc để ứng dụng tự bật */</span>
+<span class="w">    </span><span class="p">((</span><span class="n">reset_fn_t</span><span class="p">)</span><span class="n">reset</span><span class="p">)();</span><span class="w">                              </span><span class="cm">/* không quay lại */</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Những điểm hay sai:</p>
+<ul>
+<li>Quên <strong>đặt lại VTOR</strong>: ngắt đầu tiên của ứng dụng nhảy vào ISR của <strong>bootloader</strong>.</li>
+<li>Không <strong>tắt ngoại vi và ngắt</strong> mà bootloader đã bật: ứng dụng nhận ngắt từ ngoại vi nó chưa khởi tạo.</li>
+<li>Ứng dụng phải được <strong>link</strong> ở địa chỉ đúng (<code>FLASH ORIGIN = 0x08008000</code> trong linker script).</li>
+<li>Cortex-M0 không có VTOR: phải copy bảng vector của ứng dụng vào đầu RAM và ánh xạ RAM về địa chỉ 0 (SYSCFG remap).</li>
+<li>Cách sạch hơn: bootloader quyết định rồi <strong>reset</strong> hệ thống với một cờ trong RAM không khởi tạo (<code>.noinit</code>), và ở lần khởi động sau nhảy sang ứng dụng <strong>ngay đầu Reset_Handler</strong>, trước khi khởi tạo bất kỳ ngoại vi nào.</li>
+</ul>
+<h3 id="c-cap-nhat-an-toan-chong-mat-dien-va-tu-phuc-hoi">Cập nhật an toàn: chống mất điện và tự phục hồi</h3>
+<p>Quy trình A/B điển hình có xác nhận (<strong>confirm</strong>):</p>
+<ol>
+<li>Ứng dụng đang chạy (slot A) tải image mới vào slot B, kiểm tra CRC và chữ ký.</li>
+<li>Đánh dấu slot B ở trạng thái <strong>"test"</strong> (chạy thử), reset.</li>
+<li>Bootloader thấy B ở trạng thái test: <strong>swap</strong> (hoặc chọn B), chạy B, đồng thời ghi nhận "đây là lần thử".</li>
+<li>Ứng dụng mới khởi động, tự kiểm tra (self-test: kết nối được server, cảm biến hoạt động, không crash trong N phút), rồi gọi <strong>confirm</strong> để đánh dấu B là <strong>"good"</strong> (permanent).</li>
+<li>Nếu ứng dụng mới <strong>crash</strong> hoặc bị <strong>watchdog reset</strong> trước khi confirm, bootloader thấy B vẫn chưa được confirm: <strong>rollback</strong> về A.</li>
+</ol>
+<p>Mọi bước ghi trạng thái phải <strong>chịu được mất điện tại bất kỳ thời điểm nào</strong>: ghi trạng thái theo kiểu nhật ký (append-only, mỗi bước một bản ghi có CRC), không sửa tại chỗ một bản ghi duy nhất.</p>
+<p>Ngoài ra:</p>
+<ul>
+<li><strong>Watchdog</strong> phải được bật trong bootloader và trong quá trình cập nhật, để thiết bị không treo vĩnh viễn.</li>
+<li><strong>Anti-rollback</strong>: lưu phiên bản tối thiểu trong vùng chỉ tăng (OTP, monotonic counter), từ chối image cũ hơn có lỗ hổng bảo mật đã biết.</li>
+<li><strong>Delta update</strong>: chỉ gửi phần khác biệt (bsdiff, detools, JojoDiff) để giảm dung lượng tải qua mạng chậm (NB-IoT, LoRa).</li>
+</ul>
+<h3 id="c-secure-boot-va-chuoi-tin-cay">Secure boot và chuỗi tin cậy</h3>
+<p><strong>Secure boot</strong> đảm bảo chỉ firmware được <strong>ký bởi nhà sản xuất</strong> mới chạy được:</p>
+<ul>
+<li>Khóa <strong>công khai</strong> (hoặc hash của nó) được ghi vào vùng <strong>không sửa được</strong> (OTP, ROM, vùng Flash bị khóa ghi).</li>
+<li>Mỗi tầng <strong>xác minh chữ ký</strong> của tầng tiếp theo trước khi chạy nó: ROM → bootloader → ứng dụng. Đây là <strong>chain of trust</strong>.</li>
+<li><strong>Khóa cổng debug</strong> (STM32 RDP level, nRF APPROTECT) khi xuất xưởng, nếu không kẻ tấn công đọc/ghi Flash trực tiếp.</li>
+<li>Mã hóa image (ngoài ký) nếu cần bảo vệ bí mật thương mại.</li>
+<li>TrustZone (Cortex-M33, M55) tách vùng secure (khóa, crypto) khỏi non-secure (ứng dụng).</li>
+</ul>
+<p>CRC <strong>không</strong> thay được chữ ký: CRC chỉ chống lỗi ngẫu nhiên.</p>
+<h3 id="c-cac-giai-phap-co-san">Các giải pháp có sẵn</h3>
+<ul>
+<li><strong>MCUboot</strong>: bootloader mã nguồn mở, secure boot (RSA/ECDSA/Ed25519), swap/overwrite, rollback, dùng với Zephyr, Mynewt, ESP-IDF, nhiều RTOS.</li>
+<li><strong>ESP-IDF</strong>: OTA A/B có sẵn với app rollback.</li>
+<li>Hãng MCU: STM32 SBSFU, NXP MCUboot port.</li>
+<li><strong>Embedded Linux</strong>: bootloader <strong>U-Boot</strong> (hoặc barebox); cập nhật A/B ở mức <strong>rootfs</strong> với <strong>SWUpdate</strong>, <strong>RAUC</strong>, <strong>Mender</strong>; U-Boot đếm số lần khởi động thất bại (<code>bootcount</code>, <code>bootlimit</code>) để rollback; secure boot với chữ ký FIT image và dm-verity cho rootfs.</li>
+</ul>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 4</span></div>
+<ul>
+<li>Cortex-M khởi động: word 0 là MSP, word 1 là Reset_Handler; startup copy <code>.data</code>, xóa <code>.bss</code>, gọi <code>main</code>.</li>
+<li>Bootloader kiểm tra, nhận, chọn và chạy firmware. Single-slot tiết kiệm nhưng rủi ro; A/B cho phép rollback.</li>
+<li>Image header: magic, hw_id, version, size, CRC, chữ ký.</li>
+<li>Nhảy sang ứng dụng: tắt ngắt và ngoại vi, đặt VTOR, đặt MSP, gọi reset handler (hoặc reset với cờ noinit).</li>
+<li>Cập nhật an toàn: tải vào slot phụ, test, confirm, rollback nếu chưa confirm; ghi trạng thái chịu mất điện; watchdog luôn bật.</li>
+<li>Secure boot: chain of trust từ khóa trong OTP/ROM, khóa debug; dùng MCUboot / SWUpdate / RAUC.</li>
+</ul>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Sau khi bootloader nhảy sang ứng dụng, ngắt SysTick đầu tiên làm thiết bị treo. Nguyên nhân có thể?</summary>
+<p>Quên đặt <code>SCB-&gt;VTOR</code> về bảng vector của ứng dụng, nên ngắt nhảy vào handler của bootloader; hoặc SysTick của bootloader chưa tắt trong khi ứng dụng chưa sẵn sàng.</p>
+</details>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Firmware mới bị lỗi khiến thiết bị reset liên tục ngay khi khởi động. Cơ chế nào đưa thiết bị về bản cũ?</summary>
+<p>Cập nhật A/B có confirm: bản mới chạy ở trạng thái test, chỉ thành "good" khi tự xác nhận; nếu reset (watchdog/crash) trước khi confirm, bootloader rollback về slot cũ.</p>
+</details>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-4-bootloader-va-cap-nhat-firmware">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu" hidden><h2 id="c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu">Bài 5 · Độ tin cậy: watchdog, fault handling và phòng thủ</h2>
+<h3 id="c-watchdog">Watchdog</h3>
+<p><strong>Watchdog timer</strong> là bộ đếm phần cứng <strong>reset MCU</strong> nếu phần mềm không "cho ăn" (kick, refresh) nó trước khi hết thời gian. Là lưới an toàn cuối cùng khi phần mềm treo (vòng lặp vô hạn, deadlock, kẹt trong ngắt).</p>
+<p>Hai loại trên STM32 (và tương tự ở MCU khác):</p>
+<ul>
+<li><strong>Independent watchdog (IWDG)</strong>: chạy bằng <strong>clock riêng</strong> (LSI), vẫn chạy khi clock chính hỏng. Một khi bật thì <strong>không tắt được</strong> bằng phần mềm. Chỉ có giới hạn trên.</li>
+<li><strong>Window watchdog (WWDG)</strong>: phải cho ăn <strong>trong một cửa sổ thời gian</strong>, không quá muộn <strong>và không quá sớm</strong>. Bắt được lỗi phần mềm chạy <strong>quá nhanh</strong> (bỏ qua các bước, vòng lặp bị tắt ngắn bất thường).</li>
+</ul>
+<h3 id="c-cho-an-watchdog-dung-cach">Cho ăn watchdog đúng cách</h3>
+<p><strong>Sai lầm phổ biến</strong>: cho ăn watchdog trong ISR timer, hoặc trong một task riêng chạy định kỳ. Khi đó watchdog chỉ chứng minh "ngắt timer còn chạy", trong khi task chính có thể đã deadlock từ lâu.</p>
+<p><strong>Cách đúng: task watchdog (watchdog giám sát).</strong> Mỗi task quan trọng phải <strong>báo danh</strong> (check-in) định kỳ; một task giám sát chỉ cho ăn watchdog phần cứng khi <strong>mọi</strong> task đều đã báo danh trong chu kỳ vừa qua:</p>
+<div class="hl"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">TASK_CTRL</span><span class="p">,</span><span class="w"> </span><span class="n">TASK_COMM</span><span class="p">,</span><span class="w"> </span><span class="n">TASK_SENSOR</span><span class="p">,</span><span class="w"> </span><span class="n">TASK_COUNT</span><span class="w"> </span><span class="p">};</span>
+<span class="k">static</span><span class="w"> </span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">g_alive</span><span class="p">;</span><span class="w">                        </span><span class="cm">/* bit i: task i đã báo danh */</span>
+<span class="cp">#define ALL_ALIVE ((1u &lt;&lt; TASK_COUNT) - 1u)</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">wdg_checkin</span><span class="p">(</span><span class="kt">unsigned</span><span class="w"> </span><span class="n">task_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">                     </span><span class="cm">/* mỗi task gọi trong vòng lặp chính */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">irq_save</span><span class="p">();</span><span class="w"> </span><span class="n">g_alive</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="mi">1u</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">task_id</span><span class="p">;</span><span class="w"> </span><span class="n">irq_restore</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">wdg_supervisor_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">                    </span><span class="cm">/* chạy mỗi 500 ms, IWDG timeout 2 s */</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">500</span><span class="p">));</span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">irq_save</span><span class="p">();</span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">alive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">g_alive</span><span class="p">;</span><span class="w"> </span><span class="n">g_alive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="n">irq_restore</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">alive</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">ALL_ALIVE</span><span class="p">)</span><span class="w"> </span><span class="n">IWDG</span><span class="o">-&gt;</span><span class="n">KR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xAAAA</span><span class="p">;</span><span class="w">       </span><span class="cm">/* cho ăn */</span>
+<span class="w">        </span><span class="k">else</span><span class="w"> </span><span class="n">log_missing_tasks</span><span class="p">(</span><span class="o">~</span><span class="n">alive</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">ALL_ALIVE</span><span class="p">);</span><span class="w">      </span><span class="cm">/* không cho ăn → reset sau timeout */</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Task chờ sự kiện lâu (chặn trên queue vô hạn) cần báo danh theo cách khác: chờ có timeout, mỗi lần timeout thì báo danh. Ghi lại <strong>task nào không báo danh</strong> vào RAM không bị xóa (<code>.noinit</code>) trước khi reset, để biết nguyên nhân khi khởi động lại.</p>
+<p>Chọn timeout: đủ dài hơn chu kỳ xấu nhất bình thường (kể cả lúc ghi flash, kết nối mạng chậm), nhưng đủ ngắn để hệ thống phục hồi kịp với yêu cầu ứng dụng.</p>
+<h3 id="c-fault-handler-tren-cortex-m">Fault handler trên Cortex-M</h3>
+<p>Khi CPU gặp lỗi nghiêm trọng (truy cập địa chỉ không hợp lệ, lệnh không hợp lệ, chia cho 0 nếu bật bẫy, unaligned trên M0, tràn stack vào vùng MPU bảo vệ), nó nhảy vào <strong>fault handler</strong>:</p>
+<ul>
+<li><strong>HardFault</strong>: lỗi tổng quát (và mọi fault trên Cortex-M0).</li>
+<li>Cortex-M3+: <strong>MemManage</strong> (vi phạm MPU), <strong>BusFault</strong> (lỗi bus: địa chỉ không tồn tại), <strong>UsageFault</strong> (lệnh không hợp lệ, chia 0, unaligned). Mặc định chúng bị "nâng" lên HardFault trừ khi được bật riêng trong <code>SCB-&gt;SHCSR</code>.</li>
+</ul>
+<p>Handler mặc định thường là <code>while (1);</code>: thiết bị treo, mất dấu vết. Cách tốt hơn: <strong>ghi lại ngữ cảnh lỗi</strong> rồi reset.</p>
+<p>Khi fault xảy ra, CPU đã đẩy 8 thanh ghi lên stack (giống ngắt); trong đó <strong>PC</strong> cho biết lệnh gây lỗi, <strong>LR</strong> cho biết hàm gọi. Các thanh ghi trạng thái fault giải thích nguyên nhân:</p>
+<ul>
+<li><strong>CFSR</strong> (Configurable Fault Status Register): bit chi tiết (ví dụ <code>PRECISERR</code>: lỗi bus chính xác, <code>UNDEFINSTR</code>, <code>DIVBYZERO</code>, <code>UNALIGNED</code>, <code>IACCVIOL</code>, <code>DACCVIOL</code>, <code>STKERR</code>).</li>
+<li><strong>HFSR</strong>: HardFault do đâu (<code>FORCED</code>: fault cấu hình được bị nâng cấp).</li>
+<li><strong>MMFAR</strong>, <strong>BFAR</strong>: <strong>địa chỉ</strong> gây lỗi (khi bit hợp lệ tương ứng được set).</li>
+</ul>
+<div class="hl"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">r0</span><span class="p">,</span><span class="w"> </span><span class="n">r1</span><span class="p">,</span><span class="w"> </span><span class="n">r2</span><span class="p">,</span><span class="w"> </span><span class="n">r3</span><span class="p">,</span><span class="w"> </span><span class="n">r12</span><span class="p">,</span><span class="w"> </span><span class="n">lr</span><span class="p">,</span><span class="w"> </span><span class="n">pc</span><span class="p">,</span><span class="w"> </span><span class="n">xpsr</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="n">stacked_regs_t</span><span class="p">;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">magic</span><span class="p">;</span>
+<span class="w">    </span><span class="n">stacked_regs_t</span><span class="w"> </span><span class="n">regs</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cfsr</span><span class="p">,</span><span class="w"> </span><span class="n">hfsr</span><span class="p">,</span><span class="w"> </span><span class="n">mmfar</span><span class="p">,</span><span class="w"> </span><span class="n">bfar</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">crash_info_t</span><span class="p">;</span>
+
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">section</span><span class="p">(</span><span class="s">".noinit"</span><span class="p">)))</span><span class="w"> </span><span class="n">crash_info_t</span><span class="w"> </span><span class="n">g_crash</span><span class="p">;</span><span class="w">   </span><span class="cm">/* không bị xóa khi reset mềm */</span>
+
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">used</span><span class="p">))</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">hardfault_c</span><span class="p">(</span><span class="n">stacked_regs_t</span><span class="w"> </span><span class="o">*</span><span class="n">frame</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">g_crash</span><span class="p">.</span><span class="n">regs</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">frame</span><span class="p">;</span>
+<span class="w">    </span><span class="n">g_crash</span><span class="p">.</span><span class="n">cfsr</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">SCB</span><span class="o">-&gt;</span><span class="n">CFSR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">g_crash</span><span class="p">.</span><span class="n">hfsr</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">SCB</span><span class="o">-&gt;</span><span class="n">HFSR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">g_crash</span><span class="p">.</span><span class="n">mmfar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SCB</span><span class="o">-&gt;</span><span class="n">MMFAR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">g_crash</span><span class="p">.</span><span class="n">bfar</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">SCB</span><span class="o">-&gt;</span><span class="n">BFAR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">g_crash</span><span class="p">.</span><span class="n">magic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xDEADC0DEu</span><span class="p">;</span>
+<span class="w">    </span><span class="n">NVIC_SystemReset</span><span class="p">();</span><span class="w">                                       </span><span class="cm">/* reset; lần khởi động sau sẽ báo cáo */</span>
+<span class="p">}</span>
+
+<span class="cm">/* Xác định stack nào đang dùng (MSP hay PSP: bit 2 của LR/EXC_RETURN) rồi gọi hàm C */</span>
+<span class="n">__attribute__</span><span class="p">((</span><span class="kr">naked</span><span class="p">))</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">HardFault_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kr">__asm</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span>
+<span class="w">        </span><span class="s">"tst lr, #4      </span><span class="se">\n</span><span class="s">"</span>
+<span class="w">        </span><span class="s">"ite eq          </span><span class="se">\n</span><span class="s">"</span>
+<span class="w">        </span><span class="s">"mrseq r0, msp   </span><span class="se">\n</span><span class="s">"</span>
+<span class="w">        </span><span class="s">"mrsne r0, psp   </span><span class="se">\n</span><span class="s">"</span>
+<span class="w">        </span><span class="s">"b hardfault_c   </span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>(Đoạn assembly dùng lệnh <code>ite</code> của Cortex-M3+; Cortex-M0 cần viết lại bằng nhánh.) Khi khởi động, nếu <code>g_crash.magic</code> hợp lệ: in ra hoặc gửi lên server, rồi xóa magic. Từ PC, dùng <code>addr2line -e firmware.elf 0x08001234</code> để ra file và dòng code.</p>
+<p>Ngoài ra kiểm tra <strong>nguyên nhân reset</strong> (thanh ghi RCC-&gt;CSR trên STM32: power-on, pin reset, watchdog, software, brown-out, low-power) ở mỗi lần khởi động và ghi log: rất quý khi chẩn đoán thiết bị ở hiện trường.</p>
+<h3 id="c-brown-out-va-mat-dien">Brown-out và mất điện</h3>
+<p><strong>Brown-out</strong>: điện áp sụt dưới mức hoạt động an toàn (pin yếu, khởi động động cơ). MCU có thể chạy sai (đọc Flash sai, ghi Flash hỏng). Bật <strong>BOR</strong> (brown-out reset) ở mức phù hợp để MCU reset sạch thay vì chạy bất thường. Với ghi Flash/EEPROM: kiểm tra điện áp trước khi ghi, thiết kế dữ liệu chịu được mất điện (bên dưới).</p>
+<h3 id="c-bao-ve-du-lieu-luu-tru">Bảo vệ dữ liệu lưu trữ</h3>
+<p>Dữ liệu cấu hình, hiệu chuẩn, bộ đếm trong Flash/EEPROM có thể hỏng do mất điện khi đang ghi:</p>
+<ul>
+<li><strong>Hai bản sao + CRC + số thứ tự</strong>: ghi luân phiên vào bản A và B; mỗi bản có CRC và số thứ tự tăng dần. Khi đọc, chọn bản có CRC đúng và số thứ tự lớn nhất. Mất điện giữa lúc ghi một bản thì bản kia vẫn đúng.</li>
+<li><strong>Wear leveling</strong>: Flash chỉ chịu ~10.000–100.000 lần xóa mỗi sector. Ghi bộ đếm mỗi phút vào cùng một chỗ sẽ hỏng Flash sau vài tháng. Dùng log append-only trải đều trên nhiều trang, hoặc thư viện có sẵn (EEPROM emulation của hãng, <strong>littlefs</strong> chịu mất điện và có wear leveling, <strong>FlashDB</strong>).</li>
+<li>Giá trị mặc định an toàn khi không có bản hợp lệ nào.</li>
+</ul>
+<h3 id="c-lap-trinh-phong-thu">Lập trình phòng thủ</h3>
+<ul>
+<li><strong>Kiểm tra đầu vào từ bên ngoài</strong>: độ dài gói tin, giá trị tham số (range check), chỉ số mảng. Không tin dữ liệu từ mạng, UART, thậm chí cảm biến (giá trị ngoài vật lý → cảm biến hỏng).</li>
+<li><strong>Assert</strong> cho các bất biến nội bộ (<code>configASSERT</code>, <code>assert</code> riêng ghi file/dòng vào noinit rồi reset), bật trong bản phát hành nếu chi phí chấp nhận được: phát hiện sớm còn hơn chạy sai âm thầm.</li>
+<li><strong>MPU</strong>: vùng chặn ở đáy stack mỗi task (phát hiện tràn stack tức thì), chặn thực thi trong RAM (chống tấn công), chặn ghi vào vùng Flash và địa chỉ 0 (bắt con trỏ NULL).</li>
+<li><strong>Trạng thái an toàn</strong> (safe state) được định nghĩa rõ: khi phát hiện lỗi nghiêm trọng, đưa đầu ra về trạng thái không nguy hiểm (tắt nhiệt, dừng động cơ, đóng van) trước khi làm gì khác.</li>
+<li>Kiểm tra <strong>stack high-water mark</strong> và <strong>mức trống của pool/heap</strong> định kỳ, báo cáo khi gần cạn.</li>
+</ul>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 5</span></div>
+<ul>
+<li>Watchdog: IWDG (clock riêng, không tắt được), WWDG (cửa sổ, bắt cả chạy quá nhanh). Không cho ăn trong ISR timer; dùng task watchdog với báo danh của mọi task.</li>
+<li>Fault handler: lấy stack frame (MSP/PSP), lưu PC, LR, CFSR, HFSR, MMFAR, BFAR vào <code>.noinit</code>, reset, báo cáo ở lần khởi động sau; <code>addr2line</code> từ PC.</li>
+<li>Ghi lại nguyên nhân reset; bật brown-out reset.</li>
+<li>Dữ liệu lưu trữ: hai bản sao + CRC + số thứ tự; wear leveling (littlefs).</li>
+<li>Phòng thủ: kiểm tra đầu vào, assert, MPU guard, trạng thái an toàn, theo dõi tài nguyên.</li>
+</ul>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao cho ăn watchdog trong ISR của SysTick là sai?</summary>
+<p>SysTick vẫn chạy khi task chính treo hoặc deadlock, nên watchdog không bao giờ reset; nó chỉ chứng minh ngắt còn hoạt động. Phải cho ăn dựa trên báo danh của các task thực sự làm việc.</p>
+</details>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Thiết bị ngoài hiện trường thỉnh thoảng reset. Cần những thông tin gì để tìm nguyên nhân?</summary>
+<p>Nguyên nhân reset (watchdog, brown-out, software, pin), dữ liệu crash lưu trong noinit (PC, LR, CFSR, BFAR/MMFAR), task nào không báo danh với watchdog, log gần nhất (ring buffer trong noinit), và các chỉ số tài nguyên (stack, pool).</p>
+</details>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-6-logging-va-chan-doan" hidden><h2 id="c-bai-6-logging-va-chan-doan">Bài 6 · Logging và chẩn đoán</h2>
+<h3 id="c-vi-sao-logging-trong-firmware-kho">Vì sao logging trong firmware khó</h3>
+<p>Trên PC, <code>printf</code> là chuyện nhỏ. Trên MCU, <code>printf</code> qua UART:</p>
+<ul>
+<li><strong>Chậm</strong>: định dạng chuỗi tốn hàng nghìn chu kỳ; gửi 80 ký tự ở 115200 baud mất ~7 ms nếu chờ gửi xong (blocking).</li>
+<li><strong>Tốn bộ nhớ</strong>: <code>printf</code> đầy đủ của newlib thêm 20–30 KB Flash, có thể dùng heap, stack lớn (hàng trăm byte mỗi lời gọi).</li>
+<li><strong>Thay đổi thời gian</strong>: thêm log làm bug thời gian biến mất (heisenbug).</li>
+<li><strong>Không an toàn trong ISR</strong>.</li>
+</ul>
+<h3 id="c-thiet-ke-mot-he-thong-log">Thiết kế một hệ thống log</h3>
+<p><strong>1. Mức log và lọc lúc compile.</strong> Mức (ERROR, WARN, INFO, DEBUG, TRACE) và macro lọc lúc compile để log mức thấp <strong>không sinh code</strong> trong bản phát hành:</p>
+<div class="hl"><pre><span></span><code><span class="cp">#define LOG_LEVEL_ERR 1</span>
+<span class="cp">#define LOG_LEVEL_WRN 2</span>
+<span class="cp">#define LOG_LEVEL_INF 3</span>
+<span class="cp">#define LOG_LEVEL_DBG 4</span>
+<span class="cp">#ifndef LOG_LEVEL</span>
+<span class="cp">#define LOG_LEVEL LOG_LEVEL_INF</span>
+<span class="cp">#endif</span>
+
+<span class="cp">#define LOG(level, tag, fmt, ...) do {                                   \</span>
+<span class="cp">        if ((level) &lt;= LOG_LEVEL)                                        \</span>
+<span class="cp">            log_write((level), (tag), fmt, ##__VA_ARGS__);               \</span>
+<span class="cp">    } while (0)</span>
+<span class="cp">#define LOG_ERR(tag, ...) LOG(LOG_LEVEL_ERR, tag, __VA_ARGS__)</span>
+<span class="cp">#define LOG_DBG(tag, ...) LOG(LOG_LEVEL_DBG, tag, __VA_ARGS__)</span>
+<span class="cm">/* LOG_LEVEL là hằng nên compiler loại bỏ hoàn toàn nhánh không dùng */</span>
+</code></pre></div>
+
+<p>Thêm mức theo <strong>module</strong> (lọc lúc chạy theo tag) để bật debug cho riêng một module ở hiện trường.</p>
+<p><strong>2. Không chặn: ghi vào ring buffer, gửi nền.</strong> <code>log_write</code> định dạng vào một ring buffer (Module 6) rồi trả về ngay; một task ưu tiên thấp (hoặc DMA) đẩy dữ liệu ra UART. Khi buffer đầy: bỏ log và tăng bộ đếm "log bị mất", <strong>không bao giờ chặn</strong> code đang chạy. Đây là gatekeeper task (Module 8, Bài 8).</p>
+<p><strong>3. Log được từ ISR.</strong> Phiên bản ISR chỉ ghi vào buffer (hoặc chỉ ghi dữ liệu thô, không định dạng).</p>
+<p><strong>4. Deferred formatting / binary logging.</strong> Ý tưởng mạnh nhất: <strong>không định dạng trên thiết bị</strong>. Thiết bị chỉ ghi <strong>ID của chuỗi định dạng</strong> (một số nhỏ, hoặc địa chỉ của chuỗi trong một section riêng không nạp vào Flash) cùng các <strong>tham số thô</strong>. Phần mềm trên PC dùng file ELF để tra ID ra chuỗi và định dạng.</p>
+<div class="hl"><pre><span></span><code> Trên thiết bị:   [ts=4 B][id=2 B][arg1=4 B][arg2=4 B]   14 byte, vài chục chu kỳ
+ Trên PC:         "12.345 s  motor: rpm=1500 current=2.31 A"
+</code></pre></div>
+
+<p>Nhanh hơn hàng chục lần, Flash nhỏ (chuỗi không nằm trong firmware), băng thông nhỏ. Công cụ: <strong>defmt</strong> (Rust), <strong>trice</strong>, <strong>Pigweed pw_log tokenized</strong>, <strong>NanoLog</strong>, Zephyr dictionary logging.</p>
+<p><strong>5. Timestamp</strong> mỗi bản ghi (tick hoặc µs), và số thứ tự để phát hiện bản ghi bị mất.</p>
+<h3 id="c-kenh-xuat-log">Kênh xuất log</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Kênh</th>
+<th>Đặc điểm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UART</td>
+<td>Đơn giản, cần chân và bộ chuyển USB-UART; chậm</td>
+</tr>
+<tr>
+<td><strong>SEGGER RTT</strong></td>
+<td>Qua J-Link/debugger, ghi vào buffer trong RAM mà debugger đọc trong nền: rất nhanh (µs), không cần chân thêm</td>
+</tr>
+<tr>
+<td><strong>ITM / SWO</strong> (Cortex-M3+)</td>
+<td>Qua chân SWO của debugger; nhanh, có timestamp phần cứng</td>
+</tr>
+<tr>
+<td>USB CDC</td>
+<td>Không cần bộ chuyển; cần stack USB</td>
+</tr>
+<tr>
+<td>Flash / file</td>
+<td>Log tồn tại qua reset và mất điện; chú ý wear leveling</td>
+</tr>
+<tr>
+<td>Mạng</td>
+<td>Gửi lên server (MQTT, syslog); cho thiết bị đã triển khai</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="c-log-song-sot-qua-reset">Log sống sót qua reset</h3>
+<p>Đặt ring buffer log trong section <strong><code>.noinit</code></strong> (không bị xóa bởi startup code khi reset mềm: watchdog, fault, software reset). Khi khởi động, nếu buffer có header hợp lệ (magic + CRC), gửi các bản ghi cuối cùng trước khi reset: <strong>flight recorder</strong> cho thiết bị. Kết hợp với crash info (Bài 5).</p>
+<h3 id="c-crash-dump-va-core-dump">Crash dump và core dump</h3>
+<p>Ngoài các thanh ghi fault, có thể lưu <strong>stack</strong> của task bị lỗi (vài trăm byte) hoặc toàn bộ RAM (core dump) vào Flash, rồi tải lên server. Công cụ: <strong>Memfault</strong> (dịch vụ thương mại), ESP-IDF core dump, Zephyr coredump; phân tích bằng GDB với file ELF.</p>
+<h3 id="c-metrics-va-chan-doan-tu-xa">Metrics và chẩn đoán từ xa</h3>
+<p>Log là văn bản để đọc; <strong>metrics</strong> là số để theo dõi xu hướng trên hàng nghìn thiết bị:</p>
+<ul>
+<li>Bộ đếm: số lần reset theo nguyên nhân, lỗi CRC, retry, timeout, overrun buffer, log bị mất.</li>
+<li>Đồng hồ đo: stack high-water mark, mức trống pool, mức sử dụng CPU, thời gian ISR max, điện áp pin, nhiệt độ chip, RSSI.</li>
+<li>Thời gian: uptime, thời gian kết nối, thời gian ở mỗi chế độ năng lượng.</li>
+</ul>
+<p>Định kỳ gửi gói <strong>heartbeat</strong> chứa các chỉ số này. Nhiều vấn đề (rò bộ nhớ, pin chai nhanh, một lô linh kiện lỗi) chỉ lộ ra qua thống kê trên nhiều thiết bị.</p>
+<aside class="callout c-linux">
+<div class="callout-head"><span class="callout-tag">Embedded Linux</span><span class="callout-title">Logging trên Embedded Linux</span></div>
+<p>Kernel: <code>printk</code> với mức log, <code>dmesg</code>, <code>pstore</code>/ramoops lưu log kernel qua reset (đúng ý tưởng noinit). Userspace: <code>syslog</code>/<code>journald</code> (giới hạn kích thước để không làm đầy eMMC), log rotation, gửi từ xa. Trace: <code>ftrace</code>, <code>perf</code>, LTTng, eBPF.</p>
+</aside>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 6</span></div>
+<ul>
+<li><code>printf</code> chậm, tốn Flash, đổi thời gian; log trong firmware phải không chặn.</li>
+<li>Mức log lọc lúc compile; ring buffer + task gửi nền; bỏ log khi đầy và đếm.</li>
+<li>Deferred formatting / tokenized logging: thiết bị gửi ID + tham số, PC định dạng.</li>
+<li>RTT, SWO nhanh hơn UART. Log và crash info trong <code>.noinit</code> sống qua reset.</li>
+<li>Metrics và heartbeat cho chẩn đoán thiết bị đã triển khai.</li>
+</ul>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Thêm `printf` để debug thì bug biến mất. Vì sao và xử lý thế nào?</summary>
+<p><code>printf</code> làm thay đổi thời gian (chậm, có thể chặn), che đi race condition hoặc vấn đề thời gian. Dùng log không chặn và rẻ (ring buffer, RTT, binary logging), hoặc toggle GPIO + logic analyzer, hoặc trace RTOS.</p>
+</details>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-6-logging-va-chan-doan">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-7-quan-ly-nang-luong" hidden><h2 id="c-bai-7-quan-ly-nang-luong">Bài 7 · Quản lý năng lượng</h2>
+<h3 id="c-dong-trung-binh-quyet-dinh-tuoi-tho-pin">Dòng trung bình quyết định tuổi thọ pin</h3>
+<p>Thiết bị chạy pin hầu như luôn hoạt động theo kiểu <strong>duty cycle</strong>: thức dậy, làm việc trong thời gian ngắn, rồi ngủ phần lớn thời gian. Tuổi thọ pin phụ thuộc <strong>dòng trung bình</strong>:</p>
+<div class="hl"><pre><span></span><code> I_avg = Σ (I_i × t_i) / T
+
+ Tuổi thọ (giờ) ≈ Dung lượng pin (mAh) × hệ số hiệu dụng / I_avg (mA)
+</code></pre></div>
+
+<p>Ví dụ: node cảm biến mỗi 60 s thức dậy đo 50 ms ở 5 mA, gửi radio 20 ms ở 15 mA, còn lại ngủ ở 3 µA:</p>
+<div class="hl"><pre><span></span><code> I_avg = (5 × 0,05 + 15 × 0,02 + 0,003 × 59,93) / 60
+       = (0,25 + 0,30 + 0,18) / 60 mA ≈ 0,0122 mA = 12,2 µA
+ Pin 1000 mAh, hệ số 0,8:  1000 × 0,8 / 0,0122 ≈ 65.600 giờ ≈ 7,5 năm
+</code></pre></div>
+
+<p>Phân tích này chỉ ra <strong>nên tối ưu ở đâu</strong>: ở đây dòng ngủ (0,18) gần bằng phần radio (0,30). Giảm thời gian thức, giảm dòng ngủ, và <strong>giảm số lần gửi radio</strong> (gom dữ liệu gửi một lần) thường hiệu quả hơn tối ưu code chạy nhanh hơn vài phần trăm. Đừng quên <strong>tự xả</strong> của pin và các linh kiện khác trên board (bộ ổn áp, điện trở chia áp, LED, cảm biến không tắt).</p>
+<h3 id="c-cac-che-do-nang-luong-cua-mcu">Các chế độ năng lượng của MCU</h3>
+<p>Tên gọi khác nhau theo hãng; ví dụ STM32L4:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Chế độ</th>
+<th>CPU</th>
+<th>Clock</th>
+<th>RAM</th>
+<th>Ngoại vi</th>
+<th>Dòng điển hình</th>
+<th>Đánh thức</th>
+<th>Thời gian thức</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Run</td>
+<td>Chạy</td>
+<td>Đầy đủ</td>
+<td>Giữ</td>
+<td>Bật</td>
+<td>~100 µA/MHz</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Sleep</td>
+<td>Dừng</td>
+<td>Chạy</td>
+<td>Giữ</td>
+<td>Chạy</td>
+<td>vài trăm µA</td>
+<td>Mọi ngắt</td>
+<td>Tức thì</td>
+</tr>
+<tr>
+<td>Stop</td>
+<td>Dừng</td>
+<td>Tắt (trừ LSE/LSI)</td>
+<td>Giữ</td>
+<td>Phần lớn tắt</td>
+<td>1–10 µA</td>
+<td>RTC, EXTI, LPUART, LPTIM</td>
+<td>µs</td>
+</tr>
+<tr>
+<td>Standby</td>
+<td>Tắt</td>
+<td>Tắt</td>
+<td><strong>Mất</strong> (trừ backup)</td>
+<td>Tắt</td>
+<td>&lt; 1 µA</td>
+<td>RTC, chân wakeup, reset</td>
+<td>Như reset</td>
+</tr>
+<tr>
+<td>Shutdown</td>
+<td>Tắt</td>
+<td>Tắt</td>
+<td>Mất</td>
+<td>Tắt</td>
+<td>~30 nA</td>
+<td>Chân wakeup</td>
+<td>Như reset</td>
+</tr>
+</tbody>
+</table></div>
+<p>Đánh đổi: chế độ càng sâu thì dòng càng thấp nhưng <strong>thức dậy càng chậm</strong>, <strong>mất càng nhiều trạng thái</strong> (RAM, cấu hình ngoại vi phải khởi tạo lại), và <strong>càng ít nguồn đánh thức</strong>.</p>
+<p>Trên Cortex-M, lệnh <strong><code>WFI</code></strong> (wait for interrupt) đưa CPU vào sleep; bit <code>SLEEPDEEP</code> trong <code>SCB-&gt;SCR</code> chọn deep sleep (Stop/Standby tùy cấu hình của hãng). Bit <strong><code>SLEEPONEXIT</code></strong>: CPU tự ngủ lại ngay khi ISR kết thúc, cho hệ thống hoàn toàn hướng ngắt.</p>
+<h3 id="c-ky-thuat-giam-nang-luong">Kỹ thuật giảm năng lượng</h3>
+<p><strong>Tắt những gì không dùng:</strong></p>
+<ul>
+<li><strong>Clock gating</strong>: tắt clock cho ngoại vi không dùng (bit enable trong RCC).</li>
+<li>Tắt nguồn cảm biến, module radio bằng chân điều khiển hoặc switch nguồn.</li>
+<li><strong>GPIO</strong>: chân không dùng đặt ở chế độ <strong>analog</strong> (dòng rò thấp nhất), không để thả nổi (input floating dao động gây dòng rò); chú ý pull-up/pull-down tạo dòng qua mạch ngoài.</li>
+<li>Bộ ổn áp: chọn LDO/DC-DC có dòng tĩnh (quiescent) thấp.</li>
+</ul>
+<p><strong>Chạy nhanh rồi ngủ (race to sleep)</strong>: thường tiết kiệm hơn chạy chậm lâu, vì dòng nền (leakage, bộ ổn áp, clock) tốn theo thời gian. Nhưng phụ thuộc chip; đo để quyết định tần số tối ưu.</p>
+<p><strong>Để phần cứng làm việc khi CPU ngủ</strong>: DMA, LPUART nhận dữ liệu và đánh thức khi có khung hoàn chỉnh, ADC lấy mẫu theo timer và chỉ đánh thức khi vượt ngưỡng (analog watchdog), bộ đếm xung low-power.</p>
+<p><strong>Tickless idle (RTOS)</strong>: SysTick ngắt mỗi 1 ms đánh thức CPU 1000 lần mỗi giây dù không có việc gì. Ở chế độ <strong>tickless</strong> (FreeRTOS <code>configUSE_TICKLESS_IDLE</code>, Zephyr mặc định), khi mọi task đều chặn, kernel tính thời điểm task sớm nhất cần thức dậy, tắt SysTick, cấu hình một timer low-power (LPTIM, RTC) đánh thức đúng lúc đó, ngủ sâu, rồi bù lại số tick đã bỏ qua khi thức dậy.</p>
+<p><strong>Gom việc</strong>: gom nhiều phép đo rồi gửi radio một lần; gom các timer gần nhau để thức dậy một lần (timer slack/coalescing).</p>
+<h3 id="c-do-nang-luong">Đo năng lượng</h3>
+<p>Đo bằng đồng hồ vạn năng thường <strong>không đủ</strong>: dòng thay đổi từ µA tới mA trong vài ms. Dùng thiết bị chuyên dụng ghi dạng sóng dòng với dải động rộng: <strong>Nordic Power Profiler Kit II</strong>, <strong>Joulescope</strong>, <strong>Otii Arc</strong>, STM32 Power Shield, hoặc điện trở shunt + oscilloscope/bộ khuếch đại. Đo trên <strong>board thật</strong> với firmware thật, và đo cả dòng ngủ của toàn board (không chỉ MCU).</p>
+<aside class="callout c-linux">
+<div class="callout-head"><span class="callout-tag">Embedded Linux</span><span class="callout-title">Năng lượng trên Embedded Linux</span></div>
+<p>Kernel có cpuidle (trạng thái nghỉ của CPU), cpufreq/DVFS (đổi tần số và điện áp: governor <code>ondemand</code>, <code>schedutil</code>), runtime PM cho từng driver, suspend-to-RAM (<code>echo mem &gt; /sys/power/state</code>). Dòng thấp nhất thường vẫn ở mức mA, nên thiết bị siêu tiết kiệm năng lượng hay dùng MCU, hoặc MCU phụ để đánh thức hệ Linux khi cần.</p>
+</aside>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 7</span></div>
+<ul>
+<li>Tuổi thọ pin = dung lượng × hiệu dụng / dòng trung bình; tính I_avg để biết nên tối ưu ở đâu.</li>
+<li>Chế độ ngủ sâu hơn: dòng thấp hơn nhưng thức chậm hơn, mất trạng thái, ít nguồn đánh thức hơn.</li>
+<li>Tắt clock và nguồn không dùng, GPIO analog, ổn áp dòng tĩnh thấp; race to sleep; để ngoại vi low-power làm việc khi CPU ngủ.</li>
+<li>RTOS: tickless idle. Gom việc và gom thời điểm thức dậy.</li>
+<li>Đo bằng thiết bị ghi dạng sóng dòng (PPK2, Joulescope), trên board thật.</li>
+</ul>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Thiết bị ngủ 2 µA, mỗi 10 s thức 5 ms ở 4 mA. Dòng trung bình?</summary>
+<p>(4 × 0,005 + 0,002 × 9,995) / 10 ≈ (0,020 + 0,020) / 10 = 0,004 mA = 4 µA.</p>
+</details>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao SysTick 1 kHz làm hỏng mức tiêu thụ của thiết bị chạy pin dùng RTOS? Giải pháp?</summary>
+<p>Nó đánh thức CPU 1000 lần mỗi giây dù không có việc. Dùng tickless idle: khi rảnh, tắt SysTick, ngủ sâu với timer low-power đánh thức đúng lúc task tiếp theo cần chạy.</p>
+</details>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-7-quan-ly-nang-luong">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin" hidden><h2 id="c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin">Bài 8 · Case study: thiết kế node cảm biến IoT chạy pin</h2>
+<p>Bài cuối áp dụng mọi thứ vào một câu hỏi system design kiểu phỏng vấn:</p>
+<blockquote>
+<p>"Thiết kế một thiết bị đo nhiệt độ và độ ẩm trong kho lạnh, gửi dữ liệu lên cloud, chạy pin. Hãy trình bày kiến trúc phần cứng và phần mềm."</p>
+</blockquote>
+<h3 id="c-1-lam-ro-yeu-cau-va-noi-ro-gia-dinh">1. Làm rõ yêu cầu (và nói rõ giả định)</h3>
+<p>Hỏi lại người phỏng vấn, hoặc tự đặt giả định:</p>
+<ul>
+<li>Đo mỗi <strong>5 phút</strong>; gửi lên cloud mỗi <strong>1 giờ</strong> (gom 12 mẫu), nhưng <strong>gửi ngay</strong> khi nhiệt độ vượt ngưỡng cảnh báo.</li>
+<li>Môi trường <strong>−30 °C đến +10 °C</strong> (ảnh hưởng tới pin: lithium-thionyl chloride chịu lạnh tốt hơn Li-ion).</li>
+<li>Tuổi thọ pin mục tiêu <strong>5 năm</strong>.</li>
+<li>Kết nối: kho lớn, không có Wi-Fi tin cậy → <strong>LTE-M/NB-IoT</strong> (hoặc LoRaWAN nếu có gateway).</li>
+<li>Không được mất dữ liệu khi mất kết nối vài ngày → <strong>lưu đệm cục bộ</strong>.</li>
+<li>Cần <strong>cập nhật firmware từ xa</strong>; dữ liệu và kết nối phải <strong>bảo mật</strong>.</li>
+<li>Độ chính xác ±0,3 °C; sản lượng vài nghìn thiết bị.</li>
+</ul>
+<h3 id="c-2-phan-cung">2. Phần cứng</h3>
+<div class="hl"><pre><span></span><code> ┌───────────────┐   I2C   ┌──────────────┐
+ │ MCU low-power │◀───────▶│ Cảm biến T/H │  (bật nguồn qua GPIO chỉ khi đo)
+ │ Cortex-M33    │         └──────────────┘
+ │ (TrustZone)   │   SPI   ┌──────────────┐
+ │               │◀───────▶│ Flash ngoài  │  4 MB: đệm dữ liệu, slot OTA
+ │               │  UART   ┌──────────────┐
+ │               │◀───────▶│ Modem LTE-M  │  (switch nguồn hoặc PSM/eDRX)
+ │  RTC + LSE    │         └──────────────┘
+ └───────────────┘
+   Pin Li-SOCl2 3,6 V + tụ đệm (dòng đỉnh khi modem phát), đo điện áp pin bằng ADC + chia áp có công tắc
+</code></pre></div>
+
+<p>Lý do: MCU có Stop mode vài µA với RTC chạy; TrustZone/secure element cho khóa; cảm biến có độ chính xác yêu cầu, tắt nguồn khi không đo; modem LTE-M hỗ trợ <strong>PSM</strong> (ngủ sâu nhưng vẫn đăng ký mạng) để giảm năng lượng mỗi lần gửi; pin Li-SOCl2 có dung lượng lớn, chịu lạnh, nhưng <strong>dòng đỉnh thấp</strong>, nên cần <strong>tụ đệm</strong> (hoặc hybrid layer capacitor) cho xung dòng của modem.</p>
+<h3 id="c-3-kien-truc-phan-mem">3. Kiến trúc phần mềm</h3>
+<p>Dùng <strong>RTOS</strong> (Zephyr hoặc FreeRTOS) vì có stack modem/TLS và nhiều hoạt động độc lập, với các <strong>active object</strong> (Module 8):</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Thành phần</th>
+<th>Vai trò</th>
+<th>Giao tiếp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sensor AO</strong></td>
+<td>Thức theo RTC mỗi 5 phút, bật nguồn cảm biến, đo, kiểm tra ngưỡng</td>
+<td>Publish <code>MEASUREMENT</code>, <code>ALARM</code></td>
+</tr>
+<tr>
+<td><strong>Storage AO</strong></td>
+<td>Ghi mẫu vào Flash ngoài dạng log vòng (append-only, CRC mỗi bản ghi), quản lý con trỏ "đã gửi"</td>
+<td>Subscribe <code>MEASUREMENT</code>; phục vụ yêu cầu đọc</td>
+</tr>
+<tr>
+<td><strong>Comm AO</strong></td>
+<td>State machine kết nối: OFF → ATTACH → CONNECT (TLS/MQTT hoặc CoAP/DTLS) → SEND → PSM; retry với backoff</td>
+<td>Subscribe <code>ALARM</code>, timer 1 giờ; đọc từ Storage</td>
+</tr>
+<tr>
+<td><strong>OTA AO</strong></td>
+<td>Tải image vào slot phụ trên Flash ngoài, kiểm tra chữ ký, yêu cầu reset</td>
+<td>Lệnh từ cloud</td>
+</tr>
+<tr>
+<td><strong>Supervisor</strong></td>
+<td>Task watchdog, theo dõi pin, nhiệt độ chip, metrics, heartbeat</td>
+<td>Nhận báo danh</td>
+</tr>
+<tr>
+<td><strong>Power manager</strong></td>
+<td>Quyết định chế độ ngủ khi mọi AO rảnh (tickless idle → Stop)</td>
+<td>Facade cho các AO</td>
+</tr>
+</tbody>
+</table></div>
+<p>Luồng dữ liệu chính:</p>
+<div class="hl"><pre><span></span><code> RTC ──▶ Sensor AO ──MEASUREMENT──▶ Storage AO ──(flash log)
+              │
+              └──ALARM──▶ Comm AO ──đọc mẫu chưa gửi──▶ Storage AO
+                             │
+                             └──MQTT/TLS──▶ Cloud ──ACK──▶ Comm AO ──▶ Storage: đánh dấu đã gửi
+</code></pre></div>
+
+<p>Điểm thiết kế quan trọng: <strong>chỉ đánh dấu "đã gửi" sau khi nhận ACK từ server</strong> (at-least-once delivery); server lọc trùng bằng timestamp + ID thiết bị. Mất kết nối nhiều ngày thì log vòng giữ được (4 MB ÷ ~16 byte/mẫu ≈ 262.000 mẫu, khoảng 2,5 năm ở 5 phút/mẫu, chưa trừ vùng dành cho OTA).</p>
+<h3 id="c-4-ngan-sach-nang-luong">4. Ngân sách năng lượng</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Hoạt động</th>
+<th>Dòng</th>
+<th>Thời gian</th>
+<th>Tần suất</th>
+<th>Điện tích mỗi ngày</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ngủ (MCU Stop + RTC + rò board)</td>
+<td>5 µA</td>
+<td>~24 h</td>
+<td>liên tục</td>
+<td>0,12 mAh</td>
+</tr>
+<tr>
+<td>Đo (MCU + cảm biến)</td>
+<td>3 mA</td>
+<td>30 ms</td>
+<td>288 lần</td>
+<td>0,0072 mAh</td>
+</tr>
+<tr>
+<td>Ghi flash</td>
+<td>5 mA</td>
+<td>10 ms</td>
+<td>288 lần</td>
+<td>0,004 mAh</td>
+</tr>
+<tr>
+<td>Modem gửi (attach từ PSM + TLS + gửi)</td>
+<td>trung bình 60 mA</td>
+<td>8 s</td>
+<td>24 lần</td>
+<td>3,2 mAh</td>
+</tr>
+<tr>
+<td>Modem ở PSM</td>
+<td>3 µA</td>
+<td>~24 h</td>
+<td>liên tục</td>
+<td>0,072 mAh</td>
+</tr>
+<tr>
+<td><strong>Tổng</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td><strong>≈ 3,4 mAh/ngày</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>5 năm ≈ 1826 ngày × 3,4 ≈ 6200 mAh, cộng biên cho nhiệt độ lạnh, tự xả, tuổi pin → chọn pin <strong>Li-SOCl2 cỡ D (~19 Ah)</strong> hoặc giảm tần suất gửi. Bảng này cho thấy <strong>modem chiếm hơn 90%</strong> năng lượng: tối ưu số lần gửi, thời gian giữ kết nối, kích thước gói và dùng lại phiên TLS (session resumption) có tác dụng lớn nhất; tối ưu code đo là gần như vô nghĩa.</p>
+<h3 id="c-5-do-tin-cay-va-cac-che-do-loi">5. Độ tin cậy và các chế độ lỗi</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Lỗi</th>
+<th>Phát hiện</th>
+<th>Phản ứng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cảm biến không trả lời / giá trị phi vật lý</td>
+<td>Timeout I2C, range check</td>
+<td>Thử lại, reset nguồn cảm biến, gửi mã lỗi thay vì giá trị</td>
+</tr>
+<tr>
+<td>Bus I2C treo</td>
+<td>Timeout</td>
+<td>Phát 9 xung SCL, khởi tạo lại I2C</td>
+</tr>
+<tr>
+<td>Mất mạng</td>
+<td>Comm state machine timeout</td>
+<td>Backoff (5 phút, 15, 60…), dữ liệu vẫn lưu cục bộ</td>
+</tr>
+<tr>
+<td>Flash đầy</td>
+<td>Con trỏ log</td>
+<td>Ghi đè dữ liệu cũ nhất đã gửi trước; nếu chưa gửi thì giảm tần suất lưu và báo</td>
+</tr>
+<tr>
+<td>Firmware treo</td>
+<td>Task watchdog</td>
+<td>Reset, ghi nguyên nhân, gửi trong heartbeat tiếp theo</td>
+</tr>
+<tr>
+<td>Firmware mới lỗi</td>
+<td>Không confirm</td>
+<td>Rollback A/B (MCUboot)</td>
+</tr>
+<tr>
+<td>Pin yếu</td>
+<td>ADC đo khi modem tải (lúc sụt áp lớn nhất)</td>
+<td>Giảm tần suất gửi, gửi cảnh báo pin, tránh ghi flash dưới ngưỡng</td>
+</tr>
+<tr>
+<td>Mất điện khi ghi flash</td>
+<td>CRC từng bản ghi</td>
+<td>Bỏ bản ghi hỏng khi khởi động, tiếp tục</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="c-6-bao-mat">6. Bảo mật</h3>
+<ul>
+<li>Secure boot (MCUboot + chữ ký ECDSA), khóa công khai trong vùng bất biến; khóa cổng debug khi xuất xưởng.</li>
+<li>Mỗi thiết bị một danh tính riêng (chứng chỉ X.509 hoặc khóa riêng sinh trong secure element/TrustZone, không bao giờ rời chip); TLS 1.2/1.3 hoặc DTLS với xác thực hai chiều.</li>
+<li>OTA: image được ký; anti-rollback; tải qua kênh mã hóa.</li>
+<li>Không có mật khẩu mặc định chung cho mọi thiết bị.</li>
+</ul>
+<h3 id="c-7-san-xuat-va-van-hanh">7. Sản xuất và vận hành</h3>
+<ul>
+<li>Nạp bootloader + firmware + danh tính thiết bị ở cuối dây chuyền; test chức năng (đo trong buồng nhiệt chuẩn, kiểm tra kết nối, đo dòng ngủ: phát hiện lỗi hàn gây rò).</li>
+<li>Lưu dữ liệu hiệu chuẩn mỗi thiết bị trong vùng riêng có CRC.</li>
+<li>Dashboard theo dõi metrics của toàn bộ thiết bị: tỷ lệ reset, điện áp pin theo thời gian (dự đoán thay pin), tỷ lệ gửi thành công.</li>
+</ul>
+<h3 id="c-cach-trinh-bay-trong-phong-van">Cách trình bày trong phỏng vấn</h3>
+<ol>
+<li><strong>Làm rõ yêu cầu</strong>, nói giả định (2–3 phút).</li>
+<li><strong>Sơ đồ khối phần cứng</strong>, lý do chọn linh kiện chính.</li>
+<li><strong>Kiến trúc phần mềm</strong>: lớp, task/AO, luồng dữ liệu, state machine chính.</li>
+<li><strong>Ngân sách</strong>: năng lượng (thường là điểm then chốt với thiết bị pin), bộ nhớ, thời gian.</li>
+<li><strong>Chế độ lỗi</strong> và cách phục hồi.</li>
+<li><strong>OTA, bảo mật, sản xuất</strong>.</li>
+<li>Chủ động nêu <strong>đánh đổi</strong> và những gì sẽ làm nếu có thêm thời gian ("nếu cần 10 năm thì tôi sẽ chuyển sang LoRaWAN và gửi ít hơn").</li>
+</ol>
+<p>Người phỏng vấn đánh giá <strong>cách suy nghĩ có cấu trúc</strong> và khả năng <strong>nhìn ra đánh đổi</strong>, không chỉ đáp án.</p>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Tổng kết Module 9</span></div>
+<p>System design Embedded là cân bằng giữa yêu cầu và ràng buộc: bắt đầu từ yêu cầu phi chức năng, chọn nền tảng, lập ngân sách tài nguyên; thiết kế ngắt với priority theo deadline và ISR ngắn; giao thức có framing, CRC, ACK/retry, khả năng tiến hóa; bootloader và OTA A/B có confirm, rollback, secure boot; độ tin cậy với task watchdog, fault handler ghi ngữ cảnh, dữ liệu chịu mất điện; logging không chặn và metrics từ xa; năng lượng tính bằng dòng trung bình và tối ưu ở chỗ tiêu nhiều nhất.</p>
+</aside>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Trong ví dụ trên, vì sao chỉ đánh dấu dữ liệu "đã gửi" sau khi nhận ACK từ server?</summary>
+<p>Để không mất dữ liệu nếu kết nối đứt sau khi gửi mà server chưa nhận (at-least-once delivery); bên server lọc bản trùng.</p>
+</details>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Năng lượng của node chủ yếu dùng ở đâu, và tối ưu chỗ nào trước?</summary>
+<p>Modem (hơn 90%). Giảm số lần kết nối (gom dữ liệu), rút ngắn thời gian attach và TLS (PSM, session resumption), giảm kích thước gói; tối ưu phần đo gần như không ảnh hưởng.</p>
+</details><div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section></div></div></section><section class="panel" id="p-phong-van" data-panel="phong-van" role="tabpanel" hidden><div class="qa-tools"><input id="qa-search" type="search" placeholder="Lọc câu hỏi…" aria-label="Lọc câu hỏi"><label class="chk"><input id="qa-hot" type="checkbox"> Chỉ câu hay hỏi</label><button id="qa-expand" class="btn ghost" type="button">Mở tất cả</button></div><div class="qa"><div class="qa-group"><h2 class="qa-gh">Quy trình và nền tảng</h2><details class="qa-item" data-hot="1"><summary><span class="qn">01</span><span class="qt">Khi nhận một bài system design Embedded, bạn bắt đầu thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Làm rõ yêu cầu chức năng và đặc biệt là phi chức năng: thời gian (deadline), năng lượng (pin, tuổi thọ), kết nối, môi trường, an toàn/chuẩn, bảo mật, sản lượng và giá, OTA. Nói rõ giả định. Sau đó: phân chia HW/SW, chọn nền tảng, lập ngân sách (Flash, RAM, CPU, năng lượng), kiến trúc phần mềm, chế độ lỗi, bảo mật, sản xuất.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">02</span><span class="qt">Khi nào chọn MCU, khi nào chọn MPU chạy Linux?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>MCU: realtime cứng µs, năng lượng thấp (µA), khởi động nhanh, giá và board đơn giản. MPU + Linux: cần mạng phức tạp, đồ họa, nhiều phần mềm sẵn có, nhiều bộ nhớ; trả giá bằng năng lượng, thời gian khởi động, độ phức tạp và gánh nặng cập nhật bảo mật. Nhiều sản phẩm kết hợp cả hai (MPU + lõi Cortex-M).</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Ngắt</h2><details class="qa-item" data-hot="1"><summary><span class="qn">03</span><span class="qt">Quy tắc viết ISR?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Ngắn; không chặn (không mutex, delay, chờ vô hạn); không printf/malloc/flash; xóa cờ ngắt đúng lúc (chú ý write buffer: xóa sớm hoặc DSB); dữ liệu chia sẻ dùng atomic/ring buffer/critical section phía task; chỉ API FromISR và yield khi đánh thức task ưu tiên cao; phần nặng hoãn sang task.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">04</span><span class="qt">Preemption priority và subpriority khác nhau thế nào?</span></summary><div class="qa-a prose"><p>Preemption priority quyết định ngắt có chen ngang ngắt đang chạy không (nesting). Subpriority chỉ quyết định thứ tự khi nhiều ngắt cùng pending, không gây chen ngang. Số nhỏ là ưu tiên cao.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">05</span><span class="qt">Với FreeRTOS trên Cortex-M, ISR nào được gọi API kernel?</span></summary><div class="qa-a prose"><p>Chỉ ISR có priority logic thấp hơn hoặc bằng <code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code> (giá trị số lớn hơn hoặc bằng). ISR ưu tiên cao hơn không bị critical section của kernel chặn nhưng không được gọi API. Mặc định priority 0 sau reset là lỗi hay gặp.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">06</span><span class="qt">Interrupt latency gồm những thành phần nào? Làm sao giảm jitter?</span></summary><div class="qa-a prose"><p>Độ trễ phần cứng (~12 chu kỳ trên M3/M4), thời gian ngắt bị chặn (critical section dài nhất), các ISR ưu tiên cao hơn đang chạy, wait state Flash. Giảm jitter: critical section ngắn, BASEPRI thay PRIMASK, priority cao cho ISR quan trọng, chạy từ RAM/TCM, để phần cứng kích hoạt (timer → ADC, DMA).</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">07</span><span class="qt">DMA trên Cortex-M7 nhận dữ liệu nhưng CPU đọc thấy dữ liệu cũ. Vì sao?</span></summary><div class="qa-a prose"><p>Cache coherency: DMA ghi vào RAM nhưng CPU đọc từ D-cache. Phải invalidate cache vùng buffer sau khi DMA ghi xong (và clean trước khi DMA đọc), buffer căn lề 32 byte, hoặc đặt buffer ở vùng non-cacheable qua MPU.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Giao thức</h2><details class="qa-item" data-hot="1"><summary><span class="qn">08</span><span class="qt">Thiết kế framing cho giao thức UART giữa MCU và PC.</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>SOF + độ dài + loại + payload + CRC16, parser là state machine có kiểm tra độ dài tối đa, timeout giữa byte để resync, đếm lỗi CRC. Hoặc COBS với 0x00 làm ranh giới (resync tức thì, overhead ≤ 1/254). Thêm sequence number, ACK, retry có giới hạn nếu kênh có thể mất gói; trao đổi phiên bản giao thức.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">09</span><span class="qt">COBS là gì? Ưu điểm so với byte stuffing kiểu SLIP?</span></summary><div class="qa-a prose"><p>Mã hóa dữ liệu để không còn byte 0, mỗi byte 0 được thay bằng khoảng cách tới số 0 tiếp theo; 0x00 làm ranh giới gói. Overhead cố định và nhỏ (tối đa 1 byte mỗi 254), trong khi SLIP xấu nhất gấp đôi kích thước.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">10</span><span class="qt">Làm sao tránh xử lý trùng khi bên gửi gửi lại do mất ACK?</span></summary><div class="qa-a prose"><p>Sequence number: bên nhận nhớ số đã xử lý, gói trùng số thì không xử lý lại nhưng vẫn ACK. Thiết kế lệnh idempotent khi có thể.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">11</span><span class="qt">Bus I2C bị treo (SDA bị giữ thấp). Xử lý thế nào?</span></summary><div class="qa-a prose"><p>Slave bị kẹt giữa một byte (thường do MCU reset giữa giao dịch). Master chuyển chân SCL sang GPIO, phát tới 9 xung clock cho tới khi SDA lên cao, tạo điều kiện STOP, rồi khởi tạo lại ngoại vi I2C. Luôn có timeout cho giao dịch I2C.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Bootloader và OTA</h2><details class="qa-item" data-hot="1"><summary><span class="qn">12</span><span class="qt">Cortex-M khởi động từ reset thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Đọc word 0 của bảng vector làm MSP, word 1 làm địa chỉ Reset_Handler. Startup: SystemInit (clock), copy .data từ Flash sang RAM, xóa .bss, gọi constructor toàn cục (C++), gọi main.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">13</span><span class="qt">Bootloader nhảy sang ứng dụng cần làm gì?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Kiểm tra image (magic, CRC, chữ ký, hw_id). Tắt ngắt, dừng SysTick, tắt và xóa pending trong NVIC, deinit ngoại vi/clock; đặt <code>SCB-&gt;VTOR</code> = địa chỉ ứng dụng; DSB/ISB; đặt MSP từ word 0; gọi reset handler từ word 1. Ứng dụng phải link đúng địa chỉ. Cách sạch hơn: reset với cờ noinit và nhảy ngay đầu Reset_Handler.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">14</span><span class="qt">Thiết kế OTA an toàn khi mất điện và firmware mới lỗi.</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>A/B: tải vào slot phụ, kiểm tra CRC và chữ ký; đánh dấu test; bootloader swap/chọn slot mới; ứng dụng mới tự kiểm tra rồi confirm; reset trước khi confirm thì rollback. Trạng thái ghi kiểu append-only chịu mất điện; watchdog bật suốt; anti-rollback bằng phiên bản tối thiểu. Công cụ: MCUboot, ESP-IDF OTA; Linux: U-Boot bootcount + SWUpdate/RAUC/Mender.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">15</span><span class="qt">Secure boot hoạt động thế nào?</span></summary><div class="qa-a prose"><p>Khóa công khai (hoặc hash) trong vùng bất biến (OTP/ROM); mỗi tầng xác minh chữ ký tầng sau trước khi chạy (ROM → bootloader → app): chain of trust. Khóa cổng debug khi xuất xưởng; anti-rollback; có thể mã hóa image. CRC không thay được chữ ký.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Độ tin cậy, log, năng lượng</h2><details class="qa-item" data-hot="1"><summary><span class="qn">16</span><span class="qt">Thiết kế watchdog cho hệ thống nhiều task.</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Không cho ăn trong ISR timer hay một task độc lập. Mỗi task quan trọng báo danh (set bit) định kỳ; task giám sát chỉ cho ăn IWDG khi mọi bit đã set trong chu kỳ, rồi xóa bit. Task chờ lâu thì chờ có timeout để báo danh. Ghi task không báo danh vào noinit trước khi reset.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">17</span><span class="qt">IWDG và WWDG khác nhau thế nào?</span></summary><div class="qa-a prose"><p>IWDG chạy clock riêng (LSI), không tắt được, chỉ có timeout trên. WWDG phải cho ăn trong một cửa sổ thời gian, bắt cả trường hợp phần mềm chạy quá nhanh/bỏ bước; dùng clock hệ thống.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">18</span><span class="qt">Xử lý HardFault để có thông tin debug thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Handler naked kiểm tra bit 2 của EXC_RETURN để lấy MSP hoặc PSP, truyền con trỏ stack frame cho hàm C; lưu R0–R3, R12, LR, PC, xPSR cùng CFSR, HFSR, MMFAR, BFAR vào section .noinit; reset; lần khởi động sau báo cáo. Dùng <code>addr2line</code> với PC/LR để tìm dòng code. CFSR cho biết loại lỗi (PRECISERR, UNDEFINSTR, DIVBYZERO, UNALIGNED, STKERR…).</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">19</span><span class="qt">Lưu cấu hình vào Flash sao cho mất điện khi ghi không hỏng?</span></summary><div class="qa-a prose"><p>Hai bản sao (A/B) có CRC và số thứ tự tăng; ghi luân phiên vào bản cũ hơn; khi đọc chọn bản CRC đúng có số thứ tự lớn nhất; giá trị mặc định khi cả hai hỏng. Ghi thường xuyên thì cần wear leveling (log append-only, littlefs).</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">20</span><span class="qt">Vì sao printf làm firmware khó debug? Logging tốt thế nào?</span></summary><div class="qa-a prose"><p>Chậm, tốn Flash và stack, có thể chặn, thay đổi thời gian (heisenbug), không an toàn trong ISR. Logging tốt: mức log lọc lúc compile, ghi vào ring buffer không chặn, task nền gửi ra, bỏ và đếm khi đầy; binary/tokenized logging (gửi ID + tham số); RTT/SWO; buffer log trong noinit để sống qua reset.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">21</span><span class="qt">Tính tuổi thọ pin của thiết bị duty-cycle thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>I_avg = Σ(I × t)/T trên một chu kỳ, gồm cả dòng ngủ của toàn board. Tuổi thọ ≈ dung lượng × hệ số hiệu dụng / I_avg. Bảng này chỉ ra thành phần tiêu nhiều nhất (thường là radio) để tối ưu trước.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">22</span><span class="qt">Các kỹ thuật giảm năng lượng chính?</span></summary><div class="qa-a prose"><p>Chế độ ngủ sâu nhất mà nguồn đánh thức và thời gian thức cho phép; tickless idle cho RTOS; tắt clock và nguồn ngoại vi không dùng; GPIO không dùng ở analog; ổn áp dòng tĩnh thấp; race to sleep; để ngoại vi low-power (LPUART, LPTIM, ADC watchdog, DMA) làm việc khi CPU ngủ; gom việc và gom thời điểm thức dậy. Đo bằng PPK2/Joulescope.</p></div></details></div></div></section><section class="panel" id="p-quiz" data-panel="quiz" role="tabpanel" hidden><div class="quiz-bar"><div class="score" id="quiz-score">0 / 0</div><div class="meter"><span id="quiz-meter"></span></div><button class="btn ghost" id="quiz-reset" type="button">Làm lại</button></div><ol class="quiz" id="quiz"></ol></section><section class="panel" id="p-flashcard" data-panel="flashcard" role="tabpanel" hidden><div class="fc-tools"><span id="fc-pos" class="mono"></span><label class="chk"><input id="fc-only" type="checkbox"> Chỉ thẻ chưa thuộc</label><button class="btn ghost" id="fc-shuffle" type="button">Xáo trộn</button></div><div class="fc" id="fc" tabindex="0" role="button" aria-label="Lật thẻ"><div class="fc-face fc-front"><div class="fc-group" id="fc-g"></div><div class="fc-q" id="fc-q"></div><div class="fc-hint">Bấm hoặc nhấn Space để lật</div></div><div class="fc-face fc-back prose" id="fc-a" hidden></div></div><div class="fc-nav"><button class="btn ghost" id="fc-prev" type="button">← Trước</button><button class="btn warn" id="fc-again" type="button">Ôn lại</button><button class="btn ok" id="fc-known" type="button">Đã thuộc</button><button class="btn ghost" id="fc-next" type="button">Sau →</button></div></section><section class="panel" id="p-cheatsheet" data-panel="cheatsheet" role="tabpanel" hidden><div class="md-wrap"><article class="cheat"><section class="card"><h2 id="cheatsheet-quy-trinh-thiet-ke">Quy trình thiết kế</h2>
+<ol>
+<li>Yêu cầu: chức năng + thời gian, năng lượng, kết nối, môi trường, an toàn, bảo mật, vòng đời</li>
+<li>HW/SW: tần số cao → phần cứng</li>
+<li>Nền tảng: MCU / MPU / cả hai; RTOS?</li>
+<li>Ngân sách: Flash (×2 cho A/B), RAM, CPU (U&lt;70%), năng lượng, bus</li>
+<li>Kiến trúc: lớp, task/AO, luồng dữ liệu</li>
+<li>Lỗi, OTA, bảo mật, chẩn đoán, sản xuất</li>
+</ol>
+</section><section class="card"><h2 id="cheatsheet-ngat-cortex-m">Ngắt Cortex-M</h2>
+<ul>
+<li>Vào ISR ~12 chu kỳ, tail-chaining ~6</li>
+<li>Số nhỏ = ưu tiên cao; preempt vs sub</li>
+<li>FreeRTOS: ISR gọi API ≤ <code>MAX_SYSCALL</code> (số ≥)</li>
+<li>ISR: ngắn, không chặn, xóa cờ sớm, FromISR, yield</li>
+<li>Latency = HW + critical max + ISR cao hơn</li>
+<li>DMA + M7: clean trước TX, invalidate sau RX</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-giao-thuc">Giao thức</h2>
+<div class="hl"><pre><span></span><code>[SOF][LEN][TYPE][PAYLOAD][CRC16]
+COBS: no 0x00 inside, 0x00 = end, +1/254
+</code></pre></div>
+
+<ul>
+<li>Parser = state machine, check LEN, timeout byte</li>
+<li>Seq + ACK + retry (backoff) + lọc trùng</li>
+<li>Endianness rõ ràng, không cast struct</li>
+<li>TLV / CBOR / nanopb; trao đổi version</li>
+<li>I2C treo: 9 xung SCL + STOP</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-boot-amp-ota">Boot &amp; OTA</h2>
+<div class="hl"><pre><span></span><code>VT[0] = MSP, VT[1] = Reset_Handler
+jump: cli; SysTick off; NVIC clear; deinit;
+      VTOR = app; DSB; ISB; MSP = VT[0]; VT[1]()
+</code></pre></div>
+
+<ul>
+<li>Header: magic, hw_id, ver, size, CRC, sig</li>
+<li>A/B: download → verify → test → confirm | rollback</li>
+<li>Ghi trạng thái append-only; WDT luôn bật</li>
+<li>Secure boot: key trong OTP, chain of trust, khóa debug</li>
+<li>MCUboot · SWUpdate/RAUC/Mender · U-Boot bootcount</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-do-tin-cay">Độ tin cậy</h2>
+<ul>
+<li>IWDG (LSI, không tắt) · WWDG (cửa sổ)</li>
+<li>Task watchdog: bit báo danh, supervisor kick</li>
+<li>Fault: MSP/PSP theo EXC_RETURN bit 2</li>
+<li>Lưu PC, LR, CFSR, HFSR, BFAR, MMFAR → <code>.noinit</code></li>
+<li><code>addr2line -e fw.elf &lt;PC&gt;</code></li>
+<li>Reset cause mỗi lần boot; bật BOR</li>
+<li>Config: A/B + CRC + seq; littlefs</li>
+<li>MPU guard stack; safe state</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-logging">Logging</h2>
+<ul>
+<li>Level lọc lúc compile; ring buffer, không chặn</li>
+<li>Đếm log bị mất; ISR-safe</li>
+<li>Tokenized: ID + args, PC định dạng</li>
+<li>RTT, SWO &gt; UART</li>
+<li>Log trong <code>.noinit</code> = flight recorder</li>
+<li>Metrics + heartbeat: reset, lỗi, stack, pin</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-nang-luong">Năng lượng</h2>
+<div class="hl"><pre><span></span><code>I_avg = Σ(I·t) / T
+Life_h ≈ C_mAh · 0,8 / I_avg_mA
+</code></pre></div>
+
+<ul>
+<li>Sleep → Stop (µA, giữ RAM) → Standby (mất RAM)</li>
+<li><code>WFI</code>, <code>SLEEPDEEP</code>, <code>SLEEPONEXIT</code></li>
+<li>Tickless idle; clock gating; GPIO analog</li>
+<li>Race to sleep; ngoại vi low-power</li>
+<li>Gom gửi radio; đo bằng PPK2 / Joulescope</li>
+</ul></section></article></div></section></main>
+
+<footer class="wrap foot">
+  <span>Ghi chú ôn tập cá nhân · nội dung tóm tắt và ví dụ được viết lại, không trích nguyên văn sách.</span>
+</footer>
+
+<script id="page-data" type="application/json">{"quiz": [{"q": "<p>Câu hỏi đầu tiên nên làm rõ khi thiết kế thiết bị IoT:<\/p>", "o": [{"t": "Dùng MCU hãng nào", "ok": false}, {"t": "Yêu cầu phi chức năng: nguồn pin, tuổi thọ, chu kỳ đo/gửi, kết nối", "ok": true}, {"t": "Ngôn ngữ lập trình", "ok": false}, {"t": "Tên sản phẩm", "ok": false}], "e": "<p>Chúng quyết định kiến trúc.<\/p>", "g": ""}, {"q": "<p>Trên Cortex-M, số priority NVIC nhỏ hơn nghĩa là:<\/p>", "o": [{"t": "Ưu tiên cao hơn", "ok": true}, {"t": "Ưu tiên thấp hơn", "ok": false}, {"t": "Không liên quan", "ok": false}, {"t": "Ngắt bị tắt", "ok": false}], "e": "<p>0 là cao nhất trong các ngắt cấu hình được.<\/p>", "g": ""}, {"q": "<p>Subpriority quyết định:<\/p>", "o": [{"t": "Ngắt có chen ngang ngắt đang chạy không", "ok": false}, {"t": "Thứ tự phục vụ khi nhiều ngắt cùng pending", "ok": true}, {"t": "Độ trễ vào ngắt", "ok": false}, {"t": "Ngắt có được gọi API RTOS không", "ok": false}], "e": "<p>Chen ngang do preemption priority.<\/p>", "g": ""}, {"q": "<p>ISR quên xóa cờ ngắt gây ra:<\/p>", "o": [{"t": "Ngắt bị bỏ qua", "ok": false}, {"t": "ISR chạy lặp lại liên tục, CPU kẹt trong ngắt", "ok": true}, {"t": "HardFault ngay", "ok": false}, {"t": "Không có gì", "ok": false}], "e": "<p>Thường dẫn tới watchdog reset.<\/p>", "g": ""}, {"q": "<p>Cách khắc phục DMA + D-cache trên Cortex-M7 khi CPU đọc dữ liệu DMA vừa ghi:<\/p>", "o": [{"t": "Clean cache trước khi đọc", "ok": false}, {"t": "Invalidate cache vùng buffer (hoặc dùng vùng non-cacheable)", "ok": true}, {"t": "Tắt DMA", "ok": false}, {"t": "Dùng <code>volatile<\/code>", "ok": false}], "e": "<p>Clean là trước khi DMA đọc dữ liệu CPU đã ghi.<\/p>", "g": ""}, {"q": "<p>COBS dùng byte nào làm ranh giới gói?<\/p>", "o": [{"t": "0x7E", "ok": false}, {"t": "0xC0", "ok": false}, {"t": "0x00", "ok": true}, {"t": "0xFF", "ok": false}], "e": "<p>Dữ liệu được mã hóa để không chứa 0x00.<\/p>", "g": ""}, {"q": "<p>Parser nhận độ dài 200 nhưng buffer chỉ 64 byte. Đúng nhất:<\/p>", "o": [{"t": "Đọc 64 byte đầu, bỏ phần còn lại", "ok": false}, {"t": "Coi là gói không hợp lệ, quay lại tìm SOF", "ok": true}, {"t": "Mở rộng buffer bằng malloc", "ok": false}, {"t": "Ghi tiếp, hy vọng CRC sai", "ok": false}], "e": "<p>Không tin dữ liệu từ bên ngoài: chống tràn buffer.<\/p>", "g": ""}, {"q": "<p>Word đầu tiên của bảng vector Cortex-M chứa:<\/p>", "o": [{"t": "Giá trị khởi đầu của MSP", "ok": true}, {"t": "Địa chỉ Reset_Handler", "ok": false}, {"t": "Địa chỉ HardFault_Handler", "ok": false}, {"t": "Phiên bản firmware", "ok": false}], "e": "<p>Word thứ hai là Reset_Handler.<\/p>", "g": ""}, {"q": "<p>Sau khi nhảy sang ứng dụng, ngắt đầu tiên chạy handler của bootloader. Thiếu bước:<\/p>", "o": [{"t": "<code>__set_MSP<\/code>", "ok": false}, {"t": "Đặt <code>SCB-&gt;VTOR<\/code> về bảng vector của ứng dụng", "ok": true}, {"t": "Tắt watchdog", "ok": false}, {"t": "Xóa .bss", "ok": false}], "e": "<p>VTOR quyết định bảng vector đang dùng.<\/p>", "g": ""}, {"q": "<p>Firmware mới lỗi làm thiết bị reset liên tục. Cơ chế tự phục hồi:<\/p>", "o": [{"t": "Single-slot update", "ok": false}, {"t": "A/B update với confirm và rollback", "ok": true}, {"t": "CRC image", "ok": false}, {"t": "ROM bootloader", "ok": false}], "e": "<p>Chưa confirm thì bootloader quay về slot cũ.<\/p>", "g": ""}, {"q": "<p>Thành phần cốt lõi của secure boot:<\/p>", "o": [{"t": "CRC32 của image", "ok": false}, {"t": "Chữ ký số được xác minh bằng khóa công khai lưu trong vùng bất biến", "ok": true}, {"t": "Mã hóa toàn bộ Flash", "ok": false}, {"t": "Mật khẩu bootloader", "ok": false}], "e": "<p>CRC chỉ chống lỗi ngẫu nhiên.<\/p>", "g": ""}, {"q": "<p>Cho ăn watchdog trong ISR SysTick là sai vì:<\/p>", "o": [{"t": "SysTick quá nhanh", "ok": false}, {"t": "Watchdog không phát hiện được task bị treo hay deadlock", "ok": true}, {"t": "Không được truy cập IWDG trong ISR", "ok": false}, {"t": "Gây priority inversion", "ok": false}], "e": "<p>Dùng task watchdog với báo danh.<\/p>", "g": ""}, {"q": "<p>WWDG khác IWDG ở chỗ:<\/p>", "o": [{"t": "Phải cho ăn trong một cửa sổ, cho ăn quá sớm cũng reset", "ok": true}, {"t": "Không reset được MCU", "ok": false}, {"t": "Tắt được bất cứ lúc nào", "ok": false}, {"t": "Chạy bằng clock riêng LSI", "ok": false}], "e": "<p>IWDG mới chạy bằng LSI.<\/p>", "g": ""}, {"q": "<p>Thanh ghi cho biết địa chỉ gây BusFault chính xác:<\/p>", "o": [{"t": "CFSR", "ok": false}, {"t": "HFSR", "ok": false}, {"t": "BFAR (khi BFARVALID)", "ok": true}, {"t": "VTOR", "ok": false}], "e": "<p>CFSR cho biết loại lỗi; BFAR/MMFAR cho địa chỉ.<\/p>", "g": ""}, {"q": "<p>Log trong section <code>.noinit<\/code> có tác dụng:<\/p>", "o": [{"t": "Không chiếm RAM", "ok": false}, {"t": "Sống sót qua reset mềm để đọc lại nguyên nhân lỗi", "ok": true}, {"t": "Ghi vào Flash tự động", "ok": false}, {"t": "Nhanh hơn log thường", "ok": false}], "e": "<p>Startup code không xóa vùng này.<\/p>", "g": ""}, {"q": "<p>Thiết bị ngủ 5 µA, mỗi 60 s thức 100 ms ở 6 mA. Dòng trung bình xấp xỉ:<\/p>", "o": [{"t": "5 µA", "ok": false}, {"t": "15 µA", "ok": true}, {"t": "100 µA", "ok": false}, {"t": "6 mA", "ok": false}], "e": "<p>(6 × 0,1 + 0,005 × 59,9)/60 ≈ (0,6 + 0,3)/60 ≈ 0,015 mA.<\/p>", "g": ""}, {"q": "<p>Tickless idle giúp:<\/p>", "o": [{"t": "Tăng độ chính xác của tick", "ok": false}, {"t": "Tránh đánh thức CPU mỗi tick khi không có việc", "ok": true}, {"t": "Giảm kích thước stack", "ok": false}, {"t": "Tắt watchdog khi ngủ", "ok": false}], "e": "<p>Dùng timer low-power đánh thức đúng lúc task tiếp theo cần chạy.<\/p>", "g": ""}, {"q": "<p>Trong node IoT dùng LTE-M, phần tiêu nhiều năng lượng nhất thường là:<\/p>", "o": [{"t": "MCU đo cảm biến", "ok": false}, {"t": "Ghi flash", "ok": false}, {"t": "Modem kết nối và gửi", "ok": true}, {"t": "Dòng ngủ của MCU", "ok": false}], "e": "<p>Giảm số lần gửi, thời gian kết nối, kích thước gói.<\/p>", "g": ""}], "flash": [{"q": "Khi nhận một bài system design Embedded, bạn bắt đầu thế nào?", "a": "<p>Làm rõ yêu cầu chức năng và đặc biệt là phi chức năng: thời gian (deadline), năng lượng (pin, tuổi thọ), kết nối, môi trường, an toàn/chuẩn, bảo mật, sản lượng và giá, OTA. Nói rõ giả định. Sau đó: phân chia HW/SW, chọn nền tảng, lập ngân sách (Flash, RAM, CPU, năng lượng), kiến trúc phần mềm, chế độ lỗi, bảo mật, sản xuất.<\/p>", "g": "Quy trình và nền tảng"}, {"q": "Khi nào chọn MCU, khi nào chọn MPU chạy Linux?", "a": "<p>MCU: realtime cứng µs, năng lượng thấp (µA), khởi động nhanh, giá và board đơn giản. MPU + Linux: cần mạng phức tạp, đồ họa, nhiều phần mềm sẵn có, nhiều bộ nhớ; trả giá bằng năng lượng, thời gian khởi động, độ phức tạp và gánh nặng cập nhật bảo mật. Nhiều sản phẩm kết hợp cả hai (MPU + lõi Cortex-M).<\/p>", "g": "Quy trình và nền tảng"}, {"q": "Quy tắc viết ISR?", "a": "<p>Ngắn; không chặn (không mutex, delay, chờ vô hạn); không printf/malloc/flash; xóa cờ ngắt đúng lúc (chú ý write buffer: xóa sớm hoặc DSB); dữ liệu chia sẻ dùng atomic/ring buffer/critical section phía task; chỉ API FromISR và yield khi đánh thức task ưu tiên cao; phần nặng hoãn sang task.<\/p>", "g": "Ngắt"}, {"q": "Preemption priority và subpriority khác nhau thế nào?", "a": "<p>Preemption priority quyết định ngắt có chen ngang ngắt đang chạy không (nesting). Subpriority chỉ quyết định thứ tự khi nhiều ngắt cùng pending, không gây chen ngang. Số nhỏ là ưu tiên cao.<\/p>", "g": "Ngắt"}, {"q": "Với FreeRTOS trên Cortex-M, ISR nào được gọi API kernel?", "a": "<p>Chỉ ISR có priority logic thấp hơn hoặc bằng <code>configMAX_SYSCALL_INTERRUPT_PRIORITY<\/code> (giá trị số lớn hơn hoặc bằng). ISR ưu tiên cao hơn không bị critical section của kernel chặn nhưng không được gọi API. Mặc định priority 0 sau reset là lỗi hay gặp.<\/p>", "g": "Ngắt"}, {"q": "Interrupt latency gồm những thành phần nào? Làm sao giảm jitter?", "a": "<p>Độ trễ phần cứng (~12 chu kỳ trên M3/M4), thời gian ngắt bị chặn (critical section dài nhất), các ISR ưu tiên cao hơn đang chạy, wait state Flash. Giảm jitter: critical section ngắn, BASEPRI thay PRIMASK, priority cao cho ISR quan trọng, chạy từ RAM/TCM, để phần cứng kích hoạt (timer → ADC, DMA).<\/p>", "g": "Ngắt"}, {"q": "DMA trên Cortex-M7 nhận dữ liệu nhưng CPU đọc thấy dữ liệu cũ. Vì sao?", "a": "<p>Cache coherency: DMA ghi vào RAM nhưng CPU đọc từ D-cache. Phải invalidate cache vùng buffer sau khi DMA ghi xong (và clean trước khi DMA đọc), buffer căn lề 32 byte, hoặc đặt buffer ở vùng non-cacheable qua MPU.<\/p>", "g": "Ngắt"}, {"q": "Thiết kế framing cho giao thức UART giữa MCU và PC.", "a": "<p>SOF + độ dài + loại + payload + CRC16, parser là state machine có kiểm tra độ dài tối đa, timeout giữa byte để resync, đếm lỗi CRC. Hoặc COBS với 0x00 làm ranh giới (resync tức thì, overhead ≤ 1/254). Thêm sequence number, ACK, retry có giới hạn nếu kênh có thể mất gói; trao đổi phiên bản giao thức.<\/p>", "g": "Giao thức"}, {"q": "COBS là gì? Ưu điểm so với byte stuffing kiểu SLIP?", "a": "<p>Mã hóa dữ liệu để không còn byte 0, mỗi byte 0 được thay bằng khoảng cách tới số 0 tiếp theo; 0x00 làm ranh giới gói. Overhead cố định và nhỏ (tối đa 1 byte mỗi 254), trong khi SLIP xấu nhất gấp đôi kích thước.<\/p>", "g": "Giao thức"}, {"q": "Làm sao tránh xử lý trùng khi bên gửi gửi lại do mất ACK?", "a": "<p>Sequence number: bên nhận nhớ số đã xử lý, gói trùng số thì không xử lý lại nhưng vẫn ACK. Thiết kế lệnh idempotent khi có thể.<\/p>", "g": "Giao thức"}, {"q": "Bus I2C bị treo (SDA bị giữ thấp). Xử lý thế nào?", "a": "<p>Slave bị kẹt giữa một byte (thường do MCU reset giữa giao dịch). Master chuyển chân SCL sang GPIO, phát tới 9 xung clock cho tới khi SDA lên cao, tạo điều kiện STOP, rồi khởi tạo lại ngoại vi I2C. Luôn có timeout cho giao dịch I2C.<\/p>", "g": "Giao thức"}, {"q": "Cortex-M khởi động từ reset thế nào?", "a": "<p>Đọc word 0 của bảng vector làm MSP, word 1 làm địa chỉ Reset_Handler. Startup: SystemInit (clock), copy .data từ Flash sang RAM, xóa .bss, gọi constructor toàn cục (C++), gọi main.<\/p>", "g": "Bootloader và OTA"}, {"q": "Bootloader nhảy sang ứng dụng cần làm gì?", "a": "<p>Kiểm tra image (magic, CRC, chữ ký, hw_id). Tắt ngắt, dừng SysTick, tắt và xóa pending trong NVIC, deinit ngoại vi/clock; đặt <code>SCB-&gt;VTOR<\/code> = địa chỉ ứng dụng; DSB/ISB; đặt MSP từ word 0; gọi reset handler từ word 1. Ứng dụng phải link đúng địa chỉ. Cách sạch hơn: reset với cờ noinit và nhảy ngay đầu Reset_Handler.<\/p>", "g": "Bootloader và OTA"}, {"q": "Thiết kế OTA an toàn khi mất điện và firmware mới lỗi.", "a": "<p>A/B: tải vào slot phụ, kiểm tra CRC và chữ ký; đánh dấu test; bootloader swap/chọn slot mới; ứng dụng mới tự kiểm tra rồi confirm; reset trước khi confirm thì rollback. Trạng thái ghi kiểu append-only chịu mất điện; watchdog bật suốt; anti-rollback bằng phiên bản tối thiểu. Công cụ: MCUboot, ESP-IDF OTA; Linux: U-Boot bootcount + SWUpdate/RAUC/Mender.<\/p>", "g": "Bootloader và OTA"}, {"q": "Secure boot hoạt động thế nào?", "a": "<p>Khóa công khai (hoặc hash) trong vùng bất biến (OTP/ROM); mỗi tầng xác minh chữ ký tầng sau trước khi chạy (ROM → bootloader → app): chain of trust. Khóa cổng debug khi xuất xưởng; anti-rollback; có thể mã hóa image. CRC không thay được chữ ký.<\/p>", "g": "Bootloader và OTA"}, {"q": "Thiết kế watchdog cho hệ thống nhiều task.", "a": "<p>Không cho ăn trong ISR timer hay một task độc lập. Mỗi task quan trọng báo danh (set bit) định kỳ; task giám sát chỉ cho ăn IWDG khi mọi bit đã set trong chu kỳ, rồi xóa bit. Task chờ lâu thì chờ có timeout để báo danh. Ghi task không báo danh vào noinit trước khi reset.<\/p>", "g": "Độ tin cậy, log, năng lượng"}, {"q": "IWDG và WWDG khác nhau thế nào?", "a": "<p>IWDG chạy clock riêng (LSI), không tắt được, chỉ có timeout trên. WWDG phải cho ăn trong một cửa sổ thời gian, bắt cả trường hợp phần mềm chạy quá nhanh/bỏ bước; dùng clock hệ thống.<\/p>", "g": "Độ tin cậy, log, năng lượng"}, {"q": "Xử lý HardFault để có thông tin debug thế nào?", "a": "<p>Handler naked kiểm tra bit 2 của EXC_RETURN để lấy MSP hoặc PSP, truyền con trỏ stack frame cho hàm C; lưu R0–R3, R12, LR, PC, xPSR cùng CFSR, HFSR, MMFAR, BFAR vào section .noinit; reset; lần khởi động sau báo cáo. Dùng <code>addr2line<\/code> với PC/LR để tìm dòng code. CFSR cho biết loại lỗi (PRECISERR, UNDEFINSTR, DIVBYZERO, UNALIGNED, STKERR…).<\/p>", "g": "Độ tin cậy, log, năng lượng"}, {"q": "Lưu cấu hình vào Flash sao cho mất điện khi ghi không hỏng?", "a": "<p>Hai bản sao (A/B) có CRC và số thứ tự tăng; ghi luân phiên vào bản cũ hơn; khi đọc chọn bản CRC đúng có số thứ tự lớn nhất; giá trị mặc định khi cả hai hỏng. Ghi thường xuyên thì cần wear leveling (log append-only, littlefs).<\/p>", "g": "Độ tin cậy, log, năng lượng"}, {"q": "Vì sao printf làm firmware khó debug? Logging tốt thế nào?", "a": "<p>Chậm, tốn Flash và stack, có thể chặn, thay đổi thời gian (heisenbug), không an toàn trong ISR. Logging tốt: mức log lọc lúc compile, ghi vào ring buffer không chặn, task nền gửi ra, bỏ và đếm khi đầy; binary/tokenized logging (gửi ID + tham số); RTT/SWO; buffer log trong noinit để sống qua reset.<\/p>", "g": "Độ tin cậy, log, năng lượng"}, {"q": "Tính tuổi thọ pin của thiết bị duty-cycle thế nào?", "a": "<p>I_avg = Σ(I × t)/T trên một chu kỳ, gồm cả dòng ngủ của toàn board. Tuổi thọ ≈ dung lượng × hệ số hiệu dụng / I_avg. Bảng này chỉ ra thành phần tiêu nhiều nhất (thường là radio) để tối ưu trước.<\/p>", "g": "Độ tin cậy, log, năng lượng"}, {"q": "Các kỹ thuật giảm năng lượng chính?", "a": "<p>Chế độ ngủ sâu nhất mà nguồn đánh thức và thời gian thức cho phép; tickless idle cho RTOS; tắt clock và nguồn ngoại vi không dùng; GPIO không dùng ở analog; ổn áp dòng tĩnh thấp; race to sleep; để ngoại vi low-power (LPUART, LPTIM, ADC watchdog, DMA) làm việc khi CPU ngủ; gom việc và gom thời điểm thức dậy. Đo bằng PPK2/Joulescope.<\/p>", "g": "Độ tin cậy, log, năng lượng"}]}</script>
+<script>window.PAGE_KEY = "m09";</script>
+<script>(function () {
+  "use strict";
+  var DATA = {};
+  try { DATA = JSON.parse(document.getElementById("page-data").textContent || "{}"); } catch (e) {}
+  var KEY = "ek:" + (window.PAGE_KEY || "page");
+  function load(k, d) { try { var v = localStorage.getItem(KEY + ":" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(KEY + ":" + k, JSON.stringify(v)); } catch (e) {} }
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  /* ---------- tabs ---------- */
+  var tabs = $$(".tab"), panels = $$(".panel");
+  var ids = tabs.map(function (t) { return t.dataset.tab; });
+  function panelOfAnchor(id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var p = el.closest(".panel");
+    return p ? p.dataset.panel : null;
+  }
+  var chaps = $$(".chap");
+  function showChap(cid, scrollTarget) {
+    if (!chaps.length) return;
+    var ok = chaps.some(function (c) { return c.dataset.chap === cid; });
+    if (!ok) cid = chaps[0].dataset.chap;
+    chaps.forEach(function (c) { c.hidden = c.dataset.chap !== cid; });
+    $$(".bk-ch").forEach(function (li) { li.classList.toggle("cur", li.dataset.chap === cid); });
+    var cur = $('.bk-ch[data-chap="' + cid + '"] .bk-t'), cl = $("#bk-cur"); if (cur && cl) cl.textContent = cur.textContent;
+    save("chap", cid);
+    if (!scrollTarget) { var b = $(".book"); if (b) { var top = b.getBoundingClientRect().top + window.scrollY - 60; if (window.scrollY > top) window.scrollTo({ top: top }); } }
+    if (window.matchMedia("(max-width: 999px)").matches) { var nav = $(".bk-nav"); if (nav) nav.open = false; }
+  }
+  function chapOf(el) { var c = el && el.closest && el.closest(".chap"); return c ? c.dataset.chap : null; }
+  function show(id, scrollTarget) {
+    if (ids.indexOf(id) < 0) id = ids[0];
+    tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t.dataset.tab === id)); });
+    panels.forEach(function (p) { p.hidden = p.dataset.panel !== id; });
+    save("tab", id);
+    if (scrollTarget) {
+      var el = document.getElementById(scrollTarget);
+      var c = chapOf(el); if (c) showChap(c, scrollTarget);
+      if (el) setTimeout(function () { el.scrollIntoView({ block: "start" }); }, 0);
+    }
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function (e) {
+      e.preventDefault();
+      show(t.dataset.tab);
+      try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (err) {}
+      var bar = $(".tabbar"); if (bar && window.scrollY > bar.offsetTop) window.scrollTo({ top: bar.offsetTop });
+    });
+  });
+  function route() {
+    var h = (location.hash || "").slice(1);
+    if (chaps.length && !chapOf(document.getElementById(h))) showChap(load("chap", null));
+    if (h && ids.indexOf(h) >= 0) return show(h);
+    if (h) { var p = panelOfAnchor(h); if (p) return show(p, h); }
+    show(load("tab", ids[0]));
+  }
+  window.addEventListener("hashchange", route);
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a || a.classList.contains("tab")) return;
+    var id = a.getAttribute("href").slice(1);
+    var p = panelOfAnchor(id);
+    if (p) { e.preventDefault(); show(p, id); }
+  });
+
+  /* ---------- TOC scrollspy ---------- */
+  $$(".toc").forEach(function (toc) {
+    var links = $$("a", toc);
+    var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); }).filter(Boolean);
+    if (!("IntersectionObserver" in window) || !targets.length) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          links.forEach(function (a) { a.classList.toggle("active", a.getAttribute("href") === "#" + en.target.id); });
+        }
+      });
+    }, { rootMargin: "-80px 0px -70% 0px" });
+    targets.forEach(function (t) { io.observe(t); });
+  });
+
+  /* ---------- Q&A ---------- */
+  var qs = $("#qa-search"), qh = $("#qa-hot"), qx = $("#qa-expand");
+  function filterQA() {
+    var term = (qs && qs.value || "").toLowerCase().trim();
+    var hotOnly = qh && qh.checked;
+    $$(".qa-group").forEach(function (g) {
+      var any = false;
+      $$(".qa-item", g).forEach(function (it) {
+        var ok = (!hotOnly || it.dataset.hot === "1") && (!term || it.textContent.toLowerCase().indexOf(term) >= 0);
+        it.hidden = !ok; if (ok) any = true;
+      });
+      g.hidden = !any;
+    });
+  }
+  if (qs) qs.addEventListener("input", filterQA);
+  if (qh) qh.addEventListener("change", filterQA);
+  if (qx) qx.addEventListener("click", function () {
+    var items = $$(".qa-item");
+    var open = items.some(function (d) { return !d.open; });
+    items.forEach(function (d) { d.open = open; });
+    qx.textContent = open ? "Thu gọn tất cả" : "Mở tất cả";
+  });
+
+  /* ---------- Quiz ---------- */
+  var quiz = DATA.quiz || [], qEl = $("#quiz");
+  if (qEl && quiz.length) {
+    var answers = load("quiz", {});
+    var letters = "ABCDEFGH";
+    function renderQuiz() {
+      qEl.innerHTML = "";
+      var lastG = null;
+      quiz.forEach(function (q, i) {
+        if (q.g && q.g !== lastG) { var gh = document.createElement("li"); gh.className = "qz-g"; gh.textContent = q.g; qEl.appendChild(gh); lastG = q.g; }
+        var li = document.createElement("li"); li.className = "qz";
+        var stem = document.createElement("div"); stem.className = "qz-stem";
+        stem.innerHTML = '<div class="prose">' + q.q + "</div>";
+        li.appendChild(stem);
+        var opts = document.createElement("div"); opts.className = "qz-opts";
+        q.o.forEach(function (o, j) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "qz-opt";
+          b.innerHTML = '<span class="k">' + letters[j] + "</span><span>" + o.t + "</span>";
+          b.addEventListener("click", function () { answers[i] = j; save("quiz", answers); paint(li, q, i); score(); });
+          opts.appendChild(b);
+        });
+        li.appendChild(opts);
+        var exp = document.createElement("div"); exp.className = "qz-exp"; exp.hidden = true; li.appendChild(exp);
+        qEl.appendChild(li);
+        paint(li, q, i);
+      });
+      score();
+    }
+    function paint(li, q, i) {
+      var a = answers[i]; if (a === undefined) return;
+      var btns = $$(".qz-opt", li);
+      btns.forEach(function (b, j) {
+        b.disabled = true;
+        if (q.o[j].ok) b.classList.add("right");
+        else if (j === a) b.classList.add("wrong");
+      });
+      var ok = q.o[a] && q.o[a].ok;
+      var exp = $(".qz-exp", li);
+      exp.innerHTML = '<span class="qz-verdict ' + (ok ? "ok" : "no") + '">' + (ok ? "Đúng." : "Chưa đúng.") + "</span>" + (q.e || "");
+      exp.hidden = false;
+    }
+    function score() {
+      var done = 0, right = 0;
+      quiz.forEach(function (q, i) { var a = answers[i]; if (a !== undefined) { done++; if (q.o[a] && q.o[a].ok) right++; } });
+      $("#quiz-score").textContent = "Đúng " + right + "/" + quiz.length + " · đã làm " + done;
+      $("#quiz-meter").style.width = (100 * done / quiz.length) + "%";
+    }
+    $("#quiz-reset").addEventListener("click", function () { answers = {}; save("quiz", answers); renderQuiz(); });
+    renderQuiz();
+  }
+
+  /* ---------- Flashcards ---------- */
+  var cards = DATA.flash || [], fc = $("#fc");
+  if (fc && cards.length) {
+    var known = load("known", {});
+    var order = cards.map(function (_, i) { return i; });
+    var pos = 0, flipped = false;
+    function deck() {
+      var only = $("#fc-only").checked;
+      return order.filter(function (i) { return !only || !known[i]; });
+    }
+    function draw() {
+      var d = deck();
+      if (!d.length) {
+        $("#fc-g").textContent = ""; $("#fc-q").textContent = "Bạn đã thuộc hết các thẻ. Bỏ chọn bộ lọc để ôn lại.";
+        $("#fc-a").hidden = true; $(".fc-front").hidden = false; $("#fc-pos").textContent = "0 / 0"; fc.classList.remove("known"); return;
+      }
+      if (pos >= d.length) pos = 0; if (pos < 0) pos = d.length - 1;
+      var i = d[pos], c = cards[i];
+      $("#fc-g").textContent = c.g || "";
+      $("#fc-q").innerHTML = c.q;
+      $("#fc-a").innerHTML = '<div class="fc-q" style="font-size:18px">' + c.q + "</div>" + c.a;
+      $(".fc-front").hidden = flipped; $("#fc-a").hidden = !flipped;
+      fc.classList.toggle("known", !!known[i]);
+      var nk = Object.keys(known).filter(function (k) { return known[k]; }).length;
+      $("#fc-pos").textContent = (pos + 1) + " / " + d.length + " · đã thuộc " + nk + "/" + cards.length;
+    }
+    function flip() { flipped = !flipped; draw(); }
+    function step(n) { pos += n; flipped = false; draw(); }
+    fc.addEventListener("click", function (e) { if (e.target.closest("a")) return; flip(); });
+    fc.addEventListener("keydown", function (e) {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); }
+      if (e.key === "ArrowRight") step(1);
+      if (e.key === "ArrowLeft") step(-1);
+    });
+    $("#fc-prev").addEventListener("click", function () { step(-1); });
+    $("#fc-next").addEventListener("click", function () { step(1); });
+    $("#fc-known").addEventListener("click", function () {
+      var d = deck(); if (!d.length) return; known[d[pos]] = true; save("known", known);
+      if ($("#fc-only").checked) { flipped = false; draw(); } else step(1);
+    });
+    $("#fc-again").addEventListener("click", function () {
+      var d = deck(); if (!d.length) return; known[d[pos]] = false; save("known", known); step(1);
+    });
+    $("#fc-only").addEventListener("change", function () { pos = 0; flipped = false; draw(); });
+    $("#fc-shuffle").addEventListener("click", function () {
+      for (var k = order.length - 1; k > 0; k--) { var r = Math.floor(Math.random() * (k + 1)); var t = order[k]; order[k] = order[r]; order[r] = t; }
+      pos = 0; flipped = false; draw();
+    });
+    draw();
+  }
+
+  if (chaps.length) {
+    var read = load("read", {});
+    var navLinks = {};
+    function paintRead() {
+      var n = 0;
+      $$(".bk-ch").forEach(function (li) { var r = !!read[li.dataset.chap]; li.classList.toggle("read", r); if (r) n++; });
+      $$(".mark-read").forEach(function (b) { var r = !!read[b.dataset.chap]; b.textContent = r ? "Đã đọc ✓ (bấm để bỏ)" : "Đánh dấu đã đọc"; b.classList.toggle("ghost", r); });
+      var pr = $("#bk-prog"); if (pr) pr.textContent = "· đã đọc " + n + "/" + chaps.length;
+    }
+    chaps.forEach(function (c, i) {
+      var pg = $(".chap-pager", c), html = "";
+      var titleOf = function (k) { var li = $('.bk-ch[data-chap="' + chaps[k].dataset.chap + '"] .bk-t'); return li ? li.textContent : ""; };
+      if (i > 0) html += '<a class="pg-btn prev" href="#' + chaps[i - 1].dataset.chap + '"><span>← Chương trước</span><b>' + titleOf(i - 1) + "</b></a>";
+      if (i < chaps.length - 1) html += '<a class="pg-btn next" href="#' + chaps[i + 1].dataset.chap + '"><span>Chương sau →</span><b>' + titleOf(i + 1) + "</b></a>";
+      pg.innerHTML = html;
+    });
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest(".mark-read");
+      if (!b) return;
+      read[b.dataset.chap] = !read[b.dataset.chap]; save("read", read); paintRead();
+    });
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest(".pg-btn, .bk-ch > a");
+      if (!a) return;
+      e.preventDefault();
+      var id = a.getAttribute("href").slice(1);
+      showChap(id);
+      try { history.replaceState(null, "", "#" + id); } catch (err) {}
+    }, true);
+    paintRead();
+  }
+
+  route();
+})();
+</script>

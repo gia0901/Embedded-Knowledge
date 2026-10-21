@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="fonts/fonts.css">
+<title>Embedded Knowledge</title>
+<style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
+:root {
+  --bg: #F4F6F5;
+  --surface: #FFFFFF;
+  --fg: #172022;
+  --muted: #56656A;
+  --line: #D3DCDA;
+  --line-strong: #B5C3C0;
+  --accent: #0B6B55;
+  --accent-weak: #E0EFEA;
+  --copper: #9E531A;
+  --copper-weak: #F5E8DC;
+  --ok: #1D7A47;
+  --ok-weak: #E1F2E8;
+  --bad: #B23A26;
+  --bad-weak: #F8E4DF;
+  --code-bg: #EDF2F0;
+  --code-fg: #1E2A2C;
+  --sx-kw: #8A2F8F;
+  --sx-type: #0B6B55;
+  --sx-str: #9E531A;
+  --sx-com: #75868A;
+  --sx-num: #1F5FA8;
+  --sx-pp: #A33A1E;
+  --sx-fn: #1E4E79;
+
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1413; --surface: #141C1B; --fg: #E1E8E6; --muted: #92A29F; --line: #263331; --line-strong: #3A4B48;
+    --accent: #4FC3A1; --accent-weak: #15302A; --copper: #E39A62; --copper-weak: #33241A;
+    --ok: #5BCB8C; --ok-weak: #15301F; --bad: #F08A72; --bad-weak: #3A1C16;
+    --code-bg: #101918; --code-fg: #D9E3E1;
+    --sx-kw: #D79BE0; --sx-type: #4FC3A1; --sx-str: #E39A62; --sx-com: #6E817E; --sx-num: #82B4EF; --sx-pp: #F08A6A; --sx-fn: #9CC8F0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1413; --surface: #141C1B; --fg: #E1E8E6; --muted: #92A29F; --line: #263331; --line-strong: #3A4B48;
+  --accent: #4FC3A1; --accent-weak: #15302A; --copper: #E39A62; --copper-weak: #33241A;
+  --ok: #5BCB8C; --ok-weak: #15301F; --bad: #F08A72; --bad-weak: #3A1C16;
+  --code-bg: #101918; --code-fg: #D9E3E1;
+  --sx-kw: #D79BE0; --sx-type: #4FC3A1; --sx-str: #E39A62; --sx-com: #6E817E; --sx-num: #82B4EF; --sx-pp: #F08A6A; --sx-fn: #9CC8F0;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-body); font-size: 16px; line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.mono { font-family: var(--f-mono); font-size: 13px; }
+
+/* masthead */
+.masthead { background: var(--surface); border-bottom: 1px solid var(--line); }
+.masthead .wrap { padding-block: var(--s-5) var(--s-5); display: grid; gap: var(--s-3); }
+.crumb { display: flex; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap;
+  font-family: var(--f-mono); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.crumb .sep { margin: 0 .6em; color: var(--line-strong); }
+.crumb-link { color: var(--muted); text-decoration: none; }
+.crumb-link:hover { color: var(--accent); }
+.rev { white-space: nowrap; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(32px, 5vw, 52px); line-height: 1.05;
+  letter-spacing: -.01em; margin: var(--s-2) 0 0; text-wrap: balance; }
+h1 .h1-sub { display: block; line-height: 1.3; font-weight: 500; color: var(--muted); font-size: .5em; letter-spacing: 0; margin-top: var(--s-2); }
+.lede { max-width: 68ch; margin: 0; color: var(--muted); font-size: 17px; }
+.meta { display: grid; gap: var(--s-2); margin-top: var(--s-2); border-top: 1px dashed var(--line); padding-top: var(--s-3); }
+.meta-row { display: grid; grid-template-columns: 84px 1fr; gap: var(--s-3); align-items: baseline; }
+.meta-k { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.meta-v { font-size: 14px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--f-mono); font-size: 12px; padding: 1px 8px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--fg); }
+
+/* tabs */
+.tabbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: var(--s-1); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 14px 12px 12px; white-space: nowrap;
+  font-family: var(--f-display); font-weight: 600; font-size: 16px; letter-spacing: .01em; color: var(--muted); text-decoration: none;
+  border-bottom: 3px solid transparent; }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab-n { font-family: var(--f-mono); font-size: 11px; font-weight: 400; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; line-height: 18px; }
+
+.main { padding-block: var(--s-6) var(--s-7); }
+.foot { padding-block: var(--s-5); color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+
+/* reading layout */
+.md-wrap { display: grid; gap: var(--s-6); }
+.md-wrap.has-toc { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) {
+  .md-wrap.has-toc { grid-template-columns: minmax(0, 1fr) 240px; }
+  .toc { position: sticky; top: calc(72px + env(safe-area-inset-top, 0px)); align-self: start; max-height: calc(100vh - 100px); overflow: auto; }
+}
+@media (max-width: 999px) { .toc { order: -1; } }
+.toc { font-size: 13.5px; border-left: 2px solid var(--line); padding-left: var(--s-4); }
+.toc-label { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: var(--s-2); }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: t; }
+.toc li { counter-increment: t; display: grid; grid-template-columns: 22px 1fr; }
+.toc li::before { content: counter(t, decimal-leading-zero); font-family: var(--f-mono); font-size: 11px; color: var(--muted); padding-top: 2px; }
+.toc a { color: var(--fg); text-decoration: none; line-height: 1.4; }
+.toc a:hover, .toc a.active { color: var(--accent); }
+
+/* prose */
+.prose { min-width: 0; max-width: 76ch; }
+.prose > .sec, .prose > .intro { padding-bottom: var(--s-5); }
+.prose > .sec + .sec { border-top: 1px solid var(--line); padding-top: var(--s-5); }
+.prose h2 { font-family: var(--f-display); font-weight: 700; font-size: 28px; line-height: 1.2; margin: 0 0 var(--s-3); text-wrap: balance; }
+.prose h3 { font-family: var(--f-display); font-weight: 600; font-size: 20px; line-height: 1.3; margin: var(--s-5) 0 var(--s-2); }
+.prose h4 { font-size: 15px; font-weight: 700; margin: var(--s-4) 0 var(--s-1); }
+.prose p { margin: 0 0 var(--s-3); }
+.prose ul, .prose ol { margin: 0 0 var(--s-3); padding-left: 1.3em; }
+.prose li { margin: 3px 0; }
+.prose li > p { margin: 0; }
+.prose strong { font-weight: 650; }
+.prose code { font-family: var(--f-mono); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; color: var(--code-fg); overflow-wrap: anywhere; }
+.prose hr { border: 0; border-top: 1px dashed var(--line); margin: var(--s-5) 0; }
+.hl { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r); margin: var(--s-3) 0 var(--s-4); overflow-x: auto; }
+.hl pre { margin: 0; padding: 12px 14px; font-family: var(--f-mono); font-size: 13.2px; line-height: 1.55; color: var(--code-fg); }
+.hl pre code, .hl code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.prose pre:not(.hl pre) { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; overflow-x: auto; font-family: var(--f-mono); font-size: 13.2px; }
+/* pygments tokens */
+.hl .k, .hl .kd, .hl .kn, .hl .kr, .hl .kc, .hl .ow { color: var(--sx-kw); font-weight: 600; }
+.hl .kt, .hl .nc, .hl .nn { color: var(--sx-type); }
+.hl .s, .hl .s1, .hl .s2, .hl .sc, .hl .sa, .hl .se, .hl .sb, .hl .sd { color: var(--sx-str); }
+.hl .c, .hl .c1, .hl .cm, .hl .cs, .hl .ch { color: var(--sx-com); font-style: italic; }
+.hl .cp, .hl .cpf { color: var(--sx-pp); }
+.hl .m, .hl .mi, .hl .mh, .hl .mf, .hl .mo, .hl .mb, .hl .il { color: var(--sx-num); }
+.hl .nf, .hl .fm { color: var(--sx-fn); }
+.hl .err { color: inherit; background: none; border: 0; }
+
+.tbl { overflow-x: auto; margin: var(--s-3) 0 var(--s-4); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+
+/* callouts */
+.callout { margin: var(--s-4) 0; padding: var(--s-3) var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.callout > p:last-child, .callout > ul:last-child { margin-bottom: 0; }
+.callout-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2); margin-bottom: var(--s-1); }
+.callout-tag { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; padding: 1px 7px; border-radius: 3px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.callout-title { font-weight: 650; }
+.c-mcu .callout-tag, .c-linux .callout-tag, .c-emb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-pv .callout-tag { color: var(--copper); background: var(--copper-weak); border-color: transparent; }
+.c-pv { border-color: color-mix(in srgb, var(--copper) 35%, var(--line)); }
+.c-warn .callout-tag { color: var(--bad); background: var(--bad-weak); border-color: transparent; }
+.c-tip .callout-tag { color: var(--ok); background: var(--ok-weak); border-color: transparent; }
+
+/* badges */
+.badge { display: inline-block; vertical-align: middle; font-family: var(--f-mono); font-size: 11px; font-weight: 600; letter-spacing: .03em; padding: 0 6px; line-height: 19px; border-radius: 3px; margin-left: 6px; white-space: nowrap; }
+.badge.must { background: var(--accent); color: var(--surface); }
+.badge.skim { background: var(--accent-weak); color: var(--accent); }
+.badge.skip { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.badge.hot { background: var(--copper-weak); color: var(--copper); }
+.badge.std { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.pg { display: inline-block; vertical-align: middle; font-family: var(--f-mono); font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px; white-space: nowrap; letter-spacing: 0; }
+h2 .badge, h3 .badge { font-family: var(--f-mono); }
+
+/* Q&A */
+.qa-tools, .fc-tools, .quiz-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin-bottom: var(--s-5); }
+#qa-search { flex: 1 1 240px; min-width: 0; font: inherit; font-size: 15px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--surface); color: var(--fg); }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.btn { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.ghost { background: transparent; }
+.btn.ok { background: var(--ok-weak); color: var(--ok); border-color: transparent; }
+.btn.warn { background: var(--copper-weak); color: var(--copper); border-color: transparent; }
+.qa { display: grid; gap: var(--s-6); max-width: 860px; }
+.qa-gh { font-family: var(--f-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0 0 var(--s-2); }
+.qa-group { display: grid; }
+.qa-item { border-top: 1px solid var(--line); }
+.qa-group .qa-item:last-child { border-bottom: 1px solid var(--line); }
+.qa-item summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 34px 1fr auto; gap: var(--s-2); align-items: baseline; padding: 12px 0; }
+.qa-item summary::-webkit-details-marker { display: none; }
+.qn { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.qt { font-weight: 600; min-width: 0; }
+.qt code { font-family: var(--f-mono); font-size: .88em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+.qa-item[open] summary .qt { color: var(--accent); }
+.qa-a { padding: 0 0 var(--s-4) 42px; max-width: none; }
+@media (max-width: 560px) { .qa-a { padding-left: 0; } }
+
+/* quiz */
+.score { font-family: var(--f-mono); font-size: 14px; font-weight: 600; }
+.meter { flex: 1 1 160px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 80px; }
+.meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.quiz { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--s-5); max-width: 860px; counter-reset: q; }
+.qz { counter-increment: q; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s-4); }
+.qz-stem { display: grid; grid-template-columns: 34px 1fr; gap: var(--s-2); }
+.qz-stem::before { content: counter(q, decimal-leading-zero); font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 4px; }
+.qz-stem .prose p:last-child { margin-bottom: var(--s-2); }
+.qz-opts { display: grid; gap: var(--s-2); margin: var(--s-2) 0 0 42px; }
+@media (max-width: 560px) { .qz-opts { margin-left: 0; } }
+.qz-opt { text-align: left; font: inherit; font-size: 15px; padding: 9px 12px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg); cursor: pointer; display: grid; grid-template-columns: 22px 1fr; gap: 6px; }
+.qz-opt code { font-family: var(--f-mono); font-size: .88em; }
+.qz-opt .k { font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.qz-opt:hover:not(:disabled) { border-color: var(--accent); }
+.qz-opt:disabled { cursor: default; }
+.qz-opt.right { background: var(--ok-weak); border-color: var(--ok); }
+.qz-opt.wrong { background: var(--bad-weak); border-color: var(--bad); }
+.qz-exp { margin: var(--s-3) 0 0 42px; padding-top: var(--s-3); border-top: 1px dashed var(--line); font-size: 15px; }
+@media (max-width: 560px) { .qz-exp { margin-left: 0; } }
+.qz-verdict { font-weight: 700; margin-right: 6px; }
+.qz-verdict.ok { color: var(--ok); } .qz-verdict.no { color: var(--bad); }
+
+/* flashcards */
+.fc { max-width: 760px; min-height: 280px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; padding: var(--s-6) var(--s-5); cursor: pointer; display: grid; position: relative; }
+.fc::after { content: ""; position: absolute; inset: 8px; border: 1px dashed var(--line); border-radius: 6px; pointer-events: none; }
+.fc-face { position: relative; z-index: 1; display: grid; align-content: center; gap: var(--s-3); }
+.fc-group { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.fc-q { font-family: var(--f-display); font-size: clamp(20px, 3vw, 26px); font-weight: 600; line-height: 1.3; text-wrap: balance; }
+.fc-q code { font-family: var(--f-mono); font-size: .8em; }
+.fc-hint { font-size: 13px; color: var(--muted); }
+.fc-back { max-width: none; align-content: start; }
+.fc.known { border-color: var(--ok); }
+.fc-nav { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); max-width: 760px; }
+.fc-nav .btn { flex: 1 1 120px; }
+
+/* cheatsheet */
+.cheat { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--s-4); align-items: start; }
+.cheat > .intro { grid-column: 1 / -1; max-width: 76ch; }
+.cheat .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s-4); min-width: 0; font-size: 14.5px; line-height: 1.55; }
+.cheat .card.wide { grid-column: 1 / -1; }
+.cheat h2 { font-family: var(--f-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 0 0 var(--s-3); padding-bottom: var(--s-2); border-bottom: 1px solid var(--line); }
+.cheat h3 { font-size: 14px; margin: var(--s-3) 0 var(--s-1); }
+.cheat p, .cheat ul, .cheat ol { margin: 0 0 var(--s-2); }
+.cheat ul, .cheat ol { padding-left: 1.2em; }
+.cheat code { font-family: var(--f-mono); font-size: .86em; background: var(--code-bg); padding: 0 4px; border-radius: 3px; overflow-wrap: anywhere; }
+.cheat .hl { margin: var(--s-2) 0; }
+.cheat .hl pre { font-size: 12.5px; padding: 8px 10px; }
+.cheat .tbl { margin: var(--s-2) 0; }
+.cheat table { font-size: 13px; }
+.cheat th, .cheat td { padding: 5px 8px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+@media (max-width: 560px) {
+  body { font-size: 15.5px; }
+  .prose h2 { font-size: 24px; }
+  .meta-row { grid-template-columns: 1fr; gap: 2px; }
+  .fc { padding: var(--s-5) var(--s-4); }
+}
+td code, th code { white-space: nowrap; overflow-wrap: normal; }
+.toc li.l3 { counter-increment: none; grid-template-columns: 22px 1fr; font-size: 12.5px; }
+.toc li.l3::before { content: ""; }
+.toc li.l3 a { color: var(--muted); }
+.toc li.l3 a:hover, .toc li.l3 a.active { color: var(--accent); }
+.toc li.l2 + li.l2, .toc li.l3 + li.l2 { margin-top: 4px; }
+
+/* ---------- book reader ---------- */
+.book { display: grid; gap: var(--s-6); }
+@media (min-width: 1000px) {
+  .book { grid-template-columns: 280px minmax(0, 1fr); }
+  .bk-nav { position: sticky; top: calc(64px + env(safe-area-inset-top, 0px)); align-self: start; max-height: calc(100vh - 90px); overflow: auto; }
+  .bk-nav > summary { pointer-events: none; }
+  .bk-nav > summary::-webkit-details-marker { display: none; }
+}
+.bk-nav { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: var(--s-3); }
+.bk-nav > summary { cursor: pointer; font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 2px 4px var(--s-2); list-style: none; }
+.bk-nav > summary #bk-prog { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.bk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.bk-ch > a { display: grid; grid-template-columns: minmax(0, 1fr) 16px; gap: 6px; align-items: baseline; padding: 7px 6px; border-radius: 4px; color: var(--fg); text-decoration: none; font-size: 14px; line-height: 1.35; }
+.bk-ch > a:hover { background: var(--bg); }
+.bk-ch.cur > a { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+.bk-n { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.bk-ch.read .bk-done::before { content: "✓"; color: var(--ok); font-weight: 700; }
+.bk-sub { display: none; list-style: none; margin: 2px 0 6px 10px; padding: 0; border-left: 1px solid var(--line); }
+.bk-ch.cur .bk-sub { display: grid; }
+.bk-sub a { display: block; padding: 3px 8px; font-size: 12.5px; color: var(--muted); text-decoration: none; line-height: 1.35; }
+.bk-sub a:hover { color: var(--accent); }
+.bk-body { min-width: 0; }
+.chap { max-width: 74ch; font-size: 16.5px; line-height: 1.75; }
+.chap h2 { font-size: 34px; margin-bottom: var(--s-4); }
+.chap h3 { font-size: 23px; margin-top: var(--s-7); padding-top: var(--s-4); border-top: 1px solid var(--line); }
+.chap h4 { font-size: 17px; margin-top: var(--s-5); }
+.chap-end { margin-top: var(--s-7); padding-top: var(--s-5); border-top: 2px solid var(--fg); display: grid; gap: var(--s-4); }
+.chap-end .mark-read { justify-self: start; }
+.chap-pager { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.pg-btn { display: grid; gap: 2px; padding: var(--s-3) var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r); text-decoration: none; color: var(--fg); background: var(--surface); }
+.pg-btn:hover { border-color: var(--accent); }
+.pg-btn span { font-family: var(--f-mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.pg-btn b { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.pg-btn.next { grid-column: 2; text-align: right; }
+@media (max-width: 560px) { .chap-pager { grid-template-columns: 1fr; } .pg-btn.next { grid-column: 1; } .chap h2 { font-size: 27px; } .chap h3 { font-size: 20px; } .chap { font-size: 16px; } }
+
+/* self-check */
+.selfcheck { margin: var(--s-4) 0; border: 1px dashed var(--line-strong); border-radius: var(--r); padding: 0 var(--s-4); background: var(--surface); }
+.selfcheck > summary { cursor: pointer; padding: var(--s-3) 0; font-weight: 600; list-style: none; display: flex; gap: var(--s-2); align-items: baseline; flex-wrap: wrap; }
+.selfcheck > summary::-webkit-details-marker { display: none; }
+.selfcheck > summary::after { content: "Xem đáp án"; margin-left: auto; font-family: var(--f-mono); font-size: 11px; color: var(--accent); font-weight: 400; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck[open] { padding-bottom: var(--s-2); }
+.sc-tag { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 1px 7px; border-radius: 3px; background: var(--copper-weak); color: var(--copper); font-weight: 600; }
+.c-key { border-color: var(--accent); }
+.c-key .callout-tag { background: var(--accent); color: var(--surface); border-color: transparent; }
+.c-why .callout-tag, .c-ex .callout-tag { color: var(--fg); }
+.qz-g { list-style: none; font-family: var(--f-display); font-weight: 700; font-size: 22px; padding-top: var(--s-4); border-top: 2px solid var(--fg); }
+
+.bk-nav > summary { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
+@media (min-width: 1000px) { .bk-cur { display: none; } }
+@media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+.hub-grid { display: grid; gap: var(--s-7); }
+.grp { display: grid; gap: var(--s-2); }
+.grp-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; border-bottom: 2px solid var(--fg); padding-bottom: var(--s-2); }
+.grp-h h2 { font-family: var(--f-display); font-size: 26px; margin: 0; }
+.grp-h .cnt { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.sub { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: var(--s-4) 0 0; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.row .code { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.row .name { font-weight: 650; font-size: 16px; }
+.row a.name { color: var(--fg); text-decoration: none; }
+.row a.name:hover { color: var(--accent); text-decoration: underline; }
+.row .desc { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.st { font-family: var(--f-mono); font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 3px; white-space: nowrap; }
+.st.done { background: var(--accent); color: var(--surface); }
+.st.todo { color: var(--muted); border: 1px solid var(--line); }
+.prog { display: flex; flex-wrap: wrap; gap: var(--s-5); margin-top: var(--s-2); }
+.prog div { display: grid; gap: 2px; }
+.prog b { font-family: var(--f-display); font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.prog span { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+@media (max-width: 560px) { .row { grid-template-columns: 40px minmax(0, 1fr); } .row .st { grid-column: 2; justify-self: start; } }
+</style>
+<header class="masthead"><div class="wrap">
+  <div class="crumb"><span>Embedded Knowledge</span><span class="rev">Cập nhật 2026-10-21</span></div>
+  <h1>Embedded Knowledge</h1>
+  <p class="lede">Sổ ôn tập Embedded Software mức Mid: C/C++, DSA, design pattern, OS, Embedded Linux. Mỗi module có phần học sâu, Q&amp;A phỏng vấn, quiz, flashcard và cheatsheet. Mỗi cuốn sách được viết lại thành giáo trình đọc thay sách, kèm số trang gốc.</p>
+  <div class="prog"><div><b>5/13</b><span>Module</span></div><div><b>2/13</b><span>Sách</span></div></div>
+</div></header>
+<main class="wrap main"><div class="hub-grid">
+<section class="grp"><div class="grp-h"><h2>Module</h2><span class="cnt">5/13 đã có</span></div><h3 class="sub">A · C cho Embedded</h3><ul class="rows"><li class="row"><span class="code">M01</span><div><a class="name" href="m01-c-chuyen-sau.html">C chuyên sâu cho Embedded</a><div class="desc">Memory layout, const/volatile, pointer, struct, bit, endianness, integer promotion, UB, macro</div></div><span class="st done">Đã có</span></li><li class="row"><span class="code">M02</span><div><span class="name">Build và runtime</span><div class="desc">Compile/link, linker script, startup code, vector table, ISR, weak symbol, memory map</div></div><span class="st todo">Chưa làm</span></li></ul><h3 class="sub">B · Modern C++ cho Embedded</h3><ul class="rows"><li class="row"><span class="code">M03</span><div><span class="name">C++ core</span><div class="desc">RAII, rule of 0/3/5, value category, move semantics, smart pointer, type deduction, constexpr</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">M04</span><div><span class="name">C++ nâng cao cho Embedded</span><div class="desc">Template, CRTP, concepts, static vs dynamic polymorphism, no-exception/RTTI, allocator</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">M05</span><div><span class="name">Concurrency</span><div class="desc">Thread, mutex, condition variable, atomic, memory model, SPSC lock-free, priority inversion</div></div><span class="st todo">Chưa làm</span></li></ul><h3 class="sub">C · DSA cho Embedded</h3><ul class="rows"><li class="row"><span class="code">M06</span><div><a class="name" href="m06-cau-truc-du-lieu.html">Cấu trúc dữ liệu cho Embedded</a><div class="desc">9 bài: ring buffer, bitmap, intrusive list, memory pool, heap/scheduler O(1), hash cố định, lookup table, cây</div></div><span class="st done">Đã có</span></li><li class="row"><span class="code">M07</span><div><a class="name" href="m07-thuat-toan.html">Thuật toán cho Embedded</a><div class="desc">7 bài: bit, CRC, fixed-point, lọc &amp; debounce, timer wheel, nội suy &amp; số học nguyên, WCET</div></div><span class="st done">Đã có</span></li></ul><h3 class="sub">D · Design pattern &amp; System design</h3><ul class="rows"><li class="row"><span class="code">M08</span><div><a class="name" href="m08-design-patterns.html">Embedded Design Patterns</a><div class="desc">9 bài: phân lớp, super-loop/RTOS, state machine/HSM, active object, observer, DI &amp; test, mẫu đồng thời</div></div><span class="st done">Đã có</span></li><li class="row"><span class="code">M09</span><div><a class="name" href="m09-system-design.html">System Design cho Embedded</a><div class="desc">8 bài: quy trình, ngắt, giao thức, bootloader/OTA, watchdog/fault, logging, năng lượng, case study IoT</div></div><span class="st done">Đã có</span></li></ul><h3 class="sub">E · Bổ sung</h3><ul class="rows"><li class="row"><span class="code">M10</span><div><span class="name">OS và RTOS</span><div class="desc">Scheduling, context switch, sync primitive, priority inheritance, MMU/MPU, IPC</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">M11</span><div><span class="name">Embedded Linux</span><div class="desc">Boot flow, device tree, char driver, ioctl/sysfs/mmap, Yocto/Buildroot</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">M12</span><div><span class="name">Ngoại vi và debug</span><div class="desc">DMA, timer/PWM, ADC, JTAG/SWD, gdb, HardFault, logic analyzer</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">M13</span><div><span class="name">Testing và chất lượng</span><div class="desc">Unit test trên host, mock HW, MISRA, static analysis</div></div><span class="st todo">Chưa làm</span></li></ul></section>
+<section class="grp"><div class="grp-h"><h2>Sách</h2><span class="cnt">2/13 đã có</span></div><h3 class="sub">C/C++</h3><ul class="rows"><li class="row"><span class="code">B01</span><div><a class="name" href="b01-effective-modern-cpp.html">Effective Modern C++</a><div class="desc">Scott Meyers · giáo trình đầy đủ 42 item, 9 chương, 49 câu quiz</div></div><span class="st done">Đã có</span></li><li class="row"><span class="code">B02</span><div><a class="name" href="b02-cpp-concurrency-in-action.html">C++ Concurrency in Action</a><div class="desc">Anthony Williams · 2nd ed. · giáo trình đầy đủ 11 chương + phụ lục, 53 câu quiz</div></div><span class="st done">Đã có</span></li><li class="row"><span class="code">B03</span><div><span class="name">C++ High Performance</span><div class="desc">Hiệu năng, bộ nhớ, compile-time, parallel</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">B04</span><div><span class="name">The C++ Programmer&#x27;s Mindset</span><div class="desc">Sam Morley · 2025 · tư duy thuật toán và hệ thống</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">B05</span><div><span class="name">C++ Programming for Linux Systems</span><div class="desc">C++ hiện đại với API Linux</div></div><span class="st todo">Chưa làm</span></li></ul><h3 class="sub">OS / System programming</h3><ul class="rows"><li class="row"><span class="code">B06</span><div><span class="name">Operating Systems: Three Easy Pieces</span><div class="desc">Virtualization, concurrency, persistence (bản 1.0)</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">B07</span><div><span class="name">The Linux Programming Interface</span><div class="desc">Michael Kerrisk · system call, process, IPC, socket</div></div><span class="st todo">Chưa làm</span></li></ul><h3 class="sub">Kernel / Driver</h3><ul class="rows"><li class="row"><span class="code">B08</span><div><span class="name">Linux Kernel Development</span><div class="desc">Robert Love · 3rd ed.</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">B09</span><div><span class="name">Linux Device Drivers Development</span><div class="desc">Hai cuốn trong thư mục</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">B10</span><div><span class="name">Understanding Linux Network Internals</span><div class="desc">Networking stack trong kernel</div></div><span class="st todo">Chưa làm</span></li></ul><h3 class="sub">Embedded Linux</h3><ul class="rows"><li class="row"><span class="code">B11</span><div><span class="name">Mastering Embedded Linux Programming</span><div class="desc">Toolchain, bootloader, kernel, rootfs</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">B12</span><div><span class="name">Embedded Linux System Design and Development</span><div class="desc">Thiết kế hệ thống Embedded Linux</div></div><span class="st todo">Chưa làm</span></li><li class="row"><span class="code">B13</span><div><span class="name">Embedded Linux Projects Using Yocto Project Cookbook</span><div class="desc">Công thức Yocto</div></div><span class="st todo">Chưa làm</span></li></ul></section>
+</div></main>
+<footer class="wrap foot"><span>Tiến độ học (quiz, flashcard đã thuộc) được lưu riêng trên trình duyệt của bạn.</span></footer>
