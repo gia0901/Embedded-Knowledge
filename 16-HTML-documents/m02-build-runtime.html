@@ -1,0 +1,1697 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="fonts/fonts.css">
+<title>Build và runtime</title>
+<style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
+:root {
+  --bg: #F4F6F5;
+  --surface: #FFFFFF;
+  --fg: #172022;
+  --muted: #56656A;
+  --line: #D3DCDA;
+  --line-strong: #B5C3C0;
+  --accent: #0B6B55;
+  --accent-weak: #E0EFEA;
+  --copper: #9E531A;
+  --copper-weak: #F5E8DC;
+  --ok: #1D7A47;
+  --ok-weak: #E1F2E8;
+  --bad: #B23A26;
+  --bad-weak: #F8E4DF;
+  --code-bg: #EDF2F0;
+  --code-fg: #1E2A2C;
+  --sx-kw: #8A2F8F;
+  --sx-type: #0B6B55;
+  --sx-str: #9E531A;
+  --sx-com: #75868A;
+  --sx-num: #1F5FA8;
+  --sx-pp: #A33A1E;
+  --sx-fn: #1E4E79;
+
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1413; --surface: #141C1B; --fg: #E1E8E6; --muted: #92A29F; --line: #263331; --line-strong: #3A4B48;
+    --accent: #4FC3A1; --accent-weak: #15302A; --copper: #E39A62; --copper-weak: #33241A;
+    --ok: #5BCB8C; --ok-weak: #15301F; --bad: #F08A72; --bad-weak: #3A1C16;
+    --code-bg: #101918; --code-fg: #D9E3E1;
+    --sx-kw: #D79BE0; --sx-type: #4FC3A1; --sx-str: #E39A62; --sx-com: #6E817E; --sx-num: #82B4EF; --sx-pp: #F08A6A; --sx-fn: #9CC8F0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1413; --surface: #141C1B; --fg: #E1E8E6; --muted: #92A29F; --line: #263331; --line-strong: #3A4B48;
+  --accent: #4FC3A1; --accent-weak: #15302A; --copper: #E39A62; --copper-weak: #33241A;
+  --ok: #5BCB8C; --ok-weak: #15301F; --bad: #F08A72; --bad-weak: #3A1C16;
+  --code-bg: #101918; --code-fg: #D9E3E1;
+  --sx-kw: #D79BE0; --sx-type: #4FC3A1; --sx-str: #E39A62; --sx-com: #6E817E; --sx-num: #82B4EF; --sx-pp: #F08A6A; --sx-fn: #9CC8F0;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-body); font-size: 16px; line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.mono { font-family: var(--f-mono); font-size: 13px; }
+
+/* masthead */
+.masthead { background: var(--surface); border-bottom: 1px solid var(--line); }
+.masthead .wrap { padding-block: var(--s-5) var(--s-5); display: grid; gap: var(--s-3); }
+.crumb { display: flex; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap;
+  font-family: var(--f-mono); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.crumb .sep { margin: 0 .6em; color: var(--line-strong); }
+.crumb-link { color: var(--muted); text-decoration: none; }
+.crumb-link:hover { color: var(--accent); }
+.rev { white-space: nowrap; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(32px, 5vw, 52px); line-height: 1.05;
+  letter-spacing: -.01em; margin: var(--s-2) 0 0; text-wrap: balance; }
+h1 .h1-sub { display: block; line-height: 1.3; font-weight: 500; color: var(--muted); font-size: .5em; letter-spacing: 0; margin-top: var(--s-2); }
+.lede { max-width: 68ch; margin: 0; color: var(--muted); font-size: 17px; }
+.meta { display: grid; gap: var(--s-2); margin-top: var(--s-2); border-top: 1px dashed var(--line); padding-top: var(--s-3); }
+.meta-row { display: grid; grid-template-columns: 84px 1fr; gap: var(--s-3); align-items: baseline; }
+.meta-k { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.meta-v { font-size: 14px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--f-mono); font-size: 12px; padding: 1px 8px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--fg); }
+
+/* tabs */
+.tabbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: var(--s-1); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 14px 12px 12px; white-space: nowrap;
+  font-family: var(--f-display); font-weight: 600; font-size: 16px; letter-spacing: .01em; color: var(--muted); text-decoration: none;
+  border-bottom: 3px solid transparent; }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab-n { font-family: var(--f-mono); font-size: 11px; font-weight: 400; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; line-height: 18px; }
+
+.main { padding-block: var(--s-6) var(--s-7); }
+.foot { padding-block: var(--s-5); color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+
+/* reading layout */
+.md-wrap { display: grid; gap: var(--s-6); }
+.md-wrap.has-toc { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) {
+  .md-wrap.has-toc { grid-template-columns: minmax(0, 1fr) 240px; }
+  .toc { position: sticky; top: calc(72px + env(safe-area-inset-top, 0px)); align-self: start; max-height: calc(100vh - 100px); overflow: auto; }
+}
+@media (max-width: 999px) { .toc { order: -1; } }
+.toc { font-size: 13.5px; border-left: 2px solid var(--line); padding-left: var(--s-4); }
+.toc-label { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: var(--s-2); }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: t; }
+.toc li { counter-increment: t; display: grid; grid-template-columns: 22px 1fr; }
+.toc li::before { content: counter(t, decimal-leading-zero); font-family: var(--f-mono); font-size: 11px; color: var(--muted); padding-top: 2px; }
+.toc a { color: var(--fg); text-decoration: none; line-height: 1.4; }
+.toc a:hover, .toc a.active { color: var(--accent); }
+
+/* prose */
+.prose { min-width: 0; max-width: 76ch; }
+.prose > .sec, .prose > .intro { padding-bottom: var(--s-5); }
+.prose > .sec + .sec { border-top: 1px solid var(--line); padding-top: var(--s-5); }
+.prose h2 { font-family: var(--f-display); font-weight: 700; font-size: 28px; line-height: 1.2; margin: 0 0 var(--s-3); text-wrap: balance; }
+.prose h3 { font-family: var(--f-display); font-weight: 600; font-size: 20px; line-height: 1.3; margin: var(--s-5) 0 var(--s-2); }
+.prose h4 { font-size: 15px; font-weight: 700; margin: var(--s-4) 0 var(--s-1); }
+.prose p { margin: 0 0 var(--s-3); }
+.prose ul, .prose ol { margin: 0 0 var(--s-3); padding-left: 1.3em; }
+.prose li { margin: 3px 0; }
+.prose li > p { margin: 0; }
+.prose strong { font-weight: 650; }
+.prose code { font-family: var(--f-mono); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; color: var(--code-fg); overflow-wrap: anywhere; }
+.prose hr { border: 0; border-top: 1px dashed var(--line); margin: var(--s-5) 0; }
+.hl { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r); margin: var(--s-3) 0 var(--s-4); overflow-x: auto; }
+.hl pre { margin: 0; padding: 12px 14px; font-family: var(--f-mono); font-size: 13.2px; line-height: 1.55; color: var(--code-fg); }
+.hl pre code, .hl code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.prose pre:not(.hl pre) { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; overflow-x: auto; font-family: var(--f-mono); font-size: 13.2px; }
+/* pygments tokens */
+.hl .k, .hl .kd, .hl .kn, .hl .kr, .hl .kc, .hl .ow { color: var(--sx-kw); font-weight: 600; }
+.hl .kt, .hl .nc, .hl .nn { color: var(--sx-type); }
+.hl .s, .hl .s1, .hl .s2, .hl .sc, .hl .sa, .hl .se, .hl .sb, .hl .sd { color: var(--sx-str); }
+.hl .c, .hl .c1, .hl .cm, .hl .cs, .hl .ch { color: var(--sx-com); font-style: italic; }
+.hl .cp, .hl .cpf { color: var(--sx-pp); }
+.hl .m, .hl .mi, .hl .mh, .hl .mf, .hl .mo, .hl .mb, .hl .il { color: var(--sx-num); }
+.hl .nf, .hl .fm { color: var(--sx-fn); }
+.hl .err { color: inherit; background: none; border: 0; }
+
+.tbl { overflow-x: auto; margin: var(--s-3) 0 var(--s-4); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+
+/* callouts */
+.callout { margin: var(--s-4) 0; padding: var(--s-3) var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.callout > p:last-child, .callout > ul:last-child { margin-bottom: 0; }
+.callout-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2); margin-bottom: var(--s-1); }
+.callout-tag { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; padding: 1px 7px; border-radius: 3px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.callout-title { font-weight: 650; }
+.c-mcu .callout-tag, .c-linux .callout-tag, .c-emb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-pv .callout-tag { color: var(--copper); background: var(--copper-weak); border-color: transparent; }
+.c-pv { border-color: color-mix(in srgb, var(--copper) 35%, var(--line)); }
+.c-warn .callout-tag { color: var(--bad); background: var(--bad-weak); border-color: transparent; }
+.c-tip .callout-tag { color: var(--ok); background: var(--ok-weak); border-color: transparent; }
+
+/* badges */
+.badge { display: inline-block; vertical-align: middle; font-family: var(--f-mono); font-size: 11px; font-weight: 600; letter-spacing: .03em; padding: 0 6px; line-height: 19px; border-radius: 3px; margin-left: 6px; white-space: nowrap; }
+.badge.must { background: var(--accent); color: var(--surface); }
+.badge.skim { background: var(--accent-weak); color: var(--accent); }
+.badge.skip { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.badge.hot { background: var(--copper-weak); color: var(--copper); }
+.badge.std { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.pg { display: inline-block; vertical-align: middle; font-family: var(--f-mono); font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px; white-space: nowrap; letter-spacing: 0; }
+h2 .badge, h3 .badge { font-family: var(--f-mono); }
+
+/* Q&A */
+.qa-tools, .fc-tools, .quiz-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin-bottom: var(--s-5); }
+#qa-search { flex: 1 1 240px; min-width: 0; font: inherit; font-size: 15px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--surface); color: var(--fg); }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.btn { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.ghost { background: transparent; }
+.btn.ok { background: var(--ok-weak); color: var(--ok); border-color: transparent; }
+.btn.warn { background: var(--copper-weak); color: var(--copper); border-color: transparent; }
+.qa { display: grid; gap: var(--s-6); max-width: 860px; }
+.qa-gh { font-family: var(--f-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0 0 var(--s-2); }
+.qa-group { display: grid; }
+.qa-item { border-top: 1px solid var(--line); }
+.qa-group .qa-item:last-child { border-bottom: 1px solid var(--line); }
+.qa-item summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 34px 1fr auto; gap: var(--s-2); align-items: baseline; padding: 12px 0; }
+.qa-item summary::-webkit-details-marker { display: none; }
+.qn { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.qt { font-weight: 600; min-width: 0; }
+.qt code { font-family: var(--f-mono); font-size: .88em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+.qa-item[open] summary .qt { color: var(--accent); }
+.qa-a { padding: 0 0 var(--s-4) 42px; max-width: none; }
+@media (max-width: 560px) { .qa-a { padding-left: 0; } }
+
+/* quiz */
+.score { font-family: var(--f-mono); font-size: 14px; font-weight: 600; }
+.meter { flex: 1 1 160px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 80px; }
+.meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.quiz { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--s-5); max-width: 860px; counter-reset: q; }
+.qz { counter-increment: q; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s-4); }
+.qz-stem { display: grid; grid-template-columns: 34px 1fr; gap: var(--s-2); }
+.qz-stem::before { content: counter(q, decimal-leading-zero); font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 4px; }
+.qz-stem .prose p:last-child { margin-bottom: var(--s-2); }
+.qz-opts { display: grid; gap: var(--s-2); margin: var(--s-2) 0 0 42px; }
+@media (max-width: 560px) { .qz-opts { margin-left: 0; } }
+.qz-opt { text-align: left; font: inherit; font-size: 15px; padding: 9px 12px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg); cursor: pointer; display: grid; grid-template-columns: 22px 1fr; gap: 6px; }
+.qz-opt code { font-family: var(--f-mono); font-size: .88em; }
+.qz-opt .k { font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.qz-opt:hover:not(:disabled) { border-color: var(--accent); }
+.qz-opt:disabled { cursor: default; }
+.qz-opt.right { background: var(--ok-weak); border-color: var(--ok); }
+.qz-opt.wrong { background: var(--bad-weak); border-color: var(--bad); }
+.qz-exp { margin: var(--s-3) 0 0 42px; padding-top: var(--s-3); border-top: 1px dashed var(--line); font-size: 15px; }
+@media (max-width: 560px) { .qz-exp { margin-left: 0; } }
+.qz-verdict { font-weight: 700; margin-right: 6px; }
+.qz-verdict.ok { color: var(--ok); } .qz-verdict.no { color: var(--bad); }
+
+/* flashcards */
+.fc { max-width: 760px; min-height: 280px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; padding: var(--s-6) var(--s-5); cursor: pointer; display: grid; position: relative; }
+.fc::after { content: ""; position: absolute; inset: 8px; border: 1px dashed var(--line); border-radius: 6px; pointer-events: none; }
+.fc-face { position: relative; z-index: 1; display: grid; align-content: center; gap: var(--s-3); }
+.fc-group { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.fc-q { font-family: var(--f-display); font-size: clamp(20px, 3vw, 26px); font-weight: 600; line-height: 1.3; text-wrap: balance; }
+.fc-q code { font-family: var(--f-mono); font-size: .8em; }
+.fc-hint { font-size: 13px; color: var(--muted); }
+.fc-back { max-width: none; align-content: start; }
+.fc.known { border-color: var(--ok); }
+.fc-nav { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); max-width: 760px; }
+.fc-nav .btn { flex: 1 1 120px; }
+
+/* cheatsheet */
+.cheat { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--s-4); align-items: start; }
+.cheat > .intro { grid-column: 1 / -1; max-width: 76ch; }
+.cheat .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s-4); min-width: 0; font-size: 14.5px; line-height: 1.55; }
+.cheat .card.wide { grid-column: 1 / -1; }
+.cheat h2 { font-family: var(--f-mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 0 0 var(--s-3); padding-bottom: var(--s-2); border-bottom: 1px solid var(--line); }
+.cheat h3 { font-size: 14px; margin: var(--s-3) 0 var(--s-1); }
+.cheat p, .cheat ul, .cheat ol { margin: 0 0 var(--s-2); }
+.cheat ul, .cheat ol { padding-left: 1.2em; }
+.cheat code { font-family: var(--f-mono); font-size: .86em; background: var(--code-bg); padding: 0 4px; border-radius: 3px; overflow-wrap: anywhere; }
+.cheat .hl { margin: var(--s-2) 0; }
+.cheat .hl pre { font-size: 12.5px; padding: 8px 10px; }
+.cheat .tbl { margin: var(--s-2) 0; }
+.cheat table { font-size: 13px; }
+.cheat th, .cheat td { padding: 5px 8px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+@media (max-width: 560px) {
+  body { font-size: 15.5px; }
+  .prose h2 { font-size: 24px; }
+  .meta-row { grid-template-columns: 1fr; gap: 2px; }
+  .fc { padding: var(--s-5) var(--s-4); }
+}
+td code, th code { white-space: nowrap; overflow-wrap: normal; }
+.toc li.l3 { counter-increment: none; grid-template-columns: 22px 1fr; font-size: 12.5px; }
+.toc li.l3::before { content: ""; }
+.toc li.l3 a { color: var(--muted); }
+.toc li.l3 a:hover, .toc li.l3 a.active { color: var(--accent); }
+.toc li.l2 + li.l2, .toc li.l3 + li.l2 { margin-top: 4px; }
+
+/* ---------- book reader ---------- */
+.book { display: grid; gap: var(--s-6); }
+@media (min-width: 1000px) {
+  .book { grid-template-columns: 280px minmax(0, 1fr); }
+  .bk-nav { position: sticky; top: calc(64px + env(safe-area-inset-top, 0px)); align-self: start; max-height: calc(100vh - 90px); overflow: auto; }
+  .bk-nav > summary { pointer-events: none; }
+  .bk-nav > summary::-webkit-details-marker { display: none; }
+}
+.bk-nav { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: var(--s-3); }
+.bk-nav > summary { cursor: pointer; font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 2px 4px var(--s-2); list-style: none; }
+.bk-nav > summary #bk-prog { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.bk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.bk-ch > a { display: grid; grid-template-columns: minmax(0, 1fr) 16px; gap: 6px; align-items: baseline; padding: 7px 6px; border-radius: 4px; color: var(--fg); text-decoration: none; font-size: 14px; line-height: 1.35; }
+.bk-ch > a:hover { background: var(--bg); }
+.bk-ch.cur > a { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+.bk-n { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.bk-ch.read .bk-done::before { content: "✓"; color: var(--ok); font-weight: 700; }
+.bk-sub { display: none; list-style: none; margin: 2px 0 6px 10px; padding: 0; border-left: 1px solid var(--line); }
+.bk-ch.cur .bk-sub { display: grid; }
+.bk-sub a { display: block; padding: 3px 8px; font-size: 12.5px; color: var(--muted); text-decoration: none; line-height: 1.35; }
+.bk-sub a:hover { color: var(--accent); }
+.bk-body { min-width: 0; }
+.chap { max-width: 74ch; font-size: 16.5px; line-height: 1.75; }
+.chap h2 { font-size: 34px; margin-bottom: var(--s-4); }
+.chap h3 { font-size: 23px; margin-top: var(--s-7); padding-top: var(--s-4); border-top: 1px solid var(--line); }
+.chap h4 { font-size: 17px; margin-top: var(--s-5); }
+.chap-end { margin-top: var(--s-7); padding-top: var(--s-5); border-top: 2px solid var(--fg); display: grid; gap: var(--s-4); }
+.chap-end .mark-read { justify-self: start; }
+.chap-pager { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.pg-btn { display: grid; gap: 2px; padding: var(--s-3) var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r); text-decoration: none; color: var(--fg); background: var(--surface); }
+.pg-btn:hover { border-color: var(--accent); }
+.pg-btn span { font-family: var(--f-mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.pg-btn b { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.pg-btn.next { grid-column: 2; text-align: right; }
+@media (max-width: 560px) { .chap-pager { grid-template-columns: 1fr; } .pg-btn.next { grid-column: 1; } .chap h2 { font-size: 27px; } .chap h3 { font-size: 20px; } .chap { font-size: 16px; } }
+
+/* self-check */
+.selfcheck { margin: var(--s-4) 0; border: 1px dashed var(--line-strong); border-radius: var(--r); padding: 0 var(--s-4); background: var(--surface); }
+.selfcheck > summary { cursor: pointer; padding: var(--s-3) 0; font-weight: 600; list-style: none; display: flex; gap: var(--s-2); align-items: baseline; flex-wrap: wrap; }
+.selfcheck > summary::-webkit-details-marker { display: none; }
+.selfcheck > summary::after { content: "Xem đáp án"; margin-left: auto; font-family: var(--f-mono); font-size: 11px; color: var(--accent); font-weight: 400; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck[open] { padding-bottom: var(--s-2); }
+.sc-tag { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 1px 7px; border-radius: 3px; background: var(--copper-weak); color: var(--copper); font-weight: 600; }
+.c-key { border-color: var(--accent); }
+.c-key .callout-tag { background: var(--accent); color: var(--surface); border-color: transparent; }
+.c-why .callout-tag, .c-ex .callout-tag { color: var(--fg); }
+.qz-g { list-style: none; font-family: var(--f-display); font-weight: 700; font-size: 22px; padding-top: var(--s-4); border-top: 2px solid var(--fg); }
+
+.bk-nav > summary { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
+@media (min-width: 1000px) { .bk-cur { display: none; } }
+@media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="crumb"><span class="crumb-path"><a class="crumb-link" href="00-trang-chu.html">Embedded Knowledge</a><span class="sep">/</span><span>Module 02 · C cho Embedded</span></span><span class="rev">Rev 1.0 · 2026-10-22</span></div>
+    <h1>Build và runtime</h1>
+    <p class="lede">Điều gì xảy ra giữa lúc bạn bấm build và lúc dòng đầu tiên của main chạy: toolchain và từng bước biên dịch, object file ELF, linker và các lỗi liên kết, linker script cho MCU, startup code Cortex-M (đã chạy thử trên QEMU), bố trí bộ nhớ và kích thước stack, tối ưu kích thước firmware, cách một chương trình được nạp trên Linux, build system, và các lỗi build/khởi động hay gặp.</p>
+    <div class="meta">
+      <div class="meta-row"><span class="meta-k">Phạm vi</span><span class="meta-v chips"><span class="chip">GCC / binutils</span><span class="chip">ARM Cortex-M</span><span class="chip">ELF</span><span class="chip">Linux userspace</span><span class="chip">Mức Mid</span></span></div>
+      <div class="meta-row"><span class="meta-k">Nguồn</span><span class="meta-v">Kiến thức tổng hợp · GNU ld manual (Linker Scripts) · ARMv7-M Architecture Reference Manual · System V ABI, ELF specification · Ulrich Drepper, How To Write Shared Libraries</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabbar" role="tablist" aria-label="Phần">
+  <div class="wrap tabs"><a class="tab" href="#hoc-sau" data-tab="hoc-sau" role="tab">Học sâu<span class="tab-n">10</span></a><a class="tab" href="#phong-van" data-tab="phong-van" role="tab">Phỏng vấn<span class="tab-n">26</span></a><a class="tab" href="#quiz" data-tab="quiz" role="tab">Quiz<span class="tab-n">18</span></a><a class="tab" href="#flashcard" data-tab="flashcard" role="tab">Flashcard<span class="tab-n">26</span></a><a class="tab" href="#cheatsheet" data-tab="cheatsheet" role="tab">Cheatsheet</a></div>
+</nav>
+
+<main class="wrap main"><section class="panel" id="p-hoc-sau" data-panel="hoc-sau" role="tabpanel" hidden><div class="book"><details class="bk-nav" open><summary><span class="bk-lab">Bài</span><span class="bk-cur" id="bk-cur"></span><span class="mono" id="bk-prog"></span></summary><ol class="bk-list"><li class="bk-ch" data-chap="c-bai-0-tu-ma-nguon-toi-file-chay-duoc"><a href="#c-bai-0-tu-ma-nguon-toi-file-chay-duoc"><span class="bk-t">Bài 0 · Từ mã nguồn tới file chạy được</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-bon-buoc-cua-mot-lan-build">Bốn bước của một lần build</a></li><li><a href="#c-toolchain-va-cross-compile">Toolchain và cross-compile</a></li></ol></li><li class="bk-ch" data-chap="c-bai-1-object-file-va-dinh-dang-elf"><a href="#c-bai-1-object-file-va-dinh-dang-elf"><span class="bk-t">Bài 1 · Object file và định dạng ELF</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-ben-trong-mot-file-o">Bên trong một file .o</a></li><li><a href="#c-bang-ky-hieu">Bảng ký hiệu</a></li><li><a href="#c-relocation-cho-trong-cho-linker">Relocation: chỗ trống chờ linker</a></li><li><a href="#c-elf">ELF</a></li><li><a href="#c-lien-ket-cua-ky-hieu-va-odr">Liên kết của ký hiệu và ODR</a></li></ol></li><li class="bk-ch" data-chap="c-bai-2-linker-va-cac-loi-lien-ket"><a href="#c-bai-2-linker-va-cac-loi-lien-ket"><span class="bk-t">Bài 2 · Linker và các lỗi liên kết</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-linker-lam-gi">Linker làm gì</a></li><li><a href="#c-thu-vien-tinh-va-thu-tu">Thư viện tĩnh và thứ tự</a></li><li><a href="#c-bo-code-khong-dung">Bỏ code không dùng</a></li><li><a href="#c-giai-ma-loi-lien-ket">Giải mã lỗi liên kết</a></li></ol></li><li class="bk-ch" data-chap="c-bai-3-linker-script-cho-mcu"><a href="#c-bai-3-linker-script-cho-mcu"><span class="bk-t">Bài 3 · Linker script cho MCU</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-vi-sao-firmware-can-linker-script">Vì sao firmware cần linker script</a></li><li><a href="#c-doc-tung-phan">Đọc từng phần</a></li></ol></li><li class="bk-ch" data-chap="c-bai-4-startup-code-cortex-m"><a href="#c-bai-4-startup-code-cortex-m"><span class="bk-t">Bài 4 · Startup code Cortex-M</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-cortex-m-khoi-dong-the-nao">Cortex-M khởi động thế nào</a></li><li><a href="#c-nhung-diem-dang-chu-y">Những điểm đáng chú ý</a></li><li><a href="#c-chay-thu-tren-qemu">Chạy thử trên QEMU</a></li></ol></li><li class="bk-ch" data-chap="c-bai-5-bo-tri-bo-nho-stack-va-heap"><a href="#c-bai-5-bo-tri-bo-nho-stack-va-heap"><span class="bk-t">Bài 5 · Bố trí bộ nhớ, stack và heap</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-ban-do-ram-cua-firmware">Bản đồ RAM của firmware</a></li><li><a href="#c-uoc-luong-va-do-stack">Ước lượng và đo stack</a></li><li><a href="#c-heap-tren-mcu">Heap trên MCU</a></li><li><a href="#c-bo-nho-cua-process-tren-linux">Bộ nhớ của process trên Linux</a></li></ol></li><li class="bk-ch" data-chap="c-bai-6-file-map-va-toi-uu-kich-thuoc-firmware"><a href="#c-bai-6-file-map-va-toi-uu-kich-thuoc-firmware"><span class="bk-t">Bài 6 · File map và tối ưu kích thước firmware</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-doc-file-map">Đọc file map</a></li><li><a href="#c-ke-an-flash-quen-thuoc-printf">Kẻ ăn Flash quen thuộc: printf</a></li><li><a href="#c-cac-ky-thuat-giam-kich-thuoc">Các kỹ thuật giảm kích thước</a></li></ol></li><li class="bk-ch" data-chap="c-bai-7-chuong-trinh-duoc-nap-va-chay-the-nao-tren-linux"><a href="#c-bai-7-chuong-trinh-duoc-nap-va-chay-the-nao-tren-linux"><span class="bk-t">Bài 7 · Chương trình được nạp và chạy thế nào trên Linux</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-tu-execve-toi-main">Từ execve tới main</a></li><li><a href="#c-pie-got-plt">PIE, GOT, PLT</a></li><li><a href="#c-interposition-va-ld-preload">Interposition và LD_PRELOAD</a></li><li><a href="#c-tim-thu-vien-chia-se">Tìm thư viện chia sẻ</a></li><li><a href="#c-static-hay-dynamic-tren-thiet-bi-nhung">Static hay dynamic trên thiết bị nhúng</a></li></ol></li><li class="bk-ch" data-chap="c-bai-8-build-system"><a href="#c-bai-8-build-system"><span class="bk-t">Bài 8 · Build system</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-make-nhung-gi-can-nam">Make: những gì cần nắm</a></li><li><a href="#c-cmake-cho-cross-compile">CMake cho cross-compile</a></li><li><a href="#c-thoi-quen-build-tot">Thói quen build tốt</a></li></ol></li><li class="bk-ch" data-chap="c-bai-9-loi-build-va-khoi-dong-hay-gap"><a href="#c-bai-9-loi-build-va-khoi-dong-hay-gap"><span class="bk-t">Bài 9 · Lỗi build và khởi động hay gặp</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-firmware-mcu">Firmware (MCU)</a></li><li><a href="#c-linux">Linux</a></li></ol></li></ol></details><div class="bk-body"><section class="chap prose" data-chap="c-bai-0-tu-ma-nguon-toi-file-chay-duoc" hidden><h2 id="c-bai-0-tu-ma-nguon-toi-file-chay-duoc">Bài 0 · Từ mã nguồn tới file chạy được</h2>
+<h3 id="c-bon-buoc-cua-mot-lan-build">Bốn bước của một lần build</h3>
+<p>Lệnh <code>gcc main.c -o app</code> trông như một bước, thực ra là bốn chương trình chạy nối tiếp:</p>
+<div class="hl"><pre><span></span><code> main.c ──[1. tiền xử lý: cpp]──▶ main.i ──[2. biên dịch: cc1]──▶ main.s
+        ──[3. hợp dịch: as]──▶ main.o ──[4. liên kết: ld]──▶ app (ELF)
+                                         ▲
+                       các .o khác, thư viện .a/.so, startup, linker script
+</code></pre></div>
+
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Bước</th>
+<th>Làm gì</th>
+<th>Xem kết quả bằng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Tiền xử lý</td>
+<td>Thay <code>#include</code>, mở macro, xử lý <code>#if</code></td>
+<td><code>gcc -E main.c</code></td>
+</tr>
+<tr>
+<td>2. Biên dịch</td>
+<td>C/C++ → assembly của kiến trúc đích; tối ưu diễn ra ở đây</td>
+<td><code>gcc -S main.c</code></td>
+</tr>
+<tr>
+<td>3. Hợp dịch</td>
+<td>Assembly → mã máy trong <strong>object file</strong> (<code>.o</code>), còn các chỗ trống chờ địa chỉ</td>
+<td><code>gcc -c main.c</code></td>
+</tr>
+<tr>
+<td>4. Liên kết</td>
+<td>Ghép các <code>.o</code> và thư viện, gán địa chỉ cuối cùng, điền các chỗ trống</td>
+<td><code>gcc *.o -o app</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>gcc -v</code> in ra từng lệnh con được gọi; <code>-save-temps</code> giữ lại các file trung gian. Khi một macro "không chạy như mong đợi", xem file <code>.i</code> là cách nhanh nhất.</p>
+<p><strong>Mỗi file <code>.c</code> được biên dịch độc lập</strong> (một <em>translation unit</em>). Compiler không thấy file khác: nó chỉ biết <code>read_raw()</code> tồn tại nhờ khai báo trong header, và để lại một "chỗ trống" để linker điền địa chỉ sau. Đây là gốc rễ của hầu hết lỗi liên kết (Bài 2).</p>
+<h3 id="c-toolchain-va-cross-compile">Toolchain và cross-compile</h3>
+<p>Firmware được build trên PC x86 nhưng chạy trên ARM: đó là <strong>cross-compile</strong>. Toolchain đặt tên theo <strong>bộ ba</strong> (<em>target triplet</em>) <code>kiến-trúc-nhà-cung-cấp-hệ-điều-hành-abi</code>:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Toolchain</th>
+<th>Đích</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>arm-none-eabi-gcc</code></td>
+<td>ARM bare-metal (Cortex-M/R), không OS, thư viện C là newlib</td>
+</tr>
+<tr>
+<td><code>aarch64-linux-gnu-gcc</code></td>
+<td>ARM 64-bit chạy Linux, glibc</td>
+</tr>
+<tr>
+<td><code>arm-linux-gnueabihf-gcc</code></td>
+<td>ARM 32-bit Linux, ABI dùng thanh ghi FPU để truyền số thực (hard-float)</td>
+</tr>
+<tr>
+<td><code>riscv32-unknown-elf-gcc</code></td>
+<td>RISC-V 32-bit bare-metal</td>
+</tr>
+</tbody>
+</table></div>
+<p>Với đích Linux, toolchain cần <strong>sysroot</strong>: bản sao header và thư viện của hệ thống đích (từ Yocto/Buildroot SDK, M11), để chương trình được biên dịch với đúng phiên bản glibc và thư viện mà thiết bị có.</p>
+<p>Các cờ quan trọng cho Cortex-M: <code>-mcpu=cortex-m4 -mthumb</code> (bộ lệnh), <code>-mfpu=fpv4-sp-d16 -mfloat-abi=hard</code> (dùng FPU), và mọi file trong project <strong>phải</strong> cùng <code>-mfloat-abi</code>, nếu không linker báo lỗi không tương thích (hoặc tệ hơn, chạy sai khi trộn thư viện build sẵn).</p>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 0</span></div>
+<ul>
+<li>Tiền xử lý → biên dịch → hợp dịch → liên kết; xem từng bước bằng <code>-E</code>, <code>-S</code>, <code>-c</code>, <code>-v</code>, <code>-save-temps</code>.</li>
+<li>Mỗi file biên dịch độc lập; tham chiếu sang file khác là chỗ trống chờ linker.</li>
+<li>Triplet chỉ đích; bare-metal dùng <code>arm-none-eabi</code> + newlib, Linux cần sysroot; thống nhất <code>-mfloat-abi</code>.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-0-tu-ma-nguon-toi-file-chay-duoc">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-1-object-file-va-dinh-dang-elf" hidden><h2 id="c-bai-1-object-file-va-dinh-dang-elf">Bài 1 · Object file và định dạng ELF</h2>
+<h3 id="c-ben-trong-mot-file-o">Bên trong một file <code>.o</code></h3>
+<p>Lấy file sau, biên dịch cho Cortex-M4 với <code>-O2 -c</code>:</p>
+<div class="hl"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdint.h&gt;</span>
+<span class="kt">int32_t</span><span class="w"> </span><span class="nf">read_raw</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span><span class="w">                 </span><span class="cm">/* định nghĩa ở file khác */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">12</span><span class="p">;</span><span class="w">             </span><span class="cm">/* static: chỉ thấy trong file này */</span>
+<span class="kt">int32_t</span><span class="w"> </span><span class="n">last_value</span><span class="p">;</span><span class="w">                     </span><span class="cm">/* toàn cục, không khởi tạo */</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">scale</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span><span class="w">                </span><span class="cm">/* hằng */</span>
+
+<span class="kt">int32_t</span><span class="w"> </span><span class="nf">sensor_read</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">last_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read_raw</span><span class="p">()</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">scale</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">last_value</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Object file chia nội dung thành các <strong>section</strong>:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Chứa</th>
+<th>Nằm ở đâu khi chạy (MCU)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.text</code></td>
+<td>Mã máy</td>
+<td>Flash</td>
+</tr>
+<tr>
+<td><code>.rodata</code></td>
+<td>Hằng (<code>const</code>, chuỗi literal)</td>
+<td>Flash</td>
+</tr>
+<tr>
+<td><code>.data</code></td>
+<td>Biến toàn cục/static <strong>có</strong> giá trị khởi tạo khác 0</td>
+<td>RAM (giá trị ban đầu lưu trong Flash, chép sang lúc khởi động)</td>
+</tr>
+<tr>
+<td><code>.bss</code></td>
+<td>Biến toàn cục/static khởi tạo bằng 0 hoặc không khởi tạo</td>
+<td>RAM (xóa về 0 lúc khởi động; không chiếm chỗ trong file)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Xem bằng <code>objdump -h sensor.o</code> (kết quả thật, rút gọn):</p>
+<div class="hl"><pre><span></span><code>Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         00000018  00000000  00000000  00000034  2**2   CODE
+  1 .data         00000000  00000000  00000000  0000004c  2**0
+  2 .bss          00000004  00000000  00000000  0000004c  2**2
+  3 .rodata       00000004  00000000  00000000  0000004c  2**2
+</code></pre></div>
+
+<p><code>.data</code> rỗng dù có <code>offset = 12</code>? Compiler thấy <code>offset</code> là <code>static</code> và không bao giờ bị sửa, nên thay thẳng bằng hằng số 12 và bỏ biến đi. Tương tự <code>scale</code>: phép nhân với 3 được biến thành <code>r0 + (r0 &lt;&lt; 1)</code>. Biến <code>scale</code> vẫn được giữ trong <code>.rodata</code> vì nó không <code>static</code> (file khác có thể dùng).</p>
+<h3 id="c-bang-ky-hieu">Bảng ký hiệu</h3>
+<p><code>nm sensor.o</code>:</p>
+<div class="hl"><pre><span></span><code>00000000 B last_value      B: .bss, toàn cục
+         U read_raw        U: undefined, chờ linker tìm ở nơi khác
+00000000 R scale           R: .rodata
+00000000 T sensor_read     T: .text, toàn cục
+</code></pre></div>
+
+<p>Chữ in hoa là ký hiệu <strong>toàn cục</strong> (file khác thấy được), chữ thường là <strong>cục bộ</strong> (<code>static</code>). <code>W</code> là ký hiệu <strong>yếu</strong> (weak, Bài 4). Mọi địa chỉ đều là 0: trong object file, địa chỉ chỉ là vị trí tương đối trong section; địa chỉ thật do linker quyết định.</p>
+<h3 id="c-relocation-cho-trong-cho-linker">Relocation: chỗ trống chờ linker</h3>
+<p><code>objdump -dr sensor.o</code>:</p>
+<div class="hl"><pre><span></span><code>00000000 &lt;sensor_read&gt;:
+   0:  b508        push   {r3, lr}
+   2:  f7ff fffe   bl     0 &lt;read_raw&gt;
+               2: R_ARM_THM_CALL   read_raw        ← điền địa chỉ read_raw vào lệnh bl
+   6:  4b03        ldr    r3, [pc, #12]
+   8:  eb00 0040   add.w  r0, r0, r0, lsl #1       ← nhân 3
+   c:  300c        adds   r0, #12                  ← cộng offset (đã thành hằng)
+   e:  6018        str    r0, [r3, #0]             ← ghi last_value
+  10:  bd08        pop    {r3, pc}
+  14:  00000000    .word  0x00000000
+              14: R_ARM_ABS32    .bss              ← điền địa chỉ của last_value
+</code></pre></div>
+
+<p>Mỗi dòng <code>R_ARM_...</code> là một <strong>relocation</strong>: "tại offset này, khi biết địa chỉ của ký hiệu kia, hãy điền theo cách này". Linker xử lý mọi relocation sau khi đặt các section vào địa chỉ cuối cùng.</p>
+<h3 id="c-elf">ELF</h3>
+<p>Object file, file thực thi và thư viện chia sẻ trên Linux và trong hầu hết toolchain nhúng đều dùng định dạng <strong>ELF</strong>. Hai góc nhìn:</p>
+<ul>
+<li><strong>Section</strong> (dành cho linker, debugger): <code>.text</code>, <code>.data</code>, <code>.symtab</code>, <code>.debug_*</code>…; xem bằng <code>readelf -S</code>.</li>
+<li><strong>Segment / program header</strong> (dành cho bộ nạp): vùng nào nạp vào địa chỉ nào với quyền gì; xem bằng <code>readelf -l</code>. Trên MCU, công cụ nạp (OpenOCD, J-Link) dùng các segment có cờ LOAD để biết ghi gì vào Flash.</li>
+</ul>
+<p>Firmware nạp lên chip thường là <code>.bin</code> hoặc <code>.hex</code> tạo bằng <code>objcopy -O binary app.elf app.bin</code>: chỉ còn byte thô, mất hết ký hiệu và thông tin debug. <strong>Luôn giữ lại file <code>.elf</code></strong> của mỗi bản phát hành để giải mã địa chỉ khi có crash dump (M09 Bài 5).</p>
+<h3 id="c-lien-ket-cua-ky-hieu-va-odr">Liên kết của ký hiệu và ODR</h3>
+<ul>
+<li><code>static</code> ở phạm vi file (hoặc namespace không tên trong C++): ký hiệu cục bộ, hai file có thể cùng tên mà không xung đột. Mặc định nên dùng cho mọi thứ không cần xuất ra.</li>
+<li><code>extern int x;</code> trong header là <strong>khai báo</strong>; <code>int x = 0;</code> trong đúng <strong>một</strong> file <code>.c</code> là <strong>định nghĩa</strong>.</li>
+<li><strong>One Definition Rule</strong>: mỗi ký hiệu toàn cục chỉ được định nghĩa một lần trong toàn chương trình. Định nghĩa biến trong header (<code>int count;</code> không có <code>extern</code>) được include ở nhiều file sẽ vi phạm. Từ GCC 10, mặc định <code>-fno-common</code> biến lỗi này thành lỗi "multiple definition" (trước đó linker âm thầm gộp chúng lại).</li>
+<li>C++17 có biến <code>inline</code>: <code>inline int count = 0;</code> trong header được phép, linker giữ một bản.</li>
+</ul>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Hai file cùng định nghĩa `static int buffer[256];`. Có lỗi liên kết không? Chương trình dùng bao nhiêu bộ nhớ cho chúng?</summary>
+<p>Không lỗi: mỗi <code>buffer</code> là ký hiệu cục bộ của file mình, hai biến hoàn toàn riêng biệt, tổng 2 × 256 × sizeof(int) byte trong <code>.bss</code>. Nếu ý định là dùng chung một buffer thì đây là bug thầm lặng: mỗi file thao tác trên bản riêng của nó.</p>
+</details>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 1</span></div>
+<ul>
+<li><code>.text</code>, <code>.rodata</code> → Flash; <code>.data</code> → RAM (giá trị đầu ở Flash); <code>.bss</code> → RAM, xóa về 0.</li>
+<li><code>nm</code>: T/D/B/R/U/W, hoa toàn cục, thường cục bộ; địa chỉ trong <code>.o</code> chỉ tương đối.</li>
+<li>Relocation là chỗ trống linker điền; <code>objdump -dr</code> để xem.</li>
+<li>ELF: section cho linker, segment cho bộ nạp; giữ <code>.elf</code> của mỗi bản phát hành.</li>
+<li><code>static</code> mặc định cho thứ không xuất; một định nghĩa duy nhất; <code>-fno-common</code>.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-1-object-file-va-dinh-dang-elf">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-2-linker-va-cac-loi-lien-ket" hidden><h2 id="c-bai-2-linker-va-cac-loi-lien-ket">Bài 2 · Linker và các lỗi liên kết</h2>
+<h3 id="c-linker-lam-gi">Linker làm gì</h3>
+<ol>
+<li><strong>Thu thập</strong> các object file và chọn object cần thiết từ thư viện tĩnh.</li>
+<li><strong>Giải quyết ký hiệu</strong>: mỗi ký hiệu <code>U</code> phải khớp đúng một định nghĩa.</li>
+<li><strong>Bố trí</strong>: ghép các section cùng loại từ mọi file (mọi <code>.text</code> thành một <code>.text</code>) và gán địa chỉ, theo linker script (Bài 3).</li>
+<li><strong>Relocation</strong>: điền địa chỉ vào các chỗ trống.</li>
+<li>Ghi ra file ELF (và file map nếu được yêu cầu, Bài 6).</li>
+</ol>
+<h3 id="c-thu-vien-tinh-va-thu-tu">Thư viện tĩnh và thứ tự</h3>
+<p>Thư viện tĩnh <code>.a</code> chỉ là một kho chứa nhiều <code>.o</code>. Linker duyệt các tham số <strong>từ trái sang phải</strong>, và với mỗi thư viện chỉ lấy những <code>.o</code> giải quyết được ký hiệu <strong>đang còn thiếu tại thời điểm đó</strong>:</p>
+<div class="hl"><pre><span></span><code>gcc main.o -lsensor -lhal       # main cần sensor_read, sensor cần hal_i2c_read: OK
+gcc main.o -lhal -lsensor       # khi duyệt libhal, chưa ai cần hal_i2c_read → bỏ qua
+                                #   → "undefined reference to hal_i2c_read"
+</code></pre></div>
+
+<p>Quy tắc: thư viện <strong>phụ thuộc</strong> đứng trước thư viện <strong>được phụ thuộc</strong>. Hai thư viện phụ thuộc lẫn nhau thì bọc trong <code>-Wl,--start-group -lhal -lsensor -Wl,--end-group</code> (linker duyệt lặp tới khi không còn gì mới). CMake tự lo thứ tự nếu khai báo <code>target_link_libraries</code> đúng.</p>
+<h3 id="c-bo-code-khong-dung">Bỏ code không dùng</h3>
+<p>Mặc định, nếu dùng một hàm trong một file <code>.o</code>, cả file được giữ lại. Để linker bỏ từng hàm không dùng:</p>
+<div class="hl"><pre><span></span><code>gcc -ffunction-sections -fdata-sections ...   # mỗi hàm, mỗi biến một section riêng
+ld  --gc-sections                             # bỏ section không ai tham chiếu tới
+</code></pre></div>
+
+<p>Kết hợp <strong>LTO</strong> (<code>-flto</code>): compiler giữ biểu diễn trung gian trong <code>.o</code>, tối ưu lại toàn chương trình lúc liên kết (inline xuyên file, bỏ code chết). Thường giảm kích thước firmware 10–20%; đổi lại build chậm hơn và debug khó hơn một chút.</p>
+<p>Vì <code>--gc-sections</code> xóa thứ không ai tham chiếu, những thứ chỉ được <strong>phần cứng</strong> dùng (bảng vector) hoặc chỉ được tìm qua tên section (bảng lệnh shell đăng ký bằng section riêng) phải được đánh dấu <code>KEEP()</code> trong linker script hoặc <code>__attribute__((used))</code>.</p>
+<h3 id="c-giai-ma-loi-lien-ket">Giải mã lỗi liên kết</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Thông báo</th>
+<th>Nguyên nhân hay gặp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>undefined reference to 'foo'</code></td>
+<td>Quên file <code>.c</code>/thư viện; sai thứ tự thư viện; khai báo và định nghĩa khác chữ ký; <strong>gọi hàm C từ C++ thiếu <code>extern "C"</code></strong> (tên bị mangle thành <code>_Z3foov</code>)</td>
+</tr>
+<tr>
+<td><code>multiple definition of 'x'</code></td>
+<td>Định nghĩa biến/hàm không <code>inline</code> trong header; cùng hàm ở hai file</td>
+</tr>
+<tr>
+<td><code>undefined reference to '__aeabi_...'</code>, <code>memcpy</code>, <code>memset</code></td>
+<td>Build với <code>-nostdlib</code> nhưng compiler sinh lời gọi tới thư viện hỗ trợ (chia số nguyên, chép bộ nhớ); thêm <code>-lgcc</code> hoặc tự cung cấp (Bài 4)</td>
+</tr>
+<tr>
+<td><code>region 'FLASH' overflowed by N bytes</code></td>
+<td>Firmware lớn hơn Flash: xem Bài 6</td>
+</tr>
+<tr>
+<td><code>relocation truncated to fit</code></td>
+<td>Lệnh nhảy/tham chiếu xa hơn tầm với của lệnh (gọi hàm trong RAM từ Flash trên một số kiến trúc, mô hình bộ nhớ sai)</td>
+</tr>
+<tr>
+<td><code>uses VFP register arguments, x.o does not</code></td>
+<td>Trộn <code>-mfloat-abi=hard</code> và <code>soft</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Với lỗi undefined reference trong C++, đọc tên đã bị demangle (<code>c++filt _Z3foov</code> → <code>foo()</code>) để thấy chữ ký linker đang tìm, rồi so với định nghĩa.</p>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Dự án C++ gọi hàm `hal_init()` viết trong `hal.c`, link báo `undefined reference to 'hal_init()'` dù `hal.o` có trong lệnh link. Vì sao, và sửa thế nào?</summary>
+<p>Thông báo có <code>()</code>, tức linker đang tìm phiên bản C++ đã mangle (<code>_Z8hal_initv</code>), còn <code>hal.o</code> (biên dịch bằng C) chỉ có ký hiệu <code>hal_init</code>. Header được include từ file C++ mà thiếu <code>extern "C"</code>. Sửa trong <code>hal.h</code>: bọc các khai báo bằng <code>#ifdef __cplusplus extern "C" { #endif ... #ifdef __cplusplus } #endif</code>.</p>
+</details>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 2</span></div>
+<ul>
+<li>Linker: thu thập, giải quyết ký hiệu, bố trí, relocation.</li>
+<li>Thư viện tĩnh duyệt trái sang phải: phụ thuộc đứng trước; vòng thì <code>--start-group</code>.</li>
+<li><code>-ffunction-sections -fdata-sections</code> + <code>--gc-sections</code> (+ LTO); <code>KEEP</code> cho thứ chỉ phần cứng dùng.</li>
+<li>Đọc lỗi: undefined (thiếu, thứ tự, <code>extern "C"</code>), multiple definition, overflow, float ABI.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-2-linker-va-cac-loi-lien-ket">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-3-linker-script-cho-mcu" hidden><h2 id="c-bai-3-linker-script-cho-mcu">Bài 3 · Linker script cho MCU</h2>
+<h3 id="c-vi-sao-firmware-can-linker-script">Vì sao firmware cần linker script</h3>
+<p>Trên Linux, linker dùng script mặc định và hệ điều hành lo việc nạp. Trên MCU không có ai làm việc đó: linker script phải nói chính xác <strong>Flash ở đâu, RAM ở đâu, mỗi section đặt vào đâu</strong>, và xuất ra các <strong>ký hiệu</strong> (địa chỉ) mà startup code cần để chuẩn bị bộ nhớ. Các file dưới đây được dùng cho Cortex-M3 (LM3S6965, máy giả lập <code>lm3s6965evb</code> của QEMU) và đã chạy thật.</p>
+<!-- test:lm3s_ld -->
+
+<div class="hl"><pre><span></span><code>/* Bố cục bộ nhớ của MCU (ví dụ: LM3S6965, Cortex-M3: 256 KiB Flash, 64 KiB SRAM) */
+MEMORY
+{
+  FLASH (rx)  : ORIGIN = 0x00000000, LENGTH = 256K
+  RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 64K
+}
+
+_stack_size = 4K;
+_estack     = ORIGIN(RAM) + LENGTH(RAM);       /* stack đi xuống từ đỉnh RAM */
+
+ENTRY(Reset_Handler)
+
+SECTIONS
+{
+  .isr_vector : {
+    KEEP(*(.isr_vector))                        /* KEEP: không để --gc-sections xóa */
+  } &gt; FLASH
+
+  .text : {
+    *(.text*)
+    *(.rodata*)
+    . = ALIGN(4);
+  } &gt; FLASH
+
+  .init_array : {
+    __init_array_start = .;
+    KEEP(*(SORT(.init_array.*)))
+    KEEP(*(.init_array))
+    __init_array_end = .;
+  } &gt; FLASH
+
+  _sidata = LOADADDR(.data);                     /* nơi giá trị khởi tạo nằm trong Flash */
+
+  .data : {
+    . = ALIGN(4);
+    _sdata = .;
+    *(.data*)
+    *(.ramfunc*)                                 /* hàm muốn chạy từ RAM */
+    . = ALIGN(4);
+    _edata = .;
+  } &gt; RAM AT&gt; FLASH                              /* VMA ở RAM, LMA ở Flash */
+
+  .bss (NOLOAD) : {
+    . = ALIGN(4);
+    _sbss = .;
+    *(.bss*)
+    *(COMMON)
+    . = ALIGN(4);
+    _ebss = .;
+  } &gt; RAM
+
+  .noinit (NOLOAD) : {
+    *(.noinit*)                                  /* giữ nguyên qua reset mềm */
+  } &gt; RAM
+
+  _end = .;                                      /* đầu heap */
+  ASSERT(_end + _stack_size &lt;= _estack, "RAM tràn: không còn đủ chỗ cho stack")
+
+  /DISCARD/ : { *(.ARM.exidx*) *(.comment) }
+}
+</code></pre></div>
+
+<h3 id="c-doc-tung-phan">Đọc từng phần</h3>
+<p><strong><code>MEMORY</code></strong> khai báo các vùng nhớ vật lý với quyền (<code>r</code>, <code>w</code>, <code>x</code>). Chip thật thường có thêm vùng: CCM/DTCM (RAM nhanh không DMA được), backup SRAM, Flash nhiều bank. Lấy số liệu từ <strong>memory map trong datasheet</strong> (reference manual), không đoán.</p>
+<p><strong>Ký hiệu tự định nghĩa</strong> như <code>_estack = ORIGIN(RAM) + LENGTH(RAM)</code> không chiếm bộ nhớ; chúng chỉ là <strong>địa chỉ</strong> mà code C tham chiếu bằng <code>extern uint32_t _estack;</code> rồi lấy <code>&amp;_estack</code>.</p>
+<p><strong>VMA và LMA.</strong> Mỗi section có hai địa chỉ: <strong>VMA</strong> (virtual/run address, nơi section nằm khi chương trình chạy) và <strong>LMA</strong> (load address, nơi nó được lưu trong ảnh nạp). Với <code>.text</code> hai địa chỉ trùng nhau (chạy thẳng từ Flash). Với <code>.data</code>, <code>&gt; RAM AT&gt; FLASH</code> nghĩa là: code tham chiếu biến ở địa chỉ RAM, nhưng <strong>giá trị khởi tạo</strong> được ghi vào Flash; startup code phải chép từ LMA (<code>_sidata</code>) sang VMA (<code>_sdata</code>…<code>_edata</code>). Đây là lý do biến <code>.data</code> tốn <strong>cả</strong> Flash lẫn RAM.</p>
+<p><strong><code>.bss (NOLOAD)</code></strong> chỉ chiếm RAM, không có gì trong Flash; startup code xóa nó về 0. Vì vậy <code>uint8_t buf[4096];</code> không làm firmware to ra, còn <code>uint8_t buf[4096] = {1};</code> thì tốn thêm 4 KB Flash.</p>
+<p><strong><code>KEEP(*(.isr_vector))</code></strong>: bảng vector không được code nào gọi tới, <code>--gc-sections</code> sẽ xóa nó nếu không có <code>KEEP</code>. Chip khởi động với bảng vector trống thì nhảy vào địa chỉ rác ngay lệnh đầu tiên.</p>
+<p><strong><code>.init_array</code></strong>: danh sách con trỏ hàm cần chạy trước <code>main</code> (constructor của đối tượng toàn cục C++, hàm <code>__attribute__((constructor))</code>). Script xuất <code>__init_array_start/end</code> để startup code duyệt.</p>
+<p><strong><code>.ramfunc</code></strong>: hàm muốn chạy từ RAM (nhanh hơn trên chip có Flash chậm, hoặc bắt buộc khi đang xóa/ghi chính Flash đó) được đặt trong <code>.data</code>: được chép sang RAM lúc khởi động cùng các biến.</p>
+<p><strong><code>.noinit</code></strong>: biến không bị startup xóa, giữ giá trị qua reset mềm; dùng cho bộ đếm reset, lý do crash (M09 Bài 5).</p>
+<p><strong><code>ASSERT</code></strong>: biến lỗi "chạy một lúc rồi stack đè lên dữ liệu" thành lỗi <strong>lúc build</strong>. Thêm ASSERT cho mọi giới hạn bạn biết (stack tối thiểu, heap tối thiểu, firmware không vượt vùng dành cho bootloader).</p>
+<p><strong><code>/DISCARD/</code></strong> bỏ section không cần (bảng unwind của exception khi không dùng exception).</p>
+<p>Trên chip có bootloader (M09 Bài 4), linker script của ứng dụng đặt <code>FLASH</code> bắt đầu <strong>sau</strong> vùng bootloader (ví dụ <code>ORIGIN = 0x08008000</code>), và ứng dụng phải trỏ <code>VTOR</code> tới bảng vector của mình.</p>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 3</span></div>
+<ul>
+<li><code>MEMORY</code> theo datasheet; ký hiệu linker là địa chỉ, dùng bằng <code>&amp;sym</code>.</li>
+<li><code>.data</code>: VMA ở RAM, LMA ở Flash (<code>AT&gt;</code>), startup chép; <code>.bss</code> NOLOAD, startup xóa.</li>
+<li><code>KEEP</code> bảng vector; <code>.init_array</code> cho constructor; <code>.ramfunc</code>, <code>.noinit</code> theo nhu cầu.</li>
+<li><code>ASSERT</code> để tràn bộ nhớ thành lỗi lúc build.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-3-linker-script-cho-mcu">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-4-startup-code-cortex-m" hidden><h2 id="c-bai-4-startup-code-cortex-m">Bài 4 · Startup code Cortex-M</h2>
+<h3 id="c-cortex-m-khoi-dong-the-nao">Cortex-M khởi động thế nào</h3>
+<p>Khi reset, lõi Cortex-M đọc <strong>hai word đầu tiên</strong> ở địa chỉ bảng vector (mặc định 0x00000000, chip STM32 ánh xạ Flash 0x08000000 về đó):</p>
+<ol>
+<li>Word 0 → nạp vào <strong>SP</strong> (stack pointer ban đầu).</li>
+<li>Word 1 → nhảy tới địa chỉ này (<strong>Reset_Handler</strong>), chế độ Thumb (bit 0 của địa chỉ là 1).</li>
+</ol>
+<p>Không có gì khác được chuẩn bị: <code>.data</code> chưa có giá trị, <code>.bss</code> chứa rác, clock đang ở mặc định, FPU tắt. Startup code lo tất cả trước khi gọi <code>main</code>. Vì Cortex-M tự nạp SP từ bảng vector, startup có thể viết hoàn toàn bằng C (lõi Cortex-A thì cần assembly để đặt stack trước).</p>
+<!-- test:startup_c -->
+
+<div class="hl"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdint.h&gt;</span>
+
+<span class="cm">/* Ký hiệu do linker script định nghĩa: chỉ có địa chỉ, không có nội dung */</span>
+<span class="k">extern</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">_sidata</span><span class="p">,</span><span class="w"> </span><span class="n">_sdata</span><span class="p">,</span><span class="w"> </span><span class="n">_edata</span><span class="p">,</span><span class="w"> </span><span class="n">_sbss</span><span class="p">,</span><span class="w"> </span><span class="n">_ebss</span><span class="p">,</span><span class="w"> </span><span class="n">_estack</span><span class="p">;</span>
+<span class="k">extern</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">__init_array_start</span><span class="p">[])(</span><span class="kt">void</span><span class="p">);</span>
+<span class="k">extern</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">__init_array_end</span><span class="p">[])(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">Reset_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">Default_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="cm">/* Handler mặc định yếu: ISR nào không được định nghĩa ở nơi khác sẽ trỏ về đây */</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">NMI_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w">        </span><span class="n">__attribute__</span><span class="p">((</span><span class="n">weak</span><span class="p">,</span><span class="w"> </span><span class="n">alias</span><span class="p">(</span><span class="s">"Default_Handler"</span><span class="p">)));</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">HardFault_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w">  </span><span class="n">__attribute__</span><span class="p">((</span><span class="n">weak</span><span class="p">,</span><span class="w"> </span><span class="n">alias</span><span class="p">(</span><span class="s">"Default_Handler"</span><span class="p">)));</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">SysTick_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w">    </span><span class="n">__attribute__</span><span class="p">((</span><span class="n">weak</span><span class="p">,</span><span class="w"> </span><span class="n">alias</span><span class="p">(</span><span class="s">"Default_Handler"</span><span class="p">)));</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">UART0_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w">   </span><span class="n">__attribute__</span><span class="p">((</span><span class="n">weak</span><span class="p">,</span><span class="w"> </span><span class="n">alias</span><span class="p">(</span><span class="s">"Default_Handler"</span><span class="p">)));</span>
+
+<span class="cm">/* Bảng vector: phần tử 0 là SP ban đầu, phần tử 1 là địa chỉ Reset_Handler */</span>
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">section</span><span class="p">(</span><span class="s">".isr_vector"</span><span class="p">),</span><span class="w"> </span><span class="n">used</span><span class="p">))</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">uintptr_t</span><span class="w"> </span><span class="n">vector_table</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="o">&amp;</span><span class="n">_estack</span><span class="p">,</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="n">Reset_Handler</span><span class="p">,</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="n">NMI_Handler</span><span class="p">,</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="n">HardFault_Handler</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">          </span><span class="cm">/* MemManage, BusFault, UsageFault, reserved... (rút gọn) */</span>
+<span class="w">    </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">                   </span><span class="cm">/* SVC, DebugMon, reserved, PendSV */</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="n">SysTick_Handler</span><span class="p">,</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="n">UART0_IRQHandler</span><span class="p">,</span><span class="w">  </span><span class="cm">/* IRQ0 trở đi: theo datasheet của chip */</span>
+<span class="p">};</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">Reset_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="cm">/* 1. Chép giá trị khởi tạo của .data từ Flash sang RAM */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_sidata</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">dst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_sdata</span><span class="p">;</span><span class="w"> </span><span class="n">dst</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_edata</span><span class="p">;</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="n">dst</span><span class="o">++</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">src</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="cm">/* 2. Xóa .bss về 0 */</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">dst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_sbss</span><span class="p">;</span><span class="w"> </span><span class="n">dst</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_ebss</span><span class="p">;</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="n">dst</span><span class="o">++</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="cm">/* 3. (SystemInit: clock, FPU... tùy chip) */</span>
+<span class="w">    </span><span class="cm">/* 4. Chạy constructor của đối tượng toàn cục (C++) và hàm __attribute__((constructor)) */</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">**</span><span class="n">f</span><span class="p">)(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__init_array_start</span><span class="p">;</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">__init_array_end</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">f</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">f</span><span class="p">)();</span>
+<span class="w">    </span><span class="cm">/* 5. Vào main; main không nên trả về trên MCU */</span>
+<span class="w">    </span><span class="n">main</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">Default_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{}</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+
+<h3 id="c-nhung-diem-dang-chu-y">Những điểm đáng chú ý</h3>
+<p><strong>Handler yếu với alias.</strong> <code>__attribute__((weak, alias("Default_Handler")))</code> tạo ký hiệu yếu trỏ về <code>Default_Handler</code>. Khi bạn viết <code>void UART0_IRQHandler(void) {...}</code> ở file khác, định nghĩa mạnh đó thắng và bảng vector trỏ tới nó. Hệ quả nguy hiểm: <strong>gõ sai tên ISR</strong> (<code>USART2_IRQhandler</code>) không gây lỗi biên dịch hay liên kết; ngắt rơi vào <code>Default_Handler</code> và chương trình treo trong vòng lặp vô hạn. Khi debug thấy CPU kẹt ở <code>Default_Handler</code>, đọc thanh ghi <code>IPSR</code> (số exception đang xử lý) để biết ngắt nào.</p>
+<p><strong>Compiler biến vòng lặp chép thành <code>memcpy</code>.</strong> Lần build đầu tiên của đoạn code trên với <code>-O2 -nostdlib</code> báo lỗi thật:</p>
+<div class="hl"><pre><span></span><code>startup.c:34: undefined reference to `memcpy'
+startup.c:36: undefined reference to `memset'
+</code></pre></div>
+
+<p>GCC nhận ra vòng lặp chép/xóa và thay bằng lời gọi <code>memcpy</code>/<code>memset</code> (tối ưu <em>loop distribution</em>). Trong startup code điều này còn nguy hiểm hơn lỗi liên kết: <code>memcpy</code> của thư viện có thể dùng biến toàn cục chưa được khởi tạo. Cách xử lý: biên dịch startup với <code>-fno-tree-loop-distribute-patterns</code> (như ở đây), hoặc viết vòng lặp bằng assembly, hoặc đảm bảo có <code>memcpy</code>/<code>memset</code> không phụ thuộc trạng thái.</p>
+<p><strong>Thứ tự</strong>: chép <code>.data</code> và xóa <code>.bss</code> <strong>trước</strong> mọi thứ khác, vì constructor C++ và cả <code>SystemInit</code> có thể dùng biến toàn cục. Một số SDK gọi <code>SystemInit</code> (cấu hình clock) trước khi chép <code>.data</code> để việc chép chạy nhanh hơn; khi đó <code>SystemInit</code> không được dùng biến toàn cục.</p>
+<p><strong>FPU</strong>: trên Cortex-M4F/M7, dùng lệnh số thực khi FPU còn tắt gây UsageFault. <code>SystemInit</code> phải bật: <code>SCB-&gt;CPACR |= (0xF &lt;&lt; 20);</code> rồi <code>__DSB(); __ISB();</code>. Compiler có thể sinh lệnh FPU ngay trong code tưởng như không dùng số thực (chép struct bằng thanh ghi FPU), nên bật càng sớm càng tốt.</p>
+<p><strong><code>main</code> trả về</strong>: trên MCU không có ai nhận giá trị trả về; vòng <code>for (;;)</code> sau <code>main</code> ngăn CPU chạy vào vùng nhớ rác.</p>
+<h3 id="c-chay-thu-tren-qemu">Chạy thử trên QEMU</h3>
+<p>Chương trình kiểm tra từng bước của startup:</p>
+<!-- test:main_c -->
+
+<div class="hl"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdint.h&gt;</span>
+<span class="cp">#define UART0_DR (*(volatile uint32_t *)0x4000C000u)    </span><span class="cm">/* thanh ghi dữ liệu UART0 */</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">puts_uart</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">s</span><span class="p">)</span><span class="w"> </span><span class="n">UART0_DR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)</span><span class="o">*</span><span class="n">s</span><span class="o">++</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">put_hex</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"0123456789abcdef"</span><span class="p">;</span><span class="w"> </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">"0x"</span><span class="p">);</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">28</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">-=</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="n">UART0_DR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">h</span><span class="p">[(</span><span class="n">v</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xF</span><span class="p">];</span><span class="w"> </span><span class="p">}</span>
+
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">counter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span><span class="w">                    </span><span class="cm">/* .data: giá trị 42 nằm trong Flash, được chép sang RAM */</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">zeroed</span><span class="p">;</span><span class="w">                          </span><span class="cm">/* .bss: được xóa về 0 lúc khởi động */</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">banner</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"hello from flash"</span><span class="p">;</span><span class="w"> </span><span class="cm">/* .rodata: chỉ nằm trong Flash */</span>
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">section</span><span class="p">(</span><span class="s">".noinit"</span><span class="p">)))</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">boot_count</span><span class="p">;</span><span class="w">   </span><span class="cm">/* không bị xóa khi reset */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ctor_ran</span><span class="p">;</span>
+
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">constructor</span><span class="p">))</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">early_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctor_ran</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xC0FFEEu</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">section</span><span class="p">(</span><span class="s">".ramfunc"</span><span class="p">),</span><span class="w"> </span><span class="n">noinline</span><span class="p">))</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">add_in_ram</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">semihost_exit</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">                       </span><span class="cm">/* báo QEMU thoát (semihosting) */</span>
+<span class="w">    </span><span class="k">register</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">r0</span><span class="w"> </span><span class="n">__asm__</span><span class="p">(</span><span class="s">"r0"</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0x18</span><span class="p">,</span><span class="w"> </span><span class="n">r1</span><span class="w"> </span><span class="n">__asm__</span><span class="p">(</span><span class="s">"r1"</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0x20026</span><span class="p">;</span>
+<span class="w">    </span><span class="n">__asm__</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span><span class="s">"bkpt 0xAB"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">"r"</span><span class="p">(</span><span class="n">r0</span><span class="p">),</span><span class="w"> </span><span class="s">"r"</span><span class="p">(</span><span class="n">r1</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">"memory"</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">puts_uart</span><span class="p">(</span><span class="n">banner</span><span class="p">);</span><span class="w"> </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">"</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+<span class="w">    </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">"counter="</span><span class="p">);</span><span class="w"> </span><span class="n">put_hex</span><span class="p">(</span><span class="n">counter</span><span class="p">);</span><span class="w"> </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">" zeroed="</span><span class="p">);</span><span class="w"> </span><span class="n">put_hex</span><span class="p">(</span><span class="n">zeroed</span><span class="p">);</span>
+<span class="w">    </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">" ctor="</span><span class="p">);</span><span class="w"> </span><span class="n">put_hex</span><span class="p">(</span><span class="n">ctor_ran</span><span class="p">);</span><span class="w"> </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">"</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+<span class="w">    </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">"ramfunc@"</span><span class="p">);</span><span class="w"> </span><span class="n">put_hex</span><span class="p">((</span><span class="kt">uint32_t</span><span class="p">)(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="o">&amp;</span><span class="n">add_in_ram</span><span class="p">);</span><span class="w"> </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">" -&gt; "</span><span class="p">);</span><span class="w"> </span><span class="n">put_hex</span><span class="p">(</span><span class="n">add_in_ram</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">));</span><span class="w"> </span><span class="n">puts_uart</span><span class="p">(</span><span class="s">"</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+<span class="w">    </span><span class="n">semihost_exit</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="hl"><pre><span></span><code>$ arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -O2 -g -ffunction-sections -fdata-sections \
+    -fno-tree-loop-distribute-patterns -nostdlib -T lm3s.ld startup.c main.c \
+    -Wl,--gc-sections -Wl,-Map=fw.map -o fw.elf
+$ qemu-system-arm -M lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel fw.elf
+hello from flash
+counter=0x0000002a zeroed=0x00000000 ctor=0x00c0ffee
+ramfunc@0x20000005 -&gt; 0x0000002a
+</code></pre></div>
+
+<p>Mọi thứ khớp: <code>counter</code> có giá trị 42 (<code>.data</code> được chép), <code>zeroed</code> bằng 0 (<code>.bss</code> được xóa), constructor đã chạy trước <code>main</code>, hàm <code>add_in_ram</code> nằm ở địa chỉ RAM (0x20000004, bit 0 bằng 1 là dấu Thumb). Bảng ký hiệu (<code>nm -n fw.elf</code>, rút gọn) cho thấy bố cục cuối cùng:</p>
+<div class="hl"><pre><span></span><code>00000000 R vector_table
+00000048 T Default_Handler
+00000048 W HardFault_Handler        ← các handler yếu cùng địa chỉ Default_Handler
+0000004c T Reset_Handler
+000001e8 t __add_in_ram_veneer      ← linker tự chèn "cầu nhảy": Flash tới RAM quá xa cho lệnh bl
+00000254 A _sidata                  ← giá trị đầu của .data nằm ở đây trong Flash
+20000000 T counter                  ← .data trong RAM
+20000004 t add_in_ram
+20000008 b ctor_ran                 ← .bss
+20010000 R _estack                  ← đỉnh RAM = SP ban đầu
+</code></pre></div>
+
+<p>Dòng <code>__add_in_ram_veneer</code> là một chi tiết thú vị: lệnh <code>bl</code> của Thumb-2 chỉ nhảy được khoảng ±16 MB, còn khoảng cách Flash (0x0) tới RAM (0x20000000) là 512 MB, nên linker tự chèn một đoạn mã trung gian nạp địa chỉ đầy đủ rồi nhảy.</p>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Một firmware chạy đúng khi debug bằng J-Link (nạp rồi chạy từ debugger) nhưng treo khi cắm nguồn lần đầu. Biến toàn cục `int mode = 2;` luôn đọc ra giá trị lạ. Nghi ngờ gì?</summary>
+<p>Startup không chép <code>.data</code> (hoặc chép sai địa chỉ do linker script đặt <code>_sidata</code>/LMA sai). Khi chạy từ debugger, RAM có thể còn giá trị từ lần nạp trước hoặc debugger tự nạp cả vùng RAM từ file ELF (nạp theo segment, kể cả <code>.data</code> ở VMA), nên lỗi bị che. Kiểm tra <code>Reset_Handler</code>, ký hiệu <code>_sidata</code>, <code>_sdata</code>, <code>_edata</code> trong file map, và chạy thử với một lần ngắt nguồn thật.</p>
+</details>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 4</span></div>
+<ul>
+<li>Reset: word 0 → SP, word 1 → Reset_Handler; không có gì khác được chuẩn bị.</li>
+<li>Reset_Handler: chép <code>.data</code>, xóa <code>.bss</code>, SystemInit (clock, FPU), <code>.init_array</code>, <code>main</code>, vòng lặp vô hạn.</li>
+<li>Handler yếu + alias: gõ sai tên ISR không báo lỗi mà rơi vào Default_Handler.</li>
+<li>Compiler có thể biến vòng chép thành <code>memcpy</code>: <code>-fno-tree-loop-distribute-patterns</code>.</li>
+<li>Bật FPU sớm; linker chèn veneer khi nhảy xa.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-4-startup-code-cortex-m">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-5-bo-tri-bo-nho-stack-va-heap" hidden><h2 id="c-bai-5-bo-tri-bo-nho-stack-va-heap">Bài 5 · Bố trí bộ nhớ, stack và heap</h2>
+<h3 id="c-ban-do-ram-cua-firmware">Bản đồ RAM của firmware</h3>
+<div class="hl"><pre><span></span><code> 0x20010000 ┌─────────────────────┐ ← _estack (SP ban đầu)
+            │ stack ↓             │   một stack cho main + ISR (MSP);
+            │                     │   với RTOS: mỗi task một stack riêng (cấp ở .bss hoặc heap)
+            │ ...  vùng trống ... │
+            │ heap ↑ (nếu dùng)   │
+ _end       ├─────────────────────┤
+            │ .noinit             │
+            │ .bss                │
+            │ .data               │
+ 0x20000000 └─────────────────────┘
+</code></pre></div>
+
+<p>Stack đi <strong>xuống</strong>, heap đi <strong>lên</strong>; nếu gặp nhau thì dữ liệu bị đè âm thầm. Trên MCU không có MMU, không có trang bảo vệ: tràn stack không gây lỗi ngay mà làm hỏng biến toàn cục hoặc heap, và triệu chứng xuất hiện ở chỗ khác hoàn toàn.</p>
+<h3 id="c-uoc-luong-va-do-stack">Ước lượng và đo stack</h3>
+<p><strong>Tĩnh</strong>: <code>-fstack-usage</code> sinh file <code>.su</code> cho mỗi file nguồn, ghi số byte stack của từng hàm:</p>
+<div class="hl"><pre><span></span><code>main2.c:7:13:put_dec   24    static
+main2.c:8:17:deep      392   static
+main2.c:10:5:main      16    static
+</code></pre></div>
+
+<p><code>static</code> nghĩa là kích thước cố định (không có <code>alloca</code>, VLA). Tổng stack tệ nhất = đường đi sâu nhất trong <strong>đồ thị gọi hàm</strong> cộng với stack của các ISR có thể lồng nhau (Cortex-M đẩy thêm 32 byte, hoặc 104 byte có FPU, cho mỗi tầng ngắt). Đệ quy và con trỏ hàm làm phân tích tĩnh không đủ; công cụ như <code>puncover</code>, <code>avstack.pl</code> hoặc tính năng phân tích stack của các compiler thương mại tổng hợp đồ thị gọi. <code>-Wstack-usage=256</code> cảnh báo hàm nào vượt ngưỡng.</p>
+<p><strong>Động</strong>: tô stack bằng một mẫu cố định, chạy hệ thống qua mọi kịch bản, rồi tìm chỗ sâu nhất mẫu bị ghi đè (<em>stack painting / watermark</em>). FreeRTOS làm vậy cho mỗi task (<code>uxTaskGetStackHighWaterMark</code>).</p>
+<!-- test:stack_c -->
+
+<div class="hl"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stddef.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdint.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;errno.h&gt;</span>
+
+<span class="k">extern</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">_ebss</span><span class="p">,</span><span class="w"> </span><span class="n">_estack</span><span class="p">,</span><span class="w"> </span><span class="n">_end</span><span class="p">;</span>
+<span class="k">extern</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">_stack_size</span><span class="p">;</span><span class="w">                     </span><span class="cm">/* ký hiệu linker: dùng địa chỉ làm giá trị */</span>
+<span class="cp">#define STACK_PATTERN 0xDEADBEEFu</span>
+
+<span class="cm">/* Tô vùng từ cuối .bss tới gần SP hiện tại bằng mẫu; gọi sớm trong main */</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">stack_paint</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_ebss</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">sp</span><span class="p">;</span>
+<span class="w">    </span><span class="n">__asm__</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span><span class="s">"mov %0, sp"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">"=r"</span><span class="p">(</span><span class="n">sp</span><span class="p">));</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">sp</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="o">++</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STACK_PATTERN</span><span class="p">;</span><span class="w">    </span><span class="cm">/* chừa 64 byte dưới SP hiện tại */</span>
+<span class="p">}</span>
+
+<span class="cm">/* Số byte stack đã từng dùng (tính từ đỉnh RAM xuống chỗ mẫu đầu tiên bị ghi đè) */</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">stack_high_water</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_ebss</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">_estack</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">STACK_PATTERN</span><span class="p">)</span><span class="w"> </span><span class="o">++</span><span class="n">p</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="kt">size_t</span><span class="p">)((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">_estack</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">p</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="cm">/* _sbrk cho newlib: heap đi lên từ _end, không được đâm vào vùng dành cho stack */</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">_sbrk</span><span class="p">(</span><span class="kt">ptrdiff_t</span><span class="w"> </span><span class="n">incr</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">heap_end</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="k">const</span><span class="w"> </span><span class="n">heap_limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">_estack</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="kt">size_t</span><span class="p">)</span><span class="o">&amp;</span><span class="n">_stack_size</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">heap_end</span><span class="p">)</span><span class="w"> </span><span class="n">heap_end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">_end</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">heap_end</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">incr</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">heap_limit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">errno</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ENOMEM</span><span class="p">;</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="mi">-1</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">prev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">heap_end</span><span class="p">;</span>
+<span class="w">    </span><span class="n">heap_end</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">incr</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">prev</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Chạy trên QEMU (gọi <code>stack_paint()</code> đầu <code>main</code>, rồi gọi một hàm đệ quy 10 tầng):</p>
+<div class="hl"><pre><span></span><code>before: 96 B
+after deep(10): 1600 B
+malloc(1000) ok, malloc(100000) NULL
+</code></pre></div>
+
+<p>Quy tắc thực tế: đặt kích thước stack bằng mức đo được <strong>cộng biên an toàn</strong> (thường 25–50%), kiểm tra lại sau mỗi thay đổi lớn, và báo high-water mark như một metric trong bản debug.</p>
+<p><strong>Phát hiện tràn khi chạy</strong>: đặt một vùng <strong>MPU</strong> không có quyền ghi ngay dưới đáy stack (tràn → MemManage fault thay vì đè dữ liệu); Cortex-M33 (ARMv8-M) có thanh ghi giới hạn stack <strong>MSPLIM/PSPLIM</strong> làm việc này bằng phần cứng; FreeRTOS có <code>configCHECK_FOR_STACK_OVERFLOW</code>. Một kỹ thuật đơn giản khác: đặt stack ở <strong>đầu</strong> RAM (đi xuống về phía địa chỉ 0x20000000), dữ liệu ở phía trên; tràn thì ghi ra ngoài vùng RAM và thường gây fault ngay (tùy bản đồ bộ nhớ của chip) thay vì đè dữ liệu.</p>
+<h3 id="c-heap-tren-mcu">Heap trên MCU</h3>
+<p><code>malloc</code> của newlib xin bộ nhớ qua hàm <code>_sbrk</code>, do <strong>bạn</strong> cung cấp (hàm trong <code>stack.c</code> ở trên): heap tăng từ <code>_end</code>, không vượt vùng dành cho stack, hết thì trả lỗi để <code>malloc</code> trả <code>NULL</code> (thử nghiệm ở trên: xin 100.000 byte trên RAM 64 KB trả <code>NULL</code> đúng như mong đợi).</p>
+<p>Nhiều chuẩn (MISRA, hàng không, y tế) cấm cấp phát động sau khi khởi động, vì: phân mảnh làm <code>malloc</code> thất bại sau nhiều ngày chạy dù tổng bộ nhớ trống còn nhiều; thời gian <code>malloc</code> không tất định; không an toàn trong ISR. Thay thế: cấp phát tĩnh mọi thứ, <strong>memory pool</strong> khối cố định (M06 Bài 4), hoặc chỉ cấp phát trong giai đoạn khởi tạo rồi "khóa" heap.</p>
+<h3 id="c-bo-nho-cua-process-tren-linux">Bộ nhớ của process trên Linux</h3>
+<div class="hl"><pre><span></span><code> địa chỉ cao   ┌──────────────────────┐
+               │ kernel (không truy cập được từ userspace)
+               ├──────────────────────┤
+               │ stack ↓ (main thread, 8 MiB mặc định, có guard page)
+               │ ...
+               │ vùng mmap: thư viện .so, stack các thread, malloc lớn, file ánh xạ
+               │ ...
+               │ heap ↑ (brk)
+               │ .bss, .data
+               │ .text, .rodata
+ địa chỉ thấp  └──────────────────────┘
+</code></pre></div>
+
+<p>Khác MCU: mỗi vùng có quyền riêng qua MMU (ghi vào <code>.text</code> gây SIGSEGV), có <strong>guard page</strong> dưới stack, và <strong>ASLR</strong> đặt các vùng ở địa chỉ ngẫu nhiên mỗi lần chạy. Xem bố cục thật của một process: <code>cat /proc/&lt;pid&gt;/maps</code>; tổng bộ nhớ thực dùng: <code>/proc/&lt;pid&gt;/smaps_rollup</code> (RSS, PSS).</p>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Thiết bị chạy ổn vài ngày rồi một biến cấu hình toàn cục tự đổi giá trị ngẫu nhiên. Code không có chỗ nào ghi vào biến đó. Hướng điều tra?</summary>
+<p>Nghi ngờ hàng đầu là tràn stack (hoặc tràn buffer) đè lên vùng RAM chứa biến. Xem file map để biết biến nằm cạnh gì; đo high-water mark của stack (và của từng task nếu dùng RTOS) dưới mọi kịch bản, đặc biệt đường lỗi hiếm (xử lý lỗi in log dài, ISR lồng nhau). Đặt watchpoint phần cứng (DWT) trên địa chỉ biến để bắt lệnh ghi. Phòng ngừa: MPU guard dưới đáy stack hoặc MSPLIM, tăng biên stack, <code>-fstack-usage</code> trong CI.</p>
+</details>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 5</span></div>
+<ul>
+<li>Stack đi xuống, heap đi lên; trên MCU tràn là đè âm thầm.</li>
+<li>Đo stack: tĩnh (<code>-fstack-usage</code>, đồ thị gọi, cộng tầng ISR) và động (tô mẫu, high-water mark); thêm biên 25–50%.</li>
+<li>Bắt tràn khi chạy: MPU guard, MSPLIM/PSPLIM, stack ở đầu RAM, kiểm tra của RTOS.</li>
+<li>Heap qua <code>_sbrk</code>; tránh cấp phát động sau khởi động; pool khối cố định.</li>
+<li>Linux: MMU, guard page, ASLR; <code>/proc/&lt;pid&gt;/maps</code>.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-5-bo-tri-bo-nho-stack-va-heap">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-6-file-map-va-toi-uu-kich-thuoc-firmware" hidden><h2 id="c-bai-6-file-map-va-toi-uu-kich-thuoc-firmware">Bài 6 · File map và tối ưu kích thước firmware</h2>
+<h3 id="c-doc-file-map">Đọc file map</h3>
+<p>Thêm <code>-Wl,-Map=fw.map</code> khi link. File map trả lời ba câu hỏi: <strong>bộ nhớ được khai báo thế nào</strong>, <strong>mỗi section nằm ở đâu và to bao nhiêu</strong>, <strong>mỗi byte đến từ file/thư viện nào</strong>. Trích từ file map của firmware ở Bài 4:</p>
+<div class="hl"><pre><span></span><code>Memory Configuration
+Name             Origin             Length             Attributes
+FLASH            0x00000000         0x00040000         xr
+RAM              0x20000000         0x00010000         xrw
+
+.isr_vector     0x00000000       0x44
+ .isr_vector    0x00000000       0x44 startup.o
+                0x00000000                vector_table
+.text           0x00000048      0x208
+ .text.Default_Handler
+                0x00000048        0x4 startup.o
+ ...
+.data           0x20000000        0x8 load address 0x00000254
+.bss            0x20000008        0x8 load address 0x0000025c
+</code></pre></div>
+
+<p>Dòng <code>.data ... load address 0x00000254</code> thể hiện đúng VMA/LMA ở Bài 3. Phần <strong>Discarded input sections</strong> ở đầu file liệt kê những gì <code>--gc-sections</code> đã bỏ, hữu ích khi một hàm "biến mất".</p>
+<p>Công cụ đọc nhanh:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Lệnh</th>
+<th>Cho biết</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>arm-none-eabi-size fw.elf</code></td>
+<td><code>text</code> (Flash: code + hằng), <code>data</code> (vừa Flash vừa RAM), <code>bss</code> (RAM)</td>
+</tr>
+<tr>
+<td><code>arm-none-eabi-nm --size-sort -S fw.elf \| tail -20</code></td>
+<td>20 ký hiệu lớn nhất</td>
+</tr>
+<tr>
+<td><code>bloaty fw.elf -d compileunits</code></td>
+<td>Kích thước theo file nguồn</td>
+</tr>
+<tr>
+<td><code>puncover</code></td>
+<td>Giao diện web: kích thước và stack theo hàm, đồ thị gọi</td>
+</tr>
+</tbody>
+</table></div>
+<p>Flash dùng = <code>text + data</code>; RAM tĩnh = <code>data + bss</code> (chưa tính stack, heap).</p>
+<h3 id="c-ke-an-flash-quen-thuoc-printf">Kẻ ăn Flash quen thuộc: <code>printf</code></h3>
+<p>Đo thật trên Cortex-M4, <code>-Os</code>, cùng một chương trình nhỏ in một số ra UART:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Cách in</th>
+<th>Kích thước (text + data)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tự đổi số thành chuỗi</td>
+<td>~0,2 KB</td>
+</tr>
+<tr>
+<td><code>snprintf("%d")</code> với <strong>newlib-nano</strong> (<code>--specs=nano.specs</code>)</td>
+<td>~4,1 KB</td>
+</tr>
+<tr>
+<td><code>snprintf("%d")</code> với newlib đầy đủ</td>
+<td>~28,7 KB</td>
+</tr>
+<tr>
+<td><code>snprintf("%.1f")</code> với newlib-nano + <code>-u _printf_float</code></td>
+<td>~21,3 KB</td>
+</tr>
+</tbody>
+</table></div>
+<p>newlib-nano bỏ hỗ trợ số thực trong <code>printf</code> mặc định (định dạng <code>%f</code> in ra rỗng!) để tiết kiệm; bật lại bằng <code>-u _printf_float</code> thì kéo theo cả thư viện số thực mềm. Trên MCU nhỏ, các lựa chọn thường gặp: newlib-nano không float, thư viện printf nhỏ chuyên cho nhúng (ví dụ <code>mpaland/printf</code>, <code>nanoprintf</code>), in số thực bằng số nguyên đã nhân tỉ lệ (fixed-point, M07), hoặc log dạng token (M09 Bài 6).</p>
+<h3 id="c-cac-ky-thuat-giam-kich-thuoc">Các kỹ thuật giảm kích thước</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Hiệu quả điển hình</th>
+<th>Lưu ý</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-Os</code> (hoặc <code>-Oz</code> với Clang) thay <code>-O2</code></td>
+<td>10–30%</td>
+<td>Chậm hơn một chút</td>
+</tr>
+<tr>
+<td><code>-ffunction-sections -fdata-sections</code> + <code>--gc-sections</code></td>
+<td>Lớn nếu có thư viện/HAL dùng một phần</td>
+<td>Cần <code>KEEP</code> đúng chỗ</td>
+</tr>
+<tr>
+<td>LTO (<code>-flto</code>)</td>
+<td>10–20%</td>
+<td>Build chậm hơn; kiểm tra ISR và code dùng <code>used</code></td>
+</tr>
+<tr>
+<td>newlib-nano</td>
+<td>Hàng chục KB</td>
+<td>Không float trong printf mặc định</td>
+</tr>
+<tr>
+<td>C++: <code>-fno-exceptions -fno-rtti</code>, không iostream</td>
+<td>Hàng chục KB</td>
+<td>M04 Bài 0</td>
+</tr>
+<tr>
+<td>Tránh số thực trên chip không có FPU</td>
+<td>Vài KB mỗi phép toán thư viện</td>
+<td>Dùng fixed-point</td>
+</tr>
+<tr>
+<td>Bảng tra thay code, hoặc ngược lại</td>
+<td>Tùy</td>
+<td>Đo cả hai</td>
+</tr>
+<tr>
+<td>Template sinh nhiều bản sao</td>
+<td>Có thể lớn</td>
+<td>M04 Bài 7</td>
+</tr>
+</tbody>
+</table></div>
+<p>Luôn <strong>đo trước và sau</strong> (in <code>size</code> sau mỗi build trong CI, cảnh báo khi tăng quá ngưỡng). Một dòng <code>#include</code> thư viện tiện ích có thể kéo theo vài KB không ai để ý.</p>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Firmware báo `region 'FLASH' overflowed by 3200 bytes` sau khi thêm một dòng log in nhiệt độ dạng `%.2f`. Bạn làm gì?</summary>
+<p>Gần như chắc chắn dòng <code>%.2f</code> kéo theo phần định dạng số thực của printf và thư viện số thực mềm (nếu chip không có FPU hoặc dùng float ABI mềm). Xác nhận bằng file map hoặc <code>nm --size-sort</code> (thấy <code>_printf_float</code>, <code>__aeabi_d*</code>). Sửa: in số nguyên đã nhân tỉ lệ (<code>temp_centi / 100</code>, <code>temp_centi % 100</code>), hoặc log dạng token gửi giá trị thô. Nếu thật sự cần thêm chỗ: bật <code>-Os</code>, <code>--gc-sections</code>, LTO, rồi xem các ký hiệu lớn nhất.</p>
+</details>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 6</span></div>
+<ul>
+<li>File map: cấu hình bộ nhớ, vị trí và kích thước section, nguồn gốc từng byte, phần bị bỏ.</li>
+<li>Flash = text + data; RAM tĩnh = data + bss.</li>
+<li>printf là thủ phạm hàng đầu: newlib-nano, printf nhỏ, fixed-point, log token.</li>
+<li><code>-Os</code>, gc-sections, LTO, không exception/RTTI; đo kích thước trong CI.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-6-file-map-va-toi-uu-kich-thuoc-firmware">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-7-chuong-trinh-duoc-nap-va-chay-the-nao-tren-linux" hidden><h2 id="c-bai-7-chuong-trinh-duoc-nap-va-chay-the-nao-tren-linux">Bài 7 · Chương trình được nạp và chạy thế nào trên Linux</h2>
+<h3 id="c-tu-execve-toi-main">Từ <code>execve</code> tới <code>main</code></h3>
+<div class="hl"><pre><span></span><code> shell gọi execve("./app")
+   └─▶ kernel đọc ELF header, ánh xạ các segment LOAD vào bộ nhớ
+         └─▶ thấy segment INTERP: nạp dynamic linker /lib64/ld-linux-x86-64.so.2
+               (trên ARM 64-bit: /lib/ld-linux-aarch64.so.1)
+               └─▶ ld.so nạp các thư viện NEEDED (libc.so.6...), xử lý relocation
+                     └─▶ nhảy tới _start của chương trình (từ crt1.o)
+                           └─▶ __libc_start_main: khởi tạo libc, chạy .init_array
+                                 └─▶ main(argc, argv, envp)
+                                       └─▶ exit(): chạy .fini_array, atexit, destructor static
+</code></pre></div>
+
+<p>Xem bằng công cụ (kết quả thật trên một chương trình nhỏ):</p>
+<div class="hl"><pre><span></span><code>$ readelf -h app | grep Type
+  Type:     DYN (Position-Independent Executable file)
+$ readelf -d app | grep NEEDED
+  0x0000000000000001 (NEEDED)    Shared library: [libc.so.6]
+$ readelf -r app | grep JUMP_SLO
+  000000003fc0  ... R_X86_64_JUMP_SLO  puts@GLIBC_2.2.5
+  000000003fc8  ... R_X86_64_JUMP_SLO  time@GLIBC_2.2.5
+</code></pre></div>
+
+<h3 id="c-pie-got-plt">PIE, GOT, PLT</h3>
+<ul>
+<li><strong>PIE</strong> (<em>position-independent executable</em>): chương trình có thể được nạp ở địa chỉ bất kỳ; kết hợp <strong>ASLR</strong> để mỗi lần chạy một địa chỉ khác, gây khó cho tấn công khai thác lỗ hổng. Mặc định trên các bản phân phối hiện đại.</li>
+<li>Lời gọi tới hàm trong thư viện chia sẻ (<code>puts</code>, <code>time</code>) đi qua <strong>PLT</strong> (bảng các đoạn nhảy nhỏ) và <strong>GOT</strong> (bảng địa chỉ). Dòng <code>JUMP_SLOT</code> ở trên là ô trong GOT mà ld.so điền địa chỉ thật của <code>puts</code>. Có thể điền lười ở lần gọi đầu tiên (lazy binding) hoặc điền hết lúc khởi động (<code>-Wl,-z,now</code>, thường bật cùng <code>-z relro</code> để GOT thành chỉ đọc sau khi điền: chống ghi đè GOT).</li>
+</ul>
+<h3 id="c-interposition-va-ld-preload">Interposition và <code>LD_PRELOAD</code></h3>
+<p>Vì ký hiệu được tìm lúc chạy theo thứ tự nạp, thư viện nạp <strong>trước</strong> có thể thay thế hàm của thư viện sau. Ví dụ thay <code>time()</code> của libc để test chương trình phụ thuộc thời gian (đã chạy thử):</p>
+<div class="hl"><pre><span></span><code><span class="cm">/* faketime.c  →  gcc -shared -fPIC faketime.c -o libfaketime.so */</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;time.h&gt;</span>
+<span class="kt">time_t</span><span class="w"> </span><span class="nf">time</span><span class="p">(</span><span class="kt">time_t</span><span class="w"> </span><span class="o">*</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kt">time_t</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1700000000</span><span class="p">;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">v</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+
+<div class="hl"><pre><span></span><code>$ ./app
+constructor chạy trước main
+time() = 1792666066
+$ LD_PRELOAD=./libfaketime.so ./app
+constructor chạy trước main
+time() = 1700000000
+</code></pre></div>
+
+<p>Cùng cơ chế được dùng cho: thay allocator (jemalloc), đo đạc/trace (gọi hàm gốc qua <code>dlsym(RTLD_NEXT, "time")</code>), và cũng là một bề mặt tấn công (vì vậy với chương trình setuid, ld.so hạn chế chặt <code>LD_PRELOAD</code>).</p>
+<h3 id="c-tim-thu-vien-chia-se">Tìm thư viện chia sẻ</h3>
+<p>ld.so tìm theo thứ tự: <code>RPATH</code>/<code>RUNPATH</code> ghi trong file thực thi (<code>-Wl,-rpath,'$ORIGIN/../lib'</code>), biến <code>LD_LIBRARY_PATH</code>, cache <code>/etc/ld.so.cache</code> (cập nhật bằng <code>ldconfig</code>), rồi <code>/lib</code>, <code>/usr/lib</code>. <code>ldd app</code> liệt kê thư viện sẽ được nạp (đừng chạy <code>ldd</code> trên file không tin cậy: nó có thể thực thi code). <code>LD_DEBUG=libs ./app</code> in quá trình tìm kiếm.</p>
+<h3 id="c-static-hay-dynamic-tren-thiet-bi-nhung">Static hay dynamic trên thiết bị nhúng</h3>
+<ul>
+<li><strong>Dynamic</strong> (mặc định với glibc): nhiều chương trình chia sẻ thư viện, cập nhật thư viện một chỗ.</li>
+<li><strong>Static</strong>: một file chạy được ở mọi nơi có cùng kiến trúc, không phụ thuộc thư viện trên máy đích. Với glibc, liên kết tĩnh có hạn chế (NSS, <code>dlopen</code>); <strong>musl</strong> (Alpine, nhiều image nhúng nhỏ) hỗ trợ liên kết tĩnh tốt và nhỏ gọn.</li>
+<li><strong>glibc, musl, uClibc-ng</strong>: Buildroot/Yocto cho chọn thư viện C; chương trình build cho glibc không chạy trên hệ thống musl và ngược lại (Bài 9).</li>
+</ul>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 7</span></div>
+<ul>
+<li>execve → kernel ánh xạ segment → ld.so nạp thư viện, relocation → <code>_start</code> → <code>__libc_start_main</code> → <code>.init_array</code> → <code>main</code>.</li>
+<li>PIE + ASLR; gọi thư viện qua PLT/GOT; <code>-z now -z relro</code>.</li>
+<li>Interposition/<code>LD_PRELOAD</code> để thay hàm (test, allocator, trace).</li>
+<li>Tìm thư viện: rpath/runpath, <code>LD_LIBRARY_PATH</code>, ld.so.cache; <code>LD_DEBUG=libs</code>.</li>
+<li>Static với musl gọn cho nhúng; glibc và musl không thay thế nhau được.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-7-chuong-trinh-duoc-nap-va-chay-the-nao-tren-linux">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-8-build-system" hidden><h2 id="c-bai-8-build-system">Bài 8 · Build system</h2>
+<h3 id="c-make-nhung-gi-can-nam">Make: những gì cần nắm</h3>
+<div class="hl"><pre><span></span><code><span class="nv">CC</span><span class="w">      </span><span class="o">:=</span><span class="w"> </span>arm-none-eabi-gcc
+<span class="nv">CFLAGS</span><span class="w">  </span><span class="o">:=</span><span class="w"> </span>-mcpu<span class="o">=</span>cortex-m4<span class="w"> </span>-mthumb<span class="w"> </span>-Os<span class="w"> </span>-g<span class="w"> </span>-Wall<span class="w"> </span>-Wextra<span class="w"> </span>-ffunction-sections<span class="w"> </span>-fdata-sections
+<span class="nv">DEPFLAGS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>-MMD<span class="w"> </span>-MP<span class="w">                     </span><span class="c1"># sinh file .d: object phụ thuộc những header nào</span>
+<span class="nv">LDFLAGS</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>-T<span class="w"> </span>lm3s.ld<span class="w"> </span>-Wl,--gc-sections<span class="w"> </span>-Wl,-Map<span class="o">=</span><span class="k">$(</span>BUILD<span class="k">)</span>/fw.map
+
+<span class="nv">SRCS</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>startup.c<span class="w"> </span>main.c<span class="w"> </span>drivers/uart.c
+<span class="nv">OBJS</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">$(</span>SRCS:%.c<span class="o">=</span><span class="k">$(</span>BUILD<span class="k">)</span>/%.o<span class="k">)</span>
+
+<span class="nf">$(BUILD)/fw.elf</span><span class="o">:</span><span class="w"> </span><span class="k">$(</span><span class="nv">OBJS</span><span class="k">)</span> <span class="n">lm</span>3<span class="n">s</span>.<span class="n">ld</span>
+<span class="w">    </span><span class="k">$(</span>CC<span class="k">)</span><span class="w"> </span><span class="k">$(</span>CFLAGS<span class="k">)</span><span class="w"> </span><span class="k">$(</span>OBJS<span class="k">)</span><span class="w"> </span><span class="k">$(</span>LDFLAGS<span class="k">)</span><span class="w"> </span>-o<span class="w"> </span><span class="nv">$@</span>
+
+<span class="nf">$(BUILD)/%.o</span><span class="o">:</span><span class="w"> </span>%.<span class="n">c</span>
+<span class="w">    </span>@mkdir<span class="w"> </span>-p<span class="w"> </span><span class="k">$(</span>dir<span class="w"> </span><span class="nv">$@</span><span class="k">)</span>
+<span class="w">    </span><span class="k">$(</span>CC<span class="k">)</span><span class="w"> </span><span class="k">$(</span>CFLAGS<span class="k">)</span><span class="w"> </span><span class="k">$(</span>DEPFLAGS<span class="k">)</span><span class="w"> </span>-c<span class="w"> </span>$&lt;<span class="w"> </span>-o<span class="w"> </span><span class="nv">$@</span>
+
+<span class="cp">-include $(OBJS:.o=.d)                  # sửa header thì build lại đúng file phụ thuộc</span>
+</code></pre></div>
+
+<p>Hai lỗi kinh điển của Makefile tự viết: <strong>không theo dõi header</strong> (sửa <code>.h</code> mà file <code>.c</code> dùng nó không được build lại, sinh ra bug "chạy sai dù code đúng"; chữa bằng <code>-MMD -MP</code>), và <strong>không phụ thuộc vào linker script</strong> (sửa <code>.ld</code> mà không link lại).</p>
+<h3 id="c-cmake-cho-cross-compile">CMake cho cross-compile</h3>
+<p>CMake tách <strong>cấu hình toolchain</strong> (một file dùng chung cho mọi project nhắm cùng chip) khỏi <strong>mô tả project</strong>:</p>
+<!-- test:cmake_toolchain -->
+
+<div class="hl"><pre><span></span><code><span class="c"># Toolchain file: dùng khi cấu hình, ví dụ</span>
+<span class="c">#   cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_SYSTEM_NAME</span><span class="w"> </span><span class="s">Generic</span><span class="p">)</span><span class="w">                     </span><span class="c"># không có hệ điều hành</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_SYSTEM_PROCESSOR</span><span class="w"> </span><span class="s">arm</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_C_COMPILER</span><span class="w">   </span><span class="s">arm-none-eabi-gcc</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_CXX_COMPILER</span><span class="w"> </span><span class="s">arm-none-eabi-g++</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_ASM_COMPILER</span><span class="w"> </span><span class="s">arm-none-eabi-gcc</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_OBJCOPY</span><span class="w">      </span><span class="s">arm-none-eabi-objcopy</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_SIZE</span><span class="w">         </span><span class="s">arm-none-eabi-size</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_TRY_COMPILE_TARGET_TYPE</span><span class="w"> </span><span class="s">STATIC_LIBRARY</span><span class="p">)</span><span class="w">  </span><span class="c"># khi dò compiler, đừng thử link chương trình</span>
+
+<span class="nb">set</span><span class="p">(</span><span class="s">CPU_FLAGS</span><span class="w"> </span><span class="s2">"-mcpu=cortex-m3 -mthumb"</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_C_FLAGS_INIT</span><span class="w">   </span><span class="s2">"${CPU_FLAGS} -ffunction-sections -fdata-sections"</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_CXX_FLAGS_INIT</span><span class="w"> </span><span class="s2">"${CPU_FLAGS} -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti"</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_EXE_LINKER_FLAGS_INIT</span><span class="w"> </span><span class="s2">"${CPU_FLAGS} -Wl,--gc-sections -nostartfiles --specs=nano.specs --specs=nosys.specs"</span><span class="p">)</span>
+</code></pre></div>
+
+<!-- test:cmake_lists -->
+
+<div class="hl"><pre><span></span><code><span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span><span class="w"> </span><span class="s">3.20</span><span class="p">)</span>
+<span class="nb">project</span><span class="p">(</span><span class="s">fw</span><span class="w"> </span><span class="s">C</span><span class="p">)</span>
+
+<span class="nb">add_executable</span><span class="p">(</span><span class="s">fw.elf</span><span class="w"> </span><span class="s">startup.c</span><span class="w"> </span><span class="s">main.c</span><span class="p">)</span>
+<span class="nb">target_compile_options</span><span class="p">(</span><span class="s">fw.elf</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">-Wall</span><span class="w"> </span><span class="s">-Wextra</span><span class="w"> </span><span class="s">-O2</span><span class="w"> </span><span class="s">-g</span><span class="p">)</span>
+<span class="nb">set_source_files_properties</span><span class="p">(</span><span class="s">startup.c</span><span class="w"> </span><span class="s">PROPERTIES</span><span class="w"> </span><span class="s">COMPILE_OPTIONS</span><span class="w"> </span><span class="s">-fno-tree-loop-distribute-patterns</span><span class="p">)</span>
+<span class="nb">target_link_options</span><span class="p">(</span><span class="s">fw.elf</span><span class="w"> </span><span class="s">PRIVATE</span>
+<span class="w">    </span><span class="s">-T</span><span class="o">${</span><span class="nv">CMAKE_SOURCE_DIR</span><span class="o">}</span><span class="s">/lm3s.ld</span>
+<span class="w">    </span><span class="s">-Wl,-Map=</span><span class="o">${</span><span class="nv">CMAKE_BINARY_DIR</span><span class="o">}</span><span class="s">/fw.map</span><span class="p">)</span>
+<span class="nb">set_target_properties</span><span class="p">(</span><span class="s">fw.elf</span><span class="w"> </span><span class="s">PROPERTIES</span><span class="w"> </span><span class="s">LINK_DEPENDS</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_SOURCE_DIR</span><span class="o">}</span><span class="s">/lm3s.ld</span><span class="p">)</span><span class="w">  </span><span class="c"># sửa .ld thì link lại</span>
+
+<span class="nb">add_custom_command</span><span class="p">(</span><span class="s">TARGET</span><span class="w"> </span><span class="s">fw.elf</span><span class="w"> </span><span class="s">POST_BUILD</span>
+<span class="w">    </span><span class="s">COMMAND</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_OBJCOPY</span><span class="o">}</span><span class="w"> </span><span class="s">-O</span><span class="w"> </span><span class="s">binary</span><span class="w"> </span><span class="s">fw.elf</span><span class="w"> </span><span class="s">fw.bin</span>
+<span class="w">    </span><span class="s">COMMAND</span><span class="w"> </span><span class="o">${</span><span class="nv">CMAKE_SIZE</span><span class="o">}</span><span class="w"> </span><span class="s">fw.elf</span>
+<span class="w">    </span><span class="s">COMMENT</span><span class="w"> </span><span class="s2">"Tạo fw.bin và in kích thước"</span><span class="p">)</span>
+</code></pre></div>
+
+<div class="hl"><pre><span></span><code>$ cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
+$ cmake --build build
+[3/3] Linking C executable fw.elf
+   text    data     bss     dec     hex filename
+    596       4       8     608     260 fw.elf
+</code></pre></div>
+
+<p>(Đã chạy thử: build ra đúng firmware ở Bài 4 và chạy được trên QEMU.) Vài điểm: <code>CMAKE_SYSTEM_NAME Generic</code> báo không có hệ điều hành; <code>CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY</code> vì CMake mặc định thử link một chương trình để kiểm tra compiler, việc này thất bại khi chưa có linker script; <code>LINK_DEPENDS</code> để sửa <code>.ld</code> thì link lại. Cùng một <code>CMakeLists.txt</code> dùng được cho bản build test trên PC (không truyền toolchain file) nếu tách phần phụ thuộc phần cứng ra thư viện riêng (M08 Bài 7).</p>
+<h3 id="c-thoi-quen-build-tot">Thói quen build tốt</h3>
+<ul>
+<li>Hai cấu hình rõ ràng: <strong>debug</strong> (<code>-Og -g</code>, assert bật) và <strong>release</strong> (<code>-Os</code>/<code>-O2 -g</code>, assert theo chính sách); luôn giữ <code>-g</code> (thông tin debug không nằm trong <code>.bin</code>, không tốn Flash).</li>
+<li>Cảnh báo ở mức cao và <code>-Werror</code> trong CI.</li>
+<li><strong>Build tái lập</strong> (reproducible): cùng mã nguồn cho cùng file nhị phân; cố định phiên bản toolchain (container, SDK), tránh nhúng thời gian build (<code>SOURCE_DATE_EPOCH</code>), dùng <code>-ffile-prefix-map</code> để đường dẫn tuyệt đối không lọt vào binary.</li>
+<li>Nhúng <strong>phiên bản</strong> (git hash, số phiên bản) vào firmware ở vị trí cố định để đọc được từ thiết bị và từ file <code>.bin</code>.</li>
+<li><code>ccache</code> tăng tốc build lại; Ninja nhanh hơn Make cho project lớn.</li>
+<li>Cho Embedded Linux: Yocto/Buildroot sinh cả toolchain, sysroot, rootfs (M11).</li>
+</ul>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 8</span></div>
+<ul>
+<li>Make: <code>-MMD -MP</code> để theo dõi header; phụ thuộc vào linker script.</li>
+<li>CMake: toolchain file riêng (<code>Generic</code>, <code>TRY_COMPILE_TARGET_TYPE</code>), linker script qua <code>target_link_options</code>, <code>LINK_DEPENDS</code>, post-build objcopy/size.</li>
+<li>Debug/release rõ ràng, luôn <code>-g</code>, <code>-Werror</code> trong CI, build tái lập, nhúng phiên bản.</li>
+</ul>
+</aside>
+<div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-8-build-system">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-9-loi-build-va-khoi-dong-hay-gap" hidden><h2 id="c-bai-9-loi-build-va-khoi-dong-hay-gap">Bài 9 · Lỗi build và khởi động hay gặp</h2>
+<h3 id="c-firmware-mcu">Firmware (MCU)</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Triệu chứng</th>
+<th>Nguyên nhân thường gặp</th>
+<th>Cách kiểm tra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HardFault ngay khi khởi động</td>
+<td><code>_estack</code> trỏ ra ngoài RAM; bảng vector sai vị trí (thiếu <code>KEEP</code>, sai <code>ORIGIN</code> khi có bootloader); dùng lệnh FPU khi FPU chưa bật</td>
+<td>Xem 2 word đầu của <code>.bin</code>; file map; thanh ghi fault (M09)</td>
+</tr>
+<tr>
+<td>Biến toàn cục mang giá trị lạ khi cắm nguồn thật</td>
+<td><code>.data</code> không được chép / <code>.bss</code> không được xóa</td>
+<td>Bài 4</td>
+</tr>
+<tr>
+<td>CPU kẹt ở <code>Default_Handler</code></td>
+<td>Tên ISR gõ sai nên bảng vector dùng handler yếu mặc định</td>
+<td>Đọc <code>IPSR</code>; so tên với file startup của hãng</td>
+</tr>
+<tr>
+<td>Chạy đúng ở <code>-O0</code>, sai ở <code>-O2</code></td>
+<td>Biến dùng chung với ISR thiếu <code>volatile</code>/atomic; UB (tràn số có dấu, strict aliasing, biến chưa khởi tạo)</td>
+<td>Bật <code>-fsanitize=undefined</code> khi test trên PC; xem assembly</td>
+</tr>
+<tr>
+<td><code>undefined reference to memcpy/memset</code></td>
+<td>Compiler sinh lời gọi thư viện trong code <code>-nostdlib</code></td>
+<td>Bài 4</td>
+</tr>
+<tr>
+<td>HardFault khi đọc struct <code>packed</code></td>
+<td>Truy cập không căn chỉnh trên Cortex-M0 (không hỗ trợ), hoặc lệnh LDRD/LDM không căn chỉnh trên M3/M4</td>
+<td>Tránh <code>packed</code> cho dữ liệu dùng trực tiếp; <code>memcpy</code> vào biến căn chỉnh</td>
+</tr>
+<tr>
+<td>Reset ngẫu nhiên trong lúc khởi tạo dài</td>
+<td>Watchdog đã được bật (bởi bootloader hoặc option byte phần cứng)</td>
+<td>Cho watchdog ăn trong khởi tạo hoặc khởi tạo watchdog sớm</td>
+</tr>
+<tr>
+<td>Đối tượng toàn cục C++ dùng đối tượng toàn cục khác chưa được dựng</td>
+<td><strong>Static initialization order fiasco</strong>: thứ tự khởi tạo giữa các file không xác định</td>
+<td>Dùng static cục bộ trong hàm (M03 Bài 1)</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="c-linux">Linux</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Thông báo khi chạy</th>
+<th>Nguyên nhân</th>
+<th>Sửa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>./app: No such file or directory</code> dù file rõ ràng tồn tại</td>
+<td><strong>Dynamic linker (INTERP) không có trên máy đích</strong>: build cho glibc chạy trên hệ musl/BusyBox, hoặc sai kiến trúc</td>
+<td><code>readelf -l app</code> xem INTERP; build bằng toolchain/sysroot của đích hoặc liên kết tĩnh</td>
+</tr>
+<tr>
+<td><code>version 'GLIBC_2.34' not found</code></td>
+<td>Build với glibc mới hơn glibc trên thiết bị</td>
+<td>Build bằng sysroot của thiết bị (SDK Yocto/Buildroot)</td>
+</tr>
+<tr>
+<td><code>error while loading shared libraries: libfoo.so.2</code></td>
+<td>Thư viện không nằm trong đường tìm kiếm</td>
+<td>Cài đúng chỗ + <code>ldconfig</code>, hoặc rpath <code>$ORIGIN</code></td>
+</tr>
+<tr>
+<td><code>Illegal instruction</code></td>
+<td>Build với <code>-march</code> mới hơn CPU đích (ví dụ dùng lệnh AVX, ARMv8.2)</td>
+<td>Đặt <code>-march</code>/<code>-mcpu</code> theo CPU đích thật</td>
+</tr>
+<tr>
+<td><code>cannot execute binary file: Exec format error</code></td>
+<td>Sai kiến trúc (chạy file ARM trên x86)</td>
+<td><code>file app</code>; dùng <code>qemu-aarch64</code> để chạy thử</td>
+</tr>
+</tbody>
+</table></div>
+<details class="selfcheck">
+<summary><span class="sc-tag">Tự kiểm tra</span>Bạn copy một chương trình build trên Ubuntu sang board Buildroot (musl), chạy `./sensor_daemon` báo "No such file or directory", nhưng `ls` thấy file rõ ràng. Giải thích.</summary>
+<p>Thông báo không nói về file chương trình mà về <strong>dynamic linker</strong> ghi trong segment INTERP: chương trình build trên Ubuntu cần <code>/lib/ld-linux-aarch64.so.1</code> (glibc), còn hệ musl có <code>/lib/ld-musl-aarch64.so.1</code>. Kernel không tìm thấy interpreter nên <code>execve</code> trả <code>ENOENT</code>. Xác nhận bằng <code>readelf -l sensor_daemon | grep interpreter</code>. Sửa: build bằng toolchain của Buildroot (cùng thư viện C với rootfs), hoặc liên kết tĩnh.</p>
+</details>
+<aside class="callout c-key">
+<div class="callout-head"><span class="callout-tag">Ý chính</span><span class="callout-title">Ý chính của Bài 9</span></div>
+<ul>
+<li>MCU: kiểm tra <code>_estack</code>, bảng vector, FPU, chép <code>.data</code>, tên ISR, <code>volatile</code>/UB khi đổi mức tối ưu, căn chỉnh, watchdog bật sẵn, thứ tự khởi tạo static.</li>
+<li>Linux: "No such file" = thiếu interpreter; lỗi phiên bản glibc = sai sysroot; Illegal instruction = sai <code>-march</code>.</li>
+</ul>
+</aside><div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-9-loi-build-va-khoi-dong-hay-gap">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section></div></div></section><section class="panel" id="p-phong-van" data-panel="phong-van" role="tabpanel" hidden><div class="qa-tools"><input id="qa-search" type="search" placeholder="Lọc câu hỏi…" aria-label="Lọc câu hỏi"><label class="chk"><input id="qa-hot" type="checkbox"> Chỉ câu hay hỏi</label><button id="qa-expand" class="btn ghost" type="button">Mở tất cả</button></div><div class="qa"><div class="qa-group"><h2 class="qa-gh">Toolchain và object file</h2><details class="qa-item" data-hot="1"><summary><span class="qn">01</span><span class="qt">Các bước từ file .c tới file chạy được?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Tiền xử lý (include, macro, <code>#if</code>) → biên dịch ra assembly (tối ưu ở đây) → hợp dịch ra object file có section, ký hiệu, relocation → liên kết: ghép object và thư viện, gán địa chỉ, điền relocation, ra ELF. Xem từng bước bằng <code>-E</code>, <code>-S</code>, <code>-c</code>, <code>-v</code>, <code>-save-temps</code>.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">02</span><span class="qt"><code>.text</code>, <code>.rodata</code>, <code>.data</code>, <code>.bss</code> nằm ở đâu trên MCU?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p><code>.text</code> và <code>.rodata</code> ở Flash. <code>.data</code> chạy ở RAM nhưng giá trị khởi tạo lưu ở Flash, startup chép sang (tốn cả hai). <code>.bss</code> chỉ ở RAM, startup xóa về 0, không tốn Flash.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">03</span><span class="qt">Relocation là gì?</span></summary><div class="qa-a prose"><p>Chỗ trống trong object file (địa chỉ hàm/biến ở file khác hoặc chưa biết địa chỉ cuối), kèm cách điền. Linker xử lý sau khi gán địa chỉ cho mọi section. Xem bằng <code>objdump -dr</code> hoặc <code>readelf -r</code>.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">04</span><span class="qt">Triplet <code>arm-none-eabi</code> nghĩa là gì? Khác <code>arm-linux-gnueabihf</code> thế nào?</span></summary><div class="qa-a prose"><p>Kiến trúc ARM, không nhà cung cấp cụ thể, không hệ điều hành (bare-metal), ABI nhúng; thư viện C là newlib. <code>arm-linux-gnueabihf</code> nhắm Linux với glibc và ABI hard-float, cần sysroot của hệ thống đích.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">05</span><span class="qt"><code>static</code> ở phạm vi file có tác dụng gì với linker?</span></summary><div class="qa-a prose"><p>Ký hiệu trở thành cục bộ (chữ thường trong <code>nm</code>), không xung đột với tên trùng ở file khác, compiler tối ưu mạnh hơn (có thể bỏ hẳn biến nếu không bị sửa). Mặc định nên dùng cho mọi thứ không xuất ra ngoài.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Linker</h2><details class="qa-item" data-hot="1"><summary><span class="qn">06</span><span class="qt">Vì sao thứ tự thư viện tĩnh khi link lại quan trọng?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Linker duyệt trái sang phải, từ mỗi <code>.a</code> chỉ lấy object giải quyết ký hiệu đang thiếu lúc đó. Thư viện phụ thuộc phải đứng trước thư viện được phụ thuộc; phụ thuộc vòng dùng <code>--start-group ... --end-group</code>.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">07</span><span class="qt"><code>undefined reference</code> khi gọi hàm C từ C++: nguyên nhân và cách sửa?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>C++ mangle tên (<code>_Z8hal_initv</code>), object C chỉ có <code>hal_init</code>. Bọc khai báo trong header bằng <code>extern "C"</code> (trong <code>#ifdef __cplusplus</code>). Dùng <code>c++filt</code> để đọc tên linker đang tìm.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">08</span><span class="qt"><code>-ffunction-sections -fdata-sections</code> và <code>--gc-sections</code> làm gì? Rủi ro?</span></summary><div class="qa-a prose"><p>Mỗi hàm/biến một section, linker bỏ section không ai tham chiếu: firmware nhỏ hơn nhiều khi dùng một phần thư viện. Rủi ro: thứ chỉ phần cứng dùng (bảng vector) hoặc được tìm theo tên section bị xóa nếu không có <code>KEEP</code> hoặc <code>__attribute__((used))</code>.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">09</span><span class="qt">LTO là gì?</span></summary><div class="qa-a prose"><p>Link-time optimization: object giữ biểu diễn trung gian, compiler tối ưu lại toàn chương trình lúc liên kết (inline xuyên file, bỏ code chết). Giảm kích thước và tăng tốc; build chậm hơn, debug khó hơn.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Linker script và startup</h2><details class="qa-item" data-hot="1"><summary><span class="qn">10</span><span class="qt">VMA và LMA khác nhau thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>VMA là địa chỉ section khi chạy, LMA là nơi nó được lưu trong ảnh nạp. <code>.data</code> có VMA ở RAM, LMA ở Flash (<code>&gt; RAM AT&gt; FLASH</code>); startup chép từ <code>_sidata</code> sang <code>_sdata..._edata</code>.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">11</span><span class="qt">Linker script cho MCU cần những gì?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p><code>MEMORY</code> theo datasheet; <code>SECTIONS</code> đặt bảng vector (KEEP) đầu Flash, <code>.text</code>/<code>.rodata</code>, <code>.init_array</code> có ký hiệu đầu/cuối, <code>.data</code> với AT&gt;, <code>.bss</code> NOLOAD, các vùng tùy chọn (<code>.noinit</code>, <code>.ramfunc</code>); ký hiệu cho startup (<code>_estack</code>, <code>_sidata</code>, <code>_sdata</code>, <code>_edata</code>, <code>_sbss</code>, <code>_ebss</code>, <code>_end</code>); <code>ASSERT</code> chống tràn; <code>/DISCARD/</code>.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">12</span><span class="qt">Cortex-M làm gì khi reset? Reset_Handler phải làm gì?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Lõi đọc word 0 của bảng vector vào SP, word 1 là địa chỉ Reset_Handler rồi nhảy tới. Reset_Handler: chép <code>.data</code>, xóa <code>.bss</code>, SystemInit (clock, bật FPU), chạy <code>.init_array</code> (constructor C++), gọi <code>main</code>, vòng lặp vô hạn nếu <code>main</code> trả về.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">13</span><span class="qt">Vì sao gõ sai tên ISR không gây lỗi biên dịch?</span></summary><div class="qa-a prose"><p>Handler trong bảng vector là ký hiệu yếu alias tới <code>Default_Handler</code>. Hàm tên sai là một hàm khác không ai dùng; ký hiệu yếu không bị thay, ngắt rơi vào <code>Default_Handler</code> (thường vòng lặp vô hạn). Đọc <code>IPSR</code> để biết exception nào.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">14</span><span class="qt">Vì sao startup code đôi khi báo <code>undefined reference to memcpy</code>?</span></summary><div class="qa-a prose"><p>Compiler nhận ra vòng lặp chép/xóa và thay bằng <code>memcpy</code>/<code>memset</code> (loop distribution). Với <code>-nostdlib</code> không có hàm đó; và trong startup, gọi thư viện trước khi <code>.data</code>/<code>.bss</code> sẵn sàng là nguy hiểm. Dùng <code>-fno-tree-loop-distribute-patterns</code> hoặc tự cài đặt.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">15</span><span class="qt">Biến <code>.noinit</code> dùng để làm gì?</span></summary><div class="qa-a prose"><p>Không bị startup xóa nên giữ giá trị qua reset mềm: bộ đếm reset, lý do crash, thông tin cho bootloader. Phải kiểm tra tính hợp lệ (magic + CRC) vì sau mất điện nội dung là rác.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Bộ nhớ và kích thước</h2><details class="qa-item" data-hot="1"><summary><span class="qn">16</span><span class="qt">Xác định kích thước stack cần thiết thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Tĩnh: <code>-fstack-usage</code> từng hàm + đồ thị gọi tìm đường sâu nhất + stack các tầng ISR lồng nhau (32 B hoặc 104 B có FPU mỗi tầng). Động: tô stack bằng mẫu, chạy mọi kịch bản, đo high-water mark. Cộng biên 25–50%. Đệ quy và con trỏ hàm làm phân tích tĩnh không đủ.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">17</span><span class="qt">Phát hiện tràn stack trên MCU thế nào?</span></summary><div class="qa-a prose"><p>MPU region chặn ghi dưới đáy stack, MSPLIM/PSPLIM trên ARMv8-M, kiểm tra của RTOS (<code>configCHECK_FOR_STACK_OVERFLOW</code>), đặt stack ở đầu RAM để tràn ra ngoài vùng nhớ, watermark trong bản debug.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">18</span><span class="qt">Vì sao nhiều chuẩn cấm malloc trên MCU?</span></summary><div class="qa-a prose"><p>Phân mảnh làm cấp phát thất bại sau thời gian dài dù tổng trống còn nhiều; thời gian không tất định; không an toàn trong ISR; khó chứng minh không cạn bộ nhớ. Thay bằng cấp phát tĩnh, memory pool khối cố định, hoặc chỉ cấp phát lúc khởi tạo.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">19</span><span class="qt">Firmware vượt Flash: bạn làm gì?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Đọc map/<code>nm --size-sort</code>/bloaty tìm thứ lớn nhất; thủ phạm hay gặp: printf (nhất là <code>%f</code>), số thực mềm, iostream, exception/RTTI C++, template bloat. Biện pháp: <code>-Os</code>, gc-sections, LTO, newlib-nano hoặc printf nhỏ, fixed-point, log token.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">20</span><span class="qt"><code>size</code> in text, data, bss: Flash và RAM dùng bao nhiêu?</span></summary><div class="qa-a prose"><p>Flash = text + data (giá trị khởi tạo của data); RAM tĩnh = data + bss; chưa tính stack và heap.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Linux runtime và build</h2><details class="qa-item" data-hot="1"><summary><span class="qn">21</span><span class="qt">Chương trình trên Linux chạy tới main thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p><code>execve</code> → kernel ánh xạ segment LOAD, thấy INTERP thì nạp dynamic linker → ld.so nạp thư viện NEEDED, xử lý relocation → <code>_start</code> → <code>__libc_start_main</code> → <code>.init_array</code> (constructor) → <code>main</code> → <code>exit</code> chạy destructor/atexit.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">22</span><span class="qt">PLT và GOT là gì?</span></summary><div class="qa-a prose"><p>Lời gọi hàm thư viện chia sẻ nhảy qua PLT, đọc địa chỉ thật từ GOT mà ld.so điền (lười ở lần gọi đầu hoặc lúc khởi động với <code>-z now</code>). <code>-z relro</code> làm GOT chỉ đọc sau khi điền để chống ghi đè.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">23</span><span class="qt"><code>LD_PRELOAD</code> dùng làm gì?</span></summary><div class="qa-a prose"><p>Nạp thư viện trước các thư viện khác để thay thế hàm (interposition): giả lập thời gian khi test, thay allocator, trace lời gọi (gọi hàm gốc qua <code>dlsym(RTLD_NEXT, ...)</code>).</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">24</span><span class="qt">Chạy chương trình báo "No such file or directory" dù file tồn tại?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Dynamic linker ghi trong INTERP không tồn tại trên hệ thống: build cho glibc chạy trên musl, hoặc sai kiến trúc/đường dẫn. Kiểm tra <code>readelf -l</code>; build bằng toolchain + sysroot của đích hoặc liên kết tĩnh.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">25</span><span class="qt">Makefile tự viết hay mắc lỗi gì?</span></summary><div class="qa-a prose"><p>Không theo dõi header (sửa .h không build lại .c phụ thuộc) → dùng <code>-MMD -MP</code> và <code>-include</code> file .d; không phụ thuộc linker script; không tách thư mục build.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">26</span><span class="qt">Toolchain file của CMake cho bare-metal cần những gì?</span></summary><div class="qa-a prose"><p><code>CMAKE_SYSTEM_NAME Generic</code>, compiler và công cụ (<code>objcopy</code>, <code>size</code>) của toolchain, <code>CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY</code>, cờ CPU trong <code>*_FLAGS_INIT</code>, cờ link (<code>--gc-sections</code>, specs). Linker script đưa vào bằng <code>target_link_options</code> và <code>LINK_DEPENDS</code>.</p></div></details></div></div></section><section class="panel" id="p-quiz" data-panel="quiz" role="tabpanel" hidden><div class="quiz-bar"><div class="score" id="quiz-score">0 / 0</div><div class="meter"><span id="quiz-meter"></span></div><button class="btn ghost" id="quiz-reset" type="button">Làm lại</button></div><ol class="quiz" id="quiz"></ol></section><section class="panel" id="p-flashcard" data-panel="flashcard" role="tabpanel" hidden><div class="fc-tools"><span id="fc-pos" class="mono"></span><label class="chk"><input id="fc-only" type="checkbox"> Chỉ thẻ chưa thuộc</label><button class="btn ghost" id="fc-shuffle" type="button">Xáo trộn</button></div><div class="fc" id="fc" tabindex="0" role="button" aria-label="Lật thẻ"><div class="fc-face fc-front"><div class="fc-group" id="fc-g"></div><div class="fc-q" id="fc-q"></div><div class="fc-hint">Bấm hoặc nhấn Space để lật</div></div><div class="fc-face fc-back prose" id="fc-a" hidden></div></div><div class="fc-nav"><button class="btn ghost" id="fc-prev" type="button">← Trước</button><button class="btn warn" id="fc-again" type="button">Ôn lại</button><button class="btn ok" id="fc-known" type="button">Đã thuộc</button><button class="btn ghost" id="fc-next" type="button">Sau →</button></div></section><section class="panel" id="p-cheatsheet" data-panel="cheatsheet" role="tabpanel" hidden><div class="md-wrap"><article class="cheat"><section class="card"><h2 id="cheatsheet-pipeline">Pipeline</h2>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Bước</th>
+<th>Cờ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tiền xử lý</td>
+<td><code>-E</code></td>
+</tr>
+<tr>
+<td>Biên dịch</td>
+<td><code>-S</code></td>
+</tr>
+<tr>
+<td>Hợp dịch</td>
+<td><code>-c</code></td>
+</tr>
+<tr>
+<td>Liên kết</td>
+<td>(mặc định)</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>-v</code> · <code>-save-temps</code> · <code>-Wl,-Map=x.map</code></p>
+</section><section class="card"><h2 id="cheatsheet-section">Section</h2>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th></th>
+<th>Flash</th>
+<th>RAM</th>
+<th>Startup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>.text/.rodata</td>
+<td>✓</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>.data</td>
+<td>giá trị đầu</td>
+<td>✓</td>
+<td>chép</td>
+</tr>
+<tr>
+<td>.bss</td>
+<td></td>
+<td>✓</td>
+<td>xóa 0</td>
+</tr>
+<tr>
+<td>.noinit</td>
+<td></td>
+<td>✓</td>
+<td>giữ</td>
+</tr>
+</tbody>
+</table></div>
+</section><section class="card"><h2 id="cheatsheet-cong-cu">Công cụ</h2>
+<div class="hl"><pre><span></span><code>nm -n / --size-sort -S
+objdump -h / -dr
+readelf -S -l -r -d
+size · objcopy -O binary
+c++filt · addr2line -e fw.elf 0x…
+</code></pre></div>
+
+</section><section class="card"><h2 id="cheatsheet-linker-script">Linker script</h2>
+<div class="hl"><pre><span></span><code>.data : { _sdata = .; *(.data*) _edata = .; } &gt; RAM AT&gt; FLASH
+_sidata = LOADADDR(.data);
+.bss (NOLOAD) : { _sbss = .; *(.bss*) *(COMMON) _ebss = .; } &gt; RAM
+KEEP(*(.isr_vector))
+ASSERT(_end + _stack_size &lt;= _estack, "RAM tràn")
+</code></pre></div>
+
+</section><section class="card"><h2 id="cheatsheet-reset-handler">Reset_Handler</h2>
+<ol>
+<li>Chép .data (<code>_sidata</code> → <code>_sdata..._edata</code>)</li>
+<li>Xóa .bss</li>
+<li>SystemInit: clock, <code>CPACR</code> bật FPU</li>
+<li><code>.init_array</code></li>
+<li><code>main</code>, rồi <code>for(;;)</code></li>
+</ol>
+<p><code>-fno-tree-loop-distribute-patterns</code> · handler weak + alias</p>
+</section><section class="card"><h2 id="cheatsheet-loi-link">Lỗi link</h2>
+<ul>
+<li>undefined: thiếu file · thứ tự .a · <code>extern "C"</code></li>
+<li>multiple definition: định nghĩa trong header</li>
+<li>overflowed: xem Bài 6</li>
+<li>VFP args: trộn float ABI</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-stack-heap">Stack / heap</h2>
+<ul>
+<li><code>-fstack-usage</code> · <code>-Wstack-usage=N</code></li>
+<li>Tô mẫu → high-water · biên 25–50%</li>
+<li>MPU guard · MSPLIM · RTOS check</li>
+<li>ISR: +32 B (+104 B có FPU) mỗi tầng</li>
+<li><code>_sbrk</code> giới hạn; tránh malloc sau khởi động</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-kich-thuoc">Kích thước</h2>
+<ul>
+<li><code>-Os</code> · gc-sections · LTO</li>
+<li>newlib-nano; <code>%f</code> cần <code>-u _printf_float</code></li>
+<li><code>-fno-exceptions -fno-rtti</code></li>
+<li>bloaty · puncover · size trong CI</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-linux">Linux</h2>
+<p>execve → INTERP ld.so → NEEDED → reloc → <code>_start</code> → <code>__libc_start_main</code> → init_array → main</p>
+<ul>
+<li>PIE + ASLR · PLT/GOT · <code>-z now -z relro</code></li>
+<li><code>LD_PRELOAD</code> · rpath <code>$ORIGIN</code> · <code>LD_DEBUG=libs</code></li>
+<li>"No such file" = thiếu interpreter</li>
+</ul>
+</section><section class="card"><h2 id="cheatsheet-cmake-cross">CMake cross</h2>
+<div class="hl"><pre><span></span><code><span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_SYSTEM_NAME</span><span class="w"> </span><span class="s">Generic</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_TRY_COMPILE_TARGET_TYPE</span><span class="w"> </span><span class="s">STATIC_LIBRARY</span><span class="p">)</span>
+<span class="nb">target_link_options</span><span class="p">(</span><span class="s">fw</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">-T</span><span class="o">${</span><span class="nv">CMAKE_SOURCE_DIR</span><span class="o">}</span><span class="s">/x.ld</span><span class="p">)</span>
+</code></pre></div></section></article></div></section></main>
+
+<footer class="wrap foot">
+  <span>Ghi chú ôn tập cá nhân · nội dung tóm tắt và ví dụ được viết lại, không trích nguyên văn sách.</span>
+</footer>
+
+<script id="page-data" type="application/json">{"quiz": [{"q": "<p><code>uint8_t buf[4096];<\/code> ở phạm vi file làm Flash tăng bao nhiêu?<\/p>", "o": [{"t": "Gần như không: nằm trong <code>.bss<\/code>", "ok": true}, {"t": "4096 byte", "ok": false}, {"t": "8192 byte", "ok": false}, {"t": "Tùy mức tối ưu", "ok": false}], "e": "<p>.bss không có nội dung trong ảnh Flash.<\/p>", "g": ""}, {"q": "<p><code>uint8_t buf[4096] = {1};<\/code> tốn:<\/p>", "o": [{"t": "Chỉ 4096 byte RAM", "ok": false}, {"t": "Chỉ 4096 byte Flash", "ok": false}, {"t": "4096 byte RAM và 4096 byte Flash", "ok": true}, {"t": "1 byte Flash", "ok": false}], "e": "<p>.data: giá trị khởi tạo lưu ở Flash, chép sang RAM.<\/p>", "g": ""}, {"q": "<p>Trong <code>nm<\/code>, ký hiệu <code>U read_raw<\/code> nghĩa là:<\/p>", "o": [{"t": "Hàm không dùng", "ok": false}, {"t": "Được tham chiếu nhưng chưa định nghĩa trong file này", "ok": true}, {"t": "Hàm yếu", "ok": false}, {"t": "Biến chưa khởi tạo", "ok": false}], "e": "<p>Linker phải tìm định nghĩa ở nơi khác.<\/p>", "g": ""}, {"q": "<p>Link <code>main.o -lhal -lsensor<\/code>, trong đó libsensor gọi hàm của libhal. Kết quả:<\/p>", "o": [{"t": "Thành công", "ok": false}, {"t": "Có thể <code>undefined reference<\/code> tới hàm của libhal", "ok": true}, {"t": "Multiple definition", "ok": false}, {"t": "Linker tự sắp lại thứ tự", "ok": false}], "e": "<p>Thư viện phụ thuộc phải đứng trước.<\/p>", "g": ""}, {"q": "<p>Bảng vector bị xóa khi bật <code>--gc-sections<\/code> vì:<\/p>", "o": [{"t": "Linker script sai MEMORY", "ok": false}, {"t": "Không code nào tham chiếu tới nó; cần <code>KEEP<\/code>", "ok": true}, {"t": "Thiếu <code>-ffunction-sections<\/code>", "ok": false}, {"t": "Bảng vector nằm trong RAM", "ok": false}], "e": "<p>Phần cứng dùng nó, không phải code.<\/p>", "g": ""}, {"q": "<p><code>&gt; RAM AT&gt; FLASH<\/code> cho <code>.data<\/code> nghĩa là:<\/p>", "o": [{"t": "Section nằm ở cả hai nơi khi chạy", "ok": false}, {"t": "Chạy ở RAM, giá trị đầu lưu ở Flash", "ok": true}, {"t": "Chạy ở Flash, sao lưu ở RAM", "ok": false}, {"t": "Chỉ dùng khi có bootloader", "ok": false}], "e": "<p>VMA RAM, LMA Flash.<\/p>", "g": ""}, {"q": "<p>Khi Cortex-M reset, word đầu tiên của bảng vector là:<\/p>", "o": [{"t": "Địa chỉ Reset_Handler", "ok": false}, {"t": "Giá trị ban đầu của stack pointer", "ok": true}, {"t": "Địa chỉ main", "ok": false}, {"t": "Magic number", "ok": false}], "e": "<p>Word 1 mới là Reset_Handler.<\/p>", "g": ""}, {"q": "<p>Thứ tự đúng trong Reset_Handler:<\/p>", "o": [{"t": "main → chép .data → xóa .bss", "ok": false}, {"t": "Constructor C++ → chép .data → main", "ok": false}, {"t": "Chép .data → xóa .bss → SystemInit/FPU → constructor → main", "ok": true}, {"t": "Xóa .bss → main → chép .data", "ok": false}], "e": "<p>Constructor có thể dùng biến toàn cục.<\/p>", "g": ""}, {"q": "<p>Ngắt USART2 làm CPU kẹt ở <code>Default_Handler<\/code>. Nguyên nhân khả dĩ nhất:<\/p>", "o": [{"t": "Priority sai", "ok": false}, {"t": "Tên hàm ISR gõ sai nên handler yếu mặc định được dùng", "ok": true}, {"t": "Stack quá lớn", "ok": false}, {"t": "Thiếu <code>volatile<\/code>", "ok": false}], "e": "<p>Kiểm tra tên so với file startup.<\/p>", "g": ""}, {"q": "<p>Build startup <code>-O2 -nostdlib<\/code> báo <code>undefined reference to memset<\/code>. Lý do:<\/p>", "o": [{"t": "Thiếu <code>#include &lt;string.h&gt;<\/code>", "ok": false}, {"t": "Compiler thay vòng lặp xóa .bss bằng lời gọi <code>memset<\/code>", "ok": true}, {"t": "Linker script sai", "ok": false}, {"t": "<code>.bss<\/code> quá lớn", "ok": false}], "e": "<p><code>-fno-tree-loop-distribute-patterns<\/code>.<\/p>", "g": ""}, {"q": "<p>Lệnh gọi từ Flash (0x0) tới hàm ở RAM (0x20000000) trên Cortex-M, linker chèn:<\/p>", "o": [{"t": "Không gì cả", "ok": false}, {"t": "Veneer (đoạn mã trung gian nạp địa chỉ đầy đủ)", "ok": true}, {"t": "Bảng GOT", "ok": false}, {"t": "Lỗi relocation luôn luôn", "ok": false}], "e": "<p><code>bl<\/code> chỉ với tới ±16 MB.<\/p>", "g": ""}, {"q": "<p>Mỗi tầng ngắt lồng nhau trên Cortex-M4 có FPU đang dùng đẩy thêm lên stack khoảng:<\/p>", "o": [{"t": "8 byte", "ok": false}, {"t": "32 byte", "ok": false}, {"t": "104 byte", "ok": true}, {"t": "1 KB", "ok": false}], "e": "<p>Khung cơ bản 32 B, thêm thanh ghi FPU thành 104 B.<\/p>", "g": ""}, {"q": "<p>Dòng <code>snprintf(\"%.1f\")<\/code> làm firmware dùng newlib-nano tăng mạnh vì:<\/p>", "o": [{"t": "Chuỗi định dạng dài", "ok": false}, {"t": "Kéo theo phần định dạng số thực và thư viện số thực mềm (<code>-u _printf_float<\/code>)", "ok": true}, {"t": "newlib-nano không có snprintf", "ok": false}, {"t": "Do <code>-Os<\/code>", "ok": false}], "e": "<p>Đo được ~4 KB lên ~21 KB.<\/p>", "g": ""}, {"q": "<p>Flash dùng theo kết quả <code>size<\/code> là:<\/p>", "o": [{"t": "text", "ok": false}, {"t": "text + data", "ok": true}, {"t": "text + data + bss", "ok": false}, {"t": "data + bss", "ok": false}], "e": "<p>bss không chiếm Flash.<\/p>", "g": ""}, {"q": "<p>Chương trình trên Linux, hàm <code>__attribute__((constructor))<\/code> chạy khi nào?<\/p>", "o": [{"t": "Sau main", "ok": false}, {"t": "Trước main, từ <code>.init_array<\/code> trong <code>__libc_start_main<\/code>", "ok": true}, {"t": "Khi gọi lần đầu", "ok": false}, {"t": "Chỉ khi liên kết tĩnh", "ok": false}], "e": "<p>Cùng cơ chế với constructor đối tượng toàn cục C++.<\/p>", "g": ""}, {"q": "<p><code>LD_PRELOAD=./libfake.so ./app<\/code> thay được hàm <code>time()<\/code> của libc vì:<\/p>", "o": [{"t": "<code>time<\/code> là hàm yếu", "ok": false}, {"t": "Ký hiệu được tìm theo thứ tự nạp; thư viện preload đứng trước libc", "ok": true}, {"t": "Kernel chuyển hướng system call", "ok": false}, {"t": "app được build với -static", "ok": false}], "e": "<p>Interposition của dynamic linker.<\/p>", "g": ""}, {"q": "<p>Copy binary từ Ubuntu sang board musl, chạy báo \"No such file or directory\". Kiểm tra trước tiên:<\/p>", "o": [{"t": "Quyền thực thi", "ok": false}, {"t": "Dynamic linker trong INTERP (<code>readelf -l<\/code>)", "ok": true}, {"t": "Dung lượng đĩa", "ok": false}, {"t": "Biến PATH", "ok": false}], "e": "<p>Interpreter glibc không có trên hệ musl.<\/p>", "g": ""}, {"q": "<p>Sửa một file header nhưng Makefile không build lại các file .c dùng nó. Thiếu:<\/p>", "o": [{"t": "<code>-O2<\/code>", "ok": false}, {"t": "File phụ thuộc sinh bằng <code>-MMD -MP<\/code> và <code>-include<\/code> chúng", "ok": true}, {"t": "<code>.PHONY<\/code>", "ok": false}, {"t": "<code>-j<\/code>", "ok": false}], "e": "<p>Make không tự biết .c include những header nào.<\/p>", "g": ""}], "flash": [{"q": "Các bước từ file .c tới file chạy được?", "a": "<p>Tiền xử lý (include, macro, <code>#if<\/code>) → biên dịch ra assembly (tối ưu ở đây) → hợp dịch ra object file có section, ký hiệu, relocation → liên kết: ghép object và thư viện, gán địa chỉ, điền relocation, ra ELF. Xem từng bước bằng <code>-E<\/code>, <code>-S<\/code>, <code>-c<\/code>, <code>-v<\/code>, <code>-save-temps<\/code>.<\/p>", "g": "Toolchain và object file"}, {"q": "<code>.text<\/code>, <code>.rodata<\/code>, <code>.data<\/code>, <code>.bss<\/code> nằm ở đâu trên MCU?", "a": "<p><code>.text<\/code> và <code>.rodata<\/code> ở Flash. <code>.data<\/code> chạy ở RAM nhưng giá trị khởi tạo lưu ở Flash, startup chép sang (tốn cả hai). <code>.bss<\/code> chỉ ở RAM, startup xóa về 0, không tốn Flash.<\/p>", "g": "Toolchain và object file"}, {"q": "Relocation là gì?", "a": "<p>Chỗ trống trong object file (địa chỉ hàm/biến ở file khác hoặc chưa biết địa chỉ cuối), kèm cách điền. Linker xử lý sau khi gán địa chỉ cho mọi section. Xem bằng <code>objdump -dr<\/code> hoặc <code>readelf -r<\/code>.<\/p>", "g": "Toolchain và object file"}, {"q": "Triplet <code>arm-none-eabi<\/code> nghĩa là gì? Khác <code>arm-linux-gnueabihf<\/code> thế nào?", "a": "<p>Kiến trúc ARM, không nhà cung cấp cụ thể, không hệ điều hành (bare-metal), ABI nhúng; thư viện C là newlib. <code>arm-linux-gnueabihf<\/code> nhắm Linux với glibc và ABI hard-float, cần sysroot của hệ thống đích.<\/p>", "g": "Toolchain và object file"}, {"q": "<code>static<\/code> ở phạm vi file có tác dụng gì với linker?", "a": "<p>Ký hiệu trở thành cục bộ (chữ thường trong <code>nm<\/code>), không xung đột với tên trùng ở file khác, compiler tối ưu mạnh hơn (có thể bỏ hẳn biến nếu không bị sửa). Mặc định nên dùng cho mọi thứ không xuất ra ngoài.<\/p>", "g": "Toolchain và object file"}, {"q": "Vì sao thứ tự thư viện tĩnh khi link lại quan trọng?", "a": "<p>Linker duyệt trái sang phải, từ mỗi <code>.a<\/code> chỉ lấy object giải quyết ký hiệu đang thiếu lúc đó. Thư viện phụ thuộc phải đứng trước thư viện được phụ thuộc; phụ thuộc vòng dùng <code>--start-group ... --end-group<\/code>.<\/p>", "g": "Linker"}, {"q": "<code>undefined reference<\/code> khi gọi hàm C từ C++: nguyên nhân và cách sửa?", "a": "<p>C++ mangle tên (<code>_Z8hal_initv<\/code>), object C chỉ có <code>hal_init<\/code>. Bọc khai báo trong header bằng <code>extern \"C\"<\/code> (trong <code>#ifdef __cplusplus<\/code>). Dùng <code>c++filt<\/code> để đọc tên linker đang tìm.<\/p>", "g": "Linker"}, {"q": "<code>-ffunction-sections -fdata-sections<\/code> và <code>--gc-sections<\/code> làm gì? Rủi ro?", "a": "<p>Mỗi hàm/biến một section, linker bỏ section không ai tham chiếu: firmware nhỏ hơn nhiều khi dùng một phần thư viện. Rủi ro: thứ chỉ phần cứng dùng (bảng vector) hoặc được tìm theo tên section bị xóa nếu không có <code>KEEP<\/code> hoặc <code>__attribute__((used))<\/code>.<\/p>", "g": "Linker"}, {"q": "LTO là gì?", "a": "<p>Link-time optimization: object giữ biểu diễn trung gian, compiler tối ưu lại toàn chương trình lúc liên kết (inline xuyên file, bỏ code chết). Giảm kích thước và tăng tốc; build chậm hơn, debug khó hơn.<\/p>", "g": "Linker"}, {"q": "VMA và LMA khác nhau thế nào?", "a": "<p>VMA là địa chỉ section khi chạy, LMA là nơi nó được lưu trong ảnh nạp. <code>.data<\/code> có VMA ở RAM, LMA ở Flash (<code>&gt; RAM AT&gt; FLASH<\/code>); startup chép từ <code>_sidata<\/code> sang <code>_sdata..._edata<\/code>.<\/p>", "g": "Linker script và startup"}, {"q": "Linker script cho MCU cần những gì?", "a": "<p><code>MEMORY<\/code> theo datasheet; <code>SECTIONS<\/code> đặt bảng vector (KEEP) đầu Flash, <code>.text<\/code>/<code>.rodata<\/code>, <code>.init_array<\/code> có ký hiệu đầu/cuối, <code>.data<\/code> với AT&gt;, <code>.bss<\/code> NOLOAD, các vùng tùy chọn (<code>.noinit<\/code>, <code>.ramfunc<\/code>); ký hiệu cho startup (<code>_estack<\/code>, <code>_sidata<\/code>, <code>_sdata<\/code>, <code>_edata<\/code>, <code>_sbss<\/code>, <code>_ebss<\/code>, <code>_end<\/code>); <code>ASSERT<\/code> chống tràn; <code>/DISCARD/<\/code>.<\/p>", "g": "Linker script và startup"}, {"q": "Cortex-M làm gì khi reset? Reset_Handler phải làm gì?", "a": "<p>Lõi đọc word 0 của bảng vector vào SP, word 1 là địa chỉ Reset_Handler rồi nhảy tới. Reset_Handler: chép <code>.data<\/code>, xóa <code>.bss<\/code>, SystemInit (clock, bật FPU), chạy <code>.init_array<\/code> (constructor C++), gọi <code>main<\/code>, vòng lặp vô hạn nếu <code>main<\/code> trả về.<\/p>", "g": "Linker script và startup"}, {"q": "Vì sao gõ sai tên ISR không gây lỗi biên dịch?", "a": "<p>Handler trong bảng vector là ký hiệu yếu alias tới <code>Default_Handler<\/code>. Hàm tên sai là một hàm khác không ai dùng; ký hiệu yếu không bị thay, ngắt rơi vào <code>Default_Handler<\/code> (thường vòng lặp vô hạn). Đọc <code>IPSR<\/code> để biết exception nào.<\/p>", "g": "Linker script và startup"}, {"q": "Vì sao startup code đôi khi báo <code>undefined reference to memcpy<\/code>?", "a": "<p>Compiler nhận ra vòng lặp chép/xóa và thay bằng <code>memcpy<\/code>/<code>memset<\/code> (loop distribution). Với <code>-nostdlib<\/code> không có hàm đó; và trong startup, gọi thư viện trước khi <code>.data<\/code>/<code>.bss<\/code> sẵn sàng là nguy hiểm. Dùng <code>-fno-tree-loop-distribute-patterns<\/code> hoặc tự cài đặt.<\/p>", "g": "Linker script và startup"}, {"q": "Biến <code>.noinit<\/code> dùng để làm gì?", "a": "<p>Không bị startup xóa nên giữ giá trị qua reset mềm: bộ đếm reset, lý do crash, thông tin cho bootloader. Phải kiểm tra tính hợp lệ (magic + CRC) vì sau mất điện nội dung là rác.<\/p>", "g": "Linker script và startup"}, {"q": "Xác định kích thước stack cần thiết thế nào?", "a": "<p>Tĩnh: <code>-fstack-usage<\/code> từng hàm + đồ thị gọi tìm đường sâu nhất + stack các tầng ISR lồng nhau (32 B hoặc 104 B có FPU mỗi tầng). Động: tô stack bằng mẫu, chạy mọi kịch bản, đo high-water mark. Cộng biên 25–50%. Đệ quy và con trỏ hàm làm phân tích tĩnh không đủ.<\/p>", "g": "Bộ nhớ và kích thước"}, {"q": "Phát hiện tràn stack trên MCU thế nào?", "a": "<p>MPU region chặn ghi dưới đáy stack, MSPLIM/PSPLIM trên ARMv8-M, kiểm tra của RTOS (<code>configCHECK_FOR_STACK_OVERFLOW<\/code>), đặt stack ở đầu RAM để tràn ra ngoài vùng nhớ, watermark trong bản debug.<\/p>", "g": "Bộ nhớ và kích thước"}, {"q": "Vì sao nhiều chuẩn cấm malloc trên MCU?", "a": "<p>Phân mảnh làm cấp phát thất bại sau thời gian dài dù tổng trống còn nhiều; thời gian không tất định; không an toàn trong ISR; khó chứng minh không cạn bộ nhớ. Thay bằng cấp phát tĩnh, memory pool khối cố định, hoặc chỉ cấp phát lúc khởi tạo.<\/p>", "g": "Bộ nhớ và kích thước"}, {"q": "Firmware vượt Flash: bạn làm gì?", "a": "<p>Đọc map/<code>nm --size-sort<\/code>/bloaty tìm thứ lớn nhất; thủ phạm hay gặp: printf (nhất là <code>%f<\/code>), số thực mềm, iostream, exception/RTTI C++, template bloat. Biện pháp: <code>-Os<\/code>, gc-sections, LTO, newlib-nano hoặc printf nhỏ, fixed-point, log token.<\/p>", "g": "Bộ nhớ và kích thước"}, {"q": "<code>size<\/code> in text, data, bss: Flash và RAM dùng bao nhiêu?", "a": "<p>Flash = text + data (giá trị khởi tạo của data); RAM tĩnh = data + bss; chưa tính stack và heap.<\/p>", "g": "Bộ nhớ và kích thước"}, {"q": "Chương trình trên Linux chạy tới main thế nào?", "a": "<p><code>execve<\/code> → kernel ánh xạ segment LOAD, thấy INTERP thì nạp dynamic linker → ld.so nạp thư viện NEEDED, xử lý relocation → <code>_start<\/code> → <code>__libc_start_main<\/code> → <code>.init_array<\/code> (constructor) → <code>main<\/code> → <code>exit<\/code> chạy destructor/atexit.<\/p>", "g": "Linux runtime và build"}, {"q": "PLT và GOT là gì?", "a": "<p>Lời gọi hàm thư viện chia sẻ nhảy qua PLT, đọc địa chỉ thật từ GOT mà ld.so điền (lười ở lần gọi đầu hoặc lúc khởi động với <code>-z now<\/code>). <code>-z relro<\/code> làm GOT chỉ đọc sau khi điền để chống ghi đè.<\/p>", "g": "Linux runtime và build"}, {"q": "<code>LD_PRELOAD<\/code> dùng làm gì?", "a": "<p>Nạp thư viện trước các thư viện khác để thay thế hàm (interposition): giả lập thời gian khi test, thay allocator, trace lời gọi (gọi hàm gốc qua <code>dlsym(RTLD_NEXT, ...)<\/code>).<\/p>", "g": "Linux runtime và build"}, {"q": "Chạy chương trình báo \"No such file or directory\" dù file tồn tại?", "a": "<p>Dynamic linker ghi trong INTERP không tồn tại trên hệ thống: build cho glibc chạy trên musl, hoặc sai kiến trúc/đường dẫn. Kiểm tra <code>readelf -l<\/code>; build bằng toolchain + sysroot của đích hoặc liên kết tĩnh.<\/p>", "g": "Linux runtime và build"}, {"q": "Makefile tự viết hay mắc lỗi gì?", "a": "<p>Không theo dõi header (sửa .h không build lại .c phụ thuộc) → dùng <code>-MMD -MP<\/code> và <code>-include<\/code> file .d; không phụ thuộc linker script; không tách thư mục build.<\/p>", "g": "Linux runtime và build"}, {"q": "Toolchain file của CMake cho bare-metal cần những gì?", "a": "<p><code>CMAKE_SYSTEM_NAME Generic<\/code>, compiler và công cụ (<code>objcopy<\/code>, <code>size<\/code>) của toolchain, <code>CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY<\/code>, cờ CPU trong <code>*_FLAGS_INIT<\/code>, cờ link (<code>--gc-sections<\/code>, specs). Linker script đưa vào bằng <code>target_link_options<\/code> và <code>LINK_DEPENDS<\/code>.<\/p>", "g": "Linux runtime và build"}]}</script>
+<script>window.PAGE_KEY = "m02";</script>
+<script>(function () {
+  "use strict";
+  var DATA = {};
+  try { DATA = JSON.parse(document.getElementById("page-data").textContent || "{}"); } catch (e) {}
+  var KEY = "ek:" + (window.PAGE_KEY || "page");
+  function load(k, d) { try { var v = localStorage.getItem(KEY + ":" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(KEY + ":" + k, JSON.stringify(v)); } catch (e) {} }
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  /* ---------- tabs ---------- */
+  var tabs = $$(".tab"), panels = $$(".panel");
+  var ids = tabs.map(function (t) { return t.dataset.tab; });
+  function panelOfAnchor(id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var p = el.closest(".panel");
+    return p ? p.dataset.panel : null;
+  }
+  var chaps = $$(".chap");
+  function showChap(cid, scrollTarget) {
+    if (!chaps.length) return;
+    var ok = chaps.some(function (c) { return c.dataset.chap === cid; });
+    if (!ok) cid = chaps[0].dataset.chap;
+    chaps.forEach(function (c) { c.hidden = c.dataset.chap !== cid; });
+    $$(".bk-ch").forEach(function (li) { li.classList.toggle("cur", li.dataset.chap === cid); });
+    var cur = $('.bk-ch[data-chap="' + cid + '"] .bk-t'), cl = $("#bk-cur"); if (cur && cl) cl.textContent = cur.textContent;
+    save("chap", cid);
+    if (!scrollTarget) { var b = $(".book"); if (b) { var top = b.getBoundingClientRect().top + window.scrollY - 60; if (window.scrollY > top) window.scrollTo({ top: top }); } }
+    if (window.matchMedia("(max-width: 999px)").matches) { var nav = $(".bk-nav"); if (nav) nav.open = false; }
+  }
+  function chapOf(el) { var c = el && el.closest && el.closest(".chap"); return c ? c.dataset.chap : null; }
+  function show(id, scrollTarget) {
+    if (ids.indexOf(id) < 0) id = ids[0];
+    tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t.dataset.tab === id)); });
+    panels.forEach(function (p) { p.hidden = p.dataset.panel !== id; });
+    save("tab", id);
+    if (scrollTarget) {
+      var el = document.getElementById(scrollTarget);
+      var c = chapOf(el); if (c) showChap(c, scrollTarget);
+      if (el) setTimeout(function () { el.scrollIntoView({ block: "start" }); }, 0);
+    }
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function (e) {
+      e.preventDefault();
+      show(t.dataset.tab);
+      try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (err) {}
+      var bar = $(".tabbar"); if (bar && window.scrollY > bar.offsetTop) window.scrollTo({ top: bar.offsetTop });
+    });
+  });
+  function route() {
+    var h = (location.hash || "").slice(1);
+    if (chaps.length && !chapOf(document.getElementById(h))) showChap(load("chap", null));
+    if (h && ids.indexOf(h) >= 0) return show(h);
+    if (h) { var p = panelOfAnchor(h); if (p) return show(p, h); }
+    show(load("tab", ids[0]));
+  }
+  window.addEventListener("hashchange", route);
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a || a.classList.contains("tab")) return;
+    var id = a.getAttribute("href").slice(1);
+    var p = panelOfAnchor(id);
+    if (p) { e.preventDefault(); show(p, id); }
+  });
+
+  /* ---------- TOC scrollspy ---------- */
+  $$(".toc").forEach(function (toc) {
+    var links = $$("a", toc);
+    var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); }).filter(Boolean);
+    if (!("IntersectionObserver" in window) || !targets.length) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          links.forEach(function (a) { a.classList.toggle("active", a.getAttribute("href") === "#" + en.target.id); });
+        }
+      });
+    }, { rootMargin: "-80px 0px -70% 0px" });
+    targets.forEach(function (t) { io.observe(t); });
+  });
+
+  /* ---------- Q&A ---------- */
+  var qs = $("#qa-search"), qh = $("#qa-hot"), qx = $("#qa-expand");
+  function filterQA() {
+    var term = (qs && qs.value || "").toLowerCase().trim();
+    var hotOnly = qh && qh.checked;
+    $$(".qa-group").forEach(function (g) {
+      var any = false;
+      $$(".qa-item", g).forEach(function (it) {
+        var ok = (!hotOnly || it.dataset.hot === "1") && (!term || it.textContent.toLowerCase().indexOf(term) >= 0);
+        it.hidden = !ok; if (ok) any = true;
+      });
+      g.hidden = !any;
+    });
+  }
+  if (qs) qs.addEventListener("input", filterQA);
+  if (qh) qh.addEventListener("change", filterQA);
+  if (qx) qx.addEventListener("click", function () {
+    var items = $$(".qa-item");
+    var open = items.some(function (d) { return !d.open; });
+    items.forEach(function (d) { d.open = open; });
+    qx.textContent = open ? "Thu gọn tất cả" : "Mở tất cả";
+  });
+
+  /* ---------- Quiz ---------- */
+  var quiz = DATA.quiz || [], qEl = $("#quiz");
+  if (qEl && quiz.length) {
+    var answers = load("quiz", {});
+    var letters = "ABCDEFGH";
+    function renderQuiz() {
+      qEl.innerHTML = "";
+      var lastG = null;
+      quiz.forEach(function (q, i) {
+        if (q.g && q.g !== lastG) { var gh = document.createElement("li"); gh.className = "qz-g"; gh.textContent = q.g; qEl.appendChild(gh); lastG = q.g; }
+        var li = document.createElement("li"); li.className = "qz";
+        var stem = document.createElement("div"); stem.className = "qz-stem";
+        stem.innerHTML = '<div class="prose">' + q.q + "</div>";
+        li.appendChild(stem);
+        var opts = document.createElement("div"); opts.className = "qz-opts";
+        q.o.forEach(function (o, j) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "qz-opt";
+          b.innerHTML = '<span class="k">' + letters[j] + "</span><span>" + o.t + "</span>";
+          b.addEventListener("click", function () { answers[i] = j; save("quiz", answers); paint(li, q, i); score(); });
+          opts.appendChild(b);
+        });
+        li.appendChild(opts);
+        var exp = document.createElement("div"); exp.className = "qz-exp"; exp.hidden = true; li.appendChild(exp);
+        qEl.appendChild(li);
+        paint(li, q, i);
+      });
+      score();
+    }
+    function paint(li, q, i) {
+      var a = answers[i]; if (a === undefined) return;
+      var btns = $$(".qz-opt", li);
+      btns.forEach(function (b, j) {
+        b.disabled = true;
+        if (q.o[j].ok) b.classList.add("right");
+        else if (j === a) b.classList.add("wrong");
+      });
+      var ok = q.o[a] && q.o[a].ok;
+      var exp = $(".qz-exp", li);
+      exp.innerHTML = '<span class="qz-verdict ' + (ok ? "ok" : "no") + '">' + (ok ? "Đúng." : "Chưa đúng.") + "</span>" + (q.e || "");
+      exp.hidden = false;
+    }
+    function score() {
+      var done = 0, right = 0;
+      quiz.forEach(function (q, i) { var a = answers[i]; if (a !== undefined) { done++; if (q.o[a] && q.o[a].ok) right++; } });
+      $("#quiz-score").textContent = "Đúng " + right + "/" + quiz.length + " · đã làm " + done;
+      $("#quiz-meter").style.width = (100 * done / quiz.length) + "%";
+    }
+    $("#quiz-reset").addEventListener("click", function () { answers = {}; save("quiz", answers); renderQuiz(); });
+    renderQuiz();
+  }
+
+  /* ---------- Flashcards ---------- */
+  var cards = DATA.flash || [], fc = $("#fc");
+  if (fc && cards.length) {
+    var known = load("known", {});
+    var order = cards.map(function (_, i) { return i; });
+    var pos = 0, flipped = false;
+    function deck() {
+      var only = $("#fc-only").checked;
+      return order.filter(function (i) { return !only || !known[i]; });
+    }
+    function draw() {
+      var d = deck();
+      if (!d.length) {
+        $("#fc-g").textContent = ""; $("#fc-q").textContent = "Bạn đã thuộc hết các thẻ. Bỏ chọn bộ lọc để ôn lại.";
+        $("#fc-a").hidden = true; $(".fc-front").hidden = false; $("#fc-pos").textContent = "0 / 0"; fc.classList.remove("known"); return;
+      }
+      if (pos >= d.length) pos = 0; if (pos < 0) pos = d.length - 1;
+      var i = d[pos], c = cards[i];
+      $("#fc-g").textContent = c.g || "";
+      $("#fc-q").innerHTML = c.q;
+      $("#fc-a").innerHTML = '<div class="fc-q" style="font-size:18px">' + c.q + "</div>" + c.a;
+      $(".fc-front").hidden = flipped; $("#fc-a").hidden = !flipped;
+      fc.classList.toggle("known", !!known[i]);
+      var nk = Object.keys(known).filter(function (k) { return known[k]; }).length;
+      $("#fc-pos").textContent = (pos + 1) + " / " + d.length + " · đã thuộc " + nk + "/" + cards.length;
+    }
+    function flip() { flipped = !flipped; draw(); }
+    function step(n) { pos += n; flipped = false; draw(); }
+    fc.addEventListener("click", function (e) { if (e.target.closest("a")) return; flip(); });
+    fc.addEventListener("keydown", function (e) {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); }
+      if (e.key === "ArrowRight") step(1);
+      if (e.key === "ArrowLeft") step(-1);
+    });
+    $("#fc-prev").addEventListener("click", function () { step(-1); });
+    $("#fc-next").addEventListener("click", function () { step(1); });
+    $("#fc-known").addEventListener("click", function () {
+      var d = deck(); if (!d.length) return; known[d[pos]] = true; save("known", known);
+      if ($("#fc-only").checked) { flipped = false; draw(); } else step(1);
+    });
+    $("#fc-again").addEventListener("click", function () {
+      var d = deck(); if (!d.length) return; known[d[pos]] = false; save("known", known); step(1);
+    });
+    $("#fc-only").addEventListener("change", function () { pos = 0; flipped = false; draw(); });
+    $("#fc-shuffle").addEventListener("click", function () {
+      for (var k = order.length - 1; k > 0; k--) { var r = Math.floor(Math.random() * (k + 1)); var t = order[k]; order[k] = order[r]; order[r] = t; }
+      pos = 0; flipped = false; draw();
+    });
+    draw();
+  }
+
+  if (chaps.length) {
+    var read = load("read", {});
+    var navLinks = {};
+    function paintRead() {
+      var n = 0;
+      $$(".bk-ch").forEach(function (li) { var r = !!read[li.dataset.chap]; li.classList.toggle("read", r); if (r) n++; });
+      $$(".mark-read").forEach(function (b) { var r = !!read[b.dataset.chap]; b.textContent = r ? "Đã đọc ✓ (bấm để bỏ)" : "Đánh dấu đã đọc"; b.classList.toggle("ghost", r); });
+      var pr = $("#bk-prog"); if (pr) pr.textContent = "· đã đọc " + n + "/" + chaps.length;
+    }
+    chaps.forEach(function (c, i) {
+      var pg = $(".chap-pager", c), html = "";
+      var titleOf = function (k) { var li = $('.bk-ch[data-chap="' + chaps[k].dataset.chap + '"] .bk-t'); return li ? li.textContent : ""; };
+      if (i > 0) html += '<a class="pg-btn prev" href="#' + chaps[i - 1].dataset.chap + '"><span>← Chương trước</span><b>' + titleOf(i - 1) + "</b></a>";
+      if (i < chaps.length - 1) html += '<a class="pg-btn next" href="#' + chaps[i + 1].dataset.chap + '"><span>Chương sau →</span><b>' + titleOf(i + 1) + "</b></a>";
+      pg.innerHTML = html;
+    });
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest(".mark-read");
+      if (!b) return;
+      read[b.dataset.chap] = !read[b.dataset.chap]; save("read", read); paintRead();
+    });
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest(".pg-btn, .bk-ch > a");
+      if (!a) return;
+      e.preventDefault();
+      var id = a.getAttribute("href").slice(1);
+      showChap(id);
+      try { history.replaceState(null, "", "#" + id); } catch (err) {}
+    }, true);
+    paintRead();
+  }
+
+  route();
+})();
+</script>
