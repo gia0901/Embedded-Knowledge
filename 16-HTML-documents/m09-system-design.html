@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>System Design cho Embedded</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -477,7 +495,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao nên để dư Flash khi chọn MCU dù firmware hiện tại vừa đủ?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao nên để dư Flash khi chọn MCU dù firmware hiện tại vừa đủ?</span></summary>
 <p>Cần chỗ cho bản cập nhật (A/B cần gấp đôi), cho tính năng thêm sau này và bản sửa lỗi trong nhiều năm; đổi chip giữa chừng vì hết Flash rất tốn kém.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-1-quy-trinh-thiet-ke-he-thong-embedded">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-2-thiet-ke-ngat" hidden><h2 id="c-bai-2-thiet-ke-ngat">Bài 2 · Thiết kế ngắt</h2>
@@ -589,11 +607,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>ISR UART không xóa cờ ngắt (hoặc không đọc thanh ghi dữ liệu). Chuyện gì xảy ra?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">ISR UART không xóa cờ ngắt (hoặc không đọc thanh ghi dữ liệu). Chuyện gì xảy ra?</span></summary>
 <p>Ngắt vẫn pending nên ISR được gọi lại ngay khi thoát, lặp vô hạn; CPU kẹt trong ngắt, code chính và các ngắt ưu tiên thấp hơn không chạy (thường dẫn tới watchdog reset).</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một ngắt ưu tiên 2 gọi `xQueueSendFromISR` trong hệ thống có `configMAX_SYSCALL_INTERRUPT_PRIORITY` = 5 (dạng số chưa dịch). Có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một ngắt ưu tiên 2 gọi <code>xQueueSendFromISR</code> trong hệ thống có <code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code> = 5 (dạng số chưa dịch). Có vấn đề gì?</span></summary>
 <p>Có: priority 2 cao hơn ngưỡng 5, ngắt có thể chạy giữa critical section của kernel và làm hỏng cấu trúc dữ liệu của RTOS. Phải đặt priority số ≥ 5, hoặc không gọi API RTOS trong ISR đó.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-2-thiet-ke-ngat">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-3-thiet-ke-giao-thuc-truyen-thong" hidden><h2 id="c-bai-3-thiet-ke-giao-thuc-truyen-thong">Bài 3 · Thiết kế giao thức truyền thông</h2>
@@ -741,11 +759,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không nên `memcpy` buffer nhận được vào một struct C để đọc các trường?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không nên <code>memcpy</code> buffer nhận được vào một struct C để đọc các trường?</span></summary>
 <p>Struct có padding và layout phụ thuộc compiler; thứ tự byte phụ thuộc CPU; đọc thẳng có thể unaligned. Nên đọc từng trường bằng dịch bit theo thứ tự byte đã quy định.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Bên gửi gửi lại một gói vì không nhận được ACK, nhưng thực ra bên nhận đã xử lý gói đó. Làm sao tránh thực hiện hai lần?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Bên gửi gửi lại một gói vì không nhận được ACK, nhưng thực ra bên nhận đã xử lý gói đó. Làm sao tránh thực hiện hai lần?</span></summary>
 <p>Bên nhận nhớ sequence number của gói đã xử lý gần nhất; gói trùng số thì không xử lý lại nhưng vẫn gửi ACK. Thiết kế lệnh idempotent khi có thể.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-3-thiet-ke-giao-thuc-truyen-thong">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-4-bootloader-va-cap-nhat-firmware" hidden><h2 id="c-bai-4-bootloader-va-cap-nhat-firmware">Bài 4 · Bootloader và cập nhật firmware</h2>
@@ -889,11 +907,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Sau khi bootloader nhảy sang ứng dụng, ngắt SysTick đầu tiên làm thiết bị treo. Nguyên nhân có thể?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Sau khi bootloader nhảy sang ứng dụng, ngắt SysTick đầu tiên làm thiết bị treo. Nguyên nhân có thể?</span></summary>
 <p>Quên đặt <code>SCB-&gt;VTOR</code> về bảng vector của ứng dụng, nên ngắt nhảy vào handler của bootloader; hoặc SysTick của bootloader chưa tắt trong khi ứng dụng chưa sẵn sàng.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Firmware mới bị lỗi khiến thiết bị reset liên tục ngay khi khởi động. Cơ chế nào đưa thiết bị về bản cũ?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Firmware mới bị lỗi khiến thiết bị reset liên tục ngay khi khởi động. Cơ chế nào đưa thiết bị về bản cũ?</span></summary>
 <p>Cập nhật A/B có confirm: bản mới chạy ở trạng thái test, chỉ thành "good" khi tự xác nhận; nếu reset (watchdog/crash) trước khi confirm, bootloader rollback về slot cũ.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-4-bootloader-va-cap-nhat-firmware">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu" hidden><h2 id="c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu">Bài 5 · Độ tin cậy: watchdog, fault handling và phòng thủ</h2>
@@ -1003,11 +1021,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao cho ăn watchdog trong ISR của SysTick là sai?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao cho ăn watchdog trong ISR của SysTick là sai?</span></summary>
 <p>SysTick vẫn chạy khi task chính treo hoặc deadlock, nên watchdog không bao giờ reset; nó chỉ chứng minh ngắt còn hoạt động. Phải cho ăn dựa trên báo danh của các task thực sự làm việc.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Thiết bị ngoài hiện trường thỉnh thoảng reset. Cần những thông tin gì để tìm nguyên nhân?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Thiết bị ngoài hiện trường thỉnh thoảng reset. Cần những thông tin gì để tìm nguyên nhân?</span></summary>
 <p>Nguyên nhân reset (watchdog, brown-out, software, pin), dữ liệu crash lưu trong noinit (PC, LR, CFSR, BFAR/MMFAR), task nào không báo danh với watchdog, log gần nhất (ring buffer trong noinit), và các chỉ số tài nguyên (stack, pool).</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-5-do-tin-cay-watchdog-fault-handling-va-phong-thu">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-6-logging-va-chan-doan" hidden><h2 id="c-bai-6-logging-va-chan-doan">Bài 6 · Logging và chẩn đoán</h2>
@@ -1110,7 +1128,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Thêm `printf` để debug thì bug biến mất. Vì sao và xử lý thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Thêm <code>printf</code> để debug thì bug biến mất. Vì sao và xử lý thế nào?</span></summary>
 <p><code>printf</code> làm thay đổi thời gian (chậm, có thể chặn), che đi race condition hoặc vấn đề thời gian. Dùng log không chặn và rẻ (ring buffer, RTT, binary logging), hoặc toggle GPIO + logic analyzer, hoặc trace RTOS.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-6-logging-va-chan-doan">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-7-quan-ly-nang-luong" hidden><h2 id="c-bai-7-quan-ly-nang-luong">Bài 7 · Quản lý năng lượng</h2>
@@ -1227,11 +1245,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Thiết bị ngủ 2 µA, mỗi 10 s thức 5 ms ở 4 mA. Dòng trung bình?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Thiết bị ngủ 2 µA, mỗi 10 s thức 5 ms ở 4 mA. Dòng trung bình?</span></summary>
 <p>(4 × 0,005 + 0,002 × 9,995) / 10 ≈ (0,020 + 0,020) / 10 = 0,004 mA = 4 µA.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao SysTick 1 kHz làm hỏng mức tiêu thụ của thiết bị chạy pin dùng RTOS? Giải pháp?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao SysTick 1 kHz làm hỏng mức tiêu thụ của thiết bị chạy pin dùng RTOS? Giải pháp?</span></summary>
 <p>Nó đánh thức CPU 1000 lần mỗi giây dù không có việc. Dùng tickless idle: khi rảnh, tắt SysTick, ngủ sâu với timer low-power đánh thức đúng lúc task tiếp theo cần chạy.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-7-quan-ly-nang-luong">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin" hidden><h2 id="c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin">Bài 8 · Case study: thiết kế node cảm biến IoT chạy pin</h2>
@@ -1454,11 +1472,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p>System design Embedded là cân bằng giữa yêu cầu và ràng buộc: bắt đầu từ yêu cầu phi chức năng, chọn nền tảng, lập ngân sách tài nguyên; thiết kế ngắt với priority theo deadline và ISR ngắn; giao thức có framing, CRC, ACK/retry, khả năng tiến hóa; bootloader và OTA A/B có confirm, rollback, secure boot; độ tin cậy với task watchdog, fault handler ghi ngữ cảnh, dữ liệu chịu mất điện; logging không chặn và metrics từ xa; năng lượng tính bằng dòng trung bình và tối ưu ở chỗ tiêu nhiều nhất.</p>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong ví dụ trên, vì sao chỉ đánh dấu dữ liệu "đã gửi" sau khi nhận ACK từ server?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong ví dụ trên, vì sao chỉ đánh dấu dữ liệu "đã gửi" sau khi nhận ACK từ server?</span></summary>
 <p>Để không mất dữ liệu nếu kết nối đứt sau khi gửi mà server chưa nhận (at-least-once delivery); bên server lọc bản trùng.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Năng lượng của node chủ yếu dùng ở đâu, và tối ưu chỗ nào trước?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Năng lượng của node chủ yếu dùng ở đâu, và tối ưu chỗ nào trước?</span></summary>
 <p>Modem (hơn 90%). Giảm số lần kết nối (gom dữ liệu), rút ngắn thời gian attach và TLS (PSM, session resumption), giảm kích thước gói; tối ưu phần đo gần như không ảnh hưởng.</p>
 </details><div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-8-case-study-thiet-ke-node-cam-bien-iot-chay-pin">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section></div></div></section><section class="panel" id="p-phong-van" data-panel="phong-van" role="tabpanel" hidden><div class="qa-tools"><input id="qa-search" type="search" placeholder="Lọc câu hỏi…" aria-label="Lọc câu hỏi"><label class="chk"><input id="qa-hot" type="checkbox"> Chỉ câu hay hỏi</label><button id="qa-expand" class="btn ghost" type="button">Mở tất cả</button></div><div class="qa"><div class="qa-group"><h2 class="qa-gh">Quy trình và nền tảng</h2><details class="qa-item" data-hot="1"><summary><span class="qn">01</span><span class="qt">Khi nhận một bài system design Embedded, bạn bắt đầu thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Làm rõ yêu cầu chức năng và đặc biệt là phi chức năng: thời gian (deadline), năng lượng (pin, tuổi thọ), kết nối, môi trường, an toàn/chuẩn, bảo mật, sản lượng và giá, OTA. Nói rõ giả định. Sau đó: phân chia HW/SW, chọn nền tảng, lập ngân sách (Flash, RAM, CPU, năng lượng), kiến trúc phần mềm, chế độ lỗi, bảo mật, sản xuất.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">02</span><span class="qt">Khi nào chọn MCU, khi nào chọn MPU chạy Linux?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>MCU: realtime cứng µs, năng lượng thấp (µA), khởi động nhanh, giá và board đơn giản. MPU + Linux: cần mạng phức tạp, đồ họa, nhiều phần mềm sẵn có, nhiều bộ nhớ; trả giá bằng năng lượng, thời gian khởi động, độ phức tạp và gánh nặng cập nhật bảo mật. Nhiều sản phẩm kết hợp cả hai (MPU + lõi Cortex-M).</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Ngắt</h2><details class="qa-item" data-hot="1"><summary><span class="qn">03</span><span class="qt">Quy tắc viết ISR?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Ngắn; không chặn (không mutex, delay, chờ vô hạn); không printf/malloc/flash; xóa cờ ngắt đúng lúc (chú ý write buffer: xóa sớm hoặc DSB); dữ liệu chia sẻ dùng atomic/ring buffer/critical section phía task; chỉ API FromISR và yield khi đánh thức task ưu tiên cao; phần nặng hoãn sang task.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">04</span><span class="qt">Preemption priority và subpriority khác nhau thế nào?</span></summary><div class="qa-a prose"><p>Preemption priority quyết định ngắt có chen ngang ngắt đang chạy không (nesting). Subpriority chỉ quyết định thứ tự khi nhiều ngắt cùng pending, không gây chen ngang. Số nhỏ là ưu tiên cao.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">05</span><span class="qt">Với FreeRTOS trên Cortex-M, ISR nào được gọi API kernel?</span></summary><div class="qa-a prose"><p>Chỉ ISR có priority logic thấp hơn hoặc bằng <code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code> (giá trị số lớn hơn hoặc bằng). ISR ưu tiên cao hơn không bị critical section của kernel chặn nhưng không được gọi API. Mặc định priority 0 sau reset là lỗi hay gặp.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">06</span><span class="qt">Interrupt latency gồm những thành phần nào? Làm sao giảm jitter?</span></summary><div class="qa-a prose"><p>Độ trễ phần cứng (~12 chu kỳ trên M3/M4), thời gian ngắt bị chặn (critical section dài nhất), các ISR ưu tiên cao hơn đang chạy, wait state Flash. Giảm jitter: critical section ngắn, BASEPRI thay PRIMASK, priority cao cho ISR quan trọng, chạy từ RAM/TCM, để phần cứng kích hoạt (timer → ADC, DMA).</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">07</span><span class="qt">DMA trên Cortex-M7 nhận dữ liệu nhưng CPU đọc thấy dữ liệu cũ. Vì sao?</span></summary><div class="qa-a prose"><p>Cache coherency: DMA ghi vào RAM nhưng CPU đọc từ D-cache. Phải invalidate cache vùng buffer sau khi DMA ghi xong (và clean trước khi DMA đọc), buffer căn lề 32 byte, hoặc đặt buffer ở vùng non-cacheable qua MPU.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Giao thức</h2><details class="qa-item" data-hot="1"><summary><span class="qn">08</span><span class="qt">Thiết kế framing cho giao thức UART giữa MCU và PC.</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>SOF + độ dài + loại + payload + CRC16, parser là state machine có kiểm tra độ dài tối đa, timeout giữa byte để resync, đếm lỗi CRC. Hoặc COBS với 0x00 làm ranh giới (resync tức thì, overhead ≤ 1/254). Thêm sequence number, ACK, retry có giới hạn nếu kênh có thể mất gói; trao đổi phiên bản giao thức.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">09</span><span class="qt">COBS là gì? Ưu điểm so với byte stuffing kiểu SLIP?</span></summary><div class="qa-a prose"><p>Mã hóa dữ liệu để không còn byte 0, mỗi byte 0 được thay bằng khoảng cách tới số 0 tiếp theo; 0x00 làm ranh giới gói. Overhead cố định và nhỏ (tối đa 1 byte mỗi 254), trong khi SLIP xấu nhất gấp đôi kích thước.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">10</span><span class="qt">Làm sao tránh xử lý trùng khi bên gửi gửi lại do mất ACK?</span></summary><div class="qa-a prose"><p>Sequence number: bên nhận nhớ số đã xử lý, gói trùng số thì không xử lý lại nhưng vẫn ACK. Thiết kế lệnh idempotent khi có thể.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">11</span><span class="qt">Bus I2C bị treo (SDA bị giữ thấp). Xử lý thế nào?</span></summary><div class="qa-a prose"><p>Slave bị kẹt giữa một byte (thường do MCU reset giữa giao dịch). Master chuyển chân SCL sang GPIO, phát tới 9 xung clock cho tới khi SDA lên cao, tạo điều kiện STOP, rồi khởi tạo lại ngoại vi I2C. Luôn có timeout cho giao dịch I2C.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Bootloader và OTA</h2><details class="qa-item" data-hot="1"><summary><span class="qn">12</span><span class="qt">Cortex-M khởi động từ reset thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Đọc word 0 của bảng vector làm MSP, word 1 làm địa chỉ Reset_Handler. Startup: SystemInit (clock), copy .data từ Flash sang RAM, xóa .bss, gọi constructor toàn cục (C++), gọi main.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">13</span><span class="qt">Bootloader nhảy sang ứng dụng cần làm gì?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Kiểm tra image (magic, CRC, chữ ký, hw_id). Tắt ngắt, dừng SysTick, tắt và xóa pending trong NVIC, deinit ngoại vi/clock; đặt <code>SCB-&gt;VTOR</code> = địa chỉ ứng dụng; DSB/ISB; đặt MSP từ word 0; gọi reset handler từ word 1. Ứng dụng phải link đúng địa chỉ. Cách sạch hơn: reset với cờ noinit và nhảy ngay đầu Reset_Handler.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">14</span><span class="qt">Thiết kế OTA an toàn khi mất điện và firmware mới lỗi.</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>A/B: tải vào slot phụ, kiểm tra CRC và chữ ký; đánh dấu test; bootloader swap/chọn slot mới; ứng dụng mới tự kiểm tra rồi confirm; reset trước khi confirm thì rollback. Trạng thái ghi kiểu append-only chịu mất điện; watchdog bật suốt; anti-rollback bằng phiên bản tối thiểu. Công cụ: MCUboot, ESP-IDF OTA; Linux: U-Boot bootcount + SWUpdate/RAUC/Mender.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">15</span><span class="qt">Secure boot hoạt động thế nào?</span></summary><div class="qa-a prose"><p>Khóa công khai (hoặc hash) trong vùng bất biến (OTP/ROM); mỗi tầng xác minh chữ ký tầng sau trước khi chạy (ROM → bootloader → app): chain of trust. Khóa cổng debug khi xuất xưởng; anti-rollback; có thể mã hóa image. CRC không thay được chữ ký.</p></div></details></div><div class="qa-group"><h2 class="qa-gh">Độ tin cậy, log, năng lượng</h2><details class="qa-item" data-hot="1"><summary><span class="qn">16</span><span class="qt">Thiết kế watchdog cho hệ thống nhiều task.</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Không cho ăn trong ISR timer hay một task độc lập. Mỗi task quan trọng báo danh (set bit) định kỳ; task giám sát chỉ cho ăn IWDG khi mọi bit đã set trong chu kỳ, rồi xóa bit. Task chờ lâu thì chờ có timeout để báo danh. Ghi task không báo danh vào noinit trước khi reset.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">17</span><span class="qt">IWDG và WWDG khác nhau thế nào?</span></summary><div class="qa-a prose"><p>IWDG chạy clock riêng (LSI), không tắt được, chỉ có timeout trên. WWDG phải cho ăn trong một cửa sổ thời gian, bắt cả trường hợp phần mềm chạy quá nhanh/bỏ bước; dùng clock hệ thống.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">18</span><span class="qt">Xử lý HardFault để có thông tin debug thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>Handler naked kiểm tra bit 2 của EXC_RETURN để lấy MSP hoặc PSP, truyền con trỏ stack frame cho hàm C; lưu R0–R3, R12, LR, PC, xPSR cùng CFSR, HFSR, MMFAR, BFAR vào section .noinit; reset; lần khởi động sau báo cáo. Dùng <code>addr2line</code> với PC/LR để tìm dòng code. CFSR cho biết loại lỗi (PRECISERR, UNDEFINSTR, DIVBYZERO, UNALIGNED, STKERR…).</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">19</span><span class="qt">Lưu cấu hình vào Flash sao cho mất điện khi ghi không hỏng?</span></summary><div class="qa-a prose"><p>Hai bản sao (A/B) có CRC và số thứ tự tăng; ghi luân phiên vào bản cũ hơn; khi đọc chọn bản CRC đúng có số thứ tự lớn nhất; giá trị mặc định khi cả hai hỏng. Ghi thường xuyên thì cần wear leveling (log append-only, littlefs).</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">20</span><span class="qt">Vì sao printf làm firmware khó debug? Logging tốt thế nào?</span></summary><div class="qa-a prose"><p>Chậm, tốn Flash và stack, có thể chặn, thay đổi thời gian (heisenbug), không an toàn trong ISR. Logging tốt: mức log lọc lúc compile, ghi vào ring buffer không chặn, task nền gửi ra, bỏ và đếm khi đầy; binary/tokenized logging (gửi ID + tham số); RTT/SWO; buffer log trong noinit để sống qua reset.</p></div></details><details class="qa-item" data-hot="1"><summary><span class="qn">21</span><span class="qt">Tính tuổi thọ pin của thiết bị duty-cycle thế nào?</span><span class="badge hot">Hay hỏi</span></summary><div class="qa-a prose"><p>I_avg = Σ(I × t)/T trên một chu kỳ, gồm cả dòng ngủ của toàn board. Tuổi thọ ≈ dung lượng × hệ số hiệu dụng / I_avg. Bảng này chỉ ra thành phần tiêu nhiều nhất (thường là radio) để tối ưu trước.</p></div></details><details class="qa-item" data-hot="0"><summary><span class="qn">22</span><span class="qt">Các kỹ thuật giảm năng lượng chính?</span></summary><div class="qa-a prose"><p>Chế độ ngủ sâu nhất mà nguồn đánh thức và thời gian thức cho phép; tickless idle cho RTOS; tắt clock và nguồn ngoại vi không dùng; GPIO không dùng ở analog; ổn áp dòng tĩnh thấp; race to sleep; để ngoại vi low-power (LPUART, LPTIM, ADC watchdog, DMA) làm việc khi CPU ngủ; gom việc và gom thời điểm thức dậy. Đo bằng PPK2/Joulescope.</p></div></details></div></div></section><section class="panel" id="p-quiz" data-panel="quiz" role="tabpanel" hidden><div class="quiz-bar"><div class="score" id="quiz-score">0 / 0</div><div class="meter"><span id="quiz-meter"></span></div><button class="btn ghost" id="quiz-reset" type="button">Làm lại</button></div><ol class="quiz" id="quiz"></ol></section><section class="panel" id="p-flashcard" data-panel="flashcard" role="tabpanel" hidden><div class="fc-tools"><span id="fc-pos" class="mono"></span><label class="chk"><input id="fc-only" type="checkbox"> Chỉ thẻ chưa thuộc</label><button class="btn ghost" id="fc-shuffle" type="button">Xáo trộn</button></div><div class="fc" id="fc" tabindex="0" role="button" aria-label="Lật thẻ"><div class="fc-face fc-front"><div class="fc-group" id="fc-g"></div><div class="fc-q" id="fc-q"></div><div class="fc-hint">Bấm hoặc nhấn Space để lật</div></div><div class="fc-face fc-back prose" id="fc-a" hidden></div></div><div class="fc-nav"><button class="btn ghost" id="fc-prev" type="button">← Trước</button><button class="btn warn" id="fc-again" type="button">Ôn lại</button><button class="btn ok" id="fc-known" type="button">Đã thuộc</button><button class="btn ghost" id="fc-next" type="button">Sau →</button></div></section><section class="panel" id="p-cheatsheet" data-panel="cheatsheet" role="tabpanel" hidden><div class="md-wrap"><article class="cheat"><section class="card"><h2 id="cheatsheet-quy-trinh-thiet-ke">Quy trình thiết kế</h2>
 <ol>
@@ -1780,6 +1798,19 @@ Life_h ≈ C_mAh · 0,8 / I_avg_mA
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

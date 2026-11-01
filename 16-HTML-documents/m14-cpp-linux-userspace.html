@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>C++ design cho Linux userspace</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -556,7 +574,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </code></pre></div>
 
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một hàm `void Logger::add_sink(std::shared_ptr<Sink> s)` lưu `s` vào danh sách. Một hàm khác `void Report::render(std::shared_ptr<Sink> s)` chỉ ghi vài dòng vào `s` rồi trả về. Chữ ký nào nên đổi và đổi thành gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một hàm <code>void Logger::add_sink(std::shared_ptr&lt;Sink&gt; s)</code> lưu <code>s</code> vào danh sách. Một hàm khác <code>void Report::render(std::shared_ptr&lt;Sink&gt; s)</code> chỉ ghi vài dòng vào <code>s</code> rồi trả về. Chữ ký nào nên đổi và đổi thành gì?</span></summary>
 <p><code>add_sink</code> giữ lại đồng sở hữu nên nhận <code>shared_ptr</code> theo giá trị (rồi <code>std::move</code> vào danh sách) là đúng. <code>render</code> chỉ mượn trong lúc gọi nên đổi thành <code>void render(Sink&amp; s)</code>: không tốn refcount, và người gọi không bị ép phải có <code>shared_ptr</code> (có thể truyền một <code>Sink</code> trên stack khi test).</p>
 </details>
 <aside class="callout c-key">
@@ -725,7 +743,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p>Nhiều codebase nhúng biên dịch với <code>-fno-exceptions</code> (giảm kích thước binary, tránh chi phí không dự đoán được). Khi đó toàn bộ codebase dùng <code>expected</code>/<code>error_code</code>, lỗi lập trình thì <code>abort()</code> để lấy core dump, và cấp phát thất bại cũng <code>abort</code>. Thư viện chuẩn vẫn dùng được nhưng các chỗ lẽ ra ném sẽ gọi <code>abort</code>.</p>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một callback được đăng ký với thư viện C (ví dụ `libmosquitto` gọi `on_message`). Bên trong callback, code C++ có thể ném exception. Rủi ro là gì và xử lý thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một callback được đăng ký với thư viện C (ví dụ <code>libmosquitto</code> gọi <code>on_message</code>). Bên trong callback, code C++ có thể ném exception. Rủi ro là gì và xử lý thế nào?</span></summary>
 <p>Exception đi xuyên qua các frame của code C là undefined behavior (thư viện C không được biên dịch để unwind, có thể bỏ lại trạng thái hỏng như khóa đang giữ). Phải bắt hết tại biên: thân callback bọc trong <code>try { ... } catch (const std::exception&amp; e) { log } catch (...) { log }</code>, chuyển lỗi thành mã trả về hoặc đẩy thành sự kiện cho tầng C++ xử lý sau. Hàm callback có thể khai báo <code>noexcept</code> để nếu quên bắt thì <code>terminate</code> ngay tại chỗ, dễ debug hơn UB.</p>
 </details>
 <aside class="callout c-key">
@@ -997,7 +1015,7 @@ libmqttc.so.2.4.1                         (file thật)
 <li><code>RTLD_NOW</code> báo lỗi symbol thiếu ngay lúc nạp (thay vì khi gọi); <code>RTLD_LOCAL</code> không để symbol của plugin này ảnh hưởng plugin khác.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đồng nghiệp thêm một trường `int retries_` vào giữa class public `MqttClient` (không dùng pImpl) trong `libmqttc.so.2`, build lại thư viện và cập nhật lên thiết bị, nhưng không build lại ứng dụng. Điều gì có thể xảy ra?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đồng nghiệp thêm một trường <code>int retries_</code> vào giữa class public <code>MqttClient</code> (không dùng pImpl) trong <code>libmqttc.so.2</code>, build lại thư viện và cập nhật lên thiết bị, nhưng không build lại ứng dụng. Điều gì có thể xảy ra?</span></summary>
 <p>Ứng dụng cũ được biên dịch với <code>sizeof(MqttClient)</code> và offset thành viên cũ: nó cấp phát thiếu bộ nhớ cho đối tượng (trên stack hoặc heap), và code inline trong ứng dụng đọc/ghi các trường ở offset cũ, lệch so với thư viện mới. Kết quả là hỏng bộ nhớ ngẫu nhiên, khó debug, vì nạp thư viện vẫn thành công (tên symbol không đổi). Đúng quy trình: đây là thay đổi vỡ ABI, phải tăng SONAME lên <code>.so.3</code>; hoặc dùng pImpl để thêm trường không bao giờ vỡ ABI; và chạy <code>abidiff</code> trong CI để bắt lỗi kiểu này.</p>
 </details>
 <aside class="callout c-key">
@@ -1144,7 +1162,7 @@ libmqttc.so.2.4.1                         (file thật)
 
 <p>Trình tự khi hủy <code>Uploader</code>: thân destructor (<code>queue_.close()</code>) → hủy <code>worker_</code> (request_stop rồi join) → hủy <code>client_</code> → hủy <code>queue_</code>. Lưu ý thêm: khởi động thread trong <strong>danh sách khởi tạo</strong> của thành viên cuối cùng, để các thành viên nó dùng đã được dựng xong; không khởi động thread trong thân constructor nếu sau đó constructor còn có thể ném (thread đang chạy với đối tượng dựng dở).</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đoạn code: `int fd = socket(...); if (setsockopt(fd, ...) &lt; 0) throw std::system_error(...); return fd;`. Có vấn đề gì và sửa thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đoạn code: <code>int fd = socket(...); if (setsockopt(fd, ...) &lt; 0) throw std::system_error(...); return fd;</code>. Có vấn đề gì và sửa thế nào?</span></summary>
 <p>Khi <code>setsockopt</code> lỗi, exception được ném mà fd chưa được đóng: rò fd. Service chạy lâu với lỗi lặp lại sẽ cạn fd. Sửa: bọc ngay sau khi tạo, <code>unique_fd fd(::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0));</code>, mọi đường thoát tự đóng, và trả về <code>unique_fd</code> (move) thay vì <code>int</code> để người gọi cũng nhận quyền sở hữu rõ ràng. Thêm <code>SOCK_CLOEXEC</code> để fd không rò sang process con.</p>
 </details>
 <aside class="callout c-key">
@@ -1368,7 +1386,7 @@ libmqttc.so.2.4.1                         (file thật)
 <li><strong>Giới hạn còn lại</strong>: nếu thread A <code>disconnect</code> trong lúc thread B đang chạy đúng slot đó, slot vẫn chạy nốt lần này <strong>sau</strong> khi <code>disconnect</code> trả về. Nếu người nghe bị hủy ngay sau đó, vẫn có rủi ro. Muốn đảm bảo tuyệt đối thì <code>disconnect</code> phải chờ lần gọi đang chạy kết thúc (thêm khóa riêng cho mỗi slot), hoặc đơn giản hơn: <strong>giam signal vào một thread</strong> (event loop), nơi không có hai việc chạy cùng lúc. Đây là lý do nhiều framework (Qt, GLib) gắn đối tượng với thread của nó.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `Signal::emit` chép danh sách slot ra rồi mới gọi, thay vì giữ mutex trong suốt vòng lặp gọi?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>Signal::emit</code> chép danh sách slot ra rồi mới gọi, thay vì giữ mutex trong suốt vòng lặp gọi?</span></summary>
 <p>Nếu giữ mutex khi gọi: một slot gọi <code>connect</code>, <code>disconnect</code> (qua <code>Connection</code> bị hủy) hoặc <code>emit</code> lại trên cùng signal sẽ tự deadlock vì mutex không đệ quy; slot chạy lâu chặn mọi thread khác muốn connect/emit; và giữ khóa khi gọi code lạ là nguồn deadlock kinh điển khi slot lấy khóa khác. Chép danh sách <code>shared_ptr</code> ra thì nhả khóa sớm, slot vẫn được giữ sống trong lúc gọi.</p>
 </details>
 <aside class="callout c-key">
@@ -1685,7 +1703,7 @@ libmqttc.so.2.4.1                         (file thật)
 
 <p>C++26 chuẩn hóa mô hình sender/receiver (<code>std::execution</code>) làm nền chung cho các framework bất đồng bộ.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một server dùng epoll edge-triggered. Thỉnh thoảng một client gửi request lớn và server không bao giờ trả lời, dù client vẫn kết nối. Nguyên nhân khả dĩ?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một server dùng epoll edge-triggered. Thỉnh thoảng một client gửi request lớn và server không bao giờ trả lời, dù client vẫn kết nối. Nguyên nhân khả dĩ?</span></summary>
 <p>Handler chỉ gọi <code>read</code> một lần (hoặc đọc một lượng cố định) khi được báo <code>EPOLLIN</code>. Request lớn hơn lượng đó, phần còn lại nằm trong buffer socket; với edge-triggered, epoll không báo lại vì không có dữ liệu <strong>mới</strong>. Server chờ phần còn lại mãi. Sửa: đọc trong vòng lặp tới khi <code>read</code> trả <code>EAGAIN</code> (hoặc chuyển sang level-triggered). Cũng kiểm tra phía ghi: ghi thiếu mà không đăng ký <code>EPOLLOUT</code> cũng gây triệu chứng tương tự.</p>
 </details>
 <aside class="callout c-key">
@@ -1958,7 +1976,7 @@ libmqttc.so.2.4.1                         (file thật)
 
 <p>Nguyên tắc: <strong>ngừng nhận</strong> trước, <strong>xử lý nốt có hạn chót</strong>, <strong>join theo thứ tự ngược phụ thuộc</strong> (người dùng tài nguyên dừng trước tài nguyên), và <strong>không bao giờ</strong> để destructor của static chạy khi thread còn sống (M05 Bài 6).</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Service dùng một `ThreadPool` 8 thread. Một task tính báo cáo chia việc thành 16 task con, `submit` vào cùng pool rồi `get()` từng future. Khi có 8 yêu cầu báo cáo đồng thời, service treo. Giải thích và đề xuất sửa.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Service dùng một <code>ThreadPool</code> 8 thread. Một task tính báo cáo chia việc thành 16 task con, <code>submit</code> vào cùng pool rồi <code>get()</code> từng future. Khi có 8 yêu cầu báo cáo đồng thời, service treo. Giải thích và đề xuất sửa.</span></summary>
 <p>Tám task báo cáo chiếm cả 8 worker, mỗi task chặn ở <code>get()</code> chờ task con; task con nằm trong queue nhưng không còn worker nào rảnh để chạy: deadlock do pool. Sửa: không chặn chờ trong task của pool. Cách làm: tách pool (task cha chạy ở pool khác với task con); hoặc task cha không chờ mà đăng ký phần tổng hợp chạy khi task con cuối cùng xong (đếm bằng atomic, task con cuối gọi bước tổng hợp); hoặc dùng framework có fork/join với work stealing, nơi thread đang chờ tự chạy task con.</p>
 </details>
 <aside class="callout c-key">
@@ -2210,7 +2228,7 @@ libmqttc.so.2.4.1                         (file thật)
 </table></div>
 <p>Quy tắc tương thích kiểu protobuf, áp dụng cho mọi định dạng: chỉ <strong>thêm</strong> trường mới, trường mới có giá trị mặc định hợp lý, <strong>không bao giờ dùng lại</strong> số hiệu/tên trường đã xóa, bên nhận <strong>bỏ qua trường không biết</strong>. Mọi message có trường loại và phiên bản trong header. Trên thiết bị nhúng, các process được cập nhật không đồng thời (cập nhật dở, rollback) nên tương thích hai chiều là bắt buộc.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Process giám sát camera (quyền root) và process phân tích ảnh (user thường, có seccomp) cần trao đổi khung hình 1080p ở 30 fps. Thiết kế IPC?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Process giám sát camera (quyền root) và process phân tích ảnh (user thường, có seccomp) cần trao đổi khung hình 1080p ở 30 fps. Thiết kế IPC?</span></summary>
 <p>Mỗi khung khoảng 3 MB (NV12) × 30 fps ≈ 90 MB/s: không nên copy qua socket. Process camera cấp phát một vài buffer bằng <code>memfd_create</code> (hoặc dmabuf từ driver), truyền fd một lần qua Unix socket (<code>SCM_RIGHTS</code>) lúc thiết lập; process phân tích <code>mmap</code> chỉ đọc. Sau đó mỗi khung chỉ gửi message nhỏ qua socket: chỉ số buffer, timestamp, sequence. Process phân tích trả lại "đã xong buffer i" để buffer được tái sử dụng (vòng buffer có giới hạn, khi phân tích chậm thì bỏ khung cũ). Kiểm tra quyền người kết nối bằng <code>SO_PEERCRED</code>. Thêm version vào message thiết lập để hai bên được cập nhật độc lập.</p>
 </details>
 <aside class="callout c-key">
@@ -2463,7 +2481,7 @@ libmqttc.so.2.4.1                         (file thật)
 <li>Với code nhúng chạy trên ARM: biên dịch chéo trong CI và chạy test bằng <strong>QEMU user mode</strong> (<code>qemu-aarch64 ./tests</code>) để bắt lỗi phụ thuộc kiến trúc (căn chỉnh, endianness, kích thước kiểu).</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một test kiểm tra "client tự kết nối lại sau khi server khởi động lại" mất 12 giây và thỉnh thoảng thất bại trên CI. Bạn thiết kế lại thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một test kiểm tra "client tự kết nối lại sau khi server khởi động lại" mất 12 giây và thỉnh thoảng thất bại trên CI. Bạn thiết kế lại thế nào?</span></summary>
 <p>Thời gian chờ đến từ backoff thật (<code>sleep</code>) và từ việc chờ server thật khởi động. Tách logic kết nối lại thành một máy trạng thái nhận sự kiện (<code>connected</code>, <code>disconnected</code>, <code>timer_fired</code>) và một <code>Clock</code>/<code>Timer</code> được tiêm vào. Unit test dùng đồng hồ giả: gây <code>disconnected</code>, tua đồng hồ qua từng mức backoff, kiểm tra máy trạng thái yêu cầu kết nối lại đúng lúc, với transport giả. Test chạy trong mili giây và tất định. Giữ một integration test thật (ít, chạy riêng) với timeout rộng và chờ theo tín hiệu (kết nối thành công) thay vì sleep cố định.</p>
 </details>
 <aside class="callout c-key">
@@ -3002,7 +3020,7 @@ libmqttc.so.2.4.1                         (file thật)
 <li><strong>Quy mô lớn</strong>: hàng triệu timeout (mỗi kết nối một timer) thì heap O(log n) và một khóa trở thành nút thắt. Dùng <strong>timer wheel</strong> (O(1), độ phân giải thô, M07 Bài 5), hoặc gắn timer vào event loop của thread sở hữu kết nối (Bài 6) để không cần khóa.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong `TimerScheduler::run`, vì sao sau `wait_until` lại `continue` để đánh giá lại từ đầu thay vì chạy luôn callback của `top`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong <code>TimerScheduler::run</code>, vì sao sau <code>wait_until</code> lại <code>continue</code> để đánh giá lại từ đầu thay vì chạy luôn callback của <code>top</code>?</span></summary>
 <p>Vì thread có thể thức dậy vì nhiều lý do: tới hạn, có timer <strong>sớm hơn</strong> vừa được thêm (lúc đó <code>top</code> không còn là phần tử đầu), timer <code>top</code> vừa bị <strong>hủy</strong>, <code>stop_</code> được đặt, hoặc spurious wakeup. Mọi trạng thái đã có thể thay đổi trong lúc ngủ (mutex được nhả khi chờ), nên phải đọc lại đầu heap và kiểm tra lại hạn. Đây cũng là lý do <code>Item top</code> được chép ra thay vì giữ tham chiếu vào heap.</p>
 </details>
 <aside class="callout c-key">
@@ -3412,6 +3430,19 @@ libmqttc.so.2.4.1                         (file thật)
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

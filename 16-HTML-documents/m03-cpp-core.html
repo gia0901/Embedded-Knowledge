@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>C++ core</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -499,7 +517,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p><strong>Thứ tự hủy</strong> ngược thứ tự dựng: đối tượng static được hủy sau <code>main</code> theo thứ tự ngược; thành viên của class được hủy theo thứ tự ngược với thứ tự <strong>khai báo</strong> (M14 Bài 4 về thread là thành viên cuối).</p>
 <p><strong>Thứ tự khởi tạo thành viên</strong> theo thứ tự <strong>khai báo trong class</strong>, không theo thứ tự viết trong danh sách khởi tạo. <code>-Wreorder</code> cảnh báo khi hai thứ tự khác nhau, vì dùng thành viên khai báo sau để khởi tạo thành viên khai báo trước là đọc giá trị chưa khởi tạo.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`struct S { int size; std::vector<int> data; S(int n) : data(n), size(data.size()) {} };` có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>struct S { int size; std::vector&lt;int&gt; data; S(int n) : data(n), size(data.size()) {} };</code> có vấn đề gì?</span></summary>
 <p>Không có vấn đề: <code>size</code> được khai báo trước nên được khởi tạo <strong>trước</strong> <code>data</code> bất kể thứ tự trong danh sách khởi tạo… và đó chính là vấn đề: <code>size(data.size())</code> chạy khi <code>data</code> chưa được dựng, gọi hàm thành viên trên đối tượng chưa tồn tại (UB). Sửa: khởi tạo từ tham số (<code>size(n)</code>), hoặc đổi thứ tự khai báo; bật <code>-Wreorder</code> (có trong <code>-Wall</code>).</p>
 </details>
 <aside class="callout c-key">
@@ -608,7 +626,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p>Vòng <code>for</code> trên phần tử của đối tượng tạm là trường hợp tinh vi nhất: <code>make_config()</code> trả đối tượng tạm, <code>.items()</code> trả tham chiếu vào bên trong nó; chỉ đối tượng mà tham chiếu ẩn của vòng <code>for</code> gắn vào (kết quả của <code>.items()</code>) được kéo dài, còn <code>Config</code> tạm thì chết. C++23 sửa riêng trường hợp này (kéo dài mọi đối tượng tạm trong biểu thức khởi tạo của range-for); code cần chạy với chuẩn cũ hơn thì giữ đối tượng trong một biến có tên.</p>
 <p>Công cụ bắt lỗi: <code>-fsanitize=address</code> (với <code>detect_stack_use_after_return=1</code>) bắt phần lớn trường hợp dùng vùng nhớ đã chết khi test.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong `void consume(std::string&amp;&amp; s) { store(s); }`, `store` có hai overload `store(const std::string&amp;)` và `store(std::string&amp;&amp;)`. Overload nào được gọi và vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong <code>void consume(std::string&amp;&amp; s) { store(s); }</code>, <code>store</code> có hai overload <code>store(const std::string&amp;)</code> và <code>store(std::string&amp;&amp;)</code>. Overload nào được gọi và vì sao?</span></summary>
 <p><code>store(const std::string&amp;)</code>: biểu thức <code>s</code> có tên nên là lvalue, dù kiểu khai báo là <code>std::string&amp;&amp;</code>. Chuỗi bị <strong>copy</strong> chứ không move. Muốn move phải viết <code>store(std::move(s))</code>.</p>
 </details>
 <aside class="callout c-key">
@@ -765,7 +783,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p>"Không có" nghĩa là hàm không được khai báo, nên một yêu cầu move sẽ chọn copy (nếu copy còn). "Xóa" nghĩa là hàm bị <code>= delete</code> ngầm: copy sẽ không biên dịch được. Copy constructor và move constructor cũng là constructor, nên khai báo chúng làm mất default constructor.</p>
 <p>Dòng dễ gây hại nhất: <strong>chỉ cần khai báo destructor</strong> (kể cả <code>~Widget() {}</code> để debug, hay <code>virtual ~Widget() = default</code>) là move không còn được sinh tự động, và mọi "move" âm thầm trở thành <strong>copy</strong>. Nếu class có destructor tường minh, hãy <code>= default</code> cả bốn hàm copy/move nếu muốn giữ chúng. B01 Item 17 phân tích kỹ.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một class có `std::vector<int> data;` và `virtual ~Base() = default;`. Trả về đối tượng đó theo giá trị từ hàm trong một vòng lặp chậm hơn dự kiến. Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một class có <code>std::vector&lt;int&gt; data;</code> và <code>virtual ~Base() = default;</code>. Trả về đối tượng đó theo giá trị từ hàm trong một vòng lặp chậm hơn dự kiến. Vì sao?</span></summary>
 <p>Khai báo destructor (dù là <code>= default</code>) làm compiler <strong>không sinh move</strong>. Ở những chỗ không có copy elision (gán, đưa vào container, trả về biến khi NRVO không áp dụng), đối tượng bị copy, kéo theo copy cả vector. Sửa: khai báo <code>Base(Base&amp;&amp;) = default; Base&amp; operator=(Base&amp;&amp;) = default;</code> (và copy nếu cần), hoặc nếu không cần đa hình thì bỏ destructor ảo.</p>
 </details>
 <aside class="callout c-key">
@@ -830,7 +848,7 @@ move có thể ném  copies=1023  moves=0
 </code></pre></div>
 
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::vector<std::string> v; std::string s = "hello"; v.push_back(std::move(s)); std::cout &lt;&lt; s.size();` in ra gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::vector&lt;std::string&gt; v; std::string s = &quot;hello&quot;; v.push_back(std::move(s)); std::cout &lt;&lt; s.size();</code> in ra gì?</span></summary>
 <p>Không xác định theo chuẩn (trạng thái hợp lệ nhưng không xác định); với libstdc++ thực tế là 0 vì bộ nhớ đã được chuyển đi (với chuỗi ngắn trong SSO thì nội dung được chép rồi chuỗi nguồn được đặt rỗng). Đoạn code hợp lệ (gọi <code>size()</code> không có tiền điều kiện), nhưng dựa vào giá trị đó là sai thiết kế. Sau khi move, hãy gán giá trị mới trước khi dùng lại.</p>
 </details>
 <aside class="callout c-key">
@@ -918,7 +936,7 @@ weak:
 </tbody>
 </table></div>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `std::make_unique<T>(...)` được khuyên dùng thay vì `std::unique_ptr<T>(new T(...))`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>std::make_unique&lt;T&gt;(...)</code> được khuyên dùng thay vì <code>std::unique_ptr&lt;T&gt;(new T(...))</code>?</span></summary>
 <p>Không lặp tên kiểu; không có <code>new</code> trần trong code (dễ kiểm tra rò rỉ); và trước C++17, trong biểu thức như <code>f(std::unique_ptr&lt;T&gt;(new T), g())</code>, thứ tự đánh giá có thể là <code>new T</code> → <code>g()</code> (ném) → chưa kịp dựng <code>unique_ptr</code>, dẫn tới rò bộ nhớ. <code>make_unique</code> gói việc cấp phát và nhận sở hữu thành một lời gọi. (C++17 đã siết thứ tự đánh giá tham số nên kịch bản rò này không còn, nhưng các lý do khác vẫn đúng.)</p>
 </details>
 <aside class="callout c-key">
@@ -1001,7 +1019,7 @@ weak:
 <h3 id="c-rtti-va-dynamic-cast">RTTI và <code>dynamic_cast</code></h3>
 <p><code>dynamic_cast</code> và <code>typeid</code> dùng thông tin kiểu lúc chạy lưu cùng vtable. Chi phí: tốn Flash cho typeinfo, <code>dynamic_cast</code> duyệt cây kế thừa (có thể chậm). Code nhúng thường tắt bằng <code>-fno-rtti</code> (M04 Bài 0). Nhu cầu "hỏi đối tượng là kiểu gì" thường là dấu hiệu nên thêm một hàm ảo, hoặc dùng <code>std::variant</code>.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`sizeof` của `struct S { char c; int i; virtual void f(); };` trên hệ 64-bit là bao nhiêu? Trên Cortex-M (32-bit)?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>sizeof</code> của <code>struct S { char c; int i; virtual void f(); };</code> trên hệ 64-bit là bao nhiêu? Trên Cortex-M (32-bit)?</span></summary>
 <p>64-bit: vptr 8 byte (đặt đầu đối tượng trong Itanium ABI), <code>char</code> 1 + 3 padding, <code>int</code> 4 → 16 byte (đã căn theo 8). Cortex-M 32-bit: vptr 4 + char 1 + 3 padding + int 4 = 12 byte. Câu trả lời tốt nêu rõ phụ thuộc ABI và có thể đổi thứ tự thành viên để giảm padding.</p>
 </details>
 <aside class="callout c-key">
@@ -1218,7 +1236,7 @@ weak:
 <p>Với <code>int</code>, tràn là UB nên compiler kết luận <code>x + 1 &lt; x</code> không bao giờ đúng và trả <code>false</code> cố định: phép kiểm tra tràn biến mất. Với <code>unsigned</code>, tràn là phép quay vòng có định nghĩa, phép so sánh được giữ (trở thành <code>x == UINT_MAX</code>). Cách kiểm tra tràn đúng: so sánh <strong>trước</strong> khi tính (<code>x &gt; INT_MAX - 1</code>) hoặc dùng <code>__builtin_add_overflow</code>.</p>
 <p>Công cụ: <strong>UBSan</strong> (<code>-fsanitize=undefined</code>) khi chạy test; <code>-Wall -Wextra</code>; static analyzer (clang-tidy, cppcheck); <code>-fwrapv</code> (định nghĩa tràn có dấu là quay vòng) chỉ nên dùng như lưới an toàn, không thay cho code đúng.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vòng lặp `for (int i = 0; i &gt;= 0; ++i) { ... }` dùng để "chạy tới khi tràn". Có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vòng lặp <code>for (int i = 0; i &gt;= 0; ++i) { ... }</code> dùng để "chạy tới khi tràn". Có vấn đề gì?</span></summary>
 <p>Tràn số có dấu là UB, compiler được suy ra <code>i &gt;= 0</code> luôn đúng (vì <code>i</code> bắt đầu từ 0 và chỉ tăng, không được phép tràn) và biến vòng lặp thành vô hạn. Muốn đếm vòng quanh thì dùng kiểu không dấu, hoặc viết điều kiện dừng rõ ràng.</p>
 </details>
 <aside class="callout c-key">
@@ -1358,7 +1376,7 @@ weak:
 <li><code>std::function</code> có thể cấp phát khi lambda bắt nhiều dữ liệu; dùng tham số template khi chỉ gọi ngay.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đoạn code xóa phần tử thỏa điều kiện trong `std::vector` bằng vòng lặp `for (auto it ...)` và `v.erase(it)`. Có lỗi gì và viết lại thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đoạn code xóa phần tử thỏa điều kiện trong <code>std::vector</code> bằng vòng lặp <code>for (auto it ...)</code> và <code>v.erase(it)</code>. Có lỗi gì và viết lại thế nào?</span></summary>
 <p>Sau <code>erase(it)</code>, <code>it</code> (và mọi iterator phía sau) mất hiệu lực; <code>++it</code> là UB; ngoài ra mỗi lần <code>erase</code> dịch các phần tử phía sau nên tổng là O(n²). Viết lại: <code>std::erase_if(v, pred)</code> (C++20), hoặc erase-remove idiom, hoặc nếu phải dùng vòng lặp: <code>it = v.erase(it)</code> và chỉ <code>++it</code> khi không xóa.</p>
 </details>
 <aside class="callout c-key">
@@ -1770,6 +1788,19 @@ weak:
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>C chuyên sâu cho Embedded</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -1272,6 +1290,19 @@ GCC ≥ 10: <code>-fno-common</code> → định nghĩa trùng lỗi link.</p>
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

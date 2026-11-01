@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>Thuật toán cho Embedded</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -502,11 +520,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Giá trị 12-bit bù hai `0xF38` là bao nhiêu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Giá trị 12-bit bù hai <code>0xF38</code> là bao nhiêu?</span></summary>
 <p>Bit dấu (bit 11) bằng 1. 0xF38 − 0x1000 = 3896 − 4096 = −200.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Làm tròn 100 lên lũy thừa của 2 kế tiếp?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Làm tròn 100 lên lũy thừa của 2 kế tiếp?</span></summary>
 <ol start="128">
 <li><code>__builtin_clz(99) = 25</code> (99 &lt; 128), <code>1 &lt;&lt; (32 − 25) = 128</code>.</li>
 </ol>
@@ -778,11 +796,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao hai thiết bị cùng "dùng CRC-16" mà CRC không khớp?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao hai thiết bị cùng "dùng CRC-16" mà CRC không khớp?</span></summary>
 <p>Khác tham số: đa thức (0x1021 hay 0x8005), init (0x0000 hay 0xFFFF), refin/refout, xorout, hoặc thứ tự byte khi ghi CRC vào gói tin.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đa thức CRC-32 0x04C11DB7 dạng đảo bit là gì, và dùng khi nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đa thức CRC-32 0x04C11DB7 dạng đảo bit là gì, và dùng khi nào?</span></summary>
 <p>0xEDB88320; dùng trong cài đặt LSB-first (dịch phải) cho CRC reflected (refin = refout = true).</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-2-checksum-va-crc">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-3-so-hoc-fixed-point" hidden><h2 id="c-bai-3-so-hoc-fixed-point">Bài 3 · Số học fixed-point</h2>
@@ -911,11 +929,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Biểu diễn 1,75 trong Q8.8 và Q16.16.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Biểu diễn 1,75 trong Q8.8 và Q16.16.</span></summary>
 <p>Q8.8: 1,75 × 256 = 448 (0x01C0). Q16.16: 1,75 × 65536 = 114688 (0x0001C000).</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Nhân hai số Q16.16 mà dùng `int32_t` cho tích trung gian thì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Nhân hai số Q16.16 mà dùng <code>int32_t</code> cho tích trung gian thì sao?</span></summary>
 <p>Tích của hai số có 32 bit thập phân và cần tới 64 bit; tính trong 32-bit sẽ tràn (UB với số có dấu) và mất phần nguyên. Phải ép sang <code>int64_t</code> trước khi nhân.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-3-so-hoc-fixed-point">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-4-loc-tin-hieu-chong-doi-phim-hysteresis" hidden><h2 id="c-bai-4-loc-tin-hieu-chong-doi-phim-hysteresis">Bài 4 · Lọc tín hiệu, chống dội phím, hysteresis</h2>
@@ -1015,11 +1033,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao EMA viết `y += (x − y) &gt;&gt; 4` với `y` cùng độ phân giải với `x` có thể không bao giờ đạt tới giá trị thật?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao EMA viết <code>y += (x − y) &gt;&gt; 4</code> với <code>y</code> cùng độ phân giải với <code>x</code> có thể không bao giờ đạt tới giá trị thật?</span></summary>
 <p>Khi |x − y| &lt; 16, <code>(x − y) &gt;&gt; 4</code> bằng 0 (hoặc −1 với số âm), nên y dừng cách x tới 15 LSB. Phải lưu trạng thái với 4 bit thập phân thêm.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Nút có thời gian dội tối đa 15 ms. Thiết kế debounce bằng bộ đếm với tick 5 ms thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Nút có thời gian dội tối đa 15 ms. Thiết kế debounce bằng bộ đếm với tick 5 ms thế nào?</span></summary>
 <p>DB_MAX = 4 (20 ms &gt; 15 ms): trạng thái chỉ đổi sau 4 mẫu liên tiếp nhất quán.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-4-loc-tin-hieu-chong-doi-phim-hysteresis">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-5-thoi-gian-tick-va-software-timer" hidden><h2 id="c-bai-5-thoi-gian-tick-va-software-timer">Bài 5 · Thời gian, tick và software timer</h2>
@@ -1090,11 +1108,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`if (now() &gt; last + 1000)` có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>if (now() &gt; last + 1000)</code> có vấn đề gì?</span></summary>
 <p><code>last + 1000</code> có thể tràn về số nhỏ, khiến điều kiện sai thời điểm. Viết <code>if ((uint32_t)(now() − last) &gt; 1000u)</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Timer wheel 256 slot, tick 1 ms, `cur = 250`, start timer 600 ms. Timer vào slot nào, mấy vòng?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Timer wheel 256 slot, tick 1 ms, <code>cur = 250</code>, start timer 600 ms. Timer vào slot nào, mấy vòng?</span></summary>
 <p>(250 + 600) % 256 = 850 % 256 = 82; số vòng = 600 / 256 = 2 (cài đặt có thể dùng <code>(d − 1) / N</code> tùy quy ước đếm).</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-5-thoi-gian-tick-va-software-timer">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-6-tim-kiem-sap-xep-noi-suy-va-so-hoc-nguyen-nhanh" hidden><h2 id="c-bai-6-tim-kiem-sap-xep-noi-suy-va-so-hoc-nguyen-nhanh">Bài 6 · Tìm kiếm, sắp xếp, nội suy và số học nguyên nhanh</h2>
@@ -1192,11 +1210,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `mid = (lo + hi) / 2` có thể sai?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>mid = (lo + hi) / 2</code> có thể sai?</span></summary>
 <p><code>lo + hi</code> có thể tràn kiểu khi các chỉ số lớn; <code>lo + (hi − lo) / 2</code> không tràn.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Muốn biết gia tốc có vượt 2g không (vector 3 trục), cách rẻ nhất?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Muốn biết gia tốc có vượt 2g không (vector 3 trục), cách rẻ nhất?</span></summary>
 <p>So sánh x² + y² + z² với (2g)², không cần tính căn bậc hai.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-6-tim-kiem-sap-xep-noi-suy-va-so-hoc-nguyen-nhanh">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-7-tinh-tat-dinh-wcet-va-do-hieu-nang" hidden><h2 id="c-bai-7-tinh-tat-dinh-wcet-va-do-hieu-nang">Bài 7 · Tính tất định, WCET và đo hiệu năng</h2>
@@ -1293,11 +1311,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đo thời gian một hàm bằng CYCCNT trên MCU 72 MHz được 1800 chu kỳ. Bao nhiêu µs?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đo thời gian một hàm bằng CYCCNT trên MCU 72 MHz được 1800 chu kỳ. Bao nhiêu µs?</span></summary>
 <p>1800 / 72 = 25 µs.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao đo thời gian chạy nhiều lần không chứng minh được WCET?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao đo thời gian chạy nhiều lần không chứng minh được WCET?</span></summary>
 <p>Chỉ cho xấu nhất quan sát được; trường hợp xấu hơn (tổ hợp ngắt, cache miss, dữ liệu đặc biệt) có thể không xuất hiện khi test. Cần biên an toàn, tạo tải xấu có chủ đích, hoặc phân tích tĩnh.</p>
 </details>
 <aside class="callout c-key">
@@ -1697,6 +1715,19 @@ Hysteresis: bật ≥ H, tắt ≤ L, L &lt; H.</p>
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

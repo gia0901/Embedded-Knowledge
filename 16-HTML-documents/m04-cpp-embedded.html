@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>C++ nâng cao cho Embedded</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -454,7 +472,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <h3 id="c-constructor-cua-doi-tuong-toan-cuc">Constructor của đối tượng toàn cục</h3>
 <p>Đối tượng toàn cục có constructor được gọi từ <code>.init_array</code> trong startup, <strong>trước <code>main</code></strong> (M02 Bài 4). Hệ quả: constructor chạy khi clock còn mặc định, ngoại vi chưa được cấp clock, RTOS chưa chạy. Quy tắc: constructor của đối tượng toàn cục chỉ gán giá trị (tốt nhất là <code>constexpr</code>/<code>constinit</code> để không chạy code nào), mọi việc chạm phần cứng làm trong hàm <code>init()</code> gọi tường minh từ <code>main</code>.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Thêm `virtual ~ISensor() = default;` vào một interface khiến firmware không dùng heap tăng gần 800 byte và xuất hiện `_malloc_r`, `_free_r` trong file map. Giải thích và sửa.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Thêm <code>virtual ~ISensor() = default;</code> vào một interface khiến firmware không dùng heap tăng gần 800 byte và xuất hiện <code>_malloc_r</code>, <code>_free_r</code> trong file map. Giải thích và sửa.</span></summary>
 <p>Destructor ảo khiến compiler sinh thêm "deleting destructor" (phiên bản dùng cho <code>delete p</code> qua con trỏ cơ sở), hàm này gọi <code>operator delete</code>, kéo theo <code>free</code> và <code>malloc</code> của newlib. Nếu interface không bao giờ được xóa qua con trỏ cơ sở (đối tượng tĩnh, sống suốt chương trình), đổi thành <code>protected: ~ISensor() = default;</code> (không ảo): không ai xóa nhầm được, và không còn deleting destructor. Đo thật: 1.048 B xuống 292 B.</p>
 </details>
 <aside class="callout c-key">
@@ -520,7 +538,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li><strong>CTAD</strong> (C++17): <code>std::array a{1, 2, 3};</code> tự suy ra <code>std::array&lt;int, 3&gt;</code>.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Firmware có `template<std::size_t N> void dump(const uint8_t (&amp;buf)[N])` được gọi với 30 kích thước mảng khác nhau. Có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Firmware có <code>template&lt;std::size_t N&gt; void dump(const uint8_t (&amp;buf)[N])</code> được gọi với 30 kích thước mảng khác nhau. Có vấn đề gì?</span></summary>
 <p>Mỗi <code>N</code> khác nhau là một bản sao riêng của toàn bộ hàm: 30 bản code gần giống nhau trong Flash. Giải pháp: giữ template làm "vỏ" mỏng inline chỉ chuyển <code>(buf, N)</code> vào một hàm không template duy nhất (Bài 7, đo được giảm gần một nửa với 10 kích thước), hoặc nhận <code>std::span&lt;const uint8_t&gt;</code> ngay từ đầu.</p>
 </details>
 <aside class="callout c-key">
@@ -586,7 +604,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 
 <p>Code mới nên dùng concept (<code>template &lt;std::integral T&gt;</code>), nhưng bạn sẽ gặp <code>enable_if</code> trong mọi codebase và thư viện cũ; cần đọc hiểu được.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một struct `SensorFrame` được gửi qua DMA bằng cách `memcpy` vào buffer. Một đồng nghiệp thêm thành viên `std::string label;`. Làm sao để lỗi này bị bắt lúc biên dịch?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một struct <code>SensorFrame</code> được gửi qua DMA bằng cách <code>memcpy</code> vào buffer. Một đồng nghiệp thêm thành viên <code>std::string label;</code>. Làm sao để lỗi này bị bắt lúc biên dịch?</span></summary>
 <p>Thêm <code>static_assert(std::is_trivially_copyable_v&lt;SensorFrame&gt;);</code> (và <code>std::is_standard_layout_v</code>, <code>sizeof</code> mong đợi) ngay sau định nghĩa struct hoặc trong hàm gửi. <code>std::string</code> chứa con trỏ tới heap và có constructor/destructor không tầm thường, nên struct không còn trivially copyable và build thất bại với thông báo rõ ràng.</p>
 </details>
 <aside class="callout c-key">
@@ -961,7 +979,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <h3 id="c-std-pmr-voi-buffer-tinh"><code>std::pmr</code> với buffer tĩnh</h3>
 <p>Khi muốn dùng container chuẩn có sẵn mà không chạm heap toàn cục: <code>std::pmr::monotonic_buffer_resource</code> trên một mảng tĩnh, với <code>std::pmr::null_memory_resource()</code> làm upstream để <strong>báo lỗi</strong> thay vì lén xin heap khi buffer cạn. Hợp với dữ liệu cùng vòng đời (một lần parse cấu hình lúc khởi động). Tốn thêm Flash cho phần pmr của libstdc++, nên đo trước.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `StaticVector` dùng `alignas(T) std::byte storage_[N * sizeof(T)]` thay vì `T storage_[N]`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>StaticVector</code> dùng <code>alignas(T) std::byte storage_[N * sizeof(T)]</code> thay vì <code>T storage_[N]</code>?</span></summary>
 <p><code>T storage_[N]</code> dựng sẵn N đối tượng ngay khi tạo container: cần T có default constructor, tốn thời gian dựng/hủy những phần tử chưa dùng, và sai ngữ nghĩa (<code>size()</code> = 0 nhưng có N đối tượng sống). Bộ nhớ thô cho phép đối tượng chỉ tồn tại khi được <code>push_back</code> (placement new) và kết thúc khi <code>pop_back</code> (gọi destructor tường minh), đúng như <code>std::vector</code> làm với bộ nhớ heap.</p>
 </details>
 <aside class="callout c-key">
@@ -1301,7 +1319,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <h3 id="c-nhung-thu-khong-lam-trong-isr">Những thứ không làm trong ISR</h3>
 <p>Cấp phát động, ném exception, <code>std::function</code> có thể cấp phát, khóa mutex, ghi log định dạng, gọi hàm không reentrant. Gọi hàm ảo, dùng lambda không bắt gì, <code>std::array</code>, <code>std::span</code>, atomic lock-free thì hoàn toàn được.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>ISR được viết là `void TIM2_IRQHandler() { ... }` trong file `timer.cpp`. Timer chạy nhưng chương trình treo ở `Default_Handler`. Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">ISR được viết là <code>void TIM2_IRQHandler() { ... }</code> trong file <code>timer.cpp</code>. Timer chạy nhưng chương trình treo ở <code>Default_Handler</code>. Vì sao?</span></summary>
 <p>Trong file C++, tên hàm bị mangle (ví dụ <code>_Z15TIM2_IRQHandlerv</code>), không khớp ký hiệu <code>TIM2_IRQHandler</code> mà bảng vector tham chiếu. Ký hiệu yếu trong startup không bị thay thế, ngắt nhảy vào <code>Default_Handler</code>. Sửa: <code>extern "C" void TIM2_IRQHandler()</code>. Kiểm tra bằng <code>nm fw.elf | grep TIM2</code> (phải thấy <code>T TIM2_IRQHandler</code>, không phải <code>W</code>).</p>
 </details>
 <aside class="callout c-key">
@@ -1688,6 +1706,19 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

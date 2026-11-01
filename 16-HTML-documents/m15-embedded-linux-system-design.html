@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>System design cho Embedded Linux</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -531,7 +549,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </tbody>
 </table></div>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Gateway có service `cloudd` chạy với quyền root vì "cần đọc chứng chỉ trong /etc/ssl/private và thỉnh thoảng bật tắt modem". Bạn thiết kế lại thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Gateway có service <code>cloudd</code> chạy với quyền root vì "cần đọc chứng chỉ trong /etc/ssl/private và thỉnh thoảng bật tắt modem". Bạn thiết kế lại thế nào?</span></summary>
 <p><code>cloudd</code> là service tiếp xúc Internet nên phải có ít quyền nhất. Chứng chỉ: đặt quyền file cho group riêng mà <code>cloudd</code> thuộc về (hoặc dùng <code>LoadCredential=</code> của systemd để systemd đọc và trao cho service). Bật tắt modem: không làm trực tiếp, mà gọi qua D-Bus tới ModemManager (policy D-Bus cho phép user của <code>cloudd</code> gọi đúng phương thức đó) hoặc gửi yêu cầu tới <code>devmgr</code>. Chạy <code>cloudd</code> với user riêng, <code>NoNewPrivileges</code>, <code>ProtectSystem=strict</code>, không capability nào (Bài 2, Bài 7).</p>
 </details>
 <aside class="callout c-key">
@@ -661,7 +679,7 @@ $ systemd-analyze plot &gt; boot.svg       # biểu đồ thời gian
 <li><strong>LoadCredential=</strong>: systemd đọc file bí mật (khóa, mật khẩu) và đưa cho service qua thư mục riêng, service không cần quyền đọc file gốc.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Service `Type=simple` với `Restart=always`. Khi cấu hình sai, nó thoát ngay sau khi khởi động, và thiết bị nóng lên vì CPU 100%. Chuyện gì xảy ra và sửa thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Service <code>Type=simple</code> với <code>Restart=always</code>. Khi cấu hình sai, nó thoát ngay sau khi khởi động, và thiết bị nóng lên vì CPU 100%. Chuyện gì xảy ra và sửa thế nào?</span></summary>
 <p>Service thoát, systemd restart, lặp liên tục. Mặc định <code>StartLimitBurst</code> (5 lần trong 10 giây) sẽ chặn lại, nhưng nếu ai đó đặt <code>StartLimitIntervalSec=0</code> (tắt giới hạn) hoặc <code>RestartSec</code> quá ngắn thì vòng lặp không dừng. Sửa: <code>Restart=on-failure</code> với <code>RestartSec=</code> hợp lý (vài giây, có thể tăng dần bằng <code>RestartSteps=</code>/<code>RestartMaxDelaySec=</code> ở systemd mới), giữ giới hạn khởi động và chỉ định hành động khi vượt (<code>StartLimitAction=</code> hoặc <code>OnFailure=</code> chạy một unit báo lỗi). Phía chương trình: lỗi cấu hình nên được phát hiện, ghi log rõ, và với cấu hình do <code>configd</code> áp dụng thì quay về cấu hình cũ.</p>
 </details>
 <aside class="callout c-key">
@@ -783,7 +801,7 @@ $ systemd-analyze plot &gt; boot.svg       # biểu đồ thời gian
 <li>Backoff giữa các lần restart service; với lỗi phụ thuộc bên ngoài (mất mạng, cảm biến rút ra), <strong>không</strong> coi là lỗi sức khỏe gây restart: thành phần vẫn "sống", chỉ là đang ở trạng thái lỗi được xử lý.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một gateway reboot liên tục mỗi 3 phút sau khi kỹ thuật viên rút cáp mạng. Log cho thấy `cloudd` bị watchdog của systemd kill rồi `StartLimitAction=reboot`. Thiết kế sai ở đâu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một gateway reboot liên tục mỗi 3 phút sau khi kỹ thuật viên rút cáp mạng. Log cho thấy <code>cloudd</code> bị watchdog của systemd kill rồi <code>StartLimitAction=reboot</code>. Thiết kế sai ở đâu?</span></summary>
 <p><code>cloudd</code> coi "mất kết nối tới cloud" là mất sức khỏe (có lẽ thread kết nối bị chặn trong <code>connect()</code> không timeout, hoặc chỉ <code>beat</code> khi gửi thành công). Mất mạng là tình huống bình thường cần xử lý, không phải lỗi treo. Sửa: mọi thao tác mạng có timeout và chạy không chặn; thành phần báo sống mỗi khi vòng lặp của nó <strong>chạy</strong> (kể cả khi đang ở trạng thái "chờ kết nối lại với backoff"); trạng thái mất mạng được báo cáo qua <code>STATUS=</code> và metric chứ không qua watchdog. Ngoài ra, chỉ service thật sự sống còn mới nên có <code>StartLimitAction=reboot</code>.</p>
 </details>
 <aside class="callout c-key">
@@ -880,7 +898,7 @@ $ systemd-analyze plot &gt; boot.svg       # biểu đồ thời gian
 <li>Cấu hình một phần eMMC ở chế độ <strong>pSLC</strong> (enhanced area) cho phân vùng ghi nhiều: dung lượng giảm nhưng độ bền tăng nhiều lần.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Camera giám sát lưu clip 24/7 vào thẻ SD 64 GB, ghi vòng tròn. Sau 8 tháng nhiều thiết bị bị lỗi thẻ. Bạn phân tích và đề xuất gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Camera giám sát lưu clip 24/7 vào thẻ SD 64 GB, ghi vòng tròn. Sau 8 tháng nhiều thiết bị bị lỗi thẻ. Bạn phân tích và đề xuất gì?</span></summary>
 <p>Ghi video liên tục là khối lượng ghi rất lớn: ví dụ 4 Mbit/s ≈ 43 GB/ngày, tức gần một vòng thẻ mỗi ngày rưỡi. Thẻ TLC tiêu dùng chịu cỡ vài trăm P/E, vài trăm vòng tương đương khoảng 1 năm, khớp với triệu chứng. Đề xuất: dùng thẻ high-endurance/industrial (được đánh giá cho ghi liên tục), tính TBW theo bitrate thật và chọn dung lượng/loại theo tuổi thọ yêu cầu; ghi tuần tự khối lớn (WAF thấp), tránh cập nhật metadata/index liên tục; chỉ ghi liên tục khi thật cần (ghi theo sự kiện chuyển động); theo dõi tình trạng thẻ (với eMMC dùng EXT_CSD; với SD tùy hãng có lệnh sức khỏe riêng) và cảnh báo trước khi hỏng.</p>
 </details>
 <aside class="callout c-key">
@@ -1068,7 +1086,7 @@ $ systemd-analyze plot &gt; boot.svg       # biểu đồ thời gian
 <li>Cửa sổ thời gian cài và reboot theo giờ địa phương của thiết bị, có ngẫu nhiên hóa để máy chủ không bị dồn tải.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Sau một bản cập nhật, 2% thiết bị trong fleet quay về bản cũ, số còn lại chạy bình thường. Bạn điều tra thế nào và hệ thống nên hỗ trợ gì để việc này dễ dàng?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Sau một bản cập nhật, 2% thiết bị trong fleet quay về bản cũ, số còn lại chạy bình thường. Bạn điều tra thế nào và hệ thống nên hỗ trợ gì để việc này dễ dàng?</span></summary>
 <p>Trước hết dừng đợt triển khai (cơ chế theo đợt phải tự dừng khi tỉ lệ rollback vượt ngưỡng). Cần dữ liệu: thiết bị rollback gửi về lý do (slot bị mark-bad bởi kiểm tra sức khỏe nào, hay hết lượt do reset; reset cause; log của các lần khởi động thất bại được giữ lại trên phân vùng data hoặc pstore/ramoops). So sánh nhóm 2% với phần còn lại theo phiên bản phần cứng, phiên bản bootloader, cấu hình, dung lượng data, vùng mạng. Nguyên nhân thường gặp: biến thể phần cứng thiếu driver trong bản mới, chuyển đổi dữ liệu thất bại với dữ liệu thực tế lớn, kiểm tra sức khỏe phụ thuộc mạng. Hệ thống nên có: báo cáo kết quả cập nhật kèm lý do, giữ log lần khởi động lỗi, nhóm thiết bị theo biến thể phần cứng để triển khai riêng.</p>
 </details>
 <aside class="callout c-key">
@@ -1236,7 +1254,7 @@ cyclictest --mlockall --smp --priority=90 --interval=1000 --histogram=400 --dura
 
 <p>Giá trị cần nhìn là <strong>max</strong>, không phải trung bình. Một hệ thống "trung bình 8 µs" mà max 2 ms vẫn trượt deadline 1 ms. Nên chạy hàng giờ, với mọi tải có thể xảy ra trên sản phẩm thật (GPU, mạng, ghi eMMC).</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vòng điều khiển 1 kHz trên Linux thường trễ dưới 50 µs, nhưng mỗi vài phút có một chu kỳ trễ 3 ms đúng lúc service log ghi xuống eMMC. Các nguyên nhân khả dĩ và cách xử lý?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vòng điều khiển 1 kHz trên Linux thường trễ dưới 50 µs, nhưng mỗi vài phút có một chu kỳ trễ 3 ms đúng lúc service log ghi xuống eMMC. Các nguyên nhân khả dĩ và cách xử lý?</span></summary>
 <p>Có thể: thread RT (hoặc thread nó chờ qua mutex) gọi log trực tiếp và bị chặn khi I/O; mutex dùng chung với thread log không có priority inheritance; ngắt và softirq của eMMC chạy trên cùng CPU với priority cao hơn; page fault do bộ nhớ chưa khóa (khi hệ thống chịu áp lực bộ nhớ vì page cache). Xử lý: thread RT không bao giờ log hay chạm file, chỉ đẩy vào queue SPSC; bỏ mutex dùng chung hoặc dùng PI mutex; <code>mlockall</code>; ghim thread RT vào CPU cô lập, đẩy ngắt eMMC sang CPU khác; dùng PREEMPT_RT để ngắt chạy dạng thread có priority thấp hơn thread điều khiển. Đo lại bằng cyclictest khi đang ghi eMMC nặng.</p>
 </details>
 <aside class="callout c-key">
@@ -1312,7 +1330,7 @@ cyclictest --mlockall --smp --priority=90 --interval=1000 --histogram=400 --dura
 <h3 id="c-quy-dinh-phap-ly">Quy định pháp lý</h3>
 <p>Ở thị trường châu Âu, <strong>Cyber Resilience Act (CRA)</strong> áp dụng cho hầu hết sản phẩm có thành phần số: nghĩa vụ <strong>báo cáo</strong> lỗ hổng đang bị khai thác và sự cố nghiêm trọng áp dụng từ <strong>tháng 9/2026</strong>, các yêu cầu đầy đủ (thiết kế an toàn mặc định, xử lý lỗ hổng, cập nhật bảo mật trong thời gian hỗ trợ, SBOM) áp dụng từ <strong>tháng 12/2027</strong>. Thiết bị vô tuyến bán ở EU còn phải theo yêu cầu an ninh mạng của chỉ thị RED (bộ tiêu chuẩn EN 18031) từ tháng 8/2025. Khi phỏng vấn, nhắc được rằng <strong>kênh cập nhật bảo mật và quy trình xử lý lỗ hổng</strong> giờ là yêu cầu pháp lý, không chỉ là thực hành tốt, là một điểm cộng.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đề xuất cách cấp danh tính cho 50.000 thiết bị kết nối tới máy chủ MQTT trên cloud.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đề xuất cách cấp danh tính cho 50.000 thiết bị kết nối tới máy chủ MQTT trên cloud.</span></summary>
 <p>Mỗi thiết bị có một cặp khóa riêng: tốt nhất sinh <strong>bên trong</strong> secure element/TPM ở trạm sản xuất (khóa riêng không bao giờ ra ngoài), trạm gửi yêu cầu ký (CSR) tới CA của hãng, nạp chứng chỉ trả về vào thiết bị (phân vùng factory hoặc chính secure element). Thiết bị kết nối bằng mTLS: máy chủ xác thực bằng chứng chỉ, ánh xạ CN/serial sang quyền (chỉ được publish topic của chính nó). Thu hồi một thiết bị bằng danh sách thu hồi hoặc vô hiệu hóa trên máy chủ. Có cơ chế xoay vòng chứng chỉ trước khi hết hạn (qua kênh đã xác thực). Không dùng chung một chứng chỉ hay một mật khẩu cho cả fleet.</p>
 </details>
 <aside class="callout c-key">
@@ -2037,6 +2055,19 @@ cyclictest --mlockall --smp --priority=90 --interval=1000 --histogram=400 --dura
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>Concurrency: POSIX, RTOS và luyện đề</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -530,7 +548,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li><strong>Amdahl</strong>: phần tuần tự <code>s</code> giới hạn tốc độ tối đa ở <code>1/s</code> dù có bao nhiêu nhân.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `std::atomic<int>` với `relaxed` vẫn đủ cho bộ đếm số request, nhưng không đủ cho cờ `ready` ở trên?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>std::atomic&lt;int&gt;</code> với <code>relaxed</code> vẫn đủ cho bộ đếm số request, nhưng không đủ cho cờ <code>ready</code> ở trên?</span></summary>
 <p>Bộ đếm chỉ cần tính nguyên tử của chính nó; không ai dùng giá trị đếm để suy ra dữ liệu khác đã sẵn sàng. Cờ <code>ready</code> thì được dùng để suy ra <code>payload</code> đã ghi xong, nên cần quan hệ happens-before giữa ghi <code>payload</code> và đọc <code>payload</code>, thứ mà chỉ cặp release/acquire (hoặc seq_cst) tạo ra.</p>
 </details>
 <aside class="callout c-key">
@@ -681,7 +699,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p><code>pthread_cancel</code> yêu cầu một thread dừng; ở chế độ mặc định (deferred), thread dừng khi tới một <strong>cancellation point</strong> (<code>read</code>, <code>write</code>, <code>sleep</code>, <code>pthread_cond_wait</code>…). Với C++, glibc hiện thực việc hủy bằng một "exception" đặc biệt (<code>abi::__forced_unwind</code>) chạy ngược stack: destructor được gọi, nhưng nếu code có <code>catch (...)</code> mà không ném lại thì chương trình bị <code>abort</code>. Ngoài ra rất khó đảm bảo dữ liệu nhất quán khi thread bị dừng ở một điểm tùy ý.</p>
 <p>Thay vào đó dùng <strong>dừng hợp tác</strong>: thread tự kiểm tra cờ (<code>std::stop_token</code>, <code>std::atomic&lt;bool&gt;</code>) ở những điểm an toàn, và các chỗ chặn được đánh thức bằng cách đóng queue, ghi vào <code>eventfd</code>, hoặc <code>condition_variable_any</code> nhận <code>stop_token</code>. M14 Bài 6 trình bày thiết kế shutdown đầy đủ.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một service có 200 thread trên board ARM 32-bit, `pthread_create` bắt đầu trả `EAGAIN` dù RAM còn trống nhiều. Nguyên nhân khả dĩ nhất và cách xử lý?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một service có 200 thread trên board ARM 32-bit, <code>pthread_create</code> bắt đầu trả <code>EAGAIN</code> dù RAM còn trống nhiều. Nguyên nhân khả dĩ nhất và cách xử lý?</span></summary>
 <p>Hết <strong>không gian địa chỉ ảo</strong> chứ không hết RAM: 200 × 8 MiB stack mặc định ≈ 1,6 GiB địa chỉ ảo, cộng heap và thư viện là chạm giới hạn ~3 GiB của userspace 32-bit. Cũng có thể chạm giới hạn số task (<code>ulimit -u</code>, <code>/proc/sys/kernel/threads-max</code>). Xử lý: đặt stack size nhỏ theo nhu cầu đo được, và xem lại thiết kế: 200 thread thường là dấu hiệu nên chuyển sang event loop hoặc thread pool (M14).</p>
 </details>
 <aside class="callout c-key">
@@ -869,7 +887,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p>Thường là dấu hiệu thiết kế chưa rõ: hàm public khóa rồi gọi hàm public khác cũng khóa. Lời giải sạch hơn là tách hàm nội bộ <code>do_x_locked()</code> giả định đã giữ khóa, và các hàm public chỉ khóa một lần ở ngoài cùng. Recursive mutex cũng che giấu việc bất biến (invariant) của dữ liệu có thể đang bị phá dở giữa chừng khi hàm bên trong chạy.</p>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `unlock` trong `FutexMutex` dùng `fetch_sub` mà không đơn giản là `store(0)` rồi luôn gọi `wake_one()`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>unlock</code> trong <code>FutexMutex</code> dùng <code>fetch_sub</code> mà không đơn giản là <code>store(0)</code> rồi luôn gọi <code>wake_one()</code>?</span></summary>
 <p>Vẫn đúng nhưng mỗi lần unlock tốn một system call, kể cả khi không ai chờ, làm mất toàn bộ lợi ích "fast userspace". <code>fetch_sub</code> trả về giá trị cũ, cho biết có thể có người chờ (2) hay chắc chắn không (1), nên chỉ trường hợp có tranh chấp mới vào kernel.</p>
 </details>
 <aside class="callout c-key">
@@ -1058,7 +1076,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </tbody>
 </table></div>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một hàng đợi dùng `std::counting_semaphore` đếm số phần tử và `std::mutex` bảo vệ `std::deque`. Consumer làm `items.acquire()` rồi khóa mutex lấy phần tử. Có cần condition variable không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một hàng đợi dùng <code>std::counting_semaphore</code> đếm số phần tử và <code>std::mutex</code> bảo vệ <code>std::deque</code>. Consumer làm <code>items.acquire()</code> rồi khóa mutex lấy phần tử. Có cần condition variable không?</span></summary>
 <p>Không. Semaphore đã đảm nhận việc chờ: mỗi <code>release</code> của producer tương ứng đúng một phần tử, nên sau khi <code>acquire</code> thành công consumer chắc chắn có phần tử để lấy. Mutex chỉ bảo vệ cấu trúc <code>deque</code>. Đây là cách cài queue không giới hạn kinh điển; queue có giới hạn cần thêm semaphore thứ hai đếm số chỗ trống.</p>
 </details>
 <aside class="callout c-key">
@@ -1209,7 +1227,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li>Hai nhân khác loại (M7 + M4) thường giao tiếp qua shared RAM cộng <strong>hardware semaphore</strong> (HSEM) và ngắt liên nhân, cẩn thận với cache của M7 (M09 Bài 2).</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một biến `uint32_t` được ISR tăng (`ticks++`) và task đọc. Trên Cortex-M4 một nhân, cần bảo vệ không? Nếu là `uint64_t` thì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một biến <code>uint32_t</code> được ISR tăng (<code>ticks++</code>) và task đọc. Trên Cortex-M4 một nhân, cần bảo vệ không? Nếu là <code>uint64_t</code> thì sao?</span></summary>
 <p>Với <code>uint32_t</code> căn chỉnh: chỉ ISR ghi, task chỉ đọc một lệnh <code>LDR</code> nguyên tử, nên task luôn thấy một giá trị hợp lệ (cũ hoặc mới); khai báo <code>volatile</code> (hoặc dùng atomic relaxed) để compiler không giữ trong thanh ghi. Với <code>uint64_t</code>, đọc cần hai lệnh: ISR có thể chen giữa hai nửa và task thấy giá trị rách (nửa cũ nửa mới). Phải đọc trong critical section, hoặc đọc lặp tới khi hai lần đọc nửa cao giống nhau.</p>
 </details>
 <aside class="callout c-key">
@@ -1338,7 +1356,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li><code>detach</code> + lambda bắt tham chiếu tới biến cục bộ: thread tiếp tục chạy sau khi hàm tạo nó return, đọc stack đã bị dùng lại. Gần như mọi trường hợp <code>detach</code> đều nên thay bằng thread có chủ sở hữu rõ ràng (một đối tượng chịu trách nhiệm join).</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Service gọi `system("ip link set eth0 up")` từ một worker thread, thỉnh thoảng process con treo không bao giờ chạy lệnh. Giải thích và cách sửa.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Service gọi <code>system(&quot;ip link set eth0 up&quot;)</code> từ một worker thread, thỉnh thoảng process con treo không bao giờ chạy lệnh. Giải thích và cách sửa.</span></summary>
 <p><code>system</code> dùng <code>fork</code> (hoặc <code>posix_spawn</code> tùy phiên bản glibc) rồi <code>exec /bin/sh</code>. Nếu hiện thực fork rồi chạy code giữa fork và exec có đụng tới khóa (hoặc chính chương trình có <code>pthread_atfork</code> handler, hoặc thư viện ghi log trong đường đó), process con có thể chờ một khóa bị giữ bởi thread không tồn tại trong con. Ngoài ra <code>system</code> còn đổi signal mask/handler của SIGINT, SIGQUIT trong process cha, không an toàn khi có nhiều thread. Sửa: dùng <code>posix_spawn</code> với đường dẫn tuyệt đối và đối số rõ ràng (không qua shell), hoặc tốt hơn là gọi trực tiếp API (netlink/ioctl, thư viện như libnl) thay vì chạy lệnh ngoài.</p>
 </details>
 <aside class="callout c-key">
@@ -1423,7 +1441,7 @@ $2 = 499
 <li>Contention (chậm chứ không sai): <code>perf lock</code>, <code>perf record -e sched:sched_switch</code>, off-CPU flame graph, hoặc <code>mutrace</code>.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>TSan báo data race trên một `bool stop_flag` mà một thread ghi `true` và thread kia đọc trong vòng lặp. Đồng nghiệp bảo "bool ghi một byte là nguyên tử trên x86, bỏ qua được". Bạn trả lời thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">TSan báo data race trên một <code>bool stop_flag</code> mà một thread ghi <code>true</code> và thread kia đọc trong vòng lặp. Đồng nghiệp bảo "bool ghi một byte là nguyên tử trên x86, bỏ qua được". Bạn trả lời thế nào?</span></summary>
 <p>Không bỏ qua được: đây là data race nên là UB theo chuẩn, và compiler được phép tối ưu dựa trên giả định không có race. Cụ thể vòng <code>while (!stop_flag) work();</code> có thể bị biến thành đọc <code>stop_flag</code> một lần rồi lặp vô hạn nếu <code>work()</code> không chạm tới biến đó. Phần cứng nguyên tử không cứu được tối ưu của compiler. Sửa: <code>std::atomic&lt;bool&gt;</code> (relaxed là đủ nếu cờ không dùng để công bố dữ liệu khác), hoặc dùng <code>std::stop_token</code>.</p>
 </details>
 <aside class="callout c-key">
@@ -2336,6 +2354,19 @@ taskset -c 0 ./test
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

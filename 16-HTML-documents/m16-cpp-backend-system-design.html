@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>System design cho C++ server/backend</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -560,7 +578,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 
 <p>Ví dụ 3 cho thấy ước lượng dẫn thẳng tới quyết định kiến trúc: ở 100 ns mỗi message, <strong>cách viết code</strong> (bố cục bộ nhớ, không cấp phát) quan trọng hơn mọi lựa chọn công nghệ.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một service nhận 50.000 request/s, mỗi request đọc 3 khóa từ một cache từ xa (round trip 300 µs) một cách tuần tự. Độ trễ tối thiểu mỗi request và số request đang xử lý đồng thời là bao nhiêu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một service nhận 50.000 request/s, mỗi request đọc 3 khóa từ một cache từ xa (round trip 300 µs) một cách tuần tự. Độ trễ tối thiểu mỗi request và số request đang xử lý đồng thời là bao nhiêu?</span></summary>
 <p>Độ trễ tối thiểu ≈ 3 × 300 µs = 0,9 ms chỉ riêng cho cache (chưa tính xử lý). Theo định luật Little, số request đồng thời L = λ × W = 50.000 × 0,0009 ≈ 45 request đang ở trong hệ thống tại mọi thời điểm. Với mô hình một thread mỗi request (chặn khi chờ), cần ít nhất ~45 thread chỉ để chờ; với event loop thì vài thread là đủ. Cải thiện: đọc 3 khóa song song (một round trip) hoặc gộp thành một lệnh multi-get, giảm độ trễ xuống ~0,3 ms.</p>
 </details>
 <aside class="callout c-key">
@@ -700,7 +718,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li><strong>Drain khi triển khai</strong>: ngừng nhận kết nối mới, báo cho load balancer, xử lý nốt, rồi mới tắt.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một service RPC nội bộ có p50 = 0,3 ms nhưng p99 = 40 ms, và các request p99 đều là request có response nhỏ hơn 1 KB. Nghi ngờ đầu tiên?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một service RPC nội bộ có p50 = 0,3 ms nhưng p99 = 40 ms, và các request p99 đều là request có response nhỏ hơn 1 KB. Nghi ngờ đầu tiên?</span></summary>
 <p>Con số ~40 ms gần như là dấu hiệu của <strong>Nagle + delayed ACK</strong>: server gửi response thành hai lần <code>write</code> nhỏ (header rồi body); Nagle giữ gói thứ hai lại chờ ACK của gói thứ nhất, còn client hoãn ACK tới ~40 ms. Kiểm tra bằng <code>ss -i</code>/tcpdump, sửa bằng <code>TCP_NODELAY</code> và gom response thành một lần ghi (<code>writev</code>). Các nghi ngờ khác nếu không phải: tái truyền TCP (RTO tối thiểu ~200 ms), GC/compaction ở tầng lưu trữ, khóa tranh chấp.</p>
 </details>
 <aside class="callout c-key">
@@ -841,7 +859,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </table></div>
 <p>Quy tắc đo: tắt thay đổi tần số CPU hoặc ghim tần số, chạy nhiều lần và báo cả độ dao động, đo trên dữ liệu giống thật, và nhớ rằng micro benchmark nhanh không có nghĩa hệ thống nhanh (cache trong benchmark luôn "nóng").</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một service tra cứu giá theo mã sản phẩm dùng `std::map<std::string, Price>` 2 triệu phần tử, CPU 100% ở hàm tra cứu. Bạn cải tiến theo thứ tự nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một service tra cứu giá theo mã sản phẩm dùng <code>std::map&lt;std::string, Price&gt;</code> 2 triệu phần tử, CPU 100% ở hàm tra cứu. Bạn cải tiến theo thứ tự nào?</span></summary>
 <p>Đo trước (<code>perf</code>): nhiều khả năng thời gian đi vào so sánh chuỗi và cache miss khi duyệt cây (mỗi tầng một node rải rác trong heap, ~21 tầng). Bước 1: đổi sang hash map địa chỉ mở (<code>absl::flat_hash_map</code>), tra cứu O(1) với ~1–2 cache miss. Bước 2: nếu mã sản phẩm có cấu trúc, đổi khóa từ <code>std::string</code> sang số nguyên hoặc chuỗi cố định độ dài (so sánh nhanh, không cấp phát). Bước 3: tra cứu không cấp phát (dùng <code>string_view</code> với hash trong suốt, M14 Bài 11). Bước 4: nếu dữ liệu hầu như không đổi, cân nhắc mảng đã sắp xếp + tìm kiếm nhị phân, hoặc cấu trúc bất biến được thay thế nguyên khối khi cập nhật (đọc không khóa).</p>
 </details>
 <aside class="callout c-key">
@@ -1012,7 +1030,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li><strong>Batching có điều kiện</strong>: gom theo lô tăng thông lượng nhưng thêm độ trễ; gom <strong>những gì đang có sẵn</strong> (không chờ lô đầy) giữ được cả hai.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Bạn đo service bằng công cụ gửi request tuần tự (gửi, chờ, gửi tiếp) và thấy p99 = 2 ms. Sau khi lên production, client báo p99 = 50 ms. Giải thích khả dĩ?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Bạn đo service bằng công cụ gửi request tuần tự (gửi, chờ, gửi tiếp) và thấy p99 = 2 ms. Sau khi lên production, client báo p99 = 50 ms. Giải thích khả dĩ?</span></summary>
 <p>Coordinated omission: công cụ đo kiểu đóng (closed-loop) tự giảm tốc khi server chậm, nên một lần server đứng 50 ms chỉ được tính là <strong>một</strong> mẫu chậm, trong khi ngoài thực tế trong 50 ms đó có hàng trăm request đến và đều phải chờ. Ngoài ra production có fan-out, tải thật dao động, hàng đợi ở load balancer và mạng. Đo lại bằng bộ tạo tải tốc độ cố định ở mức tải thật, đo từ phía client, và ghi histogram trong server để tách thời gian chờ hàng đợi khỏi thời gian xử lý.</p>
 </details>
 <aside class="callout c-key">
@@ -1231,7 +1249,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <h3 id="c-thoi-gian-va-thu-tu">Thời gian và thứ tự</h3>
 <p>Không có đồng hồ chung chính xác giữa các máy (NTP lệch cỡ mili giây, có thể nhảy). Đừng dùng timestamp của các máy khác nhau để quyết định "cái nào xảy ra trước". Dùng số thứ tự do một nơi cấp (leader, phân vùng), <strong>logical clock</strong> (Lamport, vector clock), hoặc với khóa phân tán thì <strong>fencing token</strong> (số tăng dần đi kèm khóa; tài nguyên từ chối thao tác mang token cũ hơn token đã thấy).</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Service thanh toán gọi tới cổng ngân hàng, timeout sau 2 giây, rồi retry. Khách hàng phàn nàn bị trừ tiền hai lần. Phân tích và sửa.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Service thanh toán gọi tới cổng ngân hàng, timeout sau 2 giây, rồi retry. Khách hàng phàn nàn bị trừ tiền hai lần. Phân tích và sửa.</span></summary>
 <p>Timeout không có nghĩa là thất bại: request đầu có thể đã tới ngân hàng và được xử lý, chỉ phản hồi bị chậm hoặc mất. Retry tạo giao dịch thứ hai vì thao tác "trừ tiền" không idempotent. Sửa: sinh <strong>khóa idempotency</strong> cho mỗi lần thanh toán (lưu bền trước khi gọi), gửi kèm mọi lần thử; phía nhận (hoặc lớp bọc của ta nếu cổng hỗ trợ) trả lại kết quả của lần đã xử lý. Khi timeout, trạng thái là "chưa biết": truy vấn lại trạng thái theo khóa đó trước khi quyết định. Kèm theo: backoff có jitter, giới hạn số lần thử.</p>
 </details>
 <aside class="callout c-key">
@@ -1427,7 +1445,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li><code>mmap</code> cho database tiện nhưng nguy hiểm: không kiểm soát khi nào trang được ghi xuống, lỗi I/O biến thành <code>SIGBUS</code>, khó quản lý bộ nhớ khi dữ liệu lớn hơn RAM. Phần lớn storage engine hiện đại tự quản lý buffer pool với <code>pread</code>/<code>pwrite</code> hoặc <code>O_DIRECT</code>.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Bạn cần một storage engine cho service ghi 200.000 sự kiện nhỏ mỗi giây, đọc chủ yếu là "các sự kiện mới nhất của một thiết bị". B-tree hay LSM? Thiết kế khóa thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Bạn cần một storage engine cho service ghi 200.000 sự kiện nhỏ mỗi giây, đọc chủ yếu là "các sự kiện mới nhất của một thiết bị". B-tree hay LSM? Thiết kế khóa thế nào?</span></summary>
 <p>Ghi nhiều, nhỏ, liên tục: LSM hợp hơn (ghi tuần tự, gộp trong memtable, nén tốt), ví dụ RocksDB nhúng trong service C++. Khóa: <code>device_id</code> + timestamp (dạng big-endian để thứ tự byte trùng thứ tự thời gian, có thể đảo ngược để mới nhất đứng đầu); đọc "mới nhất của một thiết bị" là một range scan ngắn trên tiền tố <code>device_id</code>. Dùng prefix Bloom filter theo <code>device_id</code>. Lưu ý compaction gây độ trễ đuôi: giới hạn tốc độ compaction, theo dõi số SSTable tầng 0. Độ bền: WAL với group commit, hoặc nhân bản sang máy khác nếu chấp nhận mô hình bền nhờ nhân bản.</p>
 </details>
 <aside class="callout c-key">
@@ -1594,7 +1612,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li>Đường nóng: CRC32C bằng lệnh phần cứng (SSE4.2/ARMv8 CRC), buffer pool tái sử dụng, không cấp phát theo message, lô lớn để chi phí system call chia đều.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một nhóm consumer bị lag tăng dần trong giờ cao điểm dù CPU của consumer chỉ 30%. Bạn kiểm tra những gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một nhóm consumer bị lag tăng dần trong giờ cao điểm dù CPU của consumer chỉ 30%. Bạn kiểm tra những gì?</span></summary>
 <p>Song song bị giới hạn bởi số partition: nhóm có thể có nhiều consumer hơn số partition (consumer thừa ngồi không) hoặc một vài partition nóng (khóa phân vùng lệch) dồn việc cho một consumer. Consumer có thể bị chặn bởi I/O đồng bộ trong vòng xử lý (gọi database từng message) chứ không phải CPU: xử lý theo lô, gọi bất đồng bộ, tăng số request song song. Kiểm tra <code>max_bytes</code>/kích thước fetch quá nhỏ (nhiều round trip), commit offset quá thường xuyên, và hạn mức (quota) byte/s phía broker. Nếu dữ liệu cần đọc đã rơi khỏi page cache (lag quá lớn), đọc từ đĩa chậm hơn và lag tự khuếch đại.</p>
 </details>
 <aside class="callout c-key">
@@ -1783,7 +1801,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li>Kết thúc bằng đo lường (timestamp phần cứng, histogram mỗi chặng) và vận hành (giám sát khoảng trống, tự phục hồi, khởi động lại giữa phiên giao dịch bằng snapshot).</li>
 </ol>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đường A luôn đến trước đường B khoảng 3 µs. Có nên bỏ hẳn đường B để đơn giản hóa?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đường A luôn đến trước đường B khoảng 3 µs. Có nên bỏ hẳn đường B để đơn giản hóa?</span></summary>
 <p>Không. Đường B tồn tại để <strong>chịu lỗi</strong>: switch, cáp, card mạng, hoặc chính đường A mất gói. Việc A thường thắng chỉ có nghĩa B hiếm khi đóng góp gói; nhưng khi A mất gói, B lấp khoảng trống mà không cần phục hồi qua TCP (chậm hơn hàng nghìn lần). Chi phí giữ B là một nhân xử lý và phần so sánh số thứ tự, rất nhỏ so với rủi ro dựng sổ lệnh sai. Theo dõi tỉ lệ thắng của từng đường như một metric: tỉ lệ của B tăng đột ngột là dấu hiệu đường A có vấn đề.</p>
 </details>
 <aside class="callout c-key">
@@ -2210,6 +2228,19 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

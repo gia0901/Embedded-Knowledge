@@ -1,0 +1,9 @@
+Bai thuc hanh F03 (Mang may tinh) va F04 (Co so du lieu)
+
+- Moi file .cpp la ban khung: de bai o dau file, lenh bien dich ngay ben duoi.
+  Lam phan TODO, chay lai toi khi in 'DAT tat ca kiem tra'.
+- loi-giai/: loi giai tham khao, chi mo sau khi da tu lam.
+- F04/sql: python3 check.py answers.sql   (can schema.sql cung thu muc)
+- F04/index: python3 check_index.py tuning.sql
+- F04/ex7 can redis-server; F04/ex3, ex4... can libsqlite3-dev (-lsqlite3).
+- De bai day du, goi y va lien ket ly thuyet nam trong tab Thuc hanh cua tung trang.

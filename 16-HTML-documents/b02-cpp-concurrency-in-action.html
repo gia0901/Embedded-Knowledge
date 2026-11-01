@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>C++ Concurrency in Action</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -566,11 +584,11 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 </ul>
 <p>Về mặt kỹ thuật, cả hai đều là chạy nhiều task cùng lúc, và cùng dùng một bộ công cụ.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trên MCU Cortex-M4 một nhân chạy FreeRTOS với 5 task, có bao nhiêu task thực sự chạy tại cùng một thời điểm?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trên MCU Cortex-M4 một nhân chạy FreeRTOS với 5 task, có bao nhiêu task thực sự chạy tại cùng một thời điểm?</span></summary>
 <p>Một. Đây là task switching: scheduler chuyển đổi giữa các task. (ISR có thể chen vào, nhưng tại mỗi thời điểm CPU chỉ thực thi một luồng lệnh.)</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hai thread trong cùng process có chung stack không? Có chung biến toàn cục không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hai thread trong cùng process có chung stack không? Có chung biến toàn cục không?</span></summary>
 <p>Không chung stack (mỗi thread một stack riêng). Có chung biến toàn cục, heap và code.</p>
 </details>
 <h3 id="c-1-2-vi-sao-dung-concurrency">1.2 Vì sao dùng concurrency <span class="pg">tr. 7 · PDF 30</span></h3>
@@ -601,7 +619,7 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 <p>Mỗi task RTOS cần một stack (thường 256 byte đến vài KB) và một TCB (task control block). Với 64 KB RAM, mười task mỗi task 2 KB stack đã chiếm gần một phần ba. Thiết kế firmware thường giới hạn số task ở mức tối thiểu cần thiết, và dùng queue/event để một task xử lý nhiều loại sự kiện.</p>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Cho ví dụ một hệ thống Embedded dùng concurrency vì separation of concerns, không phải vì hiệu năng.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Cho ví dụ một hệ thống Embedded dùng concurrency vì separation of concerns, không phải vì hiệu năng.</span></summary>
 <p>Ví dụ: datalogger trên MCU một nhân có task đọc cảm biến theo chu kỳ, task ghi thẻ SD, task giao tiếp USB. Chạy một nhân nên không nhanh hơn, nhưng mỗi task đơn giản hơn và độ trễ của việc ghi SD không chặn việc đọc cảm biến.</p>
 </details>
 <h3 id="c-1-3-concurrency-va-multithreading-trong-c">1.3 Concurrency và multithreading trong C++ <span class="pg">tr. 10 · PDF 33</span></h3>
@@ -654,7 +672,7 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao trong "Hello Concurrent World" cần gọi `t.join()`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao trong "Hello Concurrent World" cần gọi <code>t.join()</code>?</span></summary>
 <p>Để thread chính chờ thread <code>t</code> chạy xong. Không join (hoặc detach) thì khi <code>t</code> bị hủy cuối <code>main</code>, chương trình gọi <code>std::terminate</code>; và <code>main</code> có thể kết thúc trước khi <code>hello</code> kịp in.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-1-hello-world-of-concurrency-in-c">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-2-managing-threads" hidden><h2 id="c-chuong-2-managing-threads">Chương 2 · Managing threads <span class="pg">tr. 16 · PDF 39</span></h2>
@@ -816,11 +834,11 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::thread t(Worker());` với `Worker` là function object. Có thread nào được tạo không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::thread t(Worker());</code> với <code>Worker</code> là function object. Có thread nào được tạo không?</span></summary>
 <p>Không. Đây là khai báo hàm (most vexing parse). Viết <code>std::thread t{Worker()};</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `ThreadGuard` kiểm tra `joinable()` trong destructor?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>ThreadGuard</code> kiểm tra <code>joinable()</code> trong destructor?</span></summary>
 <p>Thread có thể đã được join (hoặc detach) thủ công trước đó; gọi <code>join()</code> lần nữa là lỗi.</p>
 </details>
 <h3 id="c-2-2-truyen-doi-so-cho-ham-thread">2.2 Truyền đối số cho hàm thread <span class="pg">tr. 24 · PDF 47</span></h3>
@@ -894,11 +912,11 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`void fill(std::vector<int>&amp; v); std::vector<int> buf; std::thread t(fill, buf);` có compile không? Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>void fill(std::vector&lt;int&gt;&amp; v); std::vector&lt;int&gt; buf; std::thread t(fill, buf);</code> có compile không? Vì sao?</span></summary>
 <p>Không. <code>buf</code> được copy và truyền như rvalue, không gắn được với <code>std::vector&lt;int&gt;&amp;</code>. Dùng <code>std::thread t(fill, std::ref(buf));</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao truyền `char label[32]` cục bộ vào thread rồi detach là nguy hiểm, dù hàm thread nhận `const std::string&amp;`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao truyền <code>char label[32]</code> cục bộ vào thread rồi detach là nguy hiểm, dù hàm thread nhận <code>const std::string&amp;</code>?</span></summary>
 <p>Chỉ con trỏ được copy; việc tạo <code>std::string</code> xảy ra trong thread mới, có thể sau khi <code>label</code> đã bị hủy. Phải truyền <code>std::string(label)</code>.</p>
 </details>
 <h3 id="c-2-3-chuyen-quyen-so-huu-thread">2.3 Chuyển quyền sở hữu thread <span class="pg">tr. 27 · PDF 50</span></h3>
@@ -978,7 +996,7 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::thread a(f); std::thread b(g); a = std::move(b);` có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::thread a(f); std::thread b(g); a = std::move(b);</code> có vấn đề gì?</span></summary>
 <p><code>a</code> đang joinable khi bị gán, nên chương trình gọi <code>std::terminate</code>. Phải <code>a.join()</code> (hoặc <code>detach</code>) trước khi gán.</p>
 </details>
 <h3 id="c-2-4-chon-so-thread-luc-chay">2.4 Chọn số thread lúc chạy <span class="pg">tr. 31 · PDF 54</span></h3>
@@ -1025,7 +1043,7 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 <li><strong>Yêu cầu với kiểu</strong>: <code>T</code> phải có default constructor (để tạo vector <code>partial</code>), iterator phải ít nhất là forward iterator (để duyệt nhiều lần).</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không nên tạo số thread bằng số phần tử dữ liệu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không nên tạo số thread bằng số phần tử dữ liệu?</span></summary>
 <p>Mỗi thread có chi phí tạo và context switch; với nhiều thread hơn số nhân, các thread phải chia nhau CPU (oversubscription), làm chậm thay vì nhanh hơn.</p>
 </details>
 <h3 id="c-2-5-dinh-danh-thread">2.5 Định danh thread <span class="pg">tr. 34 · PDF 57</span></h3>
@@ -1058,7 +1076,7 @@ Nhân 0: A A B B A A B B ...        Nhân 0: A A A A A A A A ...
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hàm `get_id()` trên một `std::thread` đã được join trả về gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hàm <code>get_id()</code> trên một <code>std::thread</code> đã được join trả về gì?</span></summary>
 <p>Giá trị <code>std::thread::id</code> mặc định, nghĩa là "không phải thread nào", vì object không còn gắn với thread.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-2-managing-threads">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-3-sharing-data-between-threads" hidden><h2 id="c-chuong-3-sharing-data-between-threads">Chương 3 · Sharing data between threads <span class="pg">tr. 36 · PDF 59</span></h2>
@@ -1103,7 +1121,7 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 <p>Trên MCU một nhân không có hai thread chạy song song thật, nhưng <strong>ngắt có thể chen vào giữa bất kỳ hai lệnh nào</strong>. Ví dụ main đang cập nhật con trỏ <code>head</code> và <code>count</code> của một queue, ISR chen vào giữa và cũng thêm phần tử: invariant bị phá. Mọi khái niệm trong chương này áp dụng, chỉ khác công cụ: thay vì mutex, ta tắt ngắt (critical section) hoặc dùng cấu trúc lock-free (SPSC ring buffer).</p>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Phân biệt race condition và data race.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Phân biệt race condition và data race.</span></summary>
 <p>Race condition: kết quả phụ thuộc thứ tự tương đối giữa các thread (có thể vô hại hoặc có hại). Data race: trường hợp cụ thể khi hai thread truy cập cùng vị trí bộ nhớ, ít nhất một ghi, không đồng bộ; trong C++ là undefined behavior.</p>
 </details>
 <h3 id="c-3-2-bao-ve-du-lieu-chung-bang-mutex">3.2 Bảo vệ dữ liệu chung bằng mutex <span class="pg">tr. 40 · PDF 63</span></h3>
@@ -1472,15 +1490,15 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một stack thread-safe có `empty()`, `top()`, `pop()`, mỗi hàm đều khóa. Vì sao vẫn không an toàn?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một stack thread-safe có <code>empty()</code>, <code>top()</code>, <code>pop()</code>, mỗi hàm đều khóa. Vì sao vẫn không an toàn?</span></summary>
 <p>Race nằm giữa các lời gọi: kết quả <code>empty()</code> có thể sai ngay khi trả về, và hai thread có thể cùng <code>top()</code> rồi cùng <code>pop()</code>, xử lý một giá trị hai lần và mất một giá trị. Phải gộp thành một thao tác <code>pop</code> duy nhất.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `std::lock_guard` dùng `std::adopt_lock` sau khi gọi `std::lock(m1, m2)`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>std::lock_guard</code> dùng <code>std::adopt_lock</code> sau khi gọi <code>std::lock(m1, m2)</code>?</span></summary>
 <p>Mutex đã được <code>std::lock</code> khóa; <code>adopt_lock</code> báo <code>lock_guard</code> không khóa lại mà chỉ nhận quyền mở khóa trong destructor.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong lock hierarchy, đang giữ mutex cấp 5000, có được khóa mutex cấp 8000 không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong lock hierarchy, đang giữ mutex cấp 5000, có được khóa mutex cấp 8000 không?</span></summary>
 <p>Không. Chỉ được khóa mutex có cấp thấp hơn cấp đang giữ. Khóa 8000 vi phạm thứ tự và <code>hierarchical_mutex</code> sẽ ném exception.</p>
 </details>
 <h3 id="c-3-3-cac-co-che-bao-ve-du-lieu-khac">3.3 Các cơ chế bảo vệ dữ liệu khác <span class="pg">tr. 64 · PDF 87</span></h3>
@@ -1572,11 +1590,11 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao double-checked locking với con trỏ thường là sai?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao double-checked locking với con trỏ thường là sai?</span></summary>
 <p>Lần đọc con trỏ ngoài khóa không đồng bộ với lần ghi trong khóa ở thread khác: data race. Thread có thể thấy con trỏ khác null trước khi thấy object được khởi tạo đầy đủ.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Khi nào `std::shared_mutex` chậm hơn `std::mutex`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Khi nào <code>std::shared_mutex</code> chậm hơn <code>std::mutex</code>?</span></summary>
 <p>Khi số lần ghi không ít, thời gian giữ khóa rất ngắn, hoặc ít nhân: chi phí quản lý reader/writer lớn hơn lợi ích song song của reader.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-3-sharing-data-between-threads">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-4-synchronizing-concurrent-operations" hidden><h2 id="c-chuong-4-synchronizing-concurrent-operations">Chương 4 · Synchronizing concurrent operations <span class="pg">tr. 72 · PDF 95</span></h2>
@@ -1747,11 +1765,11 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `cv.wait(lk)` không có predicate có thể khiến consumer chờ mãi dù queue có dữ liệu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>cv.wait(lk)</code> không có predicate có thể khiến consumer chờ mãi dù queue có dữ liệu?</span></summary>
 <p>Lost wakeup: nếu producer push và notify trước khi consumer gọi <code>wait</code>, thông báo bị mất. Với predicate, consumer kiểm tra queue trước khi ngủ.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Predicate truyền cho `wait` có nên tăng một bộ đếm số lần kiểm tra không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Predicate truyền cho <code>wait</code> có nên tăng một bộ đếm số lần kiểm tra không?</span></summary>
 <p>Không nên: predicate có thể bị gọi nhiều lần không xác định (mỗi lần thức dậy, kể cả thức giả), nên không được có side effect.</p>
 </details>
 <h3 id="c-4-2-cho-su-kien-mot-lan-bang-future">4.2 Chờ sự kiện một lần bằng future <span class="pg">tr. 81 · PDF 104</span></h3>
@@ -1916,11 +1934,11 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Khi nào dùng `std::packaged_task` thay vì `std::async`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Khi nào dùng <code>std::packaged_task</code> thay vì <code>std::async</code>?</span></summary>
 <p>Khi cần tách việc tạo task khỏi việc chạy nó: đưa task vào queue để một thread cụ thể (GUI thread, worker của thread pool) chạy sau, trong khi người gửi giữ future.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hai thread cùng gọi `get()` trên cùng một object `std::shared_future`. Có an toàn không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hai thread cùng gọi <code>get()</code> trên cùng một object <code>std::shared_future</code>. Có an toàn không?</span></summary>
 <p>Không: các member function của một object <code>shared_future</code> không đồng bộ. Mỗi thread nên có bản copy riêng của <code>shared_future</code>.</p>
 </details>
 <h3 id="c-4-3-cho-co-gioi-han-thoi-gian">4.3 Chờ có giới hạn thời gian <span class="pg">tr. 93 · PDF 116</span></h3>
@@ -2054,11 +2072,11 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `cv.wait_for(lk, 100ms)` trong vòng `while (!done)` có thể chờ lâu hơn nhiều so với 100 ms?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>cv.wait_for(lk, 100ms)</code> trong vòng <code>while (!done)</code> có thể chờ lâu hơn nhiều so với 100 ms?</span></summary>
 <p>Mỗi lần thức (kể cả spurious wakeup) lại bắt đầu chờ thêm 100 ms. Tính deadline một lần rồi dùng <code>wait_until</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`duration_cast<seconds>(milliseconds(2999))` bằng bao nhiêu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>duration_cast&lt;seconds&gt;(milliseconds(2999))</code> bằng bao nhiêu?</span></summary>
 <p>2 giây: <code>duration_cast</code> cắt bớt, không làm tròn.</p>
 </details>
 <h3 id="c-4-4-dung-dong-bo-de-don-gian-hoa-code">4.4 Dùng đồng bộ để đơn giản hóa code <span class="pg">tr. 99 · PDF 122</span></h3>
@@ -2181,11 +2199,11 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Latch và barrier khác nhau ở điểm nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Latch và barrier khác nhau ở điểm nào?</span></summary>
 <p>Latch dùng một lần: đếm về 0 thì mở mãi. Barrier tái sử dụng: đồng bộ cả nhóm ở cuối mỗi pha rồi reset cho pha sau.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Ưu điểm chính của kiến trúc message passing (actor/active object) so với chia sẻ dữ liệu bằng mutex?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Ưu điểm chính của kiến trúc message passing (actor/active object) so với chia sẻ dữ liệu bằng mutex?</span></summary>
 <p>Mỗi thread không chia sẻ trạng thái, chỉ trao đổi message, nên logic nghiệp vụ không cần mutex, ít race condition và deadlock, và từng thread test độc lập được.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-4-synchronizing-concurrent-operations">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-5-the-c-memory-model-and-operations-on-atomic-types" hidden><h2 id="c-chuong-5-the-c-memory-model-and-operations-on-atomic-types">Chương 5 · The C++ memory model and operations on atomic types <span class="pg">tr. 124 · PDF 147</span></h2>
@@ -2239,11 +2257,11 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 <p>Hệ quả quan trọng: khi một thread đã <strong>thấy</strong> một giá trị nào đó trong modification order, các lần đọc <strong>sau</strong> của chính thread đó chỉ thấy giá trị đó hoặc giá trị <strong>mới hơn</strong>. Không bao giờ thấy giá trị cũ hơn. Tương tự, một lần ghi theo sau một lần đọc trong cùng thread phải xuất hiện <strong>sau</strong> giá trị đã đọc trong modification order.</p>
 <p>Nhưng lưu ý: modification order là <strong>của từng object riêng</strong>. Không có đảm bảo nào về thứ tự <strong>tương đối giữa các object khác nhau</strong>: thread A có thể thấy object X thay đổi trước Y, trong khi thread B thấy Y thay đổi trước X. Phần 5.3 bàn cách đặt ra thứ tự đó.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hai thread cùng ghi vào hai trường bit field liền kề nhau của cùng một struct. Có phải data race không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hai thread cùng ghi vào hai trường bit field liền kề nhau của cùng một struct. Có phải data race không?</span></summary>
 <p>Có: các bit field liền kề dùng chung một memory location.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Modification order đảm bảo gì giữa hai biến atomic khác nhau?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Modification order đảm bảo gì giữa hai biến atomic khác nhau?</span></summary>
 <p>Không đảm bảo gì. Modification order là của từng object; thứ tự giữa các object khác nhau phải được thiết lập bằng memory ordering.</p>
 </details>
 <h3 id="c-5-2-atomic-operation-va-atomic-type">5.2 Atomic operation và atomic type <span class="pg">tr. 128 · PDF 151</span></h3>
@@ -2402,11 +2420,11 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::atomic<int> a{5}; int e = 3; bool ok = a.compare_exchange_strong(e, 10);` Sau dòng này `ok`, `a`, `e` bằng bao nhiêu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::atomic&lt;int&gt; a{5}; int e = 3; bool ok = a.compare_exchange_strong(e, 10);</code> Sau dòng này <code>ok</code>, <code>a</code>, <code>e</code> bằng bao nhiêu?</span></summary>
 <p><code>ok == false</code> (5 khác 3), <code>a</code> vẫn là 5, <code>e</code> được ghi bằng giá trị hiện tại là 5.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `compare_exchange_weak` có thể trả về `false` dù giá trị bằng `expected`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>compare_exchange_weak</code> có thể trả về <code>false</code> dù giá trị bằng <code>expected</code>?</span></summary>
 <p>Trên kiến trúc LL/SC (ARM LDREX/STREX), lệnh store-conditional có thể thất bại vì ngắt hoặc context switch giữa chừng, dù không ai sửa giá trị. Vì vậy dùng <code>weak</code> trong vòng lặp.</p>
 </details>
 <h3 id="c-5-3-dong-bo-thao-tac-va-ep-thu-tu">5.3 Đồng bộ thao tác và ép thứ tự <span class="pg">tr. 142 · PDF 165</span></h3>
@@ -2732,15 +2750,15 @@ Sau bước 3:  A ⇄ C              (đã khôi phục)
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong litmus test bốn thread (hai thread ghi `x`, `y`, hai thread đọc ngược thứ tự), vì sao với acquire-release `z` có thể bằng 0 mà với seq_cst thì không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong litmus test bốn thread (hai thread ghi <code>x</code>, <code>y</code>, hai thread đọc ngược thứ tự), vì sao với acquire-release <code>z</code> có thể bằng 0 mà với seq_cst thì không?</span></summary>
 <p>Seq_cst có một thứ tự tổng chung mọi thread đồng ý, nên một trong hai lần ghi đứng trước và ít nhất một thread đọc thấy cả hai. Acquire-release chỉ đồng bộ theo cặp trên từng biến; hai lần ghi từ hai thread khác nhau không có thứ tự chung, nên hai thread đọc có thể thấy chúng theo thứ tự ngược nhau.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong SPSC ring buffer, vì sao producer đọc `head_` bằng relaxed nhưng đọc `tail_` bằng acquire?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong SPSC ring buffer, vì sao producer đọc <code>head_</code> bằng relaxed nhưng đọc <code>tail_</code> bằng acquire?</span></summary>
 <p><code>head_</code> chỉ do chính producer ghi, nên nó luôn thấy giá trị của mình; không cần đồng bộ. <code>tail_</code> do consumer ghi; producer cần acquire để chắc chắn consumer đã đọc xong ô dữ liệu trước khi producer ghi đè lên.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::atomic<int> hits; hits.fetch_add(1, std::memory_order_relaxed);` có an toàn khi nhiều thread cùng gọi không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::atomic&lt;int&gt; hits; hits.fetch_add(1, std::memory_order_relaxed);</code> có an toàn khi nhiều thread cùng gọi không?</span></summary>
 <p>Có: relaxed vẫn atomic, nên không mất lần đếm nào. Chỉ không đồng bộ dữ liệu khác, điều mà bộ đếm thống kê không cần.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-5-the-c-memory-model-and-operations-on-atomic-types">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-6-designing-lock-based-concurrent-data-structures" hidden><h2 id="c-chuong-6-designing-lock-based-concurrent-data-structures">Chương 6 · Designing lock-based concurrent data structures <span class="pg">tr. 173 · PDF 196</span></h2>
@@ -2942,11 +2960,11 @@ Hai phần tử:   head ─▶ [ A ] ─▶ [ B ] ─▶ [dummy] ◀─ tail
 <p>Trên MCU ít khi cần queue nhiều producer nhiều consumer với khóa mịn. Thường gặp hơn là queue của RTOS (đã tối ưu, dùng được từ ISR) hoặc SPSC ring buffer (Chương 5). Nhưng ý tưởng <strong>"tách đầu và cuối để producer và consumer không chạm nhau"</strong> chính là ý tưởng của SPSC ring buffer: producer chỉ ghi <code>head</code>, consumer chỉ ghi <code>tail</code>.</p>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao queue khóa mịn cần một node dummy?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao queue khóa mịn cần một node dummy?</span></summary>
 <p>Để <code>push</code> chỉ chạm <code>tail</code> và <code>pop</code> chỉ chạm <code>head</code>. Không có dummy, khi queue có một phần tử thì <code>head == tail</code>, và push/pop phải sửa chung một node, hai mutex không tách được.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong `try_pop`, vì sao phải đọc tail sau khi khóa `head_mutex_` chứ không phải trước?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong <code>try_pop</code>, vì sao phải đọc tail sau khi khóa <code>head_mutex_</code> chứ không phải trước?</span></summary>
 <p>Nếu đọc tail trước, giữa lúc đọc và lúc khóa head các thread khác có thể thay đổi queue; giá trị tail cũ làm phép kiểm tra rỗng sai, có thể pop qua dummy.</p>
 </details>
 <h3 id="c-6-3-thiet-ke-cau-truc-du-lieu-phuc-tap-hon">6.3 Thiết kế cấu trúc dữ liệu phức tạp hơn <span class="pg">tr. 194 · PDF 217</span></h3>
@@ -3139,11 +3157,11 @@ Hai phần tử:   head ─▶ [ A ] ─▶ [ B ] ─▶ [dummy] ◀─ tail
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao hash table phù hợp với đồng thời hơn cây nhị phân?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao hash table phù hợp với đồng thời hơn cây nhị phân?</span></summary>
 <p>Mỗi khóa thuộc đúng một bucket, các bucket độc lập nên khóa riêng được. Cây nhị phân luôn bắt đầu từ gốc, nên gốc trở thành điểm nghẽn.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong `remove_if` của danh sách hand-over-hand, vì sao phải `next_lk.unlock()` trước khi node bị hủy?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong <code>remove_if</code> của danh sách hand-over-hand, vì sao phải <code>next_lk.unlock()</code> trước khi node bị hủy?</span></summary>
 <p>Node chứa mutex; hủy một mutex đang bị khóa là undefined behavior.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-6-designing-lock-based-concurrent-data-structures">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-7-designing-lock-free-concurrent-data-structures" hidden><h2 id="c-chuong-7-designing-lock-free-concurrent-data-structures">Chương 7 · Designing lock-free concurrent data structures <span class="pg">tr. 205 · PDF 228</span></h2>
@@ -3368,15 +3386,15 @@ Hai phần tử:   head ─▶ [ A ] ─▶ [ B ] ─▶ [dummy] ◀─ tail
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không thể `delete` node ngay sau khi CAS gỡ nó khỏi stack lock-free?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không thể <code>delete</code> node ngay sau khi CAS gỡ nó khỏi stack lock-free?</span></summary>
 <p>Thread khác có thể đã đọc con trỏ tới node đó (ví dụ đang chuẩn bị đọc <code>node-&gt;next</code>) và sẽ dereference nó sau; xóa ngay làm con trỏ đó treo.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Mô tả vấn đề ABA bằng một câu và cách khắc phục.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Mô tả vấn đề ABA bằng một câu và cách khắc phục.</span></summary>
 <p>CAS thành công vì giá trị quay lại đúng giá trị cũ (A → B → A) dù trạng thái cấu trúc đã thay đổi; khắc phục bằng cách ghép một bộ đếm tăng dần vào con trỏ (tagged pointer) và CAS cả cặp.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Spinlock có phải lock-free không? Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Spinlock có phải lock-free không? Vì sao?</span></summary>
 <p>Không. Nếu thread giữ spinlock bị tạm dừng, mọi thread khác quay vòng mãi, không thread nào tiến triển.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-7-designing-lock-free-concurrent-data-structures">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-8-designing-concurrent-code" hidden><h2 id="c-chuong-8-designing-concurrent-code">Chương 8 · Designing concurrent code <span class="pg">tr. 251 · PDF 274</span></h2>
@@ -3482,7 +3500,7 @@ Hai phần tử:   head ─▶ [ A ] ─▶ [ B ] ─▶ [dummy] ◀─ tail
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Bốn thread mỗi thread tăng `counters[i]` của riêng mình trong mảng `uint32_t counters[4]`. Vì sao có thể chậm hơn dự kiến?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Bốn thread mỗi thread tăng <code>counters[i]</code> của riêng mình trong mảng <code>uint32_t counters[4]</code>. Vì sao có thể chậm hơn dự kiến?</span></summary>
 <p>False sharing: bốn biến nằm chung một cache line 64 byte, nên mỗi lần ghi của một nhân làm vô hiệu hóa line trong cache của các nhân khác. Căn lề mỗi bộ đếm ra một cache line riêng.</p>
 </details>
 <h3 id="c-8-3-thiet-ke-cau-truc-du-lieu-cho-hieu-nang-da-luong">8.3 Thiết kế cấu trúc dữ liệu cho hiệu năng đa luồng <span class="pg">tr. 266 · PDF 289</span></h3>
@@ -3650,11 +3668,11 @@ P(N) = ─────────────────────
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một chương trình có 25% thời gian tuần tự. Với 8 nhân, tăng tốc tối đa là bao nhiêu? Với vô hạn nhân?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một chương trình có 25% thời gian tuần tự. Với 8 nhân, tăng tốc tối đa là bao nhiêu? Với vô hạn nhân?</span></summary>
 <p>1 / (0,25 + 0,75/8) = 1 / 0,34375 ≈ 2,91 lần. Vô hạn nhân: 1/0,25 = 4 lần.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong `parallel_find`, vì sao không gọi `fut.get()` khi không thread nào tìm thấy?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong <code>parallel_find</code>, vì sao không gọi <code>fut.get()</code> khi không thread nào tìm thấy?</span></summary>
 <p>Không ai set promise nên <code>get()</code> sẽ chờ mãi. Phải join mọi thread rồi kiểm tra cờ <code>done</code> trước.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-8-designing-concurrent-code">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-9-advanced-thread-management" hidden><h2 id="c-chuong-9-advanced-thread-management">Chương 9 · Advanced thread management <span class="pg">tr. 300 · PDF 323</span></h2>
@@ -3800,11 +3818,11 @@ Queue:    [A1] [B1]            ─┘   → deadlock
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao pool có thể deadlock khi việc cha gọi `future.get()` trên việc con?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao pool có thể deadlock khi việc cha gọi <code>future.get()</code> trên việc con?</span></summary>
 <p>Mọi worker có thể đều đang chặn chờ việc con, trong khi việc con nằm trong queue không còn worker rảnh để chạy.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong work stealing, vì sao kẻ trộm lấy việc ở đầu cũ nhất của deque?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong work stealing, vì sao kẻ trộm lấy việc ở đầu cũ nhất của deque?</span></summary>
 <p>Việc cũ nhất thường là việc lớn (trong chia đệ quy), nên một lần trộm có nhiều việc; đồng thời tránh tranh chấp với chủ sở hữu đang làm việc ở đầu kia.</p>
 </details>
 <h3 id="c-9-2-ngat-thread">9.2 Ngắt thread <span class="pg">tr. 315 · PDF 338</span></h3>
@@ -3889,11 +3907,11 @@ Queue:    [A1] [B1]            ─┘   → deadlock
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không nên "giết" thread từ bên ngoài (kiểu `pthread_cancel`)?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không nên "giết" thread từ bên ngoài (kiểu <code>pthread_cancel</code>)?</span></summary>
 <p>Thread có thể đang giữ khóa, đang sửa dở cấu trúc dữ liệu, hoặc chưa giải phóng tài nguyên; dừng đột ngột làm khóa không được mở, invariant bị phá, tài nguyên rò rỉ.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Destructor của `std::jthread` làm gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Destructor của <code>std::jthread</code> làm gì?</span></summary>
 <p>Gọi <code>request_stop()</code> trên stop source của nó, rồi <code>join()</code>.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-9-advanced-thread-management">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-10-parallel-algorithms" hidden><h2 id="c-chuong-10-parallel-algorithms">Chương 10 · Parallel algorithms <span class="pg">tr. 327 · PDF 350</span></h2>
@@ -4033,11 +4051,11 @@ Queue:    [A1] [B1]            ─┘   → deadlock
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không được dùng mutex trong hàm truyền cho thuật toán với `par_unseq`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không được dùng mutex trong hàm truyền cho thuật toán với <code>par_unseq</code>?</span></summary>
 <p>Các lời gọi có thể xen kẽ trên cùng một thread (vector hóa); hai lời gọi xen kẽ cùng khóa một mutex sẽ khiến thread tự deadlock.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hàm truyền cho `std::for_each(std::execution::par, …)` ném exception. Điều gì xảy ra?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hàm truyền cho <code>std::for_each(std::execution::par, …)</code> ném exception. Điều gì xảy ra?</span></summary>
 <p><code>std::terminate</code> được gọi; không bắt được exception từ bên ngoài thuật toán.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-10-parallel-algorithms">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-11-testing-and-debugging-multithreaded-applications" hidden><h2 id="c-chuong-11-testing-and-debugging-multithreaded-applications">Chương 11 · Testing and debugging multithreaded applications <span class="pg">tr. 339 · PDF 362</span></h2>
@@ -4169,11 +4187,11 @@ Queue:    [A1] [B1]            ─┘   → deadlock
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao test đa luồng chạy đúng trên x86 vẫn có thể lỗi trên ARM?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao test đa luồng chạy đúng trên x86 vẫn có thể lỗi trên ARM?</span></summary>
 <p>x86 có memory model mạnh (ít đổi thứ tự), nên code thiếu acquire/release vẫn thường chạy đúng; ARM có memory model yếu hơn, làm lộ các lỗi memory ordering.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong test đa luồng, vì sao cần "thả" các thread cùng lúc bằng một `shared_future`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong test đa luồng, vì sao cần "thả" các thread cùng lúc bằng một <code>shared_future</code>?</span></summary>
 <p>Để chúng thực sự chạy đồng thời và tăng khả năng xen kẽ; nếu tạo lần lượt, thread đầu có thể chạy xong trước khi thread sau bắt đầu.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-11-testing-and-debugging-multithreaded-applications">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-phu-luc-tham-khao-nhanh" hidden><h2 id="c-phu-luc-tham-khao-nhanh">Phụ lục · Tham khảo nhanh <span class="pg">tr. 354 · PDF 377</span></h2>
@@ -4622,6 +4640,19 @@ Queue:    [A1] [B1]            ─┘   → deadlock
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

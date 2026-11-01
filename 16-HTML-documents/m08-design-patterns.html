@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>Embedded Design Patterns</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -494,11 +512,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một driver cảm biến gọi trực tiếp `HAL_I2C_Master_Transmit` của STM32. Có vấn đề gì khi đổi sang MCU nRF52?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một driver cảm biến gọi trực tiếp <code>HAL_I2C_Master_Transmit</code> của STM32. Có vấn đề gì khi đổi sang MCU nRF52?</span></summary>
 <p>Driver phải sửa vì phụ thuộc HAL của STM32. Nếu driver chỉ dùng interface bus I2C trừu tượng, chỉ cần viết cài đặt interface cho nRF52; driver giữ nguyên.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Khi nào nên dùng template thay vì virtual cho interface phần cứng trong C++?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Khi nào nên dùng template thay vì virtual cho interface phần cứng trong C++?</span></summary>
 <p>Khi cài đặt được chọn lúc compile và không đổi, và muốn compiler inline (zero-cost). Dùng virtual khi cần chọn cài đặt lúc chạy hoặc giữ code ngoài header.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-1-kien-truc-phan-lop-va-interface">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-2-mo-hinh-thuc-thi-super-loop-scheduler-va-rtos" hidden><h2 id="c-bai-2-mo-hinh-thuc-thi-super-loop-scheduler-va-rtos">Bài 2 · Mô hình thực thi: super-loop, scheduler và RTOS</h2>
@@ -646,11 +664,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong super-loop, một hàm gửi dữ liệu dùng `HAL_Delay(50)` chờ thiết bị phản hồi. Hậu quả?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong super-loop, một hàm gửi dữ liệu dùng <code>HAL_Delay(50)</code> chờ thiết bị phản hồi. Hậu quả?</span></summary>
 <p>Toàn bộ vòng lặp dừng 50 ms: các việc khác (UART, điều khiển) bị trễ, có thể tràn buffer nhận. Phải viết non-blocking (state machine + timeout) hoặc chuyển sang RTOS.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao cooperative scheduler không cần mutex giữa các task?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao cooperative scheduler không cần mutex giữa các task?</span></summary>
 <p>Mỗi task chạy tới khi xong mới tới task khác, không task nào bị task khác chen ngang giữa chừng. Chỉ cần bảo vệ dữ liệu chia sẻ với ISR.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-2-mo-hinh-thuc-thi-super-loop-scheduler-va-rtos">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-3-state-machine" hidden><h2 id="c-bai-3-state-machine">Bài 3 · State machine</h2>
@@ -827,11 +845,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vẽ state machine cho nút bấm phân biệt nhấn ngắn và nhấn giữ (&gt; 1 s).</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vẽ state machine cho nút bấm phân biệt nhấn ngắn và nhấn giữ (&gt; 1 s).</span></summary>
 <p>IDLE --nhấn--&gt; PRESSED (entry: start timer 1 s). PRESSED --nhả--&gt; IDLE (action: phát sự kiện SHORT_PRESS, dừng timer). PRESSED --timeout--&gt; HELD (action: phát LONG_PRESS). HELD --nhả--&gt; IDLE. (Đầu vào là tín hiệu đã debounce.)</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Run-to-completion nghĩa là gì và vì sao quan trọng?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Run-to-completion nghĩa là gì và vì sao quan trọng?</span></summary>
 <p>Mỗi sự kiện được xử lý xong hoàn toàn trước khi xử lý sự kiện tiếp theo; không có sự kiện nào xen giữa. Nhờ vậy trạng thái và dữ liệu của state machine không bao giờ bị thấy ở trạng thái dở dang, không cần khóa bên trong.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-3-state-machine">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-4-event-driven-architecture-va-active-object" hidden><h2 id="c-bai-4-event-driven-architecture-va-active-object">Bài 4 · Event-driven architecture và active object</h2>
@@ -931,11 +949,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không được gọi `vTaskDelay()` bên trong hàm dispatch của active object?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không được gọi <code>vTaskDelay()</code> bên trong hàm dispatch của active object?</span></summary>
 <p>Nó chặn luồng của AO: mọi sự kiện khác trong queue phải chờ, AO không phản ứng được, và queue có thể tràn. Muốn chờ thì đặt timer và xử lý sự kiện timeout.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hai active object cần dùng chung dữ liệu cấu hình. Làm thế nào theo tinh thần active object?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hai active object cần dùng chung dữ liệu cấu hình. Làm thế nào theo tinh thần active object?</span></summary>
 <p>Một AO sở hữu dữ liệu; AO khác yêu cầu bằng sự kiện và nhận bản copy qua sự kiện trả lời, hoặc AO sở hữu publish sự kiện CONFIG_CHANGED kèm dữ liệu mới. (Dữ liệu chỉ đọc, bất biến sau khởi động thì có thể chia sẻ trực tiếp.)</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-4-event-driven-architecture-va-active-object">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-5-observer-callback-producer-consumer-va-command" hidden><h2 id="c-bai-5-observer-callback-producer-consumer-va-command">Bài 5 · Observer, callback, producer-consumer và command</h2>
@@ -1029,11 +1047,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao callback C nên có tham số `void *ctx`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao callback C nên có tham số <code>void *ctx</code>?</span></summary>
 <p>Để cùng một hàm phục vụ được nhiều instance (truyền con trỏ object qua ctx), tránh phải dùng biến toàn cục để biết callback thuộc object nào.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Driver gọi callback từ ISR, người dùng gọi `printf` trong callback. Vấn đề?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Driver gọi callback từ ISR, người dùng gọi <code>printf</code> trong callback. Vấn đề?</span></summary>
 <p><code>printf</code> chậm, có thể dùng khóa hoặc cấp phát, không an toàn trong ISR; làm ISR dài, trễ các ngắt khác, có thể deadlock. Callback từ ISR phải ngắn; xử lý nặng chuyển sang task.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-5-observer-callback-producer-consumer-va-command">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-6-cac-mau-huong-doi-tuong-ap-dung-cho-embedded" hidden><h2 id="c-bai-6-cac-mau-huong-doi-tuong-ap-dung-cho-embedded">Bài 6 · Các mẫu hướng đối tượng áp dụng cho Embedded</h2>
@@ -1184,11 +1202,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao singleton làm firmware khó unit test?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao singleton làm firmware khó unit test?</span></summary>
 <p>Code gọi <code>X::instance()</code> trực tiếp nên không thay được bằng bản giả; trạng thái của singleton tồn tại qua các test và phụ thuộc thứ tự chạy test.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>CRTP khác virtual ở điểm nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">CRTP khác virtual ở điểm nào?</span></summary>
 <p>CRTP giải quyết lời gọi lúc compile (không vptr, không vtable, inline được) nhưng không chọn được kiểu lúc chạy và không có con trỏ class cơ sở chung cho mọi class con.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-6-cac-mau-huong-doi-tuong-ap-dung-cho-embedded">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-7-dependency-injection-va-test-tren-may-tinh" hidden><h2 id="c-bai-7-dependency-injection-va-test-tren-may-tinh">Bài 7 · Dependency injection và test trên máy tính</h2>
@@ -1301,11 +1319,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Muốn test logic retry có timeout 30 giây mà không phải chờ 30 giây. Thiết kế thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Muốn test logic retry có timeout 30 giây mà không phải chờ 30 giây. Thiết kế thế nào?</span></summary>
 <p>Không gọi đồng hồ hệ thống trực tiếp; nhận thời gian hiện tại qua tham số hoặc interface clock. Test đưa vào clock giả và nhảy thời gian tùy ý.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Stub và mock khác nhau thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Stub và mock khác nhau thế nào?</span></summary>
 <p>Stub chỉ trả về dữ liệu định sẵn để code chạy được. Mock được lập trình trước kỳ vọng về các lời gọi (hàm nào, tham số gì, thứ tự nào) và tự báo test thất bại nếu không khớp.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-7-dependency-injection-va-test-tren-may-tinh">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-8-cac-mau-xu-ly-dong-thoi-trong-firmware" hidden><h2 id="c-bai-8-cac-mau-xu-ly-dong-thoi-trong-firmware">Bài 8 · Các mẫu xử lý đồng thời trong firmware</h2>
@@ -1426,11 +1444,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao cần `portYIELD_FROM_ISR(woken)` cuối ISR?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao cần <code>portYIELD_FROM_ISR(woken)</code> cuối ISR?</span></summary>
 <p>Nếu ISR đánh thức một task có priority cao hơn task đang chạy, yêu cầu context switch ngay khi ISR kết thúc; không có nó, task chỉ chạy ở lần scheduler tiếp theo (tick), làm tăng độ trễ.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Gatekeeper task có ưu điểm gì so với mutex?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Gatekeeper task có ưu điểm gì so với mutex?</span></summary>
 <p>Chỉ một task chạm tài nguyên nên không cần mutex, không có priority inversion hay deadlock do thứ tự khóa, dễ áp đặt thứ tự/ưu tiên các yêu cầu; đổi lại có thêm độ trễ xếp hàng và một task.</p>
 </details>
 <aside class="callout c-key">
@@ -1835,6 +1853,19 @@ Unity/CMock, CppUTest, FFF, GoogleTest + ASan/UBSan.</p>
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

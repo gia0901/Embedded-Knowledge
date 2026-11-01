@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>Cấu trúc dữ liệu cho Embedded</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -385,7 +403,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ol>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao một hệ thống firmware có thể chạy tốt trong lúc test nhưng lỗi sau vài tuần khi dùng `malloc`/`free` liên tục?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao một hệ thống firmware có thể chạy tốt trong lúc test nhưng lỗi sau vài tuần khi dùng <code>malloc</code>/<code>free</code> liên tục?</span></summary>
 <p>Phân mảnh heap tích lũy dần: tổng bộ nhớ trống vẫn đủ nhưng không còn khối liền đủ lớn, nên một lần cấp phát thất bại sau thời gian dài chạy.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-0-dsa-trong-embedded-khac-gi">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-1-ring-buffer-circular-buffer" hidden><h2 id="c-bai-1-ring-buffer-circular-buffer">Bài 1 · Ring buffer (circular buffer)</h2>
@@ -555,15 +573,15 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Buffer N = 64 dùng chỉ số chạy tự do kiểu `uint32_t`. `head = 3`, `tail = 0xFFFFFFFE`. Có bao nhiêu phần tử?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Buffer N = 64 dùng chỉ số chạy tự do kiểu <code>uint32_t</code>. <code>head = 3</code>, <code>tail = 0xFFFFFFFE</code>. Có bao nhiêu phần tử?</span></summary>
 <p><code>head - tail</code> = 3 − 0xFFFFFFFE = 5 (mod 2^32). Có 5 phần tử: chỉ số FFFFFFFE, FFFFFFFF, 0, 1, 2.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao biến `count` làm ring buffer ISR/main mất tính lock-free?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao biến <code>count</code> làm ring buffer ISR/main mất tính lock-free?</span></summary>
 <p><code>count</code> bị cả producer (tăng) và consumer (giảm) sửa bằng read-modify-write; ISR chen giữa thao tác của main sẽ làm mất một lần cập nhật. Cần critical section.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Tính kích thước buffer nhận UART 921600 baud, 8N1, khi task xử lý có thể bị trễ tối đa 5 ms.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Tính kích thước buffer nhận UART 921600 baud, 8N1, khi task xử lý có thể bị trễ tối đa 5 ms.</span></summary>
 <p>8N1 là 10 bit mỗi byte nên ≈ 92160 byte/s; 5 ms ≈ 461 byte. Chọn 512 (lũy thừa 2), hoặc 1024 để có dư.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-1-ring-buffer-circular-buffer">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-2-mang-co-dinh-fixed-capacity-vector-va-bitmap" hidden><h2 id="c-bai-2-mang-co-dinh-fixed-capacity-vector-va-bitmap">Bài 2 · Mảng cố định, fixed-capacity vector và bitmap</h2>
@@ -664,11 +682,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Với bitmap `uint32_t bm[4]`, bit số 77 nằm ở word nào, vị trí bit nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Với bitmap <code>uint32_t bm[4]</code>, bit số 77 nằm ở word nào, vị trí bit nào?</span></summary>
 <p>Word 77 &gt;&gt; 5 = 2, bit 77 &amp; 31 = 13.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao phải kiểm tra `inv != 0` trước khi gọi `__builtin_ctz(inv)`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao phải kiểm tra <code>inv != 0</code> trước khi gọi <code>__builtin_ctz(inv)</code>?</span></summary>
 <p><code>__builtin_ctz(0)</code> là undefined behavior (không có bit 1 nào để đếm).</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-2-mang-co-dinh-fixed-capacity-vector-va-bitmap">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-3-danh-sach-lien-ket-va-intrusive-list" hidden><h2 id="c-bai-3-danh-sach-lien-ket-va-intrusive-list">Bài 3 · Danh sách liên kết và intrusive list</h2>
@@ -791,11 +809,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao RTOS dùng intrusive list cho task mà không dùng `std::list<Task*>`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao RTOS dùng intrusive list cho task mà không dùng <code>std::list&lt;Task*&gt;</code>?</span></summary>
 <p>Không cần cấp phát node khi chuyển task giữa các danh sách (ready, blocked, delayed); thao tác O(1), không thể thất bại vì hết bộ nhớ, và dùng được trong critical section/ISR.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Với danh sách đôi vòng có sentinel, điều kiện rỗng là gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Với danh sách đôi vòng có sentinel, điều kiện rỗng là gì?</span></summary>
 <p><code>head-&gt;next == head</code> (và <code>head-&gt;prev == head</code>).</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-3-danh-sach-lien-ket-va-intrusive-list">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-4-memory-pool-fixed-block-allocator" hidden><h2 id="c-bai-4-memory-pool-fixed-block-allocator">Bài 4 · Memory pool (fixed-block allocator)</h2>
@@ -984,15 +1002,15 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao memory pool kích thước cố định không bị external fragmentation?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao memory pool kích thước cố định không bị external fragmentation?</span></summary>
 <p>Mọi khối cùng kích thước, nên bất kỳ khối trống nào cũng đáp ứng được bất kỳ yêu cầu nào; không có trường hợp đủ tổng byte mà không đủ khối liền.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Double free trong pool dùng free list gây hậu quả gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Double free trong pool dùng free list gây hậu quả gì?</span></summary>
 <p>Khối xuất hiện hai lần trong free list; hai lần cấp phát sau đó trả về cùng một khối cho hai nơi khác nhau, dữ liệu ghi đè lẫn nhau.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Khối nhỏ nhất của pool phải lớn bao nhiêu? Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Khối nhỏ nhất của pool phải lớn bao nhiêu? Vì sao?</span></summary>
 <p>Ít nhất bằng kích thước một con trỏ (để chứa <code>next</code> của free list khi khối trống), và làm tròn theo căn lề lớn nhất cần dùng.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-4-memory-pool-fixed-block-allocator">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-5-priority-queue-binary-heap-va-scheduler-o-1" hidden><h2 id="c-bai-5-priority-queue-binary-heap-va-scheduler-o-1">Bài 5 · Priority queue, binary heap và scheduler O(1)</h2>
@@ -1144,11 +1162,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong heap lưu trên mảng, node chỉ số 6 có cha và các con ở chỉ số nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong heap lưu trên mảng, node chỉ số 6 có cha và các con ở chỉ số nào?</span></summary>
 <p>Cha: (6 − 1)/2 = 2. Con: 13 và 14.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`ready_bitmap = 0x00000110`. Priority cao nhất có task sẵn sàng là bao nhiêu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>ready_bitmap = 0x00000110</code>. Priority cao nhất có task sẵn sàng là bao nhiêu?</span></summary>
 <p>Bit cao nhất là bit 8 (0x100). CLZ = 23, priority = 31 − 23 = 8.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-5-priority-queue-binary-heap-va-scheduler-o-1">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-6-hash-table-kich-thuoc-co-dinh" hidden><h2 id="c-bai-6-hash-table-kich-thuoc-co-dinh">Bài 6 · Hash table kích thước cố định</h2>
@@ -1237,11 +1255,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không thể xóa phần tử trong linear probing bằng cách đặt ô về "trống"?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không thể xóa phần tử trong linear probing bằng cách đặt ô về "trống"?</span></summary>
 <p>Ô trống làm dừng việc dò; các khóa đã được đặt sau ô đó (do va chạm) sẽ không tìm thấy được nữa. Phải dùng tombstone.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Cần lưu tối đa 100 phiên kết nối trong hash table open addressing. Chọn dung lượng bao nhiêu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Cần lưu tối đa 100 phiên kết nối trong hash table open addressing. Chọn dung lượng bao nhiêu?</span></summary>
 <p>Với load factor ≤ 0,7 cần ít nhất 143 ô; chọn 256 (lũy thừa 2 gần nhất phía trên).</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-6-hash-table-kich-thuoc-co-dinh">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-7-lookup-table-va-table-driven-code" hidden><h2 id="c-bai-7-lookup-table-va-table-driven-code">Bài 7 · Lookup table và table-driven code</h2>
@@ -1328,7 +1346,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một bảng chuyển đổi cho ADC 12-bit với giá trị `float` tốn bao nhiêu Flash? Cách giảm?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một bảng chuyển đổi cho ADC 12-bit với giá trị <code>float</code> tốn bao nhiêu Flash? Cách giảm?</span></summary>
 <p>4096 × 4 byte = 16 KB. Giảm bằng cách lưu ít điểm mẫu (ví dụ 33 điểm cách đều) rồi nội suy tuyến tính, hoặc lưu <code>int16_t</code> với hệ số tỷ lệ cố định.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-bai-7-lookup-table-va-table-driven-code">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-bai-8-cay-trong-embedded" hidden><h2 id="c-bai-8-cay-trong-embedded">Bài 8 · Cây trong Embedded</h2>
@@ -1356,7 +1374,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao scheduler CFS của Linux dùng red-black tree thay vì hash table?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao scheduler CFS của Linux dùng red-black tree thay vì hash table?</span></summary>
 <p>Cần lấy task có vruntime nhỏ nhất (dữ liệu có thứ tự) và chèn/xóa với thời gian xấu nhất O(log n); hash table không giữ thứ tự và có xấu nhất O(n).</p>
 </details>
 <aside class="callout c-key">
@@ -1720,6 +1738,19 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

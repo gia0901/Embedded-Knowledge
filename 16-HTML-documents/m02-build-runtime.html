@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>Build và runtime</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -515,7 +533,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <li>C++17 có biến <code>inline</code>: <code>inline int count = 0;</code> trong header được phép, linker giữ một bản.</li>
 </ul>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hai file cùng định nghĩa `static int buffer[256];`. Có lỗi liên kết không? Chương trình dùng bao nhiêu bộ nhớ cho chúng?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hai file cùng định nghĩa <code>static int buffer[256];</code>. Có lỗi liên kết không? Chương trình dùng bao nhiêu bộ nhớ cho chúng?</span></summary>
 <p>Không lỗi: mỗi <code>buffer</code> là ký hiệu cục bộ của file mình, hai biến hoàn toàn riêng biệt, tổng 2 × 256 × sizeof(int) byte trong <code>.bss</code>. Nếu ý định là dùng chung một buffer thì đây là bug thầm lặng: mỗi file thao tác trên bản riêng của nó.</p>
 </details>
 <aside class="callout c-key">
@@ -590,7 +608,7 @@ ld  --gc-sections                             # bỏ section không ai tham chi�
 </table></div>
 <p>Với lỗi undefined reference trong C++, đọc tên đã bị demangle (<code>c++filt _Z3foov</code> → <code>foo()</code>) để thấy chữ ký linker đang tìm, rồi so với định nghĩa.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Dự án C++ gọi hàm `hal_init()` viết trong `hal.c`, link báo `undefined reference to 'hal_init()'` dù `hal.o` có trong lệnh link. Vì sao, và sửa thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Dự án C++ gọi hàm <code>hal_init()</code> viết trong <code>hal.c</code>, link báo <code>undefined reference to &#x27;hal_init()&#x27;</code> dù <code>hal.o</code> có trong lệnh link. Vì sao, và sửa thế nào?</span></summary>
 <p>Thông báo có <code>()</code>, tức linker đang tìm phiên bản C++ đã mangle (<code>_Z8hal_initv</code>), còn <code>hal.o</code> (biên dịch bằng C) chỉ có ký hiệu <code>hal_init</code>. Header được include từ file C++ mà thiếu <code>extern "C"</code>. Sửa trong <code>hal.h</code>: bọc các khai báo bằng <code>#ifdef __cplusplus extern "C" { #endif ... #ifdef __cplusplus } #endif</code>.</p>
 </details>
 <aside class="callout c-key">
@@ -817,7 +835,7 @@ ramfunc@0x20000005 -&gt; 0x0000002a
 
 <p>Dòng <code>__add_in_ram_veneer</code> là một chi tiết thú vị: lệnh <code>bl</code> của Thumb-2 chỉ nhảy được khoảng ±16 MB, còn khoảng cách Flash (0x0) tới RAM (0x20000000) là 512 MB, nên linker tự chèn một đoạn mã trung gian nạp địa chỉ đầy đủ rồi nhảy.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một firmware chạy đúng khi debug bằng J-Link (nạp rồi chạy từ debugger) nhưng treo khi cắm nguồn lần đầu. Biến toàn cục `int mode = 2;` luôn đọc ra giá trị lạ. Nghi ngờ gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một firmware chạy đúng khi debug bằng J-Link (nạp rồi chạy từ debugger) nhưng treo khi cắm nguồn lần đầu. Biến toàn cục <code>int mode = 2;</code> luôn đọc ra giá trị lạ. Nghi ngờ gì?</span></summary>
 <p>Startup không chép <code>.data</code> (hoặc chép sai địa chỉ do linker script đặt <code>_sidata</code>/LMA sai). Khi chạy từ debugger, RAM có thể còn giá trị từ lần nạp trước hoặc debugger tự nạp cả vùng RAM từ file ELF (nạp theo segment, kể cả <code>.data</code> ở VMA), nên lỗi bị che. Kiểm tra <code>Reset_Handler</code>, ký hiệu <code>_sidata</code>, <code>_sdata</code>, <code>_edata</code> trong file map, và chạy thử với một lần ngắt nguồn thật.</p>
 </details>
 <aside class="callout c-key">
@@ -918,7 +936,7 @@ malloc(1000) ok, malloc(100000) NULL
 
 <p>Khác MCU: mỗi vùng có quyền riêng qua MMU (ghi vào <code>.text</code> gây SIGSEGV), có <strong>guard page</strong> dưới stack, và <strong>ASLR</strong> đặt các vùng ở địa chỉ ngẫu nhiên mỗi lần chạy. Xem bố cục thật của một process: <code>cat /proc/&lt;pid&gt;/maps</code>; tổng bộ nhớ thực dùng: <code>/proc/&lt;pid&gt;/smaps_rollup</code> (RSS, PSS).</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Thiết bị chạy ổn vài ngày rồi một biến cấu hình toàn cục tự đổi giá trị ngẫu nhiên. Code không có chỗ nào ghi vào biến đó. Hướng điều tra?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Thiết bị chạy ổn vài ngày rồi một biến cấu hình toàn cục tự đổi giá trị ngẫu nhiên. Code không có chỗ nào ghi vào biến đó. Hướng điều tra?</span></summary>
 <p>Nghi ngờ hàng đầu là tràn stack (hoặc tràn buffer) đè lên vùng RAM chứa biến. Xem file map để biết biến nằm cạnh gì; đo high-water mark của stack (và của từng task nếu dùng RTOS) dưới mọi kịch bản, đặc biệt đường lỗi hiếm (xử lý lỗi in log dài, ISR lồng nhau). Đặt watchpoint phần cứng (DWT) trên địa chỉ biến để bắt lệnh ghi. Phòng ngừa: MPU guard dưới đáy stack hoặc MSPLIM, tăng biên stack, <code>-fstack-usage</code> trong CI.</p>
 </details>
 <aside class="callout c-key">
@@ -1062,7 +1080,7 @@ RAM              0x20000000         0x00010000         xrw
 </table></div>
 <p>Luôn <strong>đo trước và sau</strong> (in <code>size</code> sau mỗi build trong CI, cảnh báo khi tăng quá ngưỡng). Một dòng <code>#include</code> thư viện tiện ích có thể kéo theo vài KB không ai để ý.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Firmware báo `region 'FLASH' overflowed by 3200 bytes` sau khi thêm một dòng log in nhiệt độ dạng `%.2f`. Bạn làm gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Firmware báo <code>region &#x27;FLASH&#x27; overflowed by 3200 bytes</code> sau khi thêm một dòng log in nhiệt độ dạng <code>%.2f</code>. Bạn làm gì?</span></summary>
 <p>Gần như chắc chắn dòng <code>%.2f</code> kéo theo phần định dạng số thực của printf và thư viện số thực mềm (nếu chip không có FPU hoặc dùng float ABI mềm). Xác nhận bằng file map hoặc <code>nm --size-sort</code> (thấy <code>_printf_float</code>, <code>__aeabi_d*</code>). Sửa: in số nguyên đã nhân tỉ lệ (<code>temp_centi / 100</code>, <code>temp_centi % 100</code>), hoặc log dạng token gửi giá trị thô. Nếu thật sự cần thêm chỗ: bật <code>-Os</code>, <code>--gc-sections</code>, LTO, rồi xem các ký hiệu lớn nhất.</p>
 </details>
 <aside class="callout c-key">
@@ -1313,7 +1331,7 @@ $ cmake --build build
 </tbody>
 </table></div>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Bạn copy một chương trình build trên Ubuntu sang board Buildroot (musl), chạy `./sensor_daemon` báo "No such file or directory", nhưng `ls` thấy file rõ ràng. Giải thích.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Bạn copy một chương trình build trên Ubuntu sang board Buildroot (musl), chạy <code>./sensor_daemon</code> báo "No such file or directory", nhưng <code>ls</code> thấy file rõ ràng. Giải thích.</span></summary>
 <p>Thông báo không nói về file chương trình mà về <strong>dynamic linker</strong> ghi trong segment INTERP: chương trình build trên Ubuntu cần <code>/lib/ld-linux-aarch64.so.1</code> (glibc), còn hệ musl có <code>/lib/ld-musl-aarch64.so.1</code>. Kernel không tìm thấy interpreter nên <code>execve</code> trả <code>ENOENT</code>. Xác nhận bằng <code>readelf -l sensor_daemon | grep interpreter</code>. Sửa: build bằng toolchain của Buildroot (cùng thư viện C với rootfs), hoặc liên kết tĩnh.</p>
 </details>
 <aside class="callout c-key">
@@ -1691,6 +1709,19 @@ ASSERT(_end + _stack_size &lt;= _estack, "RAM tràn")
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();

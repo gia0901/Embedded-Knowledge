@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="fonts/fonts.css">
+<!DOCTYPE html>
 <title>Effective Modern C++</title>
 <style>/* Layout: datasheet-style masthead, sticky tab strip, reading column + sticky TOC rail on wide screens. */
 :root {
@@ -321,6 +322,23 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .bk-cur { text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--fg); }
 @media (min-width: 1000px) { .bk-cur { display: none; } }
 @media (max-width: 999px) { .bk-nav > summary::after { content: "▾ đổi chương"; margin-left: auto; color: var(--accent); } .bk-nav[open] > summary::after { content: "▴ đóng"; } }
+
+/* CS Foundations: hai khung liên hệ */
+.c-lemb .callout-tag { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
+.c-job { border-color: var(--copper); border-left-width: 4px; }
+.c-job .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.selfcheck > summary .sc-q { flex: 1 1 60%; }
+/* Tab Thực hành */
+.selfcheck.sc-code > summary::after { content: "Mở code"; }
+.selfcheck.sc-sol > summary::after { content: "Xem lời giải"; }
+.selfcheck.sc-hint > summary::after { content: "Xem gợi ý"; }
+.selfcheck[open] > summary::after { content: "Ẩn"; }
+.selfcheck.sc-sol { border-color: var(--copper, #b26b3a); }
+.selfcheck.sc-code { border-style: solid; }
+.prose pre { position: relative; }
+.copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
+.copy-btn:hover { opacity: 1; }
+.c-practice .callout-tag { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -709,7 +727,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 
 <p>Nhưng một <strong>tham chiếu tới mảng</strong> thì giữ nguyên kiểu mảng, kể cả kích thước: <code>int (&amp;ref)[16] = arr;</code>. Item 1 tận dụng điều này.</p>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Biểu thức nào là lvalue: `x`, `x + 1`, `++x`, `x++`, `"abc"`, `std::move(x)`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Biểu thức nào là lvalue: <code>x</code>, <code>x + 1</code>, <code>++x</code>, <code>x++</code>, <code>&quot;abc&quot;</code>, <code>std::move(x)</code>?</span></summary>
 <ul>
 <li><code>x</code>: lvalue (có tên).</li>
 <li><code>x + 1</code>: rvalue.</li>
@@ -720,7 +738,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`void f(std::string&amp; s);` Gọi `f("hello")` có compile không? Còn `void g(const std::string&amp; s); g("hello")`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>void f(std::string&amp; s);</code> Gọi <code>f(&quot;hello&quot;)</code> có compile không? Còn <code>void g(const std::string&amp; s); g(&quot;hello&quot;)</code>?</span></summary>
 <p><code>f("hello")</code> lỗi: cần tạo <code>std::string</code> tạm (rvalue) mà <code>std::string&amp;</code> không gắn được với rvalue. <code>g("hello")</code> compile: <code>const std::string&amp;</code> gắn được với object tạm.</p>
 </details>
 <div class="chap-end"><button class="btn ok mark-read" type="button" data-chap="c-chuong-0-kien-thuc-nen-truoc-khi-bat-dau">Đánh dấu đã đọc</button><div class="chap-pager"></div></div></section><section class="chap prose" data-chap="c-chuong-1-deducing-types" hidden><h2 id="c-chuong-1-deducing-types">Chương 1 · Deducing Types <span class="pg">tr. 9 · PDF 27</span></h2>
@@ -922,19 +940,19 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`template<typename T> void f(T&amp; p);` với `const std::array<int, 4> a{};` gọi `f(a)`. `T` là gì? Hàm có sửa được `a` không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>template&lt;typename T&gt; void f(T&amp; p);</code> với <code>const std::array&lt;int, 4&gt; a{};</code> gọi <code>f(a)</code>. <code>T</code> là gì? Hàm có sửa được <code>a</code> không?</span></summary>
 <p><code>T = const std::array&lt;int, 4&gt;</code>, <code>p</code> có kiểu <code>const std::array&lt;int, 4&gt;&amp;</code>. Không sửa được: <code>const</code> được giữ trong <code>T</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`template<typename T> void g(T p);` gọi `g(rx)` với `const int&amp; rx`. `T` là gì? Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>template&lt;typename T&gt; void g(T p);</code> gọi <code>g(rx)</code> với <code>const int&amp; rx</code>. <code>T</code> là gì? Vì sao?</span></summary>
 <p><code>T = int</code>. Truyền theo giá trị: bỏ <code>&amp;</code>, rồi bỏ <code>const</code> mức ngoài, vì <code>p</code> là bản sao độc lập.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`template<typename T> void h(T&amp;&amp; p);` gọi `h(x)` và `h(std::move(x))` với `int x`. Kiểu `T` và `p` trong mỗi trường hợp?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>template&lt;typename T&gt; void h(T&amp;&amp; p);</code> gọi <code>h(x)</code> và <code>h(std::move(x))</code> với <code>int x</code>. Kiểu <code>T</code> và <code>p</code> trong mỗi trường hợp?</span></summary>
 <p><code>h(x)</code>: <code>x</code> là lvalue → <code>T = int&amp;</code>, <code>p: int&amp;</code>. <code>h(std::move(x))</code>: rvalue → <code>T = int</code>, <code>p: int&amp;&amp;</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `array_size` viết bằng template an toàn hơn macro `sizeof(a)/sizeof(a[0])`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>array_size</code> viết bằng template an toàn hơn macro <code>sizeof(a)/sizeof(a[0])</code>?</span></summary>
 <p>Macro vẫn compile khi lỡ truyền con trỏ (cho kết quả sai, ví dụ 4/1 = 4). Template nhận <code>T (&amp;)[N]</code> sẽ báo lỗi compile vì con trỏ không khớp với tham chiếu tới mảng.</p>
 </details>
 <h3 id="c-item-2-hieu-auto-type-deduction">Item 2 · Hiểu <code>auto</code> type deduction <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 18 · PDF 36</span></h3>
@@ -1030,11 +1048,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Kiểu của mỗi biến: `auto a = 1.5f;`, `auto b = {1.5f};`, `auto&amp; c = a;`, `const auto d = c;`, `auto e{1.5f};` (C++17)?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Kiểu của mỗi biến: <code>auto a = 1.5f;</code>, <code>auto b = {1.5f};</code>, <code>auto&amp; c = a;</code>, <code>const auto d = c;</code>, <code>auto e{1.5f};</code> (C++17)?</span></summary>
 <p><code>a: float</code>, <code>b: std::initializer_list&lt;float&gt;</code>, <code>c: float&amp;</code>, <code>d: const float</code>, <code>e: float</code> (từ C++17).</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vòng lặp `for (auto p : packets)` với `std::vector<Packet>` có vấn đề gì nếu `Packet` lớn 256 byte?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vòng lặp <code>for (auto p : packets)</code> với <code>std::vector&lt;Packet&gt;</code> có vấn đề gì nếu <code>Packet</code> lớn 256 byte?</span></summary>
 <p>Mỗi vòng copy một <code>Packet</code> 256 byte vào <code>p</code>. Nếu chỉ đọc, dùng <code>const auto&amp; p</code>; nếu cần sửa phần tử thật, dùng <code>auto&amp; p</code>.</p>
 </details>
 <h3 id="c-item-3-hieu-decltype">Item 3 · Hiểu <code>decltype</code> <span class="badge skim">Lướt</span> <span class="pg">tr. 23 · PDF 41</span></h3>
@@ -1121,11 +1139,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Với `int a[4];`, `decltype(a)` và `decltype(a[0])` là gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Với <code>int a[4];</code>, <code>decltype(a)</code> và <code>decltype(a[0])</code> là gì?</span></summary>
 <p><code>decltype(a)</code> là <code>int[4]</code> (tên, kiểu khai báo). <code>decltype(a[0])</code> là <code>int&amp;</code> (biểu thức lvalue không phải tên).</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một hàm `auto get_cfg() { return cfg_; }` với `Config cfg_;` là thành viên. Người gọi viết `get_cfg().baud = 9600;`. Chuyện gì xảy ra?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một hàm <code>auto get_cfg() { return cfg_; }</code> với <code>Config cfg_;</code> là thành viên. Người gọi viết <code>get_cfg().baud = 9600;</code>. Chuyện gì xảy ra?</span></summary>
 <p><code>auto</code> bỏ tham chiếu nên hàm trả về bản sao <code>Config</code>. Phép gán sửa bản sao tạm, <code>cfg_</code> không đổi (và với class, code vẫn compile, nên lỗi rất khó thấy). Muốn sửa được thì khai báo kiểu trả về <code>Config&amp;</code>. Cũng có thể dùng <code>decltype(auto)</code> với <code>return (cfg_);</code>, nhưng viết rõ <code>Config&amp;</code> dễ đọc hơn nhiều.</p>
 </details>
 <h3 id="c-item-4-biet-cach-xem-kieu-duoc-suy-ra">Item 4 · Biết cách xem kiểu được suy ra <span class="badge skip">Bỏ qua</span> <span class="pg">tr. 30 · PDF 48</span></h3>
@@ -1154,7 +1172,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 <p>Trên MCU không có cách in kiểu lúc chạy, nên mẹo <code>TypeDisplay</code> và <code>static_assert(std::is_same_v&lt;decltype(x), const int&amp;&gt;)</code> là hai công cụ hữu ích nhất. <code>static_assert</code> còn có thể để lại trong code như một bài test chạy lúc compile.</p>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `typeid(rx).name()` với `const int&amp; rx` không giúp ích khi debug suy luận kiểu?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>typeid(rx).name()</code> với <code>const int&amp; rx</code> không giúp ích khi debug suy luận kiểu?</span></summary>
 <p>Vì <code>typeid</code> bỏ tham chiếu và <code>const</code>, kết quả in ra chỉ là <code>int</code>, đúng những thông tin bạn đang muốn kiểm tra đã bị mất.</p>
 </details>
 <aside class="callout c-key">
@@ -1279,11 +1297,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`for (const std::pair<int, Sensor>&amp; e : sensor_map)` với `std::map<int, Sensor>`. Có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>for (const std::pair&lt;int, Sensor&gt;&amp; e : sensor_map)</code> với <code>std::map&lt;int, Sensor&gt;</code>. Có vấn đề gì?</span></summary>
 <p>Kiểu phần tử là <code>std::pair&lt;const int, Sensor&gt;</code>. Kiểu viết tay khác, nên mỗi vòng tạo một <code>pair</code> tạm, copy cả <code>Sensor</code>. Dùng <code>const auto&amp; e</code>, hoặc C++17 <code>for (const auto&amp; [id, s] : sensor_map)</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Khi nào vẫn nên dùng `std::function` thay vì `auto`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Khi nào vẫn nên dùng <code>std::function</code> thay vì <code>auto</code>?</span></summary>
 <p>Khi cần một biến (hoặc thành viên class, phần tử container) chứa được <strong>nhiều loại callable khác nhau</strong>, ví dụ danh sách callback do người dùng đăng ký. <code>auto</code> chỉ giữ được đúng một kiểu closure cụ thể.</p>
 </details>
 <h3 id="c-item-6-dung-explicitly-typed-initializer-khi-auto-suy-ra-kie">Item 6 · Dùng explicitly typed initializer khi <code>auto</code> suy ra kiểu không mong muốn <span class="badge skim">Lướt</span> <span class="pg">tr. 43 · PDF 61</span></h3>
@@ -1337,11 +1355,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `bool b = flags()[0];` an toàn còn `auto b = flags()[0];` thì không, với `std::vector<bool> flags();`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>bool b = flags()[0];</code> an toàn còn <code>auto b = flags()[0];</code> thì không, với <code>std::vector&lt;bool&gt; flags();</code>?</span></summary>
 <p>Bản <code>bool</code> chuyển proxy sang giá trị ngay trong câu lệnh. Bản <code>auto</code> giữ lại proxy, mà proxy trỏ vào <code>vector</code> tạm đã bị hủy cuối câu lệnh.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Nếu `flags` là một biến `std::vector<bool>` (không phải hàm trả về object tạm), `auto b = flags[0];` có vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Nếu <code>flags</code> là một biến <code>std::vector&lt;bool&gt;</code> (không phải hàm trả về object tạm), <code>auto b = flags[0];</code> có vấn đề gì?</span></summary>
 <p>Không treo, vì <code>flags</code> còn sống. Nhưng <code>b</code> là proxy, không phải bản sao: sửa <code>b = true</code> sẽ <strong>sửa phần tử trong vector</strong>, và nếu <code>flags</code> thay đổi kích thước thì proxy có thể bị vô hiệu. Hành vi khác hẳn <code>bool b</code>.</p>
 </details>
 <aside class="callout c-key">
@@ -1483,15 +1501,15 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`uint8_t level{adc_raw &gt;&gt; 4};` với `uint16_t adc_raw` có compile không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>uint8_t level{adc_raw &gt;&gt; 4};</code> với <code>uint16_t adc_raw</code> có compile không?</span></summary>
 <p>Không: biểu thức có kiểu <code>int</code> (sau integer promotion) và không phải hằng số, chuyển sang <code>uint8_t</code> là narrowing. Viết <code>uint8_t level = static_cast&lt;uint8_t&gt;(adc_raw &gt;&gt; 4);</code> để ghi rõ việc cắt bit.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::vector<std::string> v{3, "x"};` tạo gì? Còn `std::vector<std::string> w(3, "x");`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::vector&lt;std::string&gt; v{3, &quot;x&quot;};</code> tạo gì? Còn <code>std::vector&lt;std::string&gt; w(3, &quot;x&quot;);</code>?</span></summary>
 <p><code>w(3, "x")</code>: 3 chuỗi <code>"x"</code>. Với <code>v{3, "x"}</code>: compiler thử <code>initializer_list&lt;std::string&gt;</code> trước, nhưng <code>3</code> không chuyển được sang <code>std::string</code>, nên quay về overload thường và cũng tạo 3 chuỗi <code>"x"</code>. Đây là trường hợp hiếm mà hai cách cho cùng kết quả.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`Timer t();` rồi `t.start();` báo lỗi gì? Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>Timer t();</code> rồi <code>t.start();</code> báo lỗi gì? Vì sao?</span></summary>
 <p><code>t</code> là khai báo một hàm trả về <code>Timer</code>, không phải object, nên <code>t.start()</code> lỗi (không có thành viên của một hàm). Sửa bằng <code>Timer t;</code> hoặc <code>Timer t{};</code>.</p>
 </details>
 <h3 id="c-item-8-uu-tien-nullptr-thay-cho-0-va-null">Item 8 · Ưu tiên <code>nullptr</code> thay cho <code>0</code> và <code>NULL</code> <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 58 · PDF 76</span></h3>
@@ -1549,7 +1567,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `locked_call(handle_a, m, 0)` lỗi trong khi `handle_a(0)` gọi trực tiếp thì được?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>locked_call(handle_a, m, 0)</code> lỗi trong khi <code>handle_a(0)</code> gọi trực tiếp thì được?</span></summary>
 <p>Literal <code>0</code> được phép chuyển thành con trỏ null. Qua template, <code>Ptr</code> được suy ra là <code>int</code>, <code>ptr</code> là một biến <code>int</code> bình thường, không còn là literal, nên không chuyển sang con trỏ được.</p>
 </details>
 <h3 id="c-item-9-uu-tien-alias-declaration-thay-cho-typedef">Item 9 · Ưu tiên alias declaration thay cho <code>typedef</code> <span class="badge skim">Lướt</span> <span class="pg">tr. 63 · PDF 81</span></h3>
@@ -1607,7 +1625,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Viết alias template `RegArray<N>` cho `std::array<volatile uint32_t, N>`.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Viết alias template <code>RegArray&lt;N&gt;</code> cho <code>std::array&lt;volatile uint32_t, N&gt;</code>.</span></summary>
 <p><code>template&lt;std::size_t N&gt; using RegArray = std::array&lt;volatile uint32_t, N&gt;;</code> (tham số template của alias có thể là giá trị, không chỉ kiểu).</p>
 </details>
 <h3 id="c-item-10-uu-tien-scoped-enum-thay-cho-unscoped-enum">Item 10 · Ưu tiên scoped enum thay cho unscoped enum <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 67 · PDF 85</span></h3>
@@ -1689,11 +1707,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`enum class Reg : uint8_t { Ctrl = 0x10 }; uint8_t addr = Reg::Ctrl;` có compile không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>enum class Reg : uint8_t { Ctrl = 0x10 }; uint8_t addr = Reg::Ctrl;</code> có compile không?</span></summary>
 <p>Không: scoped enum không chuyển ngầm sang số nguyên. Viết <code>static_cast&lt;uint8_t&gt;(Reg::Ctrl)</code> hoặc <code>to_underlying(Reg::Ctrl)</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `enum OldStatus;` không forward declare được mà `enum class Status;` thì được?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>enum OldStatus;</code> không forward declare được mà <code>enum class Status;</code> thì được?</span></summary>
 <p>Unscoped enum không có kiểu nền mặc định, compiler phải thấy mọi giá trị mới biết kích thước. Scoped enum mặc định kiểu nền <code>int</code> nên đã biết kích thước.</p>
 </details>
 <h3 id="c-item-11-uu-tien-deleted-function-thay-cho-private-khong-dinh">Item 11 · Ưu tiên deleted function thay cho private không định nghĩa <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 74 · PDF 92</span></h3>
@@ -1761,11 +1779,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Có `void set_baud(uint32_t);` và `void set_baud(int) = delete;`. Gọi `set_baud(115200)` có compile không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Có <code>void set_baud(uint32_t);</code> và <code>void set_baud(int) = delete;</code>. Gọi <code>set_baud(115200)</code> có compile không?</span></summary>
 <p>Không: literal <code>115200</code> có kiểu <code>int</code>, khớp chính xác với bản <code>int</code> đã bị xóa. Phải viết <code>set_baud(115200u)</code>. Ví dụ này cho thấy deleted function tham gia overload resolution, nên cần cân nhắc kỹ khi xóa.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao nên đặt deleted function ở `public`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao nên đặt deleted function ở <code>public</code>?</span></summary>
 <p>Compiler kiểm tra quyền truy cập trước khi kiểm tra deleted; để <code>private</code> có thể làm thông báo lỗi nói về quyền truy cập thay vì nói hàm đã bị xóa.</p>
 </details>
 <h3 id="c-item-12-khai-bao-ham-ghi-de-voi-override">Item 12 · Khai báo hàm ghi đè với <code>override</code> <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 79 · PDF 97</span></h3>
@@ -1861,7 +1879,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`virtual void on_irq(uint32_t mask);` ở class cha, class con viết `void on_irq(uint16_t mask) override;`. Kết quả?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>virtual void on_irq(uint32_t mask);</code> ở class cha, class con viết <code>void on_irq(uint16_t mask) override;</code>. Kết quả?</span></summary>
 <p>Lỗi compile: kiểu tham số khác (<code>uint16_t</code> khác <code>uint32_t</code>) nên không ghi đè gì cả, và <code>override</code> buộc compiler báo lỗi. Không có <code>override</code>, đây sẽ là một hàm mới và gọi qua con trỏ class cha vẫn chạy bản cũ.</p>
 </details>
 <h3 id="c-item-13-uu-tien-const-iterator-thay-cho-iterator">Item 13 · Ưu tiên <code>const_iterator</code> thay cho <code>iterator</code> <span class="badge skip">Bỏ qua</span> <span class="pg">tr. 86 · PDF 104</span></h3>
@@ -1935,11 +1953,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một `std::vector<Frame>` tăng từ 1000 lên 2000 phần tử. `Frame` có move constructor không ghi `noexcept`. Điều gì xảy ra lúc realloc?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một <code>std::vector&lt;Frame&gt;</code> tăng từ 1000 lên 2000 phần tử. <code>Frame</code> có move constructor không ghi <code>noexcept</code>. Điều gì xảy ra lúc realloc?</span></summary>
 <p>Vector dùng <code>std::move_if_noexcept</code>, thấy move có thể ném nên <strong>copy</strong> cả 1000 phần tử để giữ strong exception guarantee. Thêm <code>noexcept</code> thì các phần tử được move.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Khác biệt giữa `noexcept` dùng như specifier và như operator?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Khác biệt giữa <code>noexcept</code> dùng như specifier và như operator?</span></summary>
 <p>Specifier <code>void f() noexcept(cond);</code> khai báo hàm có noexcept khi <code>cond</code> là true. Operator <code>noexcept(expr)</code> là biểu thức bool lúc compile, cho biết <code>expr</code> có được khai báo là không ném không.</p>
 </details>
 <h3 id="c-item-15-dung-constexpr-bat-cu-khi-nao-co-the">Item 15 · Dùng <code>constexpr</code> bất cứ khi nào có thể <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 97 · PDF 115</span></h3>
@@ -2048,11 +2066,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`const int a = 10;` và `constexpr int b = 10;` khác nhau thế nào khi dùng làm kích thước `std::array`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>const int a = 10;</code> và <code>constexpr int b = 10;</code> khác nhau thế nào khi dùng làm kích thước <code>std::array</code>?</span></summary>
 <p>Trong trường hợp này cả hai đều dùng được, vì <code>a</code> là <code>const int</code> được khởi tạo bằng hằng số (quy tắc đặc biệt cho số nguyên). Nhưng <code>const int c = read();</code> thì không dùng được, còn <code>constexpr int d = read();</code> sẽ lỗi ngay ở khai báo. <code>constexpr</code> đảm bảo và kiểm tra điều đó; <code>const</code> thì không.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hàm `constexpr` có chắc chắn được tính lúc compile không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hàm <code>constexpr</code> có chắc chắn được tính lúc compile không?</span></summary>
 <p>Không. Chỉ khi đối số là hằng compile-time <strong>và</strong> kết quả được dùng ở ngữ cảnh cần hằng (hoặc compiler chọn tính sớm). Muốn bắt buộc, gán kết quả cho biến <code>constexpr</code>, hoặc dùng <code>consteval</code> (C++20).</p>
 </details>
 <h3 id="c-item-16-lam-cho-const-member-function-thread-safe">Item 16 · Làm cho <code>const</code> member function thread-safe <span class="badge skim">Lướt</span> <span class="pg">tr. 103 · PDF 121</span></h3>
@@ -2107,7 +2125,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `std::mutex` trong class phải khai báo `mutable` để dùng trong hàm `const`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>std::mutex</code> trong class phải khai báo <code>mutable</code> để dùng trong hàm <code>const</code>?</span></summary>
 <p>Trong hàm <code>const</code>, mọi thành viên được coi là <code>const</code>. <code>lock()</code> và <code>unlock()</code> không phải hàm <code>const</code>, nên phải đánh dấu mutex là <code>mutable</code>.</p>
 </details>
 <h3 id="c-item-17-hieu-cach-sinh-special-member-function">Item 17 · Hiểu cách sinh special member function <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 109 · PDF 127</span></h3>
@@ -2228,11 +2246,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Class chỉ có thành viên `std::unique_ptr<int> p_;` và không khai báo gì. Nó copy được không? Move được không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Class chỉ có thành viên <code>std::unique_ptr&lt;int&gt; p_;</code> và không khai báo gì. Nó copy được không? Move được không?</span></summary>
 <p>Move được (move tự sinh, move từng thành viên). Copy không được: copy constructor được sinh nhưng bị định nghĩa là deleted vì <code>unique_ptr</code> không copy được.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Thêm `~Widget() = default;` vào một class đang move được. Class còn move được không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Thêm <code>~Widget() = default;</code> vào một class đang move được. Class còn move được không?</span></summary>
 <p>Không còn move operation tự sinh, vì đã khai báo destructor (kể cả <code>= default</code>). "Move" sẽ thành copy nếu copy được. Phải khai báo thêm <code>Widget(Widget&amp;&amp;) = default;</code> và move assignment.</p>
 </details>
 <aside class="callout c-key">
@@ -2361,11 +2379,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::unique_ptr<Base> p = std::make_unique<Derived>();` với `Base` không có virtual destructor. Vấn đề gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::unique_ptr&lt;Base&gt; p = std::make_unique&lt;Derived&gt;();</code> với <code>Base</code> không có virtual destructor. Vấn đề gì?</span></summary>
 <p>Khi <code>p</code> bị hủy, <code>delete</code> được gọi qua <code>Base*</code>. Không có virtual destructor thì destructor của <code>Derived</code> không chạy: undefined behavior (thường là rò tài nguyên của <code>Derived</code>).</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `unique_ptr` không copy được? Muốn truyền nó vào hàm để hàm giữ lại thì làm thế nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>unique_ptr</code> không copy được? Muốn truyền nó vào hàm để hàm giữ lại thì làm thế nào?</span></summary>
 <p>Copy sẽ tạo hai chủ sở hữu và giải phóng hai lần. Truyền bằng <code>std::move</code>: <code>store(std::move(p));</code> với tham số <code>std::unique_ptr&lt;T&gt;</code>; sau đó <code>p</code> là null.</p>
 </details>
 <h3 id="c-item-19-dung-std-shared-ptr-cho-so-huu-chia-se">Item 19 · Dùng <code>std::shared_ptr</code> cho sở hữu chia sẻ <span class="badge skim">Lướt</span> <span class="pg">tr. 125 · PDF 143</span></h3>
@@ -2454,11 +2472,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::shared_ptr<T> a = std::make_shared<T>(); std::shared_ptr<T> b = a;` có bao nhiêu control block? Reference count bằng mấy?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::shared_ptr&lt;T&gt; a = std::make_shared&lt;T&gt;(); std::shared_ptr&lt;T&gt; b = a;</code> có bao nhiêu control block? Reference count bằng mấy?</span></summary>
 <p>Một control block (b dùng chung với a), reference count bằng 2.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không nên gọi `shared_from_this()` trong constructor?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không nên gọi <code>shared_from_this()</code> trong constructor?</span></summary>
 <p>Trong constructor, chưa có <code>shared_ptr</code> nào quản lý object (nó được tạo sau khi constructor chạy xong), nên không có control block để dùng chung.</p>
 </details>
 <h3 id="c-item-20-dung-std-weak-ptr-cho-con-tro-giong-shared-ptr-nhung">Item 20 · Dùng <code>std::weak_ptr</code> cho con trỏ giống <code>shared_ptr</code> nhưng có thể treo <span class="badge skim">Lướt</span> <span class="pg">tr. 134 · PDF 152</span></h3>
@@ -2516,7 +2534,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `weak_ptr` không có `operator-&gt;`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>weak_ptr</code> không có <code>operator-&gt;</code>?</span></summary>
 <p>Kiểm tra còn sống và truy cập phải là một thao tác atomic. Nếu có <code>-&gt;</code>, object có thể bị hủy bởi thread khác giữa lúc kiểm tra và lúc dùng. <code>lock()</code> trả về <code>shared_ptr</code> giữ object sống trong lúc dùng.</p>
 </details>
 <h3 id="c-item-21-uu-tien-std-make-unique-va-std-make-shared-thay-vi-n">Item 21 · Ưu tiên <code>std::make_unique</code> và <code>std::make_shared</code> thay vì <code>new</code> trực tiếp <span class="badge skim">Lướt</span> <span class="pg">tr. 139 · PDF 157</span></h3>
@@ -2588,11 +2606,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`make_shared` cấp phát mấy lần? `shared_ptr<T>(new T)` cấp phát mấy lần?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>make_shared</code> cấp phát mấy lần? <code>shared_ptr&lt;T&gt;(new T)</code> cấp phát mấy lần?</span></summary>
 <p><code>make_shared</code>: một lần (object và control block chung khối). <code>shared_ptr&lt;T&gt;(new T)</code>: hai lần.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một `shared_ptr` tới object 2 MB tạo bằng `make_shared`. Mọi `shared_ptr` đã bị hủy nhưng còn một `weak_ptr` trong cache. 2 MB đó đã được trả lại chưa?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một <code>shared_ptr</code> tới object 2 MB tạo bằng <code>make_shared</code>. Mọi <code>shared_ptr</code> đã bị hủy nhưng còn một <code>weak_ptr</code> trong cache. 2 MB đó đã được trả lại chưa?</span></summary>
 <p>Chưa. Destructor đã chạy, nhưng vùng nhớ chung với control block chỉ được giải phóng khi weak count về 0.</p>
 </details>
 <h3 id="c-item-22-voi-pimpl-dinh-nghia-special-member-function-trong-f">Item 22 · Với Pimpl, định nghĩa special member function trong file .cpp <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 147 · PDF 165</span></h3>
@@ -2706,11 +2724,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao lỗi "incomplete type" xuất hiện ở `main.cpp` chứ không ở `motor.cpp`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao lỗi "incomplete type" xuất hiện ở <code>main.cpp</code> chứ không ở <code>motor.cpp</code>?</span></summary>
 <p>Destructor tự sinh là inline, được sinh ở mọi nơi dùng <code>Motor</code>. Ở <code>main.cpp</code>, <code>Impl</code> chưa được định nghĩa, nên <code>static_assert</code> trong deleter của <code>unique_ptr</code> thất bại.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Đã khai báo `~Motor();` trong header và `= default` trong .cpp, nhưng `std::vector<Motor>` khi tăng dung lượng lại báo lỗi copy. Vì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Đã khai báo <code>~Motor();</code> trong header và <code>= default</code> trong .cpp, nhưng <code>std::vector&lt;Motor&gt;</code> khi tăng dung lượng lại báo lỗi copy. Vì sao?</span></summary>
 <p>Khai báo destructor làm mất move tự sinh; vector cố copy, mà copy bị xóa do <code>unique_ptr</code>. Cần khai báo move constructor và move assignment (<code>noexcept</code>) trong header, định nghĩa <code>= default</code> trong .cpp.</p>
 </details>
 <aside class="callout c-key">
@@ -2800,11 +2818,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`const std::vector<int> v = load(); auto w = std::move(v);` thì `v` sau đó còn dữ liệu không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>const std::vector&lt;int&gt; v = load(); auto w = std::move(v);</code> thì <code>v</code> sau đó còn dữ liệu không?</span></summary>
 <p>Còn: <code>std::move(v)</code> cho <code>const vector&amp;&amp;</code>, chỉ khớp copy constructor, nên <code>w</code> là bản copy và <code>v</code> không bị ảnh hưởng.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`void f(Frame&amp;&amp; x) { g(x); }` với hai overload `g(const Frame&amp;)` và `g(Frame&amp;&amp;)`. `g` nào được gọi?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>void f(Frame&amp;&amp; x) { g(x); }</code> với hai overload <code>g(const Frame&amp;)</code> và <code>g(Frame&amp;&amp;)</code>. <code>g</code> nào được gọi?</span></summary>
 <p><code>g(const Frame&amp;)</code>, vì <code>x</code> là lvalue. Muốn gọi bản rvalue phải viết <code>g(std::move(x))</code>.</p>
 </details>
 <h3 id="c-item-24-phan-biet-universal-reference-va-rvalue-reference">Item 24 · Phân biệt universal reference và rvalue reference <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 164 · PDF 182</span></h3>
@@ -2893,7 +2911,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Cái nào là universal reference? (a) `template<class T> void f(T&amp;&amp;);` (b) `template<class T> void f(const T&amp;&amp;);` (c) `template<class T> struct S { void f(T&amp;&amp;); };` (d) `auto&amp;&amp; x = y;` (e) `template<class... A> void f(A&amp;&amp;...);`</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Cái nào là universal reference? (a) <code>template&lt;class T&gt; void f(T&amp;&amp;);</code> (b) <code>template&lt;class T&gt; void f(const T&amp;&amp;);</code> (c) <code>template&lt;class T&gt; struct S { void f(T&amp;&amp;); };</code> (d) <code>auto&amp;&amp; x = y;</code> (e) <code>template&lt;class... A&gt; void f(A&amp;&amp;...);</code></span></summary>
 <p>(a), (d), (e). (b) có <code>const</code>; (c) không có suy luận kiểu ở <code>f</code>.</p>
 </details>
 <h3 id="c-item-25-std-move-cho-rvalue-reference-std-forward-cho-univer">Item 25 · <code>std::move</code> cho rvalue reference, <code>std::forward</code> cho universal reference <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 168 · PDF 186</span></h3>
@@ -2997,11 +3015,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `return std::move(local);` chậm hơn hoặc bằng `return local;`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>return std::move(local);</code> chậm hơn hoặc bằng <code>return local;</code>?</span></summary>
 <p><code>return local;</code> cho phép compiler bỏ hẳn copy/move (NRVO); nếu không elide được thì <code>local</code> tự được coi là rvalue và được move. <code>return std::move(local);</code> trả về một tham chiếu, không đủ điều kiện elision, nên luôn phải move.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`template<class T> void store(T&amp;&amp; v) { cache_ = std::move(v); }` gọi với một biến `std::string s`. Hậu quả?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>template&lt;class T&gt; void store(T&amp;&amp; v) { cache_ = std::move(v); }</code> gọi với một biến <code>std::string s</code>. Hậu quả?</span></summary>
 <p><code>s</code> bị move mất nội dung dù người gọi truyền lvalue. Phải dùng <code>std::forward&lt;T&gt;(v)</code>.</p>
 </details>
 <h3 id="c-item-26-tranh-overload-tren-universal-reference">Item 26 · Tránh overload trên universal reference <span class="badge skim">Lướt</span> <span class="pg">tr. 177 · PDF 195</span></h3>
@@ -3092,7 +3110,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `Person p("A"); Person q(p);` gọi constructor template chứ không gọi copy constructor?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>Person p(&quot;A&quot;); Person q(p);</code> gọi constructor template chứ không gọi copy constructor?</span></summary>
 <p><code>p</code> là lvalue không const. Template suy ra <code>T = Person&amp;</code>, khớp chính xác; copy constructor cần thêm <code>const</code>. Khớp chính xác thắng.</p>
 </details>
 <h3 id="c-item-27-cac-cach-thay-the-cho-overload-tren-universal-refere">Item 27 · Các cách thay thế cho overload trên universal reference <span class="badge skim">Lướt</span> <span class="pg">tr. 184 · PDF 202</span></h3>
@@ -3183,7 +3201,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao trong `enable_if` của `Person` phải dùng `std::decay_t<T>` thay vì `T`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao trong <code>enable_if</code> của <code>Person</code> phải dùng <code>std::decay_t&lt;T&gt;</code> thay vì <code>T</code>?</span></summary>
 <p>Với lvalue, <code>T</code> là <code>Person&amp;</code> hoặc <code>const Person&amp;</code>; <code>is_base_of&lt;Person, Person&amp;&gt;</code> là false (tham chiếu không phải class). <code>decay_t</code> bỏ tham chiếu và cv để so sánh đúng kiểu class.</p>
 </details>
 <h3 id="c-item-28-hieu-reference-collapsing">Item 28 · Hiểu reference collapsing <span class="badge skim">Lướt</span> <span class="pg">tr. 197 · PDF 215</span></h3>
@@ -3264,7 +3282,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`template<class T> void f(T&amp;&amp; p);` gọi `f(cx)` với `const int cx`. Viết ra từng bước để có kiểu của `p`.</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>template&lt;class T&gt; void f(T&amp;&amp; p);</code> gọi <code>f(cx)</code> với <code>const int cx</code>. Viết ra từng bước để có kiểu của <code>p</code>.</span></summary>
 <p><code>cx</code> là lvalue <code>const int</code> → <code>T = const int&amp;</code>. <code>ParamType = const int&amp; &amp;&amp;</code> → collapsing → <code>const int&amp;</code>.</p>
 </details>
 <h3 id="c-item-29-gia-dinh-move-khong-co-san-khong-re-va-khong-duoc-du">Item 29 · Giả định move không có sẵn, không rẻ, và không được dùng <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 203 · PDF 221</span></h3>
@@ -3306,7 +3324,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::array<std::string, 3>` move có lợi không? `std::array<int, 3>` thì sao?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::array&lt;std::string, 3&gt;</code> move có lợi không? <code>std::array&lt;int, 3&gt;</code> thì sao?</span></summary>
 <p><code>array&lt;string, 3&gt;</code>: có lợi, vì mỗi phần tử string được move (rẻ với chuỗi dài). <code>array&lt;int, 3&gt;</code>: move và copy như nhau (copy 3 int).</p>
 </details>
 <h3 id="c-item-30-cac-truong-hop-perfect-forwarding-that-bai">Item 30 · Các trường hợp perfect forwarding thất bại <span class="badge skim">Lướt</span> <span class="pg">tr. 207 · PDF 225</span></h3>
@@ -3381,7 +3399,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao không forward được bit field nhưng gọi trực tiếp thì được?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao không forward được bit field nhưng gọi trực tiếp thì được?</span></summary>
 <p>Gọi trực tiếp với tham số theo giá trị chỉ cần đọc giá trị. Forward cần tham chiếu, mà không thể có tham chiếu không const tới bit field (không có địa chỉ cho từng bit).</p>
 </details>
 <aside class="callout c-key">
@@ -3509,11 +3527,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Trong member function, `[=]{ return count_; }` capture gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Trong member function, <code>[=]{ return count_; }</code> capture gì?</span></summary>
 <p>Con trỏ <code>this</code>, không phải bản sao của <code>count_</code>. Closure sẽ treo nếu sống lâu hơn object.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `[divisor_]` (với `divisor_` là thành viên) báo lỗi compile?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>[divisor_]</code> (với <code>divisor_</code> là thành viên) báo lỗi compile?</span></summary>
 <p>Chỉ biến cục bộ không static (và tham số) mới capture được. Thành viên được truy cập qua <code>this</code>. Dùng init capture <code>[d = divisor_]</code> (C++14) hoặc copy ra biến cục bộ trước.</p>
 </details>
 <h3 id="c-item-32-dung-init-capture-de-move-object-vao-closure">Item 32 · Dùng init capture để move object vào closure <span class="badge skim">Lướt</span> <span class="pg">tr. 224 · PDF 242</span></h3>
@@ -3569,7 +3587,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`[buf = std::move(buf)]`: hai chữ `buf` là gì?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>[buf = std::move(buf)]</code>: hai chữ <code>buf</code> là gì?</span></summary>
 <p><code>buf</code> bên trái là tên thành viên của closure. <code>buf</code> bên phải là biến trong scope tạo lambda, được move vào thành viên đó.</p>
 </details>
 <h3 id="c-item-33-dung-decltype-tren-tham-so-auto-amp-amp-de-std-forwa">Item 33 · Dùng <code>decltype</code> trên tham số <code>auto&amp;&amp;</code> để <code>std::forward</code> <span class="badge skip">Bỏ qua</span> <span class="pg">tr. 229 · PDF 247</span></h3>
@@ -3664,7 +3682,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`auto cb = std::bind(log_at, now(), _1);` gọi `cb(msg)` một giờ sau. Thời gian ghi log là lúc nào?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>auto cb = std::bind(log_at, now(), _1);</code> gọi <code>cb(msg)</code> một giờ sau. Thời gian ghi log là lúc nào?</span></summary>
 <p>Lúc tạo <code>cb</code>, vì <code>now()</code> được tính khi gọi <code>std::bind</code>. Lambda <code>[](auto msg) { log_at(now(), msg); }</code> tính <code>now()</code> lúc gọi.</p>
 </details>
 <aside class="callout c-key">
@@ -3722,7 +3740,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Một ứng dụng Embedded Linux cần một thread điều khiển chạy với `SCHED_FIFO` priority 80. Nên dùng `std::async` hay `std::thread`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Một ứng dụng Embedded Linux cần một thread điều khiển chạy với <code>SCHED_FIFO</code> priority 80. Nên dùng <code>std::async</code> hay <code>std::thread</code>?</span></summary>
 <p><code>std::thread</code>, vì cần <code>native_handle()</code> để đặt scheduling policy và priority. <code>std::async</code> không cho kiểm soát thread nào chạy task.</p>
 </details>
 <h3 id="c-item-36-chi-dinh-std-launch-async-neu-bat-buoc-phai-bat-dong">Item 36 · Chỉ định <code>std::launch::async</code> nếu bắt buộc phải bất đồng bộ <span class="badge skim">Lướt</span> <span class="pg">tr. 245 · PDF 263</span></h3>
@@ -3790,7 +3808,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`fut.wait_for(10ms)` trả về giá trị nào khi task bị deferred?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>fut.wait_for(10ms)</code> trả về giá trị nào khi task bị deferred?</span></summary>
 <p><code>std::future_status::deferred</code>, mỗi lần gọi, không bao giờ <code>ready</code> cho tới khi gọi <code>get()</code>/<code>wait()</code>.</p>
 </details>
 <h3 id="c-item-37-lam-cho-std-thread-unjoinable-tren-moi-duong-di">Item 37 · Làm cho <code>std::thread</code> unjoinable trên mọi đường đi <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 250 · PDF 268</span></h3>
@@ -3893,11 +3911,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `ThreadRAII` cần khai báo move operation `= default`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>ThreadRAII</code> cần khai báo move operation <code>= default</code>?</span></summary>
 <p>Vì nó khai báo destructor, nên compiler không sinh move (Item 17). Không có move thì không trả <code>ThreadRAII</code> từ hàm hay đặt vào container được.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao thành viên `std::thread` nên được khai báo cuối cùng trong class?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao thành viên <code>std::thread</code> nên được khai báo cuối cùng trong class?</span></summary>
 <p>Thành viên khởi tạo theo thứ tự khai báo, và thread chạy ngay khi khởi tạo. Đặt cuối để mọi thành viên mà thread có thể dùng đã được khởi tạo xong.</p>
 </details>
 <h3 id="c-item-38-hieu-hanh-vi-destructor-khac-nhau-cua-thread-handle">Item 38 · Hiểu hành vi destructor khác nhau của thread handle <span class="badge skim">Lướt</span> <span class="pg">tr. 258 · PDF 276</span></h3>
@@ -3946,7 +3964,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hàm tạo `auto f = std::async(std::launch::async, heavy);` rồi return mà không gọi `f.get()`. Hàm có trả về ngay không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hàm tạo <code>auto f = std::async(std::launch::async, heavy);</code> rồi return mà không gọi <code>f.get()</code>. Hàm có trả về ngay không?</span></summary>
 <p>Không: khi <code>f</code> bị hủy (là future cuối cùng tới shared state của task async), destructor chặn cho tới khi <code>heavy</code> chạy xong.</p>
 </details>
 <h3 id="c-item-39-can-nhac-void-future-cho-giao-tiep-su-kien-mot-lan">Item 39 · Cân nhắc <code>void</code> future cho giao tiếp sự kiện một lần <span class="badge skim">Lướt</span> <span class="pg">tr. 262 · PDF 280</span></h3>
@@ -4057,7 +4075,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao condition variable thuần (không có cờ) có thể khiến reacting task chờ mãi?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao condition variable thuần (không có cờ) có thể khiến reacting task chờ mãi?</span></summary>
 <p>Lost wakeup: nếu <code>notify_one</code> được gọi trước <code>wait</code>, thông báo mất, và không có trạng thái nào ghi nhớ sự kiện đã xảy ra.</p>
 </details>
 <h3 id="c-item-40-dung-std-atomic-cho-concurrency-volatile-cho-special">Item 40 · Dùng <code>std::atomic</code> cho concurrency, <code>volatile</code> cho special memory <span class="badge must">Đọc kỹ</span> <span class="pg">tr. 271 · PDF 289</span></h3>
@@ -4215,11 +4233,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Hai thread cùng thực hiện `++vc` 1000 lần trên `volatile int vc = 0;`. Kết quả cuối có chắc là 2000 không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Hai thread cùng thực hiện <code>++vc</code> 1000 lần trên <code>volatile int vc = 0;</code>. Kết quả cuối có chắc là 2000 không?</span></summary>
 <p>Không. <code>++vc</code> là đọc-tăng-ghi, không atomic; hai thread có thể đọc cùng giá trị và ghi đè lên nhau. Về mặt chuẩn đây còn là data race, tức UB. Dùng <code>std::atomic&lt;int&gt;</code>.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `std::atomic<int> y = x;` (với `x` là atomic) không compile?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>std::atomic&lt;int&gt; y = x;</code> (với <code>x</code> là atomic) không compile?</span></summary>
 <p>Copy cần đọc <code>x</code> và ghi <code>y</code> trong một thao tác atomic trên hai vùng nhớ, phần cứng thường không hỗ trợ, nên copy constructor bị xóa. Viết <code>std::atomic&lt;int&gt; y(x.load());</code>.</p>
 </details>
 <aside class="callout c-key">
@@ -4346,7 +4364,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Setter `void set_name(std::string n) { name_ = std::move(n); }` được gọi lặp lại nhiều lần với các tên dài xấp xỉ nhau từ một lvalue. Vì sao bản `const std::string&amp;` có thể nhanh hơn?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Setter <code>void set_name(std::string n) { name_ = std::move(n); }</code> được gọi lặp lại nhiều lần với các tên dài xấp xỉ nhau từ một lvalue. Vì sao bản <code>const std::string&amp;</code> có thể nhanh hơn?</span></summary>
 <p>Mỗi lần gọi bản truyền giá trị phải cấp phát bộ nhớ cho <code>n</code> và giải phóng bộ nhớ cũ của <code>name_</code>. Bản <code>const&amp;</code> gán trực tiếp và tái sử dụng dung lượng sẵn có của <code>name_</code>, không cấp phát.</p>
 </details>
 <h3 id="c-item-42-can-nhac-emplacement-thay-vi-insertion">Item 42 · Cân nhắc emplacement thay vì insertion <span class="badge skim">Lướt</span> <span class="pg">tr. 292 · PDF 310</span></h3>
@@ -4425,11 +4443,11 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 </ul>
 </aside>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>`std::set<std::string> s; s.emplace(existing_string);` có lợi gì so với `s.insert(existing_string)`?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q"><code>std::set&lt;std::string&gt; s; s.emplace(existing_string);</code> có lợi gì so với <code>s.insert(existing_string)</code>?</span></summary>
 <p>Gần như không: đối số cùng kiểu phần tử (điều kiện 2 không thỏa), và set có thể từ chối trùng lặp (điều kiện 3 không thỏa), nên emplace có thể còn tạo rồi hủy một node thừa.</p>
 </details>
 <details class="selfcheck">
-<summary><span class="sc-tag">Tự kiểm tra</span>Vì sao `v.emplace_back(nullptr)` compile được với `std::vector<std::regex>` còn `push_back(nullptr)` thì không?</summary>
+<summary><span class="sc-tag">Tự kiểm tra</span><span class="sc-q">Vì sao <code>v.emplace_back(nullptr)</code> compile được với <code>std::vector&lt;std::regex&gt;</code> còn <code>push_back(nullptr)</code> thì không?</span></summary>
 <p><code>emplace_back</code> dùng direct initialization nên gọi được constructor <code>explicit std::regex(const char*)</code>. <code>push_back</code> cần copy initialization, không dùng constructor <code>explicit</code>.</p>
 </details>
 <aside class="callout c-key">
@@ -4864,6 +4882,19 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     }, true);
     paintRead();
   }
+
+    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  $$(".prose pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code") || pre;
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+    });
+    pre.appendChild(b);
+  });
 
   route();
 })();
