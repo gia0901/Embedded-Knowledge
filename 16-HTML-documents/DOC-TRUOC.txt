@@ -5,4 +5,4 @@ Embedded Knowledge - ban offline
 3. Tien do (da doc, flashcard da thuoc) luu trong trinh duyet cua tung may.
 4. Trang chu liet ke ca cac module khong co trong goi nay; cac link do mo ban online.
 5. Thu muc bai-tap/: file bai thuc hanh F03, F04 de bien dich ngay (xem bai-tap/DOC-TRUOC.txt).
-Dong goi: 2026-11-01
+Dong goi: 2026-11-02
