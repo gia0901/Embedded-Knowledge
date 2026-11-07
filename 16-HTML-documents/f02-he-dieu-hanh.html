@@ -339,6 +339,67 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .copy-btn { position: absolute; top: 6px; right: 6px; font: 11px var(--f-mono); padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: .75; }
 .copy-btn:hover { opacity: 1; }
 .c-practice .callout-tag { color: var(--accent); }
+
+/* ---------- figures (diagram-style.md) ---------- */
+.fig { margin: var(--s-5) 0; padding: var(--s-4) var(--s-4) var(--s-3); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r); }
+.fig-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fig .f-svg { display: block; width: 100%; height: auto; margin: 0 auto; }
+.fig figcaption { margin-top: var(--s-3); padding-top: var(--s-2); border-top: 1px solid var(--line);
+  font-size: 14px; line-height: 1.5; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.fig .fig-n { font-family: var(--f-display); font-weight: 700; color: var(--fg); letter-spacing: .01em; }
+.fig .fig-cap { flex: 1 1 240px; color: var(--fg); }
+.fig .fig-src { font-family: var(--f-mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+.fig .fig-src.new { color: var(--copper); }
+.fig .fig-src .pg { margin-left: 4px; }
+/* SVG primitives: only semantic classes, colors from tokens */
+.f-svg { font-family: var(--f-body); }
+.f-svg text { fill: var(--fg); font-size: 13px; }
+.f-svg text.f-sm { font-size: 11px; }
+.f-svg .f-mono, .f-svg text.f-mono { font-family: var(--f-mono); }
+.f-svg .f-b { font-weight: 600; }
+.f-svg .f-i { font-style: italic; }
+.f-svg .f-box { fill: var(--surface); stroke: var(--fg); stroke-width: 1.3; }
+.f-svg .f-cell { fill: var(--surface); stroke: var(--fg); stroke-width: 1; }
+.f-svg .f-fill { fill: var(--code-bg); stroke: var(--line-strong); stroke-width: 1; }
+.f-svg .f-region { fill: var(--bg); stroke: var(--line-strong); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.f-svg .f-line { fill: none; stroke: var(--fg); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+.f-svg .f-thin { fill: none; stroke: var(--line-strong); stroke-width: 1; }
+.f-svg .f-thin-fg { fill: none; stroke: var(--fg); stroke-width: 1; }
+.f-svg .f-grid { fill: none; stroke: var(--line); stroke-width: 1; }
+.f-svg .f-head { fill: var(--fg); stroke: none; }
+.f-svg .f-dot { fill: var(--fg); stroke: none; }
+.f-svg .f-dash { stroke-dasharray: 5 4; }
+.f-svg .f-w2 { stroke-width: 2.2; }
+.f-svg .f-w3 { stroke-width: 3.2; }
+/* tones: stroke for lines, fill for text/heads/dots, tinted fill for boxes */
+.f-svg .f-line.f-hl, .f-svg .f-thin-fg.f-hl { stroke: var(--accent); }
+.f-svg .f-line.f-hl2, .f-svg .f-thin-fg.f-hl2 { stroke: var(--copper); }
+.f-svg .f-line.f-bad { stroke: var(--bad); }
+.f-svg .f-line.f-ok { stroke: var(--ok); }
+.f-svg .f-line.f-mut { stroke: var(--muted); }
+.f-svg text.f-hl, .f-svg .f-head.f-hl, .f-svg .f-dot.f-hl { fill: var(--accent); }
+.f-svg text.f-hl2, .f-svg .f-head.f-hl2, .f-svg .f-dot.f-hl2 { fill: var(--copper); }
+.f-svg text.f-bad, .f-svg .f-head.f-bad, .f-svg .f-dot.f-bad { fill: var(--bad); }
+.f-svg text.f-ok, .f-svg .f-head.f-ok, .f-svg .f-dot.f-ok { fill: var(--ok); }
+.f-svg text.f-mut, .f-svg .f-head.f-mut, .f-svg .f-dot.f-mut { fill: var(--muted); }
+.f-svg .f-box.f-hl, .f-svg .f-cell.f-hl, .f-svg .f-fill.f-hl { fill: var(--accent-weak); stroke: var(--accent); }
+.f-svg .f-box.f-hl2, .f-svg .f-cell.f-hl2, .f-svg .f-fill.f-hl2 { fill: var(--copper-weak); stroke: var(--copper); }
+.f-svg .f-box.f-bad, .f-svg .f-cell.f-bad, .f-svg .f-fill.f-bad { fill: var(--bad-weak); stroke: var(--bad); }
+.f-svg .f-box.f-ok, .f-svg .f-cell.f-ok, .f-svg .f-fill.f-ok { fill: var(--ok-weak); stroke: var(--ok); }
+.f-svg .f-box.f-mut, .f-svg .f-cell.f-mut, .f-svg .f-fill.f-mut { fill: var(--code-bg); stroke: var(--line-strong); }
+.f-svg .f-region.f-hl { fill: var(--accent-weak); stroke: var(--accent); }
+.f-svg .f-region.f-hl2 { fill: var(--copper-weak); stroke: var(--copper); }
+.f-svg .f-region.f-mut { fill: var(--code-bg); }
+@media (max-width: 640px) {
+  .fig { padding: var(--s-3) var(--s-3) var(--s-2); margin-inline: -4px; }
+}
+@media print { .fig { break-inside: avoid; } }
+/* tham chiếu hình trong sách (không vẽ lại) */
+.fig-ref { margin: var(--s-3) 0 var(--s-4); padding: 8px 12px; border-left: 3px solid var(--line-strong); background: var(--surface); font-size: 14px; line-height: 1.5; color: var(--muted); border-radius: 0 var(--r) var(--r) 0; }
+.fig-ref strong { color: var(--fg); }
+.fig-ref-k { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-right: 8px; color: var(--copper); }
+.fig-ref .pg { margin-left: 4px; }
 </style>
 
 <header class="masthead">
