@@ -1,0 +1,4 @@
+{
+  "spiffe://netlab.local/ns/web/sa/frontend": ["orders:read"],
+  "spiffe://netlab.local/ns/batch/sa/reporter": ["orders:read", "orders:write"]
+}

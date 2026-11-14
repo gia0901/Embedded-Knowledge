@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: auth-mtls, namespace: security}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: auth-mtls}}
+  template:
+    metadata: {labels: {app: auth-mtls}}
+    spec:
+      automountServiceAccountToken: false            # không cần gọi API server
+      containers:
+      - name: server
+        image: nicolaka/netshoot:v0.13
+        command: ["openssl", "s_server", "-accept", "8443", "-www",
+                  "-cert", "/tls/tls.crt", "-key", "/tls/tls.key", "-cert_chain", "/tls/ca.crt",
+                  "-CAfile", "/trust/root.crt", "-Verify", "1", "-verify_return_error"]
+        ports: [{containerPort: 8443}]
+        volumeMounts:
+        - {name: tls, mountPath: /tls, readOnly: true}
+        - {name: trust, mountPath: /trust, readOnly: true}
+      volumes:
+      - {name: tls, secret: {secretName: auth-server-tls}}
+      - {name: trust, configMap: {name: netlab-root}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: auth-mtls, namespace: security}
+spec:
+  selector: {app: auth-mtls}
+  ports: [{port: 8443, targetPort: 8443}]
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: client-mtls, namespace: web, labels: {app: frontend-mtls}}
+spec:
+  automountServiceAccountToken: false
+  containers:
+  - name: c
+    image: nicolaka/netshoot:v0.13
+    command: ["sleep", "infinity"]
+    volumeMounts:
+    - {name: tls, mountPath: /tls, readOnly: true}
+    - {name: trust, mountPath: /trust, readOnly: true}
+  volumes:
+  - {name: tls, secret: {secretName: frontend-client-tls}}
+  - {name: trust, configMap: {name: netlab-root}}
+---
+# Mở đúng một đường cho cặp pod mới (namespace security và web đang default deny từ Lab 14.2)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: auth-mtls-ingress, namespace: security}
+spec:
+  podSelector: {matchLabels: {app: auth-mtls}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}
+      podSelector: {matchLabels: {app: frontend-mtls}}
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: client-mtls-egress, namespace: web}
+spec:
+  podSelector: {matchLabels: {app: frontend-mtls}}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      podSelector: {matchLabels: {k8s-app: kube-dns}}
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}
+      podSelector: {matchLabels: {app: auth-mtls}}
+    ports: [{protocol: TCP, port: 8443}]

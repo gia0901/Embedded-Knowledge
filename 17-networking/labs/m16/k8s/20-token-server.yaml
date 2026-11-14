@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: token-server, namespace: security}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: token-server}}
+  template:
+    metadata: {labels: {app: token-server}}
+    spec:
+      serviceAccountName: token-server
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+      - name: app
+        image: netlab/auth:1.0
+        imagePullPolicy: Never                      # image đã nạp bằng kind load
+        command: ["python3", "token_server.py"]
+        env: [{name: ACTIVE_KID, value: "k1"}]
+        ports: [{containerPort: 8443}]
+        resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 128Mi}}
+        securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+        volumeMounts:
+        - {name: tls, mountPath: /tls, readOnly: true}
+        - {name: trust, mountPath: /trust, readOnly: true}
+        - {name: keys, mountPath: /keys, readOnly: true}
+        - {name: config, mountPath: /config, readOnly: true}
+      volumes:
+      - {name: tls, secret: {secretName: token-server-tls}}
+      - {name: trust, configMap: {name: netlab-root}}
+      - {name: keys, secret: {secretName: token-signing-keys, defaultMode: 0440}}   # đọc được nhờ fsGroup
+      - {name: config, configMap: {name: token-clients}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: token, namespace: security}
+spec:
+  selector: {app: token-server}
+  ports: [{port: 8443, targetPort: 8443}]

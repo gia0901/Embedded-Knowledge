@@ -1,0 +1,290 @@
+<!-- Core Net Lab · Module 00 · Phòng lab (fragment, được index.html nạp vào) -->
+<div class="goals"><h4>Sau buổi này bạn có</h4><ul>
+  <li>Một máy Ubuntu (WSL2) với đủ công cụ network, Docker và compiler C/C++, Python.</li>
+  <li>Wireshark trên Windows để mở file pcap capture từ Ubuntu.</li>
+  <li>Lần đầu nhìn thấy một web request thật trên dây: DNS → TCP → HTTP.</li>
+</ul></div>
+
+<h2>Phòng lab trông thế nào</h2>
+<p>Mọi bài thực hành trong khoá chạy trên Linux, vì cluster platform ở công ty gần như chắc chắn là Linux + Kubernetes. Trên Windows, cách gọn nhất là WSL2: một VM Ubuntu nhẹ, khởi động trong 1–2 giây, dùng chung ổ đĩa với Windows.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 760 300" role="img" aria-label="Kiến trúc phòng lab: Windows chứa WSL2 Ubuntu, trong đó có Docker và các container nối vào bridge network netlab">
+  <rect class="box" x="10" y="10" width="740" height="280" rx="12"/>
+  <text x="28" y="36" class="t-b">Windows 11 (máy của bạn)</text>
+  <g class="t-base">
+    <rect class="f" x="28" y="56" width="150" height="40" rx="7"/><text x="103" y="81" class="t-c">Wireshark (GUI)</text>
+    <rect class="f" x="28" y="106" width="150" height="40" rx="7"/><text x="103" y="131" class="t-c">VS Code + WSL ext.</text>
+    <rect class="f" x="28" y="156" width="150" height="40" rx="7"/><text x="103" y="181" class="t-c">Browser</text>
+  </g>
+  <text x="28" y="230" class="t-s t-m">Wi-Fi/Ethernet → home router → Internet</text>
+  <line class="ln" x1="28" y1="246" x2="300" y2="246"/>
+  <rect class="sunk" x="220" y="46" width="510" height="232" rx="10"/>
+  <text x="238" y="70" class="t-b">WSL2 · Ubuntu 24.04</text>
+  <text x="238" y="88" class="t-s t-m">eth0: 172.x.x.x (sau NAT của Windows)</text>
+  <g class="t-app"><rect class="f" x="238" y="102" width="200" height="34" rx="6"/><text x="338" y="124" class="t-c">curl · dig · openssl</text></g>
+  <g class="t-tra"><rect class="f" x="238" y="142" width="200" height="34" rx="6"/><text x="338" y="164" class="t-c">ss · nc · socat · iperf3</text></g>
+  <g class="t-net"><rect class="f" x="238" y="182" width="200" height="34" rx="6"/><text x="338" y="204" class="t-c">ip · ping · traceroute · mtr</text></g>
+  <g class="t-lnk"><rect class="f" x="238" y="222" width="200" height="34" rx="6"/><text x="338" y="244" class="t-c">tcpdump · tshark</text></g>
+  <rect class="box" x="460" y="102" width="252" height="160" rx="9"/>
+  <text x="476" y="124" class="t-b">Docker Engine</text>
+  <g class="t-k8s">
+    <rect class="f" x="476" y="140" width="100" height="44" rx="6"/><text x="526" y="160" class="t-c">container a</text><text x="526" y="175" class="t-c t-s t-m">172.20.0.2</text>
+    <rect class="f" x="596" y="140" width="100" height="44" rx="6"/><text x="646" y="160" class="t-c">container b</text><text x="646" y="175" class="t-c t-s t-m">172.20.0.3</text>
+  </g>
+  <line class="ln" x1="526" y1="184" x2="526" y2="218"/><line class="ln" x1="646" y1="184" x2="646" y2="218"/>
+  <line class="ln-ink" x1="490" y1="218" x2="682" y2="218"/>
+  <text x="586" y="240" class="t-c t-s">bridge network "netlab"</text>
+  <text x="586" y="254" class="t-c t-s t-m">gọi nhau bằng tên: ping b</text>
+  <path class="ln dash" d="M178 76 C200 76 200 250 238 250"/>
+  <text x="182" y="272" class="t-s t-m">file .pcap qua \\wsl$</text>
+</svg></div>
+<figcaption>Bốn nhóm công cụ trong Ubuntu được tô màu theo layer (học ở module 01). Docker cho bạn nhiều host ảo nối với nhau để thử client/server, firewall, TLS mà không cần thêm máy thật.</figcaption></figure>
+
+<h2>Bước 1 · Cài WSL2 và Ubuntu</h2>
+<p>Mở <b>PowerShell bằng quyền Administrator</b> (chuột phải nút Start → Terminal (Admin)):</p>
+<script type="text/plain" class="term" data-title="PowerShell (Admin) · Windows">
+PS> wsl --install -d Ubuntu-24.04
+# Máy hỏi khởi động lại → khởi động lại. Mở "Ubuntu 24.04" từ Start menu,
+# đặt username + password Linux (password này dùng cho sudo).
+PS> wsl -l -v
+  NAME            STATE           VERSION
+* Ubuntu-24.04    Running         2              ◀ phải là 2
+</script>
+<div class="note trap"><b>Cạm bẫy</b><p>Nếu báo lỗi về virtualization: vào BIOS bật <i>Intel VT-x</i> / <i>AMD-V (SVM)</i>. Nếu VERSION là 1, chạy <code>wsl --set-version Ubuntu-24.04 2</code>.</p></div>
+
+<h2>Bước 2 · Công cụ network và lập trình</h2>
+<p>Từ đây trở đi mọi lệnh gõ trong cửa sổ <b>Ubuntu</b>:</p>
+<script type="text/plain" class="term">
+$ sudo apt update && sudo apt upgrade -y
+$ sudo apt install -y build-essential gdb python3 python3-venv python3-pip \
+    iproute2 iputils-ping traceroute mtr-tiny dnsutils whois curl wget \
+    netcat-openbsd socat tcpdump tshark nmap openssl jq iperf3 net-tools git
+# Khi cài tshark, nếu hỏi "Should non-superusers be able to capture packets?" → chọn No.
+# Trong khoá này luôn capture bằng sudo.
+$ mkdir -p ~/netlab/pcaps && cd ~/netlab
+</script>
+<p class="small muted">Dòng kết thúc bằng <code>\</code> nghĩa là lệnh còn tiếp ở dòng sau. Nút Copy chép cả ba dòng; dán vào terminal là chạy được.</p>
+
+<h2>Bước 3 · Docker Engine trong Ubuntu</h2>
+<p>Cài Docker Engine thẳng trong Ubuntu (giống server ở công ty, không cần Docker Desktop). Ubuntu trên WSL bản mới đã bật <code>systemd</code> sẵn nên Docker tự chạy khi mở máy.</p>
+<script type="text/plain" class="term">
+$ cat /etc/wsl.conf
+[boot]
+systemd=true                                   ◀ cần dòng này; thiếu thì thêm vào rồi chạy "wsl --shutdown" bên PowerShell
+$ curl -fsSL https://get.docker.com -o get-docker.sh
+$ less get-docker.sh                           # đọc lướt trước khi chạy script tải từ Internet
+$ sudo sh get-docker.sh
+$ sudo usermod -aG docker $USER
+# Đóng cửa sổ Ubuntu, mở lại để group "docker" có hiệu lực
+$ docker run --rm hello-world
+Hello from Docker!                             ◀ thấy dòng này là xong
+$ docker pull nicolaka/netshoot                # "hộp đồ nghề" debug network, dùng rất nhiều trong khoá
+</script>
+<div class="note more"><b>Đọc thêm</b><p>Cách cài từng bước bằng apt repository (khuyến nghị cho máy production): <a href="https://docs.docker.com/engine/install/ubuntu/" target="_blank" rel="noopener">docs.docker.com/engine/install/ubuntu</a>. Kubernetes (kind, kubectl) sẽ cài ở module 14 khi cần.</p></div>
+
+<h2>Bước 4 · Wireshark và VS Code trên Windows</h2>
+<ul>
+  <li><b>Wireshark</b>: tải bản Windows ở <a href="https://www.wireshark.org/download.html" target="_blank" rel="noopener">wireshark.org/download</a>. Dùng để mở file <code>.pcap</code> capture trong Ubuntu. Đường dẫn từ Windows: gõ <code>\\wsl$\Ubuntu-24.04\home\&lt;tên-bạn&gt;\netlab\pcaps</code> vào thanh địa chỉ File Explorer.</li>
+  <li><b>VS Code</b> + extension <i>WSL</i> (Microsoft). Trong Ubuntu gõ <code>code .</code> để mở thư mục hiện tại; terminal bên trong VS Code chính là Ubuntu.</li>
+</ul>
+
+<h2>Bước 5 · Kiểm tra phòng lab</h2>
+<p>Lưu script dưới đây thành <code>~/netlab/check-lab.sh</code>, rồi chạy <code>bash check-lab.sh</code>.</p>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/check-lab.sh">
+#!/usr/bin/env bash
+# In ✔/✘ cho từng công cụ cần dùng trong khoá
+tools=(gcc g++ make gdb python3 pip3 ip ping traceroute mtr dig curl nc socat
+       tcpdump tshark nmap openssl jq iperf3 git docker)
+ok=0; miss=()
+for t in "${tools[@]}"; do
+  if command -v "$t" >/dev/null 2>&1; then
+    printf '  \e[32m✔\e[0m %-11s %s\n' "$t" "$(command -v "$t")"
+    ok=$((ok + 1))
+  else
+    printf '  \e[31m✘\e[0m %s\n' "$t"
+    miss+=("$t")
+  fi
+done
+echo "→ $ok/${#tools[@]} công cụ sẵn sàng"
+if docker info >/dev/null 2>&1; then
+  echo "  docker daemon: đang chạy"
+else
+  echo "  docker daemon: CHƯA chạy (thử: sudo systemctl start docker)"
+fi
+[ ${#miss[@]} -gt 0 ] && echo "Thiếu: ${miss[*]}"
+exit 0
+</script>
+<ul class="checklist" data-id="m00-setup">
+  <li><label><input type="checkbox"><span><code>wsl -l -v</code> báo Ubuntu-24.04 VERSION 2</span></label></li>
+  <li><label><input type="checkbox"><span><code>check-lab.sh</code> báo đủ 22/22 công cụ</span></label></li>
+  <li><label><input type="checkbox"><span><code>docker run --rm hello-world</code> chạy không cần <code>sudo</code></span></label></li>
+  <li><label><input type="checkbox"><span>Wireshark mở được, VS Code mở được thư mục <code>~/netlab</code></span></label></li>
+</ul>
+
+<h2>Làm thử: packet đầu tiên</h2>
+<p>Đây là thí nghiệm sẽ lặp lại suốt khoá: <b>capture ở một cửa sổ, tạo traffic ở cửa sổ kia</b>. Mở hai cửa sổ Ubuntu cạnh nhau.</p>
+<div class="cols2">
+<script type="text/plain" class="term" data-title="Cửa sổ 1 · capture">
+$ sudo tcpdump -i any -nn 'port 53 or port 80'
+</script>
+<script type="text/plain" class="term" data-title="Cửa sổ 2 · tạo traffic">
+$ curl -s -o /dev/null -w '%{http_code}\n' http://example.com
+200
+</script>
+</div>
+<p>Cửa sổ 1 sẽ in ra các dòng giống thế này (IP address của bạn sẽ khác; ở đây dùng address minh hoạ):</p>
+<script type="text/plain" class="term" data-title="Output cửa sổ 1 (rút gọn, có chú thích)">
+eth0 Out IP 172.28.5.9.41212 > 10.255.255.254.53: 4021+ A? example.com.        ◀ ① DNS query: "example.com là IP nào?"
+eth0 In  IP 10.255.255.254.53 > 172.28.5.9.41212: 4021 1/0/0 A 203.0.113.10     ◀ ② DNS response: 203.0.113.10
+eth0 Out IP 172.28.5.9.50566 > 203.0.113.10.80: Flags [S], seq 1180...          ◀ ③ SYN: xin mở TCP connection
+eth0 In  IP 203.0.113.10.80 > 172.28.5.9.50566: Flags [S.], seq 9921..., ack ... ◀ ④ SYN-ACK: server đồng ý
+eth0 Out IP 172.28.5.9.50566 > 203.0.113.10.80: Flags [.], ack 1                ◀ ⑤ ACK: connection đã mở
+eth0 Out IP 172.28.5.9.50566 > 203.0.113.10.80: Flags [P.], length 75: HTTP: GET / HTTP/1.1  ◀ ⑥ HTTP request
+eth0 In  IP 203.0.113.10.80 > 172.28.5.9.50566: Flags [P.], length 1256: HTTP: HTTP/1.1 200 OK ◀ ⑦ HTTP response
+eth0 Out IP 172.28.5.9.50566 > 203.0.113.10.80: Flags [F.], ...                 ◀ ⑧ FIN: đóng connection
+</script>
+<script type="application/json" class="seq">
+{"title":"Một lệnh curl = ba protocol nối tiếp nhau","actors":["curl (máy bạn)","DNS resolver","example.com :80"],
+ "steps":[
+  {"f":0,"t":1,"l":"A? example.com","m":1,"k":"app"},
+  {"f":1,"t":0,"l":"A 203.0.113.10","m":1,"d":1,"k":"app"},
+  {"sep":"TCP 3-way handshake · module 05"},
+  {"f":0,"t":2,"l":"SYN","m":1,"k":"tra"},
+  {"f":2,"t":0,"l":"SYN, ACK","m":1,"d":1,"k":"tra"},
+  {"f":0,"t":2,"l":"ACK","m":1,"k":"tra"},
+  {"sep":"HTTP · module 02"},
+  {"f":0,"t":2,"l":"GET / HTTP/1.1","m":1},
+  {"f":2,"t":0,"l":"HTTP/1.1 200 OK + HTML","m":1,"d":1},
+  {"sep":"đóng connection"},
+  {"f":0,"t":2,"l":"FIN","m":1,"k":"tra"},
+  {"f":2,"t":0,"l":"FIN, ACK","m":1,"d":1,"k":"tra"}
+ ]}
+</script>
+<div class="note trap"><b>Không thấy dòng DNS?</b><p>WSL bản mới có thể chuyển DNS qua một kênh riêng của Windows (tính năng <i>DNS tunneling</i>) nên tcpdump không thấy. Thay lệnh curl bằng <code>dig @8.8.8.8 example.com</code> để ép DNS query đi qua network thật. Nếu thấy cùng một packet in ra nhiều lần, đó là do <code>-i any</code> capture trên nhiều interface; bỏ qua.</p></div>
+<div class="note key"><b>Ghi nhớ</b><p>Một thao tác "mở trang web" là cả một chuỗi protocol. Khi debug ở công ty, câu hỏi đầu tiên luôn là: <b>chuỗi này gãy ở bước nào?</b> DNS không resolve được, TCP handshake thất bại, hay TLS/HTTP bị từ chối? tcpdump trả lời câu hỏi đó trong một phút.</p></div>
+
+<h2>Bảng công cụ theo layer</h2>
+<p>In ra hoặc ghim lại. Mỗi công cụ trả lời một loại câu hỏi:</p>
+<div class="tbl"><table>
+<thead><tr><th>Layer</th><th>Câu hỏi khi debug</th><th>Lệnh hay dùng</th></tr></thead>
+<tbody>
+<tr class="t-app"><td><span class="lay"></span>Application</td><td>Server trả về gì? Header nào? Certificate nào?</td><td><code>curl -v URL</code>, <code>dig name</code>, <code>openssl s_client -connect host:443</code></td></tr>
+<tr class="t-tra"><td><span class="lay"></span>Transport</td><td>Port nào đang listen? Connection nào đang mở?</td><td><code>ss -tulpn</code>, <code>ss -tan</code>, <code>nc -vz host 443</code>, <code>nmap -p 1-1000 host</code></td></tr>
+<tr class="t-net"><td><span class="lay"></span>Network</td><td>Có reach được không? Đi theo route nào?</td><td><code>ip addr</code>, <code>ip route</code>, <code>ping</code>, <code>traceroute -n</code>, <code>mtr</code></td></tr>
+<tr class="t-lnk"><td><span class="lay"></span>Link</td><td>Interface nào? MAC address nào? Link có up không?</td><td><code>ip link</code>, <code>ip neigh</code>, <code>bridge link</code></td></tr>
+<tr class="t-base"><td><span class="lay"></span>Mọi layer</td><td>Thực sự có packet gì trên dây?</td><td><code>sudo tcpdump -i any -nn 'filter'</code>, <code>tshark -r file.pcap</code>, Wireshark</td></tr>
+</tbody></table></div>
+<h3>Năm filter tcpdump dùng 90% thời gian</h3>
+<script type="text/plain" class="term">
+$ sudo tcpdump -i any -nn host 1.1.1.1                    # mọi packet tới/từ một IP
+$ sudo tcpdump -i any -nn port 443                        # một port
+$ sudo tcpdump -i any -nn 'tcp[tcpflags] & tcp-syn != 0'  # chỉ packet có SYN (ai đang mở connection)
+$ sudo tcpdump -i any -nn -A port 80                      # in cả payload dạng ASCII (HTTP không encrypt)
+$ sudo tcpdump -i any -nn -w ~/netlab/pcaps/cap.pcap port 53  # ghi ra file để mở bằng Wireshark
+</script>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m00" data-title="Kiểm tra nhanh">
+[
+ {"q":"Service A báo <i>connection refused</i> khi gọi service B ở port 8443. Lệnh nào chạy trên máy B cho biết có process nào đang listen ở port 8443 không?",
+  "o":["<code>ping B</code>","<code>ss -tulpn | grep 8443</code>","<code>dig B</code>","<code>traceroute B</code>"],"a":1,
+  "e":"<code>ss -tulpn</code> liệt kê socket đang LISTEN (t=TCP, u=UDP, l=listening, p=process, n=không đổi số sang tên). <i>Connection refused</i> thường nghĩa là packet tới được máy nhưng không có process nào listen ở port đó."},
+ {"q":"Muốn mở packet đã capture bằng Wireshark trên Windows, trong Ubuntu bạn dùng option nào của tcpdump?",
+  "o":["<code>-A</code>","<code>-nn</code>","<code>-w file.pcap</code>","<code>-i any</code>"],"a":2,
+  "e":"<code>-w</code> ghi packet thô ra file. <code>-A</code> in payload dạng ASCII, <code>-nn</code> không resolve tên host và tên port, <code>-i any</code> capture trên mọi interface."},
+ {"q":"Trong thí nghiệm curl, thứ tự đúng của các protocol xuất hiện trên dây là:",
+  "o":["TCP → DNS → HTTP","DNS → TCP handshake → HTTP","HTTP → TCP → DNS","DNS → HTTP → TCP"],"a":1,
+  "e":"Phải biết IP trước (DNS), rồi mở connection tới IP đó (TCP 3-way handshake), sau đó mới gửi HTTP request qua connection."},
+ {"q":"Hai container cùng nằm trên Docker network <code>netlab</code>. Vì sao <code>ping b</code> từ container a chạy được mà không cần biết IP?",
+  "o":["Docker sửa file /etc/hosts của Windows","Docker có DNS server nội bộ cho các network do user tạo, resolve tên container ra IP","Ping tự dò mọi IP trong subnet","Do WSL2 dùng NAT"],"a":1,
+  "e":"Network do user tạo có DNS server nội bộ ở 127.0.0.11 bên trong container. Kubernetes làm điều tương tự với CoreDNS (module 03, 14)."},
+ {"q":"Những công cụ nào làm việc ở <b>network layer</b> (IP, routing)?",
+  "o":["<code>ip route</code>","<code>traceroute</code>","<code>curl</code>","<code>ping</code>"],"a":[0,1,3],
+  "e":"<code>ip route</code> xem routing table, <code>ping</code> và <code>traceroute</code> dùng ICMP/TTL ở network layer. <code>curl</code> là HTTP client ở application layer."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"00 Phòng lab","c":[
+ {"t":"Windows","col":"base","c":[{"t":"Wireshark: mở .pcap"},{"t":"VS Code + WSL extension"},{"t":"\\\\wsl$ để lấy file"}]},
+ {"t":"WSL2 Ubuntu","col":"net","c":[{"t":"VM nhẹ, nằm sau NAT"},{"t":"apt: công cụ network"},{"t":"gcc, python3"}]},
+ {"t":"Docker","col":"k8s","c":[{"t":"Container = host giả lập"},{"t":"Bridge network + DNS nội bộ"},{"t":"netshoot: hộp đồ nghề"}]},
+ {"t":"Công cụ theo layer","col":"app","c":[{"t":"Application: curl, dig, openssl"},{"t":"Transport: ss, nc, iperf3"},{"t":"Network: ip, ping, traceroute"},{"t":"Mọi layer: tcpdump, tshark"}]},
+ {"t":"Thói quen debug","col":"sec","c":[{"t":"Capture một bên, tạo traffic bên kia"},{"t":"Hỏi: chuỗi protocol gãy ở bước nào?"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 0.1 · Hai host trong một máy</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Docker</span><span class="chip t-base">15 phút</span></div>
+  <p>Tạo một network <code>netlab</code>, chạy hai container <code>a</code> và <code>b</code> bằng image <code>nicolaka/netshoot</code>, cho <code>a</code> ping <code>b</code> bằng tên. Tìm IP address và MAC address của mỗi container, và xem <code>a</code> dùng DNS server nào.</p>
+  <p class="done-when"><b>Xong khi:</b> trả lời được: IP của a và b, chúng có cùng subnet không, file <code>/etc/resolv.conf</code> trong container trỏ tới đâu.</p>
+  <details><summary>Gợi ý</summary><p><code>docker network create</code>, <code>docker run -d --name ... --network ... IMAGE sleep infinity</code>, <code>docker exec -it a bash</code>, rồi trong container dùng <code>ip addr</code>, <code>cat /etc/resolv.conf</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker network create netlab
+$ docker run -d --name a --network netlab nicolaka/netshoot sleep infinity
+$ docker run -d --name b --network netlab nicolaka/netshoot sleep infinity
+$ docker exec a ping -c 3 b
+PING b (172.20.0.3) 56(84) bytes of data.             ◀ tên "b" đã được resolve ra IP
+$ docker exec a ip -br addr
+eth0@if12   UP   172.20.0.2/16                        ◀ cùng subnet 172.20.0.0/16 với b
+$ docker exec a cat /etc/resolv.conf
+nameserver 127.0.0.11                                 ◀ DNS server nội bộ của Docker
+$ docker network inspect netlab | jq '.[0].Containers'
+# Dọn dẹp khi xong:
+$ docker rm -f a b && docker network rm netlab
+</script>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 0.2 · Từ tcpdump sang Wireshark</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">tcpdump · Wireshark</span><span class="chip t-base">20 phút</span></div>
+  <p>Ghi lại thí nghiệm curl ở trên vào file <code>~/netlab/pcaps/first.pcap</code>, mở bằng Wireshark trên Windows. Trong packet chứa HTTP GET, mở rộng từng dòng ở khung giữa của Wireshark và ghi lại: source/destination MAC, source/destination IP, source/destination TCP port, request line của HTTP.</p>
+  <p class="done-when"><b>Xong khi:</b> điền được bảng 4 dòng (Ethernet, IP, TCP, HTTP) với giá trị thật từ máy bạn. Bảng này chính là encapsulation sẽ học ở module 01.</p>
+  <details><summary>Gợi ý</summary><p>Dùng <code>-w</code> thay vì in ra màn hình. Trong Wireshark gõ display filter <code>http</code>. Nếu capture bằng <code>-i any</code>, link layer sẽ hiện là "Linux cooked capture" thay vì Ethernet; capture bằng <code>-i eth0</code> để thấy Ethernet header thật.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ sudo -v                                             # nhập password trước, để lệnh chạy nền không bị kẹt
+$ sudo tcpdump -i eth0 -nn -w ~/netlab/pcaps/first.pcap 'port 53 or port 80' &
+$ sleep 1; curl -s -o /dev/null http://example.com
+$ sudo pkill tcpdump                                  # dừng tcpdump
+$ tshark -r ~/netlab/pcaps/first.pcap -Y http.request -T fields \
+    -e eth.src -e eth.dst -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e http.request.line
+</script>
+  <p>Lệnh <code>tshark</code> cuối in đúng các field cần điền, không cần mở GUI. Nên biết cả hai cách vì server ở công ty không có GUI.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 0.3 · Hàm <code>cap</code> cho bản thân</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Bash</span><span class="chip t-base">20 phút</span></div>
+  <p>Viết một hàm Bash <code>cap</code> đặt trong <code>~/.bashrc</code>: <code>cap 443</code> capture packet ở port 443 vào file <code>~/netlab/pcaps/2026-11-11_14-05-33_port443.pcap</code> (tên theo thời gian hiện tại), in ra đường dẫn file, dừng khi nhấn Ctrl+C. Không truyền tham số thì capture mọi thứ.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>cap 53</code> rồi <code>dig example.com</code> ở cửa sổ khác tạo ra một file pcap mở được bằng Wireshark.</p>
+  <details><summary>Gợi ý</summary><p><code>date +%F_%H-%M-%S</code> cho thời gian. Tham số đầu là <code>$1</code>; kiểm tra rỗng bằng <code>[ -n "$1" ]</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="bash" data-file="thêm vào cuối ~/.bashrc">
+cap() {
+  local dir=~/netlab/pcaps ts filter name
+  mkdir -p "$dir"
+  ts=$(date +%F_%H-%M-%S)
+  if [ -n "$1" ]; then filter="port $1"; name="${ts}_port$1.pcap"
+  else filter=""; name="${ts}_all.pcap"; fi
+  echo "→ ghi vào $dir/$name (Ctrl+C để dừng)"
+  sudo tcpdump -i any -nn -w "$dir/$name" $filter
+}
+</script>
+  <p>Chạy <code>source ~/.bashrc</code> để dùng ngay. <code>$filter</code> cố ý không đặt trong ngoặc kép để khi rỗng nó biến mất hoàn toàn.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m00"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li><a href="https://learn.microsoft.com/windows/wsl/install" target="_blank" rel="noopener">Cài WSL (Microsoft Learn)</a> · và <a href="https://learn.microsoft.com/windows/wsl/networking" target="_blank" rel="noopener">networking trong WSL</a>: vì sao Ubuntu có IP 172.x (NAT, học ở module 06).</li>
+  <li><a href="https://www.tcpdump.org/manpages/tcpdump.1.html" target="_blank" rel="noopener">man tcpdump</a> và <a href="https://www.tcpdump.org/manpages/pcap-filter.7.html" target="_blank" rel="noopener">cú pháp pcap-filter</a>.</li>
+  <li><a href="https://gaia.cs.umass.edu/kurose_ross/wireshark.php" target="_blank" rel="noopener">Wireshark labs của chính tác giả sách</a>: bài tập Wireshark theo từng chương, rất nên làm song song.</li>
+  <li><a href="https://github.com/nicolaka/netshoot" target="_blank" rel="noopener">nicolaka/netshoot</a>: danh sách công cụ có trong image.</li>
+</ul>

@@ -1,0 +1,36 @@
+cmake_minimum_required(VERSION 3.16)
+project(netsec LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)            # cho clangd / VS Code
+
+find_package(OpenSSL 3.0 REQUIRED)
+find_package(nlohmann_json 3 REQUIRED)
+find_package(Threads REQUIRED)
+
+option(NETSEC_SANITIZE "Bật AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+if(NETSEC_SANITIZE)
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+add_compile_options(-Wall -Wextra -Wpedantic)
+
+# Thư viện dùng chung: mọi file trong src/ (mỗi lab thêm một file)
+file(GLOB NETSEC_SRC CONFIGURE_DEPENDS src/*.cpp)
+add_library(netsec STATIC ${NETSEC_SRC})
+target_include_directories(netsec PUBLIC include)
+target_link_libraries(netsec PUBLIC OpenSSL::SSL OpenSSL::Crypto nlohmann_json::nlohmann_json Threads::Threads)
+
+# Mỗi file trong apps/ và tests/ là một chương trình; tests/ được đăng ký với ctest
+enable_testing()
+file(GLOB NETSEC_APPS CONFIGURE_DEPENDS apps/*.cpp)
+file(GLOB NETSEC_TESTS CONFIGURE_DEPENDS tests/*.cpp)
+foreach(src IN LISTS NETSEC_APPS NETSEC_TESTS)
+  get_filename_component(name ${src} NAME_WE)
+  add_executable(${name} ${src})
+  target_link_libraries(${name} PRIVATE netsec)
+endforeach()
+foreach(src IN LISTS NETSEC_TESTS)
+  get_filename_component(name ${src} NAME_WE)
+  add_test(NAME ${name} COMMAND ${name})
+endforeach()

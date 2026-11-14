@@ -1,0 +1,29 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: {name: netlab-ca}
+spec:
+  ca: {secretName: netlab-ca}          # intermediate CA của Lab 10.2 (namespace cert-manager)
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: auth-server, namespace: security}
+spec:
+  secretName: auth-server-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256}
+  usages: [server auth, digital signature]
+  dnsNames: [auth-mtls.security.svc.cluster.local, auth-mtls.security]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: frontend-client, namespace: web}
+spec:
+  secretName: frontend-client-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256}
+  usages: [client auth, digital signature]
+  uris: [spiffe://netlab.local/ns/web/sa/frontend]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}

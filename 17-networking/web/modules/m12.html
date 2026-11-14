@@ -1,0 +1,868 @@
+<!-- Core Net Lab · Module 12 · Authentication & Authorization (Kurose & Ross 8e, §8.4 + ngoài sách) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Phân biệt rõ authentication (bạn là ai), authorization (bạn được làm gì) và audit (ai đã làm gì); trả đúng 401 hay 403.</li>
+  <li>Lưu mật khẩu đúng cách (Argon2id, salt) và hiểu MFA, TOTP chạy thế nào.</li>
+  <li>Đọc, ký, validate JWT; biết các lỗi validate kinh điển (alg none, thiếu kiểm tra aud, exp).</li>
+  <li>Hiểu OAuth 2.0 (authorization code + PKCE, client credentials), OIDC, và cách 5G core dùng NRF làm authorization server.</li>
+  <li>Dùng LDAP để login và lấy group; map group → role → permission theo RBAC.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ curl -s https://accounts.google.com/.well-known/openid-configuration \
+    | jq '{issuer, token_endpoint, jwks_uri, id_token_signing_alg_values_supported}'
+{
+  "issuer": "https://accounts.google.com",                    ◀ Q1: file này dùng để làm gì?
+  "token_endpoint": "https://oauth2.googleapis.com/token",
+  "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+  "id_token_signing_alg_values_supported": ["RS256"]
+}
+$ curl -s https://www.googleapis.com/oauth2/v3/certs | jq -c '.keys[] | {kid, alg, kty, use}'
+{"kid":"…","alg":"RS256","kty":"RSA","use":"sig"}              ◀ Q2: vì sao có hơn một key?
+{"kid":"…","alg":"RS256","kty":"RSA","use":"sig"}
+$ T=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2F1dGgubmV0bGFiLmxvY2FsIiwic3ViIjoic3ZjLWEiLCJhdWQiOiJvcmRlcnMtYXBpIiwic2NvcGUiOiJvcmRlcnM6cmVhZCIsImlhdCI6MTc5NDY1MDQwMCwiZXhwIjoxNzk0NjU0MDAwfQ._ieglwtzFlwnytDuN9_X29caX5JC0UWYzC-5sXoj8mg
+$ cut -d. -f2 <<<"$T" | tr '_-' '/+' | base64 -d; echo
+{"iss":"https://auth.netlab.local","sub":"svc-a","aud":"orders-api","scope":"orders:read","iat":1794650400,"exp":1794654000}base64: invalid input
+                                                              ◀ Q3: không cần key mà vẫn đọc được. JWT có mã hoá không?
+$ date -u -d @1794654000                                      # Q4: token này hết hạn lúc nào?
+$ sudo grep "^$USER:" /etc/shadow | cut -d: -f2 | cut -c1-12
+$y$j9T$…                                                      ◀ Q5: "$y$" là thuật toán gì? vì sao không phải SHA-256?
+</script>
+<p class="small muted">Dòng <code>base64: invalid input</code> là vì JWT dùng base64<b>url</b> và bỏ dấu <code>=</code> ở cuối, nên <code>base64 -d</code> phàn nàn (và có thể cắt mất ký tự cuối); phần lớn payload vẫn đọc được. Token <code>$T</code> là token mẫu của khoá này, được ký bằng secret <code>netlab-demo-secret-please-change-me-32</code>; dùng lại trong widget và Lab 12.2.</p>
+
+<h2>Ba câu hỏi khác nhau</h2>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Câu hỏi</th><th>Ví dụ</th><th>Sai thì HTTP trả</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>Authentication (AuthN)</b></td><td>Bạn là ai? Chứng minh đi.</td><td>Password + TOTP, client certificate (mTLS), passkey</td><td><code>401 Unauthorized</code> + header <code>WWW-Authenticate</code></td></tr>
+<tr class="t-k8s"><td><span class="lay"></span><b>Authorization (AuthZ)</b></td><td>Bạn được làm việc này không?</td><td>Role operator được sửa config; scope <code>orders:read</code></td><td><code>403 Forbidden</code></td></tr>
+<tr><td><b>Audit / Accounting</b></td><td>Ai đã làm gì, lúc nào?</td><td>Log có user, action, resource, kết quả, thời gian</td><td>(không trả gì; ghi log)</td></tr>
+</tbody></table></div>
+<p>Tên HTTP gây nhầm: <code>401 Unauthorized</code> thật ra nghĩa là <b>chưa authenticate</b> (thiếu hoặc sai credential). Đã biết bạn là ai nhưng không cho phép thì là <code>403</code>. Bộ ba AuthN, AuthZ, Accounting còn gọi là <b>AAA</b>. Trong mạng viễn thông, AAA cho thiết bị mạng và thuê bao chạy qua RADIUS, TACACS+, Diameter.</p>
+<p>Thứ chứng minh danh tính gọi là <b>credential</b>, thuộc một trong ba loại <b>factor</b>: thứ bạn <b>biết</b> (password), thứ bạn <b>có</b> (điện thoại sinh TOTP, security key, private key), thứ bạn <b>là</b> (vân tay). <b>MFA</b> là dùng từ hai loại khác nhau trở lên.</p>
+<p>Toàn cảnh một hệ thống auth hiện đại:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 284" role="img" aria-label="User đăng nhập ở authorization server, client nhận access token, gọi resource server; resource server lấy public key qua JWKS">
+  <g class="t-app"><rect class="f" x="10" y="20" width="150" height="50" rx="8"/></g>
+  <text x="85" y="41" class="t-c t-b">User</text><text x="85" y="58" class="t-c t-s t-m">browser, kubectl</text>
+  <g class="t-app"><rect class="f" x="10" y="170" width="150" height="60" rx="8"/></g>
+  <text x="85" y="194" class="t-c t-b">Client</text><text x="85" y="212" class="t-c t-s t-m">web app, svc-a, AMF</text>
+  <g class="t-sec"><rect class="f" x="285" y="20" width="170" height="60" rx="8"/></g>
+  <text x="370" y="44" class="t-c t-b">Authorization server</text><text x="370" y="62" class="t-c t-s t-m">Keycloak, Dex, NRF…</text>
+  <rect class="box" x="530" y="20" width="180" height="60" rx="8"/>
+  <text x="620" y="44" class="t-c t-b">User store</text><text x="620" y="62" class="t-c t-s t-m">LDAP / DB: password hash</text>
+  <g class="t-k8s"><rect class="f" x="530" y="170" width="180" height="60" rx="8"/></g>
+  <text x="620" y="194" class="t-c t-b">Resource server</text><text x="620" y="212" class="t-c t-s t-m">orders-api, UDM…</text>
+  <line class="ln-ink" x1="160" y1="45" x2="277" y2="45"/><path class="ah" d="M285 45 l-10 -5 v10 z"/>
+  <text x="222" y="37" class="t-c t-s t-b">① login + MFA</text>
+  <line class="ln-ink" x1="455" y1="50" x2="522" y2="50"/><path class="ah" d="M530 50 l-10 -5 v10 z"/>
+  <text x="492" y="42" class="t-c t-s">verify</text>
+  <path class="ln-ink" d="M330 80 V195 H168"/><path class="ah" d="M160 195 l10 -5 v10 z"/>
+  <text x="248" y="187" class="t-c t-s t-b">② access token (JWT)</text>
+  <line class="ln-ink" x1="160" y1="215" x2="522" y2="215"/><path class="ah" d="M530 215 l-10 -5 v10 z"/>
+  <text x="400" y="233" class="t-c t-s t-b">③ Authorization: Bearer …</text>
+  <line class="ln dash" x1="440" y1="80" x2="585" y2="164"/><path class="ah-m" d="M592 168 l-11 -1 l5 -9 z"/>
+  <text x="530" y="118" class="t-s t-m">④ JWKS: public key,</text><text x="530" y="133" class="t-s t-m">lấy trước và cache</text>
+  <text x="10" y="258" class="t-s t-m">AuthN xảy ra ở ① (và khi client tự xác thực để lấy token).</text>
+  <text x="10" y="274" class="t-s t-m">AuthZ xảy ra ở resource server: token có scope/role cho hành động này không?</text>
+</svg></div>
+<figcaption>Resource server không cần gọi authorization server cho mỗi request: nó verify chữ ký của token bằng public key đã cache (④). Đây là lý do JWT phổ biến trong hệ thống nhiều service.</figcaption></figure>
+
+<h2>Từ "I am Alice" tới nonce</h2>
+<p>Sách xây dựng authentication protocol từng bước, mỗi bước vá lỗ hổng của bước trước. <span class="bk">§8.4</span> Chuỗi này giải thích vì sao mọi protocol hiện đại đều có <b>nonce</b> hoặc <b>challenge</b>:</p>
+<div class="tbl"><table>
+<thead><tr><th>Protocol</th><th>Alice chứng minh bằng</th><th>Trudy phá bằng</th></tr></thead>
+<tbody>
+<tr><td>ap1.0</td><td>Nói "I am Alice"</td><td>Nói y như vậy</td></tr>
+<tr><td>ap2.0</td><td>+ gửi từ IP của Alice</td><td>IP spoofing (module 06)</td></tr>
+<tr><td>ap3.0</td><td>+ gửi kèm password</td><td>Nghe lén password</td></tr>
+<tr><td>ap3.1</td><td>+ password đã mã hoá</td><td><b>Replay</b> nguyên bản mã hoá: Bob không phân biệt được</td></tr>
+<tr class="t-sec"><td><span class="lay"></span>ap4.0</td><td>Bob gửi <b>nonce</b> R (dùng một lần), Alice trả về R mã hoá bằng shared key</td><td>Replay vô dụng vì lần sau R khác. Hạn chế: cần shared key trước.</td></tr>
+<tr class="t-sec"><td><span class="lay"></span>Mở rộng</td><td>Nonce + <b>chữ ký</b> bằng private key</td><td>Man-in-the-middle nếu không biết public key thật → certificate (module 10)</td></tr>
+</tbody></table></div>
+<div class="note key"><b>Bạn đã gặp mẫu này ở đâu</b><p>TLS CertificateVerify (module 11) là "nonce + chữ ký": ClientHello.random đóng vai nonce. TOTP là ap4.0 với nonce là thời gian hiện tại. Passkey/WebAuthn là bản mở rộng: server gửi challenge, thiết bị ký bằng private key không bao giờ rời máy. Password gửi qua TLS về bản chất vẫn là ap3.0, chỉ được TLS che khỏi người nghe lén.</p></div>
+
+<h2>Lưu password</h2>
+<p>Server không bao giờ lưu password, chỉ lưu kết quả của một hàm <b>một chiều, cố ý chậm, có salt</b>. Khi login, server tính lại hàm đó với password vừa nhận rồi so sánh. Lý do phải chậm: khi DB bị lộ, kẻ tấn công đoán password <b>offline</b> với tốc độ của GPU. Với SHA-256, GPU đời mới thử được cỡ hàng chục tỷ lần mỗi giây; mọi password 8 ký tự chữ thường + số (36⁸ ≈ 2.8 nghìn tỷ khả năng) rơi trong vài phút. Hàm như Argon2id tốn vài chục ms và vài chục MB RAM <b>cho mỗi lần thử</b>, nên cùng việc đó mất hàng nghìn năm.</p>
+<div class="tbl"><table>
+<thead><tr><th>Thuật toán</th><th>Tham số tối thiểu (OWASP)</th><th>Ghi chú</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>Argon2id</b></td><td>m = 19 MiB, t = 2, p = 1</td><td>Lựa chọn đầu tiên; tốn RAM nên GPU/ASIC khó song song hoá</td></tr>
+<tr><td><b>scrypt</b></td><td>N = 2¹⁷, r = 8, p = 1</td><td>Cũng memory-hard</td></tr>
+<tr><td><b>bcrypt</b></td><td>cost ≥ 10</td><td>Cũ nhưng còn tốt; chỉ dùng 72 byte đầu của password</td></tr>
+<tr><td><b>PBKDF2-HMAC-SHA256</b></td><td>600,000 iteration</td><td>Dùng khi cần chuẩn FIPS; không memory-hard</td></tr>
+<tr><td>yescrypt (<code>$y$</code>)</td><td>mặc định của distro</td><td>Hàm mặc định cho <code>/etc/shadow</code> trên Ubuntu, Debian mới (Q5)</td></tr>
+<tr><td>MD5, SHA-1, SHA-256 thuần</td><td>—</td><td><b>Không dùng</b> cho password</td></tr>
+</tbody></table></div>
+<p>Chuỗi lưu trong DB tự mô tả đủ để verify lại: <code>$argon2id$v=19$m=19456,t=2,p=1$&lt;salt&gt;$&lt;hash&gt;</code>. <b>Salt</b> ngẫu nhiên cho mỗi password khiến hai người cùng password có hash khác nhau và bảng tra sẵn (rainbow table) vô dụng. <b>Pepper</b> là một secret chung giữ ngoài DB (trong KMS), thêm vào trước khi hash: lộ DB mà không lộ pepper thì không đoán offline được.</p>
+<div class="note trap"><b>Cạm bẫy ở endpoint login</b><ul>
+  <li><b>User enumeration:</b> trả "không có user này" khác với "sai password" (khác nội dung, hoặc khác thời gian phản hồi vì user không tồn tại thì bỏ qua bước hash) giúp kẻ tấn công biết user nào có thật. Luôn trả cùng một thông báo, và vẫn chạy hash giả khi user không tồn tại.</li>
+  <li><b>Credential stuffing:</b> thử password lộ từ site khác. Chống bằng rate limit theo IP và theo account, MFA, kiểm tra password có trong danh sách đã lộ.</li>
+  <li><b>Lockout cứng</b> (khoá vĩnh viễn sau 5 lần sai) biến thành công cụ DoS: ai cũng khoá được account admin. Dùng delay tăng dần và CAPTCHA/MFA thay vì khoá hẳn.</li>
+</ul></div>
+<p><b>TOTP</b> (RFC 6238), loại mã 6 số trong app authenticator, chính là HMAC (module 09): <code>code = truncate(HMAC-SHA1(secret, floor(time / 30)))</code>. Server và điện thoại chung secret (QR code lúc đăng ký), cùng tính theo đồng hồ, nên mã đổi mỗi 30 giây. Lab 12.1 tự cài đặt TOTP và kiểm tra với test vector của RFC.</p>
+
+<h2>Session hay token</h2>
+<p>HTTP là stateless (module 02). Sau khi login, server phải đưa cho client một thứ để gửi kèm các request sau:</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Session ID (cookie)</th><th>Self-contained token (JWT)</th></tr></thead>
+<tbody>
+<tr><td><b>Client giữ</b></td><td>Chuỗi ngẫu nhiên vô nghĩa</td><td>Token chứa sẵn identity, scope, hạn, có chữ ký</td></tr>
+<tr><td><b>Server verify</b></td><td>Tra session store (Redis, DB) mỗi request</td><td>Verify chữ ký bằng key; không cần tra cứu</td></tr>
+<tr><td><b>Thu hồi</b></td><td>Xoá khỏi store là xong, ngay lập tức</td><td>Khó: token còn hợp lệ tới <code>exp</code>. Phải dùng token ngắn hạn, hoặc denylist theo <code>jti</code></td></tr>
+<tr><td><b>Hợp với</b></td><td>Web app một khối, browser</td><td>Nhiều service, nhiều cluster, service-to-service</td></tr>
+</tbody></table></div>
+
+<h2>JWT</h2>
+<p><b>JSON Web Token</b> (RFC 7519) gồm 3 phần base64url nối bằng dấu chấm:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 206" role="img" aria-label="JWT gồm header, payload, signature">
+  <g class="t-app"><text x="10" y="32" class="tc t-mono t-b">eyJhbGciOiJIUzI1NiIs…</text></g>
+  <text x="236" y="32" class="t-mono t-b">.</text>
+  <g class="t-net"><text x="250" y="32" class="tc t-mono t-b">eyJpc3MiOiJodHRwczov…</text></g>
+  <text x="496" y="32" class="t-mono t-b">.</text>
+  <g class="t-sec"><text x="510" y="32" class="tc t-mono t-b">_ieglwtzFlwnytDuN9…</text></g>
+  <g class="t-app"><rect class="f" x="10" y="52" width="220" height="144" rx="8"/></g>
+  <text x="120" y="74" class="t-c t-b">Header</text>
+  <text x="24" y="98" class="t-mono">"alg": "HS256",</text>
+  <text x="24" y="114" class="t-mono">"typ": "JWT"</text>
+  <text x="24" y="146" class="t-s t-m">thuật toán ký, kid</text>
+  <text x="24" y="162" class="t-s t-m">(chọn key nào để verify)</text>
+  <g class="t-net"><rect class="f" x="250" y="52" width="240" height="144" rx="8"/></g>
+  <text x="370" y="74" class="t-c t-b">Payload (claims)</text>
+  <text x="264" y="98" class="t-mono">iss: https://auth.netlab.local</text>
+  <text x="264" y="114" class="t-mono">sub: svc-a</text>
+  <text x="264" y="130" class="t-mono">aud: orders-api</text>
+  <text x="264" y="146" class="t-mono">scope: orders:read</text>
+  <text x="264" y="162" class="t-mono">iat: 1794650400</text>
+  <text x="264" y="178" class="t-mono">exp: 1794654000</text>
+  <g class="t-sec"><rect class="f" x="510" y="52" width="200" height="144" rx="8"/></g>
+  <text x="610" y="74" class="t-c t-b">Signature</text>
+  <text x="524" y="98" class="t-mono">HMAC-SHA256(key,</text>
+  <text x="524" y="114" class="t-mono"> header64 + "." +</text>
+  <text x="524" y="130" class="t-mono"> payload64)</text>
+  <text x="524" y="162" class="t-s t-m">chỉ phần này cần key;</text>
+  <text x="524" y="178" class="t-s t-m">sửa 1 byte là sai chữ ký</text>
+</svg></div>
+<figcaption>Trả lời Q3: header và payload chỉ là base64url, <b>ai cũng đọc được</b>. JWT thông thường là JWS (signed), không phải mã hoá. Không đặt password, PII, secret vào payload. Cần che nội dung thì dùng JWE, hoặc đừng đặt dữ liệu đó vào token.</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th>Claim</th><th>Nghĩa</th><th>Resource server phải kiểm tra</th></tr></thead>
+<tbody>
+<tr><td><code>iss</code></td><td>Ai cấp token</td><td>Đúng issuer mình tin (và dùng đúng JWKS của issuer đó)</td></tr>
+<tr><td><code>sub</code></td><td>Token nói về ai (user ID, client ID)</td><td>Dùng làm identity cho authorization và audit log</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>aud</code></td><td>Token dành cho service nào</td><td><b>Có mình trong đó.</b> Thiếu bước này, token cấp cho service A dùng được ở service B.</td></tr>
+<tr><td><code>exp</code>, <code>nbf</code>, <code>iat</code></td><td>Hết hạn, chưa có hiệu lực trước, thời điểm cấp (Unix time)</td><td>Theo đồng hồ của mình, cho phép lệch (leeway) vài chục giây</td></tr>
+<tr><td><code>scope</code> / <code>roles</code></td><td>Quyền được cấp</td><td>Hành động đang làm có nằm trong đó không</td></tr>
+<tr><td><code>jti</code></td><td>ID duy nhất của token</td><td>Dùng cho denylist hoặc chống replay khi cần</td></tr>
+</tbody></table></div>
+<p>Hai họ thuật toán ký: <b>HS256</b> (HMAC, cùng một secret để ký và verify, nên mọi service verify được cũng <b>ký</b> được) và <b>RS256 / ES256 / EdDSA</b> (ký bằng private key chỉ authorization server giữ, verify bằng public key công bố qua <b>JWKS</b>). Giữa nhiều service, luôn dùng loại thứ hai. Header <code>kid</code> chỉ key nào trong JWKS; nhờ vậy authorization server xoay vòng key được: công bố key mới bên cạnh key cũ, ký bằng key mới, gỡ key cũ khi token cũ đã hết hạn (Q2).</p>
+<p>Thử verify JWT ngay trong trang. Widget chạy hoàn toàn trong browser của bạn, nhưng tập thói quen tốt: <b>đừng dán token thật của production vào trang web nào</b>.</p>
+<div data-widget="jwt"></div>
+<div class="note trap"><b>Cạm bẫy khi validate JWT</b><ul>
+  <li><b>alg: none.</b> Library tin <code>alg</code> trong header, mà header do người gửi tự viết. Token <code>alg: none</code> không cần chữ ký vẫn được chấp nhận. Luôn truyền <b>allowlist</b> thuật toán cố định khi verify.</li>
+  <li><b>Algorithm confusion:</b> server dùng RS256, kẻ tấn công gửi token HS256 ký bằng <b>public key</b> (ai cũng có) làm HMAC secret. Library ngây thơ đem public key ra verify HMAC → khớp. Cũng chữa bằng allowlist.</li>
+  <li>Không kiểm tra <code>aud</code>, <code>iss</code>, <code>exp</code>: chữ ký đúng chỉ chứng minh token do issuer cấp, không chứng minh nó dành cho bạn hay còn hạn.</li>
+  <li><code>kid</code> hay <code>jku</code> trỏ tới URL hoặc file do kẻ tấn công kiểm soát: chỉ lấy key từ JWKS đã cấu hình sẵn, không theo URL trong token.</li>
+  <li>Access token sống nhiều ngày: không thu hồi được. Access token nên sống vài phút; dùng refresh token (được lưu và thu hồi được) để lấy token mới.</li>
+</ul></div>
+
+<h2>OAuth 2.0</h2>
+<p>OAuth 2.0 (RFC 6749) giải bài toán <b>uỷ quyền</b>: cho một client (app, service) lấy access token để gọi API, mà không đưa password của user cho client. Có 4 vai: <b>resource owner</b> (user), <b>client</b>, <b>authorization server</b> (cấp token), <b>resource server</b> (API). Cách lấy token gọi là <b>grant</b>:</p>
+<div class="tbl"><table>
+<thead><tr><th>Grant</th><th>Khi nào</th><th>Trạng thái</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>Authorization code + PKCE</b></td><td>Có user ngồi trước browser hoặc app</td><td>Chuẩn cho mọi loại client</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Client credentials</b></td><td>Service-to-service, không có user</td><td>Chuẩn; 5G NRF dùng grant này</td></tr>
+<tr><td><b>Refresh token</b></td><td>Lấy access token mới khi token cũ sắp hết hạn</td><td>Chuẩn; nên xoay vòng refresh token mỗi lần dùng</td></tr>
+<tr><td><b>Device code</b></td><td>Thiết bị không có browser: CLI, TV</td><td>Chuẩn (RFC 8628)</td></tr>
+<tr><td>Implicit, Password</td><td>Token trả thẳng qua URL / client cầm password của user</td><td><b>Đã bị loại</b> trong OAuth 2.1 và best practice hiện nay</td></tr>
+</tbody></table></div>
+<script type="application/json" class="seq">
+{"title":"Authorization code + PKCE","actors":["User (browser)","Client (web app)","Authorization server","Resource server"],"w":175,"steps":[
+ {"f":0,"t":1,"l":"bấm Login"},
+ {"note":"sinh code_verifier ngẫu nhiên,\ncode_challenge = SHA256(code_verifier)","a":1,"b":2},
+ {"f":1,"t":0,"l":"302 → /authorize?client_id&redirect_uri\n&scope&state&code_challenge","m":1},
+ {"f":0,"t":2,"l":"GET /authorize?…","m":1},
+ {"note":"user đăng nhập (+ MFA) và đồng ý cấp quyền (consent)","a":0,"b":2},
+ {"f":2,"t":0,"l":"302 → redirect_uri?code=…&state=…","m":1,"d":1},
+ {"f":0,"t":1,"l":"GET /callback?code&state","m":1},
+ {"note":"kiểm tra state khớp (chống CSRF)","a":0,"b":1},
+ {"f":1,"t":2,"l":"POST /token: code + code_verifier\n+ client authentication","m":1,"k":"sec"},
+ {"f":2,"t":1,"l":"access_token, refresh_token (+ id_token)","m":1,"k":"sec","d":1},
+ {"f":1,"t":3,"l":"GET /orders  Authorization: Bearer …","m":1,"k":"tra"},
+ {"f":3,"t":1,"l":"200 OK","m":1,"k":"tra","d":1}
+]}
+</script>
+<p>Hai chi tiết đáng nhớ. <b>Code</b> đi qua browser (có thể lộ qua log, history) nhưng vô dụng nếu thiếu <b>code_verifier</b>, thứ chỉ client giữ: đó là <b>PKCE</b>. <b>state</b> buộc callback với đúng phiên login mà client đã khởi tạo, chống kẻ tấn công nhét code của họ vào phiên của nạn nhân.</p>
+<div class="note trap"><b>OAuth không phải là authentication</b><p>Access token nói "client này được gọi API X", không nói chắc "người đang dùng là Alice", và nó được cấp cho resource server chứ không cho client. Dùng access token để login vào client là lỗi kinh điển. Login cần <b>OpenID Connect</b>.</p></div>
+
+<h3>OpenID Connect (OIDC)</h3>
+<p>OIDC là lớp authentication xây trên OAuth 2.0: thêm scope <code>openid</code>, và authorization server (lúc này gọi là <b>OpenID Provider</b>, IdP) trả thêm <b>ID token</b>, một JWT nói về việc user đã login. Discovery document <code>/.well-known/openid-configuration</code> (Q1) cho client biết mọi endpoint và JWKS để tự cấu hình.</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>ID token</th><th>Access token</th></tr></thead>
+<tbody>
+<tr><td><b>Dành cho</b></td><td>Client (<code>aud</code> = client_id)</td><td>Resource server (API)</td></tr>
+<tr><td><b>Nói gì</b></td><td>User nào, login lúc nào, bằng cách nào (<code>sub</code>, <code>auth_time</code>, <code>amr</code>, <code>nonce</code>)</td><td>Được phép làm gì (<code>scope</code>)</td></tr>
+<tr><td><b>Định dạng</b></td><td>Luôn là JWT</td><td>JWT hoặc chuỗi opaque (khi đó API hỏi lại qua introspection, RFC 7662)</td></tr>
+<tr><td><b>Gửi cho API?</b></td><td>Không</td><td>Có, header <code>Authorization: Bearer</code></td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job: 5G core dùng OAuth 2.0 như thế nào</b><p>Trong 5G SBA, <b>NRF</b> đóng vai authorization server. NF consumer (ví dụ AMF) authenticate với NRF bằng mTLS (module 11), dùng <b>client credentials grant</b> để xin access token với <code>scope</code> là tên NF service cần gọi (ví dụ <code>nudm-uecm</code>). NF producer (UDM) verify chữ ký của NRF, rồi kiểm tra <code>aud</code>, <code>scope</code>, <code>exp</code> trước khi phục vụ (3GPP TS 33.501, TS 29.510). Lab 12.3 dựng phiên bản thu nhỏ của đúng luồng này.</p></div>
+<script type="application/json" class="seq">
+{"title":"Client credentials kiểu 5G: AMF gọi UDM","actors":["NF consumer (AMF)","NRF","NF producer (UDM)"],"w":230,"steps":[
+ {"sep":"mTLS giữa các NF (module 11)"},
+ {"f":0,"t":1,"l":"POST /oauth2/token\ngrant_type=client_credentials\nscope=nudm-uecm","m":1,"k":"sec"},
+ {"note":"AMF đã đăng ký?\nprofile cho phép scope?","a":1,"b":1},
+ {"f":1,"t":0,"l":"access_token (JWT ký bởi NRF), expires_in","m":1,"k":"sec","d":1},
+ {"f":0,"t":2,"l":"PUT /nudm-uecm/v1/{ueId}/registrations/amf-3gpp-access\nAuthorization: Bearer …","m":1,"k":"tra"},
+ {"note":"verify chữ ký NRF,\naud, scope, exp","a":2,"b":2},
+ {"f":2,"t":0,"l":"201 Created","m":1,"k":"tra","d":1}
+]}
+</script>
+
+<h2>Directory và LDAP</h2>
+<p>Trong doanh nghiệp và nhà mạng, user và group thường nằm trong một <b>directory</b> (OpenLDAP, 389 DS, Active Directory) truy cập bằng <b>LDAP</b>. Dữ liệu là một cây (DIT), mỗi entry có <b>DN</b> (Distinguished Name) duy nhất:</p>
+<script type="text/plain" class="term" data-title="ldapsearch (Lab 12.4)">
+$ ldapsearch -x -H ldap://127.0.0.1 -b dc=netlab,dc=local -D cn=admin,dc=netlab,dc=local -w admin '(uid=alice)' cn memberOf
+dn: uid=alice,ou=people,dc=netlab,dc=local                    ◀ DN: đọc từ trái sang là đi từ lá lên gốc
+cn: Alice Nguyen
+$ ldapsearch -x -H ldap://127.0.0.1 -b ou=groups,dc=netlab,dc=local -D cn=admin,dc=netlab,dc=local -w admin \
+    '(member=uid=alice,ou=people,dc=netlab,dc=local)' cn
+dn: cn=netops,ou=groups,dc=netlab,dc=local                    ◀ alice thuộc group netops
+cn: netops
+</script>
+<p>Cách một service login user qua LDAP (search-then-bind): (1) bind bằng <b>service account</b> chỉ có quyền đọc; (2) search DN của user theo username; (3) <b>bind lại bằng DN của user và password vừa nhận</b>, để chính LDAP server kiểm tra password; (4) search group của user để làm authorization. LDAP dùng port 389 (nên có StartTLS) và 636 cho LDAPS. Đừng bao giờ gửi bind password qua LDAP không mã hoá.</p>
+<div class="note trap"><b>Cạm bẫy LDAP</b><ul>
+  <li><b>Password rỗng:</b> theo chuẩn LDAP, simple bind với DN có thật và password rỗng là "unauthenticated bind" và có thể trả <b>success</b>. OpenLDAP mặc định từ chối, nhưng không phải server nào cũng vậy. Code login phải tự chặn password rỗng trước khi bind.</li>
+  <li><b>LDAP injection:</b> ghép username thẳng vào filter. Username <code>*</code> hay <code>alice)(uid=*</code> làm filter khớp nhiều entry. Luôn escape (<code>escape_filter_chars</code> trong ldap3).</li>
+</ul></div>
+
+<h2>Authorization: ai được làm gì</h2>
+<p>Sau khi biết identity, ta cần một mô hình quyết định. Phổ biến nhất là <b>RBAC</b> (Role-Based Access Control): gán permission cho <b>role</b>, gán role cho <b>subject</b> (user, group, service account). Kubernetes RBAC (module 14) là đúng mô hình này với Role/ClusterRole và RoleBinding.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 152" role="img" aria-label="RBAC: subject gán vào role, role gán permission">
+  <text x="80" y="16" class="t-c t-s t-b t-m">SUBJECT</text><text x="360" y="16" class="t-c t-s t-b t-m">ROLE</text><text x="630" y="16" class="t-c t-s t-b t-m">PERMISSION</text>
+  <g class="t-app"><rect class="f" x="20" y="28" width="120" height="30" rx="6"/><rect class="f" x="20" y="70" width="120" height="30" rx="6"/><rect class="f" x="20" y="112" width="120" height="30" rx="6"/></g>
+  <text x="80" y="48" class="t-c t-s">alice (netops)</text><text x="80" y="90" class="t-c t-s">bob (auditors)</text><text x="80" y="132" class="t-c t-s">svc-a (service)</text>
+  <g class="t-k8s"><rect class="f" x="300" y="49" width="120" height="30" rx="6"/><rect class="f" x="300" y="91" width="120" height="30" rx="6"/></g>
+  <text x="360" y="69" class="t-c t-s t-b">operator</text><text x="360" y="111" class="t-c t-s t-b">viewer</text>
+  <g class="t-sec"><rect class="f" x="560" y="28" width="140" height="30" rx="6"/><rect class="f" x="560" y="70" width="140" height="30" rx="6"/></g>
+  <rect class="empty" x="560" y="112" width="140" height="30" rx="6"/>
+  <text x="630" y="48" class="t-c t-s t-mono">config:read</text><text x="630" y="90" class="t-c t-s t-mono">config:write</text><text x="630" y="132" class="t-c t-s t-mono t-m">users:admin</text>
+  <line class="ln" x1="140" y1="43" x2="300" y2="64"/><line class="ln" x1="140" y1="85" x2="300" y2="106"/><line class="ln" x1="140" y1="127" x2="300" y2="106"/>
+  <line class="ln" x1="420" y1="64" x2="560" y2="43"/><line class="ln" x1="420" y1="64" x2="560" y2="85"/><line class="ln" x1="420" y1="106" x2="560" y2="43"/>
+  <text x="220" y="146" class="t-c t-s t-m">role binding</text><text x="490" y="146" class="t-c t-s t-m">role definition</text>
+</svg></div>
+<figcaption><code>users:admin</code> không được gán cho role nào nên không ai có: <b>deny by default</b>. Muốn biết "alice được làm gì" chỉ cần đi theo mũi tên; muốn thu quyền một nhóm người chỉ cần sửa một role.</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th>Mô hình</th><th>Quyết định dựa trên</th><th>Ví dụ</th></tr></thead>
+<tbody>
+<tr><td><b>ACL</b></td><td>Danh sách ai được làm gì gắn vào từng resource</td><td>Quyền file Unix, S3 bucket ACL</td></tr>
+<tr class="t-k8s"><td><span class="lay"></span><b>RBAC</b></td><td>Role của subject</td><td>Kubernetes RBAC, role trong Keycloak</td></tr>
+<tr><td><b>ABAC</b></td><td>Thuộc tính của subject, resource, môi trường (giờ, IP, namespace)</td><td>"operator chỉ được sửa config của namespace mình, trong giờ làm việc"; OPA/Rego, AWS IAM condition</td></tr>
+<tr><td><b>ReBAC</b></td><td>Quan hệ giữa các đối tượng</td><td>"người sở hữu document được sửa nó"; Google Zanzibar, OpenFGA</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy authorization phổ biến nhất</b><p>Kiểm tra role nhưng quên kiểm tra <b>object</b>: user có quyền <code>orders:read</code> gọi <code>GET /orders/1234</code> và đọc được đơn hàng của người khác chỉ bằng cách đổi ID. Lỗi này (BOLA, Broken Object Level Authorization) đứng đầu OWASP API Security Top 10. Mọi endpoint nhận ID phải kiểm tra subject có quyền với <b>đúng object đó</b>.</p></div>
+<div class="note job"><b>Liên hệ job</b><p>Kiến trúc thường gặp: gateway hoặc sidecar kiểm tra token (chữ ký, <code>aud</code>, <code>exp</code>, scope thô), service tự kiểm tra quyền chi tiết theo object. Mọi quyết định allow/deny quan trọng phải được ghi <b>audit log</b> có identity, action, resource, kết quả. Khi có sự cố, câu hỏi đầu tiên luôn là "ai đã làm gì, bằng credential nào".</p></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m12" data-title="Kiểm tra module 12">
+[
+ {"q":"Request có access token hợp lệ của svc-a, nhưng svc-a không có scope <code>orders:write</code> để gọi POST /orders. API nên trả gì?","o":["401 Unauthorized","403 Forbidden","404 Not Found","500"],"a":1,
+  "e":"Đã biết là ai (authenticated) nhưng không được phép → 403. 401 dành cho thiếu hoặc sai credential."},
+ {"q":"Vì sao ap4.0 (nonce) chống được replay mà ap3.1 (password mã hoá) không?","o":["Vì nonce mã hoá mạnh hơn","Vì mỗi lần Bob gửi nonce mới, câu trả lời cũ không dùng lại được","Vì nonce dài hơn password","Vì dùng public key"],"a":1,
+  "e":"Bản password mã hoá giống nhau mọi lần nên ghi lại là dùng được. Nonce làm câu trả lời gắn với đúng một phiên."},
+ {"q":"Cách lưu password nào đúng?","o":["SHA-256(password)","SHA-256(salt + password)","Argon2id với salt ngẫu nhiên riêng cho mỗi password","AES-encrypt(password)"],"a":2,
+  "e":"Cần hàm cố ý chậm, tốn bộ nhớ, có salt. Mã hoá được thì giải mã được: lộ key là lộ hết password."},
+ {"q":"Endpoint login trả 'user không tồn tại' nhanh hơn hẳn 'sai password'. Vấn đề là gì?","o":["Không sao","User enumeration: kẻ tấn công biết username nào có thật qua nội dung hoặc thời gian phản hồi","Lộ password","DoS"],"a":1,
+  "e":"Trả cùng thông báo và vẫn chạy một lần hash giả khi user không tồn tại để thời gian phản hồi tương đương."},
+ {"q":"Payload của JWT có bí mật không?","o":["Có, vì đã được ký","Không: chỉ là base64url, ai cầm token đều đọc được","Có, nếu dùng RS256","Chỉ issuer đọc được"],"a":1,
+  "e":"Chữ ký bảo vệ integrity, không bảo vệ confidentiality. Cần giấu thì dùng JWE hoặc đừng đặt vào token."},
+ {"q":"Library verify JWT bằng thuật toán ghi trong header của token. Kẻ tấn công làm gì được?","o":["Không gì cả","Gửi token alg=none không có chữ ký, hoặc HS256 ký bằng public key (algorithm confusion)","Chỉ làm token hết hạn","Đọc private key"],"a":1,
+  "e":"Header do người gửi viết. Luôn truyền allowlist, ví dụ algorithms=[\"ES256\"]."},
+ {"q":"orders-api verify chữ ký và exp nhưng không kiểm tra <code>aud</code>. Hậu quả?","o":["Không sao vì chữ ký đúng","Token cấp cho service khác (cùng issuer) cũng gọi được orders-api","Token hết hạn vẫn dùng được","Không verify được chữ ký"],"a":1,
+  "e":"Một service bị chiếm sẽ dùng mọi token nó nhận được để gọi các service khác. aud giới hạn token vào đúng người nhận."},
+ {"q":"Vì sao hệ thống nhiều service nên dùng ES256/RS256 thay vì HS256 cho access token?","o":["Nhanh hơn","Với HS256, service nào verify được cũng ký được token giả; với ES256 chỉ authorization server giữ private key","Token ngắn hơn","Không cần JWKS"],"a":1,
+  "e":"HS256 dùng chung một secret. Public key chỉ verify được, không ký được."},
+ {"q":"Trong authorization code flow, PKCE bảo vệ khỏi điều gì?","o":["XSS","Kẻ đánh cắp authorization code (qua log, app độc trên máy) đổi được code lấy token","Password yếu","DoS"],"a":1,
+  "e":"Đổi code lấy token cần code_verifier mà chỉ client gốc biết; authorization server so SHA256(code_verifier) với code_challenge đã nhận lúc đầu."},
+ {"q":"Service-to-service (không có user) nên lấy access token bằng grant nào?","o":["Authorization code","Implicit","Client credentials","Password"],"a":2,
+  "e":"Client tự authenticate (client secret, private_key_jwt hoặc mTLS) và nhận token cho chính nó. 5G NRF dùng grant này."},
+ {"q":"Client nhận ID token và access token từ OIDC provider. Nên gửi cái nào cho API?","o":["ID token","Access token","Cả hai","Không cái nào"],"a":1,
+  "e":"ID token có aud là client, dành cho client biết user là ai. API nhận access token."},
+ {"q":"Code login LDAP bind bằng DN của user và password người dùng nhập. User để trống password. Rủi ro?","o":["Không sao, bind sẽ lỗi","Unauthenticated bind: một số server trả success, user login được không cần password","LDAP injection","Lộ DN"],"a":1,
+  "e":"Luôn từ chối password rỗng trước khi bind; đừng dựa vào cấu hình server."},
+ {"q":"User có role <code>orders:read</code> đổi ID trong URL và đọc được đơn hàng của người khác. Đây là lỗi gì?","o":["Authentication","BOLA: kiểm tra role mà không kiểm tra quyền trên đúng object","Injection","CSRF"],"a":1,
+  "e":"Đứng đầu OWASP API Security Top 10. Phải kiểm tra subject có quan hệ với object (chủ sở hữu, cùng tenant…)."}
+]
+</script>
+
+<h3>Ôn lại module 02, 09, 11</h3>
+<script type="application/json" class="quiz" data-id="m12-review" data-title="Ôn lại">
+[
+ {"q":"Web app lưu session ID trong cookie. Attribute nào ngăn JavaScript (bị XSS) đọc cookie đó?","o":["Secure","HttpOnly","SameSite","Path"],"a":1,
+  "e":"HttpOnly chặn document.cookie; Secure chỉ gửi qua HTTPS; SameSite giảm CSRF (module 02)."},
+ {"q":"Khi verify chữ ký HS256, vì sao so sánh bằng hmac.compare_digest thay vì ==?","o":["Nhanh hơn","Constant-time: không lộ số byte khớp qua thời gian phản hồi (timing attack, module 09)","Hỗ trợ Unicode","Không khác gì"],"a":1,
+  "e":"== dừng ở byte sai đầu tiên; đo thời gian đủ nhiều lần là đoán dần được MAC đúng."},
+ {"q":"Access token bị đánh cắp từ log. Cơ chế nào ở module 11 khiến token đó vô dụng với kẻ trộm?","o":["0-RTT","Certificate-bound access token: token gắn với client cert, phải có private key mới dùng được","SNI","OCSP stapling"],"a":1,
+  "e":"RFC 8705: resource server so fingerprint của client cert trong mTLS với claim cnf trong token."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"12 AuthN & AuthZ","c":[
+ {"t":"Khái niệm","col":"base","c":[{"t":"AuthN 401 · AuthZ 403 · Audit"},{"t":"Factor: biết, có, là → MFA"},{"t":"ap1.0 → ap4.0: nonce chống replay"}]},
+ {"t":"Password","col":"app","c":[{"t":"Argon2id, scrypt, bcrypt + salt"},{"t":"Pepper ngoài DB"},{"t":"Enumeration, stuffing, rate limit"},{"t":"TOTP = HMAC(secret, time/30)"}]},
+ {"t":"JWT","col":"sec","c":[{"t":"header.payload.signature (base64url)"},{"t":"iss, sub, aud, exp, scope, jti"},{"t":"HS256 vs ES256/RS256 + JWKS, kid"},{"t":"Allowlist alg; kiểm tra aud, exp"},{"t":"Đọc được, không mã hoá"}]},
+ {"t":"OAuth 2.0 / OIDC","col":"net","c":[{"t":"Auth code + PKCE, state"},{"t":"Client credentials (5G NRF)"},{"t":"Refresh token, token ngắn hạn"},{"t":"OIDC: ID token, discovery"},{"t":"OAuth ≠ authentication"}]},
+ {"t":"Directory","col":"tra","c":[{"t":"LDAP: DIT, DN, bind, filter"},{"t":"Search-then-bind"},{"t":"LDAPS / StartTLS"},{"t":"Chặn password rỗng, escape filter"}]},
+ {"t":"Authorization","col":"k8s","c":[{"t":"ACL, RBAC, ABAC, ReBAC"},{"t":"Deny by default, least privilege"},{"t":"BOLA: kiểm tra từng object"},{"t":"Audit log mọi quyết định"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 12.1 · Hash password và TOTP</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Python · argon2</span><span class="chip t-base">35 phút</span></div>
+  <p>Phần 1: đo số lần hash mỗi giây của SHA-256 so với Argon2id (tham số OWASP), tạo chuỗi hash lưu DB, verify đúng/sai, và kiểm tra khi nào cần rehash. Phần 2: tự viết TOTP theo RFC 6238 chỉ bằng <code>hmac</code> và <code>struct</code>, kiểm tra với test vector của RFC, rồi so với app authenticator trên điện thoại.</p>
+  <p class="done-when"><b>Xong khi:</b> thấy Argon2id chậm hơn SHA-256 nhiều nghìn lần; hàm TOTP của bạn ra đúng <code>94287082</code> cho test vector (T = 59, 8 chữ số) và cùng mã 6 số với app trên điện thoại.</p>
+  <details><summary>Gợi ý</summary><p><code>sudo apt install -y python3-argon2</code>. <code>PasswordHasher(time_cost, memory_cost, parallelism)</code> với <code>memory_cost</code> tính bằng KiB. TOTP: counter = <code>int(time // 30)</code> đóng gói 8 byte big-endian; offset = 4 bit cuối của HMAC; lấy 4 byte từ offset, bỏ bit cao nhất, mod 10^digits. Secret trong QR code là base32. Test vector RFC 6238: secret ASCII <code>12345678901234567890</code>, SHA-1.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m12/pwhash.py">
+#!/usr/bin/env python3
+"""So sánh SHA-256 với Argon2id cho việc lưu password. Cần: sudo apt install -y python3-argon2"""
+import hashlib
+import os
+import time
+
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
+
+
+def rate(fn, seconds: float = 1.0) -> float:
+    n, t0 = 0, time.perf_counter()
+    while time.perf_counter() - t0 < seconds:
+        fn()
+        n += 1
+    return n / (time.perf_counter() - t0)
+
+
+pw, salt = b"correct horse battery staple", os.urandom(16)
+ph = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)    # mức tối thiểu OWASP: 19 MiB
+r_sha = rate(lambda: hashlib.sha256(salt + pw).digest())
+r_argon = rate(lambda: ph.hash(pw))
+print(f"SHA-256(salt+pw): {r_sha:12,.0f} lần/giây (1 core, Python; GPU nhanh hơn nhiều nghìn lần)")
+print(f"Argon2id        : {r_argon:12,.1f} lần/giây → chậm hơn {r_sha / r_argon:,.0f} lần")
+
+stored = ph.hash("hunter2")
+print("Chuỗi lưu trong DB:", stored)
+for guess in ("hunter1", "hunter2"):
+    try:
+        ph.verify(stored, guess)
+        print(f"  verify {guess!r}: OK")
+    except VerifyMismatchError:
+        print(f"  verify {guess!r}: sai password")
+print("  cùng password, hash khác nhau (nhờ salt):", ph.hash("hunter2") != ph.hash("hunter2"))
+# Tăng tham số sau này: hash cũ vẫn verify được; lúc user login thành công thì hash lại bằng tham số mới
+ph_new = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=1)
+print("  hash cũ cần rehash theo tham số mới?", ph_new.check_needs_rehash(stored))
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m12/totp.py">
+#!/usr/bin/env python3
+"""TOTP (RFC 6238) = HOTP (RFC 4226) với counter = thời gian / 30 giây."""
+import base64
+import hashlib
+import hmac
+import secrets
+import struct
+import sys
+import time
+
+
+def totp(secret_b32: str, t: float | None = None, step: int = 30, digits: int = 6) -> str:
+    key = base64.b32decode(secret_b32.upper() + "=" * (-len(secret_b32) % 8))
+    counter = int((time.time() if t is None else t) // step)
+    mac = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = mac[-1] & 0x0F                                   # dynamic truncation
+    code = (struct.unpack(">I", mac[offset:offset + 4])[0] & 0x7FFFFFFF) % 10 ** digits
+    return f"{code:0{digits}d}"
+
+
+if __name__ == "__main__":
+    rfc = base64.b32encode(b"12345678901234567890").decode()
+    assert totp(rfc, t=59, digits=8) == "94287082", "sai test vector RFC 6238"
+    print("test vector RFC 6238: OK")
+    secret = sys.argv[1] if len(sys.argv) > 1 else base64.b32encode(secrets.token_bytes(20)).decode()
+    print("secret (nhập tay vào app authenticator):", secret)
+    print("otpauth URI (để làm QR):", f"otpauth://totp/NetLab:alice?secret={secret}&issuer=NetLab")
+    while True:
+        print(f"\r{totp(secret)}   còn {30 - int(time.time()) % 30:2d} giây ", end="", flush=True)
+        time.sleep(1)
+</script>
+<script type="text/plain" class="term">
+$ sudo apt install -y python3-argon2 && mkdir -p ~/netlab/m12 && cd ~/netlab/m12
+$ python3 pwhash.py
+SHA-256(salt+pw):    1,512,804 lần/giây (1 core, Python; GPU nhanh hơn nhiều nghìn lần)
+Argon2id        :         31.6 lần/giây → chậm hơn 47,874 lần
+Chuỗi lưu trong DB: $argon2id$v=19$m=19456,t=2,p=1$Zk3…$Q0n…
+  verify 'hunter1': sai password
+  verify 'hunter2': OK
+  cùng password, hash khác nhau (nhờ salt): True
+  hash cũ cần rehash theo tham số mới? True
+$ python3 totp.py
+test vector RFC 6238: OK
+secret (nhập tay vào app authenticator): JBSW…
+otpauth URI (để làm QR): otpauth://totp/NetLab:alice?secret=JBSW…&issuer=NetLab
+482915   còn 17 giây                                          ◀ so với app trên điện thoại; Ctrl+C để thoát
+</script>
+  <p class="small muted">Số lần/giây phụ thuộc máy. Nếu mã TOTP lệch app một bước, kiểm tra đồng hồ WSL (<code>date</code>): VM ngủ dậy hay bị lệch giờ. Server thật thường chấp nhận cả mã của bước trước và sau (±30 giây) và ghi nhớ mã đã dùng để chống replay trong cùng bước.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 12.2 · Tự viết JWT HS256 và lừa một verifier ngây thơ</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python</span><span class="chip t-base">45 phút</span></div>
+  <p>Viết <code>jwt_hs256.py</code> không dùng library JWT: hàm <code>sign(claims)</code> và <code>verify(token, audience, issuer)</code> làm đủ 5 bước (allowlist alg, chữ ký constant-time, iss, aud, exp/nbf có leeway). Viết thêm một <code>naive_verify</code> mắc lỗi tin <code>alg</code> trong header và không kiểm tra claim. Chạy cả hai trên 6 token: hợp lệ, sửa scope giữ chữ ký cũ, <code>alg=none</code>, sai audience, hết hạn, ký bằng secret khác.</p>
+  <p class="done-when"><b>Xong khi:</b> verifier đúng chỉ chấp nhận token hợp lệ; verifier ngây thơ chấp nhận ít nhất <code>alg=none</code>, sai audience và hết hạn. Verify được token <code>$T</code> trong phần Làm trước bằng hàm của bạn (sẽ báo hết hạn nếu bạn làm sau 14/11/2026 11:00 UTC).</p>
+  <details><summary>Gợi ý</summary><p>base64url: <code>base64.urlsafe_b64encode(…).rstrip(b"=")</code>; khi decode thêm lại <code>"=" * (-len(s) % 4)</code>. JSON phải serialize gọn (<code>separators=(",", ":")</code>) nhưng verifier chỉ dùng đúng chuỗi base64 nhận được, không serialize lại. So chữ ký bằng <code>hmac.compare_digest</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m12/jwt_hs256.py">
+#!/usr/bin/env python3
+"""JWT HS256 tự viết để hiểu (production: dùng library, ví dụ PyJWT). So verifier đúng với verifier ngây thơ."""
+import base64
+import hashlib
+import hmac
+import json
+import time
+
+SECRET = b"netlab-demo-secret-please-change-me-32"
+
+
+class InvalidToken(Exception):
+    pass
+
+
+def b64u(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def b64u_dec(s: str) -> bytes:
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def compact(obj: dict) -> bytes:
+    return json.dumps(obj, separators=(",", ":")).encode()
+
+
+def sign(claims: dict, key: bytes = SECRET) -> str:
+    signing_input = b64u(compact({"alg": "HS256", "typ": "JWT"})) + "." + b64u(compact(claims))
+    return signing_input + "." + b64u(hmac.new(key, signing_input.encode(), hashlib.sha256).digest())
+
+
+def verify(token: str, *, audience: str, issuer: str, key: bytes = SECRET, leeway: int = 30) -> dict:
+    try:
+        h64, p64, s64 = token.split(".")
+        header, claims = json.loads(b64u_dec(h64)), json.loads(b64u_dec(p64))
+    except ValueError as e:                                    # sai số phần, base64 hay JSON hỏng
+        raise InvalidToken(f"token hỏng: {e}") from None
+    if header.get("alg") != "HS256":                           # 1. allowlist, không tin header
+        raise InvalidToken(f"alg không được phép: {header.get('alg')}")
+    expected = hmac.new(key, f"{h64}.{p64}".encode(), hashlib.sha256).digest()
+    if not hmac.compare_digest(expected, b64u_dec(s64)):       # 2. chữ ký, so constant-time
+        raise InvalidToken("sai chữ ký")
+    if claims.get("iss") != issuer:                            # 3. đúng nơi cấp
+        raise InvalidToken(f"iss sai: {claims.get('iss')}")
+    aud = claims.get("aud")
+    if audience not in (aud if isinstance(aud, list) else [aud]):   # 4. token dành cho mình
+        raise InvalidToken(f"aud sai: {aud}")
+    now = time.time()
+    if not isinstance(claims.get("exp"), (int, float)) or now > claims["exp"] + leeway:   # 5. còn hạn
+        raise InvalidToken("hết hạn (hoặc thiếu exp)")
+    if now + leeway < claims.get("nbf", 0):
+        raise InvalidToken("chưa tới nbf")
+    return claims
+
+
+def naive_verify(token: str) -> dict:
+    """SAI có chủ đích: tin alg trong header, không kiểm tra iss/aud/exp."""
+    h64, p64, s64 = token.split(".")
+    if json.loads(b64u_dec(h64)).get("alg") == "none":
+        return json.loads(b64u_dec(p64))
+    expected = hmac.new(SECRET, f"{h64}.{p64}".encode(), hashlib.sha256).digest()
+    if not hmac.compare_digest(expected, b64u_dec(s64)):
+        raise InvalidToken("sai chữ ký")
+    return json.loads(b64u_dec(p64))
+
+
+if __name__ == "__main__":
+    now = int(time.time())
+    iss = "https://auth.netlab.local"
+    base = {"iss": iss, "sub": "svc-a", "aud": "orders-api", "scope": "orders:read", "iat": now, "exp": now + 300}
+    good = sign(base)
+    h64, _, s64 = good.split(".")
+    admin_p64 = b64u(compact({**base, "scope": "orders:admin"}))
+    cases = {
+        "hợp lệ": good,
+        "sửa scope, giữ chữ ký cũ": f"{h64}.{admin_p64}.{s64}",
+        "alg=none": b64u(compact({"alg": "none", "typ": "JWT"})) + f".{admin_p64}.",
+        "sai audience": sign({**base, "aud": "billing-api"}),
+        "hết hạn": sign({**base, "iat": now - 7200, "exp": now - 3600}),
+        "ký bằng secret khác": sign(base, key=b"guessed-secret"),
+    }
+    verifiers = (("naive", naive_verify), ("đúng ", lambda t: verify(t, audience="orders-api", issuer=iss)))
+    for name, token in cases.items():
+        for label, fn in verifiers:
+            try:
+                result = f"CHẤP NHẬN scope={fn(token)['scope']}"
+            except InvalidToken as e:
+                result = f"từ chối: {e}"
+            print(f"{name:<26} {label}  {result}")
+</script>
+<script type="text/plain" class="term">
+$ python3 jwt_hs256.py
+hợp lệ                     naive  CHẤP NHẬN scope=orders:read
+hợp lệ                     đúng   CHẤP NHẬN scope=orders:read
+sửa scope, giữ chữ ký cũ   naive  từ chối: sai chữ ký
+sửa scope, giữ chữ ký cũ   đúng   từ chối: sai chữ ký
+alg=none                   naive  CHẤP NHẬN scope=orders:admin               ◀ leo thang quyền không cần secret
+alg=none                   đúng   từ chối: alg không được phép: none
+sai audience               naive  CHẤP NHẬN scope=orders:read
+sai audience               đúng   từ chối: aud sai: billing-api
+hết hạn                    naive  CHẤP NHẬN scope=orders:read
+hết hạn                    đúng   từ chối: hết hạn (hoặc thiếu exp)
+ký bằng secret khác        naive  từ chối: sai chữ ký
+ký bằng secret khác        đúng   từ chối: sai chữ ký
+$ python3 -c 'import jwt_hs256 as j, sys; print(j.verify(sys.argv[1], audience="orders-api", issuer="https://auth.netlab.local"))' "$T"
+… jwt_hs256.InvalidToken: hết hạn (hoặc thiếu exp)             ◀ chữ ký đúng, nhưng token mẫu đã hết hạn
+</script>
+  <p class="small muted">Với PyJWT (<code>sudo apt install -y python3-jwt</code>), cả hàm <code>verify</code> gói gọn trong một lệnh: <code>jwt.decode(token, key, algorithms=["HS256"], audience="orders-api", issuer=…, leeway=30, options={"require": ["exp", "iss", "aud"]})</code>. Điểm quan trọng là luôn truyền <code>algorithms</code>, <code>audience</code>, <code>issuer</code>.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 12.3 · Mini token server (client credentials) và API kiểm tra scope</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · PyJWT · ES256</span><span class="chip t-base">60 phút</span></div>
+  <p>Dựng phiên bản thu nhỏ của luồng NRF ở trên:</p>
+  <ul>
+    <li><code>token_server.py</code> (port 9000): <code>POST /token</code> với <code>grant_type=client_credentials</code>, client authenticate bằng HTTP Basic, chỉ cấp scope client được phép, trả access token JWT ký ES256 sống 5 phút; <code>GET /.well-known/jwks.json</code> công bố public key với <code>kid</code>.</li>
+    <li><code>orders_api.py</code> (port 9001): <code>GET /orders</code> cần <code>orders:read</code>, <code>POST /orders</code> cần <code>orders:write</code>; verify token qua JWKS; trả 401 hay 403 đúng chuẩn kèm <code>WWW-Authenticate</code>.</li>
+  </ul>
+  <p class="done-when"><b>Xong khi:</b> svc-a đọc được nhưng ghi bị 403; svc-a xin scope <code>orders:write</code> bị <code>invalid_scope</code>; sai secret bị <code>invalid_client</code>; token bị sửa chữ ký bị 401 <code>invalid_token</code>; svc-b ghi được.</p>
+  <details><summary>Gợi ý</summary><p><code>sudo apt install -y python3-jwt python3-cryptography jq</code>. Ký: <code>jwt.encode(claims, private_key, algorithm="ES256", headers={"kid": KID})</code>. JWK từ public key: <code>jwt.algorithms.ECAlgorithm.to_jwk(pub)</code> (trả về chuỗi JSON). Phía API: <code>jwt.PyJWKClient(url).get_signing_key_from_jwt(token).key</code>, rồi <code>jwt.decode(…, algorithms=["ES256"], audience=…, issuer=…)</code>. Mọi lỗi của PyJWT kế thừa <code>jwt.PyJWTError</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m12/token_server.py">
+#!/usr/bin/env python3
+"""OAuth 2.0 token server tối giản: client credentials grant, access token JWT ES256, JWKS. Chỉ để học."""
+import base64
+import hmac
+import json
+import secrets
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
+
+import jwt
+from cryptography.hazmat.primitives.asymmetric import ec
+from jwt.algorithms import ECAlgorithm
+
+ISSUER = "http://127.0.0.1:9000"
+KEY = ec.generate_private_key(ec.SECP256R1())   # restart là đổi key; thực tế key nằm trong KMS/HSM
+KID = secrets.token_hex(4)
+CLIENTS = {  # client_id → (secret, scope được phép). Thực tế: lưu hash của secret, hoặc dùng mTLS / private_key_jwt.
+    "svc-a": ("a-secret-123", {"orders:read"}),
+    "svc-b": ("b-secret-456", {"orders:read", "orders:write"}),
+}
+
+
+class Handler(BaseHTTPRequestHandler):
+    def reply(self, code: int, body: dict, extra: dict | None = None) -> None:
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")          # token không được cache
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self) -> None:
+        if self.path != "/.well-known/jwks.json":
+            return self.reply(404, {"error": "not_found"})
+        jwk = json.loads(ECAlgorithm.to_jwk(KEY.public_key()))
+        jwk.update(kid=KID, use="sig", alg="ES256")
+        self.reply(200, {"keys": [jwk]})
+
+    def client_id(self) -> str | None:
+        """client_secret_basic: Authorization: Basic base64(client_id:client_secret)"""
+        auth = self.headers.get("Authorization", "")
+        if not auth.startswith("Basic "):
+            return None
+        try:
+            cid, _, secret = base64.b64decode(auth[6:]).decode().partition(":")
+        except ValueError:
+            return None
+        known = CLIENTS.get(cid)
+        return cid if known and hmac.compare_digest(known[0].encode(), secret.encode()) else None
+
+    def do_POST(self) -> None:
+        if self.path != "/token":
+            return self.reply(404, {"error": "not_found"})
+        form = parse_qs(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
+        if form.get("grant_type") != ["client_credentials"]:
+            return self.reply(400, {"error": "unsupported_grant_type"})
+        cid = self.client_id()
+        if not cid:
+            return self.reply(401, {"error": "invalid_client"}, {"WWW-Authenticate": 'Basic realm="token"'})
+        requested, allowed = set(form.get("scope", [""])[0].split()), CLIENTS[cid][1]
+        if not requested or not requested <= allowed:
+            return self.reply(400, {"error": "invalid_scope", "allowed": sorted(allowed)})
+        now = int(time.time())
+        claims = {"iss": ISSUER, "sub": cid, "aud": "orders-api", "scope": " ".join(sorted(requested)),
+                  "iat": now, "exp": now + 300, "jti": secrets.token_hex(8)}
+        token = jwt.encode(claims, KEY, algorithm="ES256", headers={"kid": KID})
+        print(f"[token] cấp cho {cid}: scope={claims['scope']}")
+        self.reply(200, {"access_token": token, "token_type": "Bearer", "expires_in": 300, "scope": claims["scope"]})
+
+    def log_message(self, *args) -> None:                      # tắt log mặc định của http.server
+        pass
+
+
+if __name__ == "__main__":
+    print(f"token server {ISSUER}  kid={KID}")
+    ThreadingHTTPServer(("127.0.0.1", 9000), Handler).serve_forever()
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m12/orders_api.py">
+#!/usr/bin/env python3
+"""Resource server: verify access token bằng JWKS của token server, rồi kiểm tra scope."""
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import jwt
+
+ISSUER = "http://127.0.0.1:9000"
+JWKS = jwt.PyJWKClient(ISSUER + "/.well-known/jwks.json")     # tải và cache key theo kid
+ROUTES = {("GET", "/orders"): "orders:read", ("POST", "/orders"): "orders:write"}
+
+
+class Handler(BaseHTTPRequestHandler):
+    def reply(self, code: int, body: dict, extra: dict | None = None) -> None:
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def api(self, method: str) -> None:
+        need = ROUTES.get((method, self.path))
+        if not need:
+            return self.reply(404, {"error": "not_found"})
+        auth = self.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):                                    # AuthN: chưa có credential
+            return self.reply(401, {"error": "missing_token"}, {"WWW-Authenticate": "Bearer"})
+        token = auth[7:]
+        try:
+            key = JWKS.get_signing_key_from_jwt(token).key
+            claims = jwt.decode(token, key, algorithms=["ES256"], audience="orders-api", issuer=ISSUER,
+                                leeway=30, options={"require": ["exp", "iat", "iss", "aud", "sub"]})
+        except jwt.PyJWTError as e:                                           # AuthN: credential sai
+            return self.reply(401, {"error": "invalid_token", "detail": str(e)},
+                              {"WWW-Authenticate": 'Bearer error="invalid_token"'})
+        if need not in claims.get("scope", "").split():                       # AuthZ
+            return self.reply(403, {"error": "insufficient_scope", "need": need},
+                              {"WWW-Authenticate": f'Bearer error="insufficient_scope", scope="{need}"'})
+        print(f"[api] {claims['sub']} {method} {self.path} (jti={claims.get('jti')})")   # audit log
+        self.reply(200, {"ok": True, "caller": claims["sub"], "action": f"{method} {self.path}"})
+
+    def do_GET(self) -> None:
+        self.api("GET")
+
+    def do_POST(self) -> None:
+        self.api("POST")
+
+    def log_message(self, *args) -> None:
+        pass
+
+
+if __name__ == "__main__":
+    print("orders-api http://127.0.0.1:9001")
+    ThreadingHTTPServer(("127.0.0.1", 9001), Handler).serve_forever()
+</script>
+<script type="text/plain" class="term">
+$ sudo apt install -y python3-jwt python3-cryptography jq
+$ python3 token_server.py & python3 orders_api.py &
+$ TOK='http://127.0.0.1:9000/token'; API='http://127.0.0.1:9001/orders'
+$ T=$(curl -s -u svc-a:a-secret-123 -d grant_type=client_credentials -d scope=orders:read $TOK | jq -r .access_token)
+[token] cấp cho svc-a: scope=orders:read
+$ cut -d. -f1 <<<"$T" | base64 -d 2>/dev/null; echo
+{"alg":"ES256","kid":"3f9a1c2e","typ":"JWT"}                  ◀ kid trỏ tới key trong JWKS
+$ curl -s -H "Authorization: Bearer $T" $API
+{"ok": true, "caller": "svc-a", "action": "GET /orders"}
+$ curl -s -i -X POST -H "Authorization: Bearer $T" $API | grep -E '^HTTP|^WWW|error'
+HTTP/1.0 403 Forbidden
+WWW-Authenticate: Bearer error="insufficient_scope", scope="orders:write"
+$ curl -s -u svc-a:a-secret-123 -d grant_type=client_credentials -d scope=orders:write $TOK
+{"error": "invalid_scope", "allowed": ["orders:read"]}
+$ curl -s -u svc-a:wrong -d grant_type=client_credentials -d scope=orders:read $TOK
+{"error": "invalid_client"}
+$ curl -s -H "Authorization: Bearer ${T:0:-10}AAAAAAAAAA" $API     # phá 10 ký tự cuối của chữ ký
+{"error": "invalid_token", "detail": "Signature verification failed"}
+$ T2=$(curl -s -u svc-b:b-secret-456 -d grant_type=client_credentials -d 'scope=orders:read orders:write' $TOK | jq -r .access_token)
+$ curl -s -X POST -H "Authorization: Bearer $T2" $API
+{"ok": true, "caller": "svc-b", "action": "POST /orders"}
+$ kill %1 %2
+</script>
+  <p class="small muted"><code>kid</code> của bạn sẽ khác; header có thể in kèm lỗi base64 vì thiếu padding. <b>Mở rộng:</b> (1) restart token server (key mới, kid mới) rồi gọi API bằng token cũ: token cũ bị từ chối vì key cũ không còn trong JWKS, token mới vẫn chạy nhờ PyJWKClient tải lại JWKS khi gặp kid lạ; (2) thêm Basic auth bằng mTLS của module 11 thay cho client secret; (3) đổi <code>aud</code> thành tên NF và <code>scope</code> thành <code>nudm-uecm</code> để giống NRF.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 12.4 · Login qua LDAP và phân quyền RBAC</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">OpenLDAP · Python · ldap3</span><span class="chip t-base">60 phút</span></div>
+  <p>Cài OpenLDAP (<code>slapd</code>) trong WSL với base <code>dc=netlab,dc=local</code>, tạo <code>ou=people</code> (alice, bob) và <code>ou=groups</code> (netops chứa alice, auditors chứa bob). Viết <code>ldap_login.py user password action</code> theo kiểu search-then-bind, lấy group, map group → role → permission như sơ đồ RBAC ở trên, rồi in ALLOW/DENY. Thử thêm username có ký tự đặc biệt và password rỗng.</p>
+  <p class="done-when"><b>Xong khi:</b> alice được <code>config:write</code>, bob chỉ được <code>config:read</code>, sai password bị từ chối với cùng một thông báo như user không tồn tại, username <code>alice)(uid=*</code> và password rỗng đều bị chặn.</p>
+  <details><summary>Gợi ý</summary><p>Cài slapd không hỏi gì: điền trước câu trả lời bằng <code>debconf-set-selections</code>, rồi <code>DEBIAN_FRONTEND=noninteractive apt install</code>. Nếu slapd đã cài từ trước thì chạy <code>sudo dpkg-reconfigure -f noninteractive slapd</code> sau khi điền debconf. Thêm entry bằng <code>ldapadd</code>, đặt password bằng <code>ldappasswd</code> (server tự hash). Python: <code>sudo apt install -y python3-ldap3</code>; <code>ldap3.utils.conv.escape_filter_chars</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ cat <<'EOF' | sudo debconf-set-selections
+> slapd slapd/internal/generated_adminpw password admin
+> slapd slapd/internal/adminpw password admin
+> slapd slapd/password1 password admin
+> slapd slapd/password2 password admin
+> slapd slapd/domain string netlab.local
+> slapd shared/organization string NetLab
+> EOF
+$ sudo DEBIAN_FRONTEND=noninteractive apt install -y slapd ldap-utils python3-ldap3
+$ sudo service slapd start                                   # nếu WSL chưa bật systemd
+$ ldapwhoami -x -H ldap://127.0.0.1 -D cn=admin,dc=netlab,dc=local -w admin
+dn:cn=admin,dc=netlab,dc=local
+</script>
+<script type="text/plain" class="code" data-lang="plaintext" data-file="~/netlab/m12/netlab.ldif">
+dn: ou=people,dc=netlab,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=netlab,dc=local
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=alice,ou=people,dc=netlab,dc=local
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Nguyen
+sn: Nguyen
+
+dn: uid=bob,ou=people,dc=netlab,dc=local
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Tran
+sn: Tran
+
+dn: cn=netops,ou=groups,dc=netlab,dc=local
+objectClass: groupOfNames
+cn: netops
+member: uid=alice,ou=people,dc=netlab,dc=local
+
+dn: cn=auditors,ou=groups,dc=netlab,dc=local
+objectClass: groupOfNames
+cn: auditors
+member: uid=bob,ou=people,dc=netlab,dc=local
+</script>
+<script type="text/plain" class="term">
+$ ADM="-x -H ldap://127.0.0.1 -D cn=admin,dc=netlab,dc=local -w admin"
+$ ldapadd $ADM -f netlab.ldif
+adding new entry "ou=people,dc=netlab,dc=local"
+…
+$ ldappasswd $ADM -s alice-pw uid=alice,ou=people,dc=netlab,dc=local
+$ ldappasswd $ADM -s bob-pw uid=bob,ou=people,dc=netlab,dc=local
+$ ldapsearch $ADM -b dc=netlab,dc=local -LLL '(uid=alice)' userPassword
+dn: uid=alice,ou=people,dc=netlab,dc=local
+userPassword:: e1NTSEF9…                                      ◀ base64 của "{SSHA}…": server lưu hash, không lưu plaintext
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m12/ldap_login.py">
+#!/usr/bin/env python3
+"""Login qua LDAP (search-then-bind), lấy group, map group → role → permission (RBAC)."""
+import sys
+
+from ldap3 import SUBTREE, Connection, Server
+from ldap3.core.exceptions import LDAPException
+from ldap3.utils.conv import escape_filter_chars
+
+LDAP_URL = "ldap://127.0.0.1"          # production: ldaps:// hoặc StartTLS, verify cert của server
+BASE = "dc=netlab,dc=local"
+SVC_DN, SVC_PW = "cn=admin,dc=netlab,dc=local", "admin"   # thực tế: service account chỉ có quyền đọc
+ROLE_OF_GROUP = {"netops": "operator", "auditors": "viewer"}
+PERMS = {"operator": {"config:read", "config:write"}, "viewer": {"config:read"}}
+FAIL = "sai username hoặc password"     # một thông báo cho mọi trường hợp: chống user enumeration
+
+
+def login(username: str, password: str) -> tuple[set[str], set[str]]:
+    if not password:
+        raise PermissionError(FAIL)                          # chặn unauthenticated bind
+    server = Server(LDAP_URL, connect_timeout=3)
+    with Connection(server, SVC_DN, SVC_PW, auto_bind=True) as svc:
+        svc.search(f"ou=people,{BASE}",
+                   f"(&(objectClass=inetOrgPerson)(uid={escape_filter_chars(username)}))",
+                   SUBTREE, attributes=["uid"])
+        if len(svc.entries) != 1:
+            raise PermissionError(FAIL)
+        user_dn = svc.entries[0].entry_dn
+        svc.search(f"ou=groups,{BASE}",
+                   f"(&(objectClass=groupOfNames)(member={escape_filter_chars(user_dn)}))",
+                   SUBTREE, attributes=["cn"])
+        groups = {str(e.cn) for e in svc.entries}
+    user = Connection(server, user_dn, password)
+    if not user.bind():                                      # LDAP server tự kiểm tra password
+        raise PermissionError(FAIL)
+    user.unbind()
+    roles = {ROLE_OF_GROUP[g] for g in groups if g in ROLE_OF_GROUP}
+    return roles, set().union(*(PERMS[r] for r in roles))
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        sys.exit("Dùng: ldap_login.py user password action")
+    username, password, action = sys.argv[1:]
+    try:
+        roles, perms = login(username, password)
+    except PermissionError as e:
+        sys.exit(f"✘ {username}: {e}")
+    except LDAPException as e:
+        sys.exit(f"✘ lỗi LDAP: {e}")
+    decision = "ALLOW" if action in perms else "DENY"       # deny by default
+    print(f"✔ {username}: roles={sorted(roles)} permissions={sorted(perms)}")
+    print(f"  {action}: {decision}")                         # thực tế: ghi audit log ở đây
+</script>
+<script type="text/plain" class="term">
+$ python3 ldap_login.py alice alice-pw config:write
+✔ alice: roles=['operator'] permissions=['config:read', 'config:write']
+  config:write: ALLOW
+$ python3 ldap_login.py bob bob-pw config:write
+✔ bob: roles=['viewer'] permissions=['config:read']
+  config:write: DENY
+$ python3 ldap_login.py alice wrong config:read
+✘ alice: sai username hoặc password
+$ python3 ldap_login.py carol x config:read
+✘ carol: sai username hoặc password                            ◀ cùng thông báo với sai password
+$ python3 ldap_login.py 'alice)(uid=*' x config:read
+✘ alice)(uid=*: sai username hoặc password                     ◀ đã escape: filter tìm đúng chuỗi "alice)(uid=*"
+$ python3 ldap_login.py alice '' config:read
+✘ alice: sai username hoặc password                            ◀ chặn trước khi bind
+</script>
+  <p class="small muted">Thử bỏ <code>escape_filter_chars</code> và chạy lại với username <code>*</code>: filter thành <code>(uid=*)</code>, khớp cả alice và bob, và code chỉ không bị lừa nhờ dòng kiểm tra "đúng một entry". Ở đây vẫn dùng LDAP không mã hoá vì là lab trên localhost. Module 16 sẽ ghép LDAP, token server và mTLS thành một auth service hoàn chỉnh.</p>
+  </details>
+</div>
+
+<div class="note more"><b>Bản C/C++</b><p><a href="#m17">Lab 17.3</a> verify JWT ES256 bằng C++ và OpenSSL: allowlist <code>alg</code>, chuyển chữ ký raw r‖s sang DER, JWKS cache có thời hạn, và đối chiếu kết quả với PyJWT trên 11 token mẫu (gồm <code>alg=none</code> và HS256 giả mạo).</p></div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m12"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §8.4 (End-point authentication, ap1.0–ap4.0). Phần còn lại của module này nằm ngoài sách.</li>
+  <li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html" target="_blank" rel="noopener">OWASP Password Storage Cheat Sheet</a> và <a href="https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html" target="_blank" rel="noopener">Authentication Cheat Sheet</a>: tham số và quy tắc cập nhật nhất.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc9700" target="_blank" rel="noopener">RFC 9700: OAuth 2.0 Security Best Current Practice</a>: vì sao bỏ implicit và password grant, vì sao PKCE bắt buộc.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc8725" target="_blank" rel="noopener">RFC 8725: JWT Best Current Practices</a>: danh sách đầy đủ các lỗi validate JWT.</li>
+  <li><a href="https://owasp.org/API-Security/editions/2023/en/0x11-t10/" target="_blank" rel="noopener">OWASP API Security Top 10 (2023)</a>: BOLA và các lỗi authorization khác.</li>
+  <li><a href="https://www.keycloak.org/getting-started/getting-started-docker" target="_blank" rel="noopener">Keycloak getting started (Docker)</a>: chạy một IdP thật trong 5 phút để thử authorization code flow.</li>
+</ul>

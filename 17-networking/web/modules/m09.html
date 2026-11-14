@@ -1,0 +1,568 @@
+<!-- Core Net Lab · Module 09 · Cryptography căn bản (Kurose & Ross 8e, §8.1–8.3) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Biết mỗi mục tiêu security (confidentiality, integrity, authentication, non-repudiation) cần công cụ cryptography nào.</li>
+  <li>Dùng đúng symmetric encryption: AES-GCM (AEAD), nonce không bao giờ lặp lại, không dùng ECB.</li>
+  <li>Hiểu public key cryptography (RSA, ECC), Diffie-Hellman key exchange, và vì sao thực tế luôn kết hợp với symmetric key.</li>
+  <li>Phân biệt hash, MAC (HMAC) và digital signature: cái nào chống được kẻ tấn công, cái nào cho non-repudiation.</li>
+  <li>Thấy được vấn đề "public key này có đúng của Alice không?", lý do tồn tại của certificate (module 10).</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ echo -n "hello" | sha256sum
+2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824  -
+$ echo -n "hellp" | sha256sum                       # Q1: đổi 1 ký tự, hash đổi bao nhiêu?
+$ openssl rand -hex 32                              # 32 byte ngẫu nhiên từ CSPRNG: đủ làm key AES-256
+$ echo -n "amount=100" | openssl dgst -sha256 -hmac "secret-key"
+SHA2-256(stdin)= 9c1e…                              ◀ Q2: khác gì sha256sum ở trên?
+$ openssl genpkey -algorithm ed25519 -out alice.key
+$ openssl pkey -in alice.key -pubout                # Q3: public key được suy ra từ private key; ngược lại thì sao?
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA…
+$ openssl speed -seconds 1 -evp aes-128-gcm 2>/dev/null | tail -1
+$ openssl speed -seconds 1 rsa2048 ecdsap256 2>/dev/null | tail -4   # Q4: symmetric nhanh hơn public key bao nhiêu lần?
+</script>
+<p class="small muted">Lệnh <code>openssl speed</code> chạy vài giây. Output của AES là số byte/giây, của RSA/ECDSA là số lần sign/verify mỗi giây; so sánh thô là đủ.</p>
+
+<h2>Mục tiêu security và công cụ tương ứng</h2>
+<p>Sách dùng ba nhân vật: <b>Alice</b> và <b>Bob</b> muốn liên lạc an toàn, <b>Trudy</b> (intruder) có thể nghe lén, sửa, chèn, xoá, gửi lại (replay) message, hoặc giả làm Alice <span class="bk">§8.1</span>. Alice và Bob ở đây có thể là hai microservice, một NF và NRF, hay một client và service xác thực của bạn.</p>
+<div class="tbl"><table>
+<thead><tr><th>Mục tiêu</th><th>Câu hỏi</th><th>Công cụ</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>Confidentiality</b></td><td>Trudy có đọc được nội dung không?</td><td>Encryption (symmetric, public key)</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Integrity</b></td><td>Message có bị sửa trên đường không?</td><td>MAC, digital signature, AEAD (hash một mình thì <b>không đủ</b>)</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Authentication</b></td><td>Người gửi có đúng là Alice không?</td><td>MAC (nếu chung key), digital signature + certificate, challenge-response</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Non-repudiation</b></td><td>Alice có chối được là mình đã gửi không?</td><td>Digital signature (MAC không làm được)</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Freshness</b></td><td>Đây có phải message cũ bị gửi lại không?</td><td>Nonce, timestamp, sequence number</td></tr>
+<tr><td><b>Availability</b></td><td>Service có bị làm sập không?</td><td>Không phải cryptography: rate limiting, firewall (module 13)</td></tr>
+</tbody></table></div>
+<div class="note key"><b>Ghi nhớ: đừng tự chế cryptography</b><p>Mọi thuật toán trong bài là để <b>hiểu và dùng đúng</b>, không phải để tự cài đặt cho production. Dùng library đã kiểm chứng (OpenSSL/BoringSSL, libsodium, Go crypto, Python <code>cryptography</code>) với tham số mặc định an toàn. Lỗi thật thường không nằm ở thuật toán mà ở cách dùng: nonce lặp lại, so sánh MAC sai cách, quên verify certificate, key nằm trong code.</p></div>
+
+<h2>Symmetric key cryptography</h2>
+<p>Alice và Bob dùng chung <b>một key</b> K<sub>AB</sub>: mã hoá và giải mã bằng cùng key đó <span class="bk">§8.2.1</span>. Nhanh (Q4: hàng GB/giây nhờ lệnh AES trong CPU), nên mọi dữ liệu lớn đều được mã hoá theo cách này. Vấn đề khó: làm sao hai bên có chung key mà Trudy không biết? (phần public key sẽ trả lời).</p>
+<div class="tbl"><table>
+<thead><tr><th>Thuật toán</th><th>Loại</th><th>Ghi chú</th></tr></thead>
+<tbody>
+<tr><td><b>AES</b> (128 / 256 bit key)</td><td>Block cipher, block 16 byte</td><td>Chuẩn hiện nay, có lệnh phần cứng (AES-NI)</td></tr>
+<tr><td><b>ChaCha20</b></td><td>Stream cipher</td><td>Nhanh trên thiết bị không có AES-NI (điện thoại cũ)</td></tr>
+<tr><td>DES, 3DES, RC4</td><td>Cũ</td><td><b>Không dùng</b>: key 56 bit của DES bị brute force trong vài giờ; RC4 có lỗ hổng</td></tr>
+</tbody></table></div>
+
+<h3>Mode of operation: ECB lộ pattern</h3>
+<p>Block cipher chỉ mã hoá được 16 byte. Message dài hơn cần một <b>mode</b> để xâu chuỗi các block. Mode đơn giản nhất, <b>ECB</b>, mã hoá từng block độc lập: block giống nhau cho ciphertext giống nhau, và Trudy thấy được cấu trúc của dữ liệu.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 680 200" role="img" aria-label="ECB cho ciphertext lặp lại khi plaintext lặp lại; CBC thì không">
+  <text x="10" y="40" class="t-b">plaintext</text>
+  <g class="t-app"><rect class="f" x="120" y="20" width="120" height="32" rx="3"/><text x="180" y="41" class="t-c t-s t-mono">ATTACK AT DAWN!!</text>
+  <rect class="f" x="250" y="20" width="120" height="32" rx="3"/><text x="310" y="41" class="t-c t-s t-mono">ATTACK AT DAWN!!</text></g>
+  <g class="t-tra"><rect class="f" x="380" y="20" width="120" height="32" rx="3"/><text x="440" y="41" class="t-c t-s t-mono">RETREAT AT DUSK!</text></g>
+  <g class="t-app"><rect class="f" x="510" y="20" width="120" height="32" rx="3"/><text x="570" y="41" class="t-c t-s t-mono">ATTACK AT DAWN!!</text></g>
+  <text x="10" y="102" class="t-b">ECB</text><text x="10" y="118" class="t-s t-m">không dùng</text>
+  <g class="t-sec"><rect class="f" x="120" y="82" width="120" height="32" rx="3"/><text x="180" y="103" class="t-c t-s t-mono">3a9f 07c1 …</text>
+  <rect class="f" x="250" y="82" width="120" height="32" rx="3"/><text x="310" y="103" class="t-c t-s t-mono">3a9f 07c1 …</text></g>
+  <g class="t-net"><rect class="f" x="380" y="82" width="120" height="32" rx="3"/><text x="440" y="103" class="t-c t-s t-mono">b21e 55d0 …</text></g>
+  <g class="t-sec"><rect class="f" x="510" y="82" width="120" height="32" rx="3"/><text x="570" y="103" class="t-c t-s t-mono">3a9f 07c1 …</text></g>
+  <text x="10" y="164" class="t-b">CBC / GCM</text><text x="10" y="180" class="t-s t-m">có IV / nonce</text>
+  <g class="t-base"><rect class="f" x="120" y="144" width="120" height="32" rx="3"/><text x="180" y="165" class="t-c t-s t-mono">e4c0 9b17 …</text>
+  <rect class="f" x="250" y="144" width="120" height="32" rx="3"/><text x="310" y="165" class="t-c t-s t-mono">51aa 3fe2 …</text>
+  <rect class="f" x="380" y="144" width="120" height="32" rx="3"/><text x="440" y="165" class="t-c t-s t-mono">0d7c c845 …</text>
+  <rect class="f" x="510" y="144" width="120" height="32" rx="3"/><text x="570" y="165" class="t-c t-s t-mono">9e31 70bb …</text></g>
+  <text x="640" y="103" class="t-s t-m">lộ</text><text x="640" y="117" class="t-s t-m">pattern</text>
+</svg></div>
+<figcaption>Ví dụ nổi tiếng: ảnh chim cánh cụt mã hoá bằng ECB vẫn nhìn ra hình chim. CBC trộn block trước vào block sau và bắt đầu bằng một <b>IV</b> ngẫu nhiên, nên cùng plaintext cho ciphertext khác nhau <span class="bk">§8.2.1</span>. Lab 9.1 làm lại thí nghiệm này.</figcaption></figure>
+
+<h3>AEAD: encryption kèm integrity</h3>
+<p>CBC hay CTR chỉ cho confidentiality: Trudy lật một bit ciphertext thì plaintext bị đổi theo mà bên nhận không hề biết. Cách dùng hiện đại là <b>AEAD</b> (Authenticated Encryption with Associated Data), ví dụ <b>AES-GCM</b> và <b>ChaCha20-Poly1305</b>. Mọi cipher suite của TLS 1.3 đều là AEAD.</p>
+<div class="formula">AEAD-Encrypt(key, nonce, plaintext, associated data) → ciphertext + tag (16 byte)
+<small><b>nonce</b>: 12 byte, phải khác nhau cho mỗi message cùng key. <b>Associated data</b> (AAD): dữ liệu được xác thực nhưng không mã hoá, ví dụ header, key ID, version. Giải mã sẽ <b>thất bại</b> nếu ciphertext, tag hay AAD bị sửa dù một bit.</small></div>
+<div class="note trap"><b>Cạm bẫy chết người: nonce reuse</b><p>Dùng lại cùng nonce với cùng key cho hai message trong AES-GCM thì XOR của hai ciphertext bằng XOR của hai plaintext: biết một plaintext là đọc được plaintext kia. Tệ hơn, Trudy còn có thể giả mạo tag. Dùng nonce ngẫu nhiên 96 bit (an toàn tới khoảng 2<sup>32</sup> message mỗi key) hoặc counter, và xoay vòng key định kỳ. Lab 9.2 cho bạn tự khôi phục plaintext từ một lần nonce reuse.</p></div>
+
+<h2>Public key cryptography</h2>
+<p>Mỗi bên có một <b>key pair</b>: <b>public key</b> công bố cho mọi người, <b>private key</b> giữ tuyệt đối bí mật. Thứ gì một key làm thì chỉ key kia gỡ được <span class="bk">§8.2.2</span>:</p>
+<ul>
+  <li><b>Mã hoá</b> bằng public key của Bob → chỉ private key của Bob giải mã được.</li>
+  <li><b>Ký</b> bằng private key của Alice → ai có public key của Alice cũng verify được (phần digital signature).</li>
+</ul>
+<p>Từ public key không suy ra được private key (Q3); bảo mật dựa trên bài toán khó: phân tích thừa số số lớn (<b>RSA</b>) hoặc discrete logarithm trên elliptic curve (<b>ECC</b>).</p>
+<div class="tbl"><table>
+<thead><tr><th>Thuật toán</th><th>Key size tương đương ~128 bit security</th><th>Dùng cho</th></tr></thead>
+<tbody>
+<tr><td><b>RSA</b></td><td>3,072 bit (2,048 vẫn phổ biến)</td><td>Signature, mã hoá key; certificate truyền thống</td></tr>
+<tr><td><b>ECDSA</b> (P-256)</td><td>256 bit</td><td>Signature; certificate hiện đại, nhanh hơn RSA nhiều</td></tr>
+<tr><td><b>Ed25519</b></td><td>256 bit</td><td>Signature; SSH key, nhiều hệ thống mới</td></tr>
+<tr><td><b>ECDH / X25519</b></td><td>256 bit</td><td>Key exchange (TLS 1.3)</td></tr>
+</tbody></table></div>
+<p>Public key chậm hơn symmetric hàng nghìn lần (Q4). Vì vậy hệ thống thật dùng <b>hybrid</b>: public key chỉ để thống nhất một <b>session key</b> ngắn hạn, rồi mọi dữ liệu được mã hoá bằng symmetric key đó. TLS làm đúng như vậy.</p>
+
+<h3>Diffie-Hellman key exchange</h3>
+<p>Làm sao Alice và Bob có chung một key bí mật khi mọi thứ họ gửi đều bị Trudy nghe? <b>Diffie-Hellman (DH)</b>: mỗi bên chọn một số bí mật, chỉ gửi đi một con số "đã trộn", và cả hai tự tính ra cùng một secret. Thử với số nhỏ để thấy phép toán, rồi với số lớn để thấy vì sao Eve (người nghe lén) bó tay:</p>
+<div data-widget="dh"></div>
+<p>TLS 1.3 dùng <b>ECDHE</b> (DH trên elliptic curve, <i>ephemeral</i>: tạo key pair mới cho mỗi connection). Nhờ ephemeral, kể cả khi private key dài hạn của server bị lộ sau này, traffic đã ghi lại trước đó vẫn không giải mã được: tính chất <b>forward secrecy</b>.</p>
+<p>Nhưng DH thuần có một lỗ hổng lớn: nó không biết mình đang nói chuyện với ai.</p>
+<script type="application/json" class="seq">
+{"title":"Man-in-the-middle với Diffie-Hellman không xác thực","actors":["Alice","Trudy","Bob"],"w":220,"steps":[
+ {"f":0,"t":1,"l":"gᵃ (tưởng gửi cho Bob)","m":1},
+ {"f":1,"t":2,"l":"gᵗ (giả làm Alice)","m":1,"k":"sec"},
+ {"f":2,"t":1,"l":"gᵇ","m":1,"d":1},
+ {"f":1,"t":0,"l":"gᵗ (giả làm Bob)","m":1,"d":1,"k":"sec"},
+ {"note":"Alice có chung key với Trudy; Bob cũng vậy.\nTrudy giải mã, đọc, sửa, mã hoá lại rồi chuyển tiếp. Không ai biết.","a":0,"b":2}
+]}
+</script>
+<div class="note key"><b>Ghi nhớ</b><p>Key exchange phải đi kèm <b>authentication</b>: server ký giá trị DH của mình bằng private key dài hạn, và client verify chữ ký bằng public key của server. Câu hỏi còn lại: client lấy public key "đúng của server" ở đâu? Đó là việc của <b>certificate</b> và <b>CA</b> (module 10), rồi TLS ghép tất cả lại (module 11).</p></div>
+<p class="small muted">Máy tính lượng tử đủ lớn sẽ phá được RSA, ECC và DH (thuật toán Shor). Các hệ thống đang chuyển sang <b>post-quantum cryptography</b>: TLS hiện đại đã dùng key exchange lai X25519 + ML-KEM (Kyber). Symmetric key và hash chỉ cần key/output dài gấp đôi.</p>
+
+<h2>Hash function</h2>
+<p><b>Cryptographic hash function</b> H biến dữ liệu độ dài bất kỳ thành chuỗi độ dài cố định (SHA-256: 32 byte) <span class="bk">§8.3.1</span>, với các tính chất:</p>
+<ul>
+  <li><b>Preimage resistance</b>: biết H(m), không tìm được m.</li>
+  <li><b>Second preimage resistance</b>: biết m, không tìm được m' ≠ m có cùng hash.</li>
+  <li><b>Collision resistance</b>: không tìm được bất kỳ cặp m ≠ m' nào cùng hash.</li>
+  <li><b>Avalanche</b>: đổi 1 bit input thì khoảng một nửa số bit output đổi theo (Q1).</li>
+</ul>
+<div class="tbl"><table>
+<thead><tr><th>Hash</th><th>Trạng thái</th></tr></thead>
+<tbody>
+<tr><td>MD5, SHA-1</td><td><b>Đã bị phá</b> collision resistance (SHA-1: dự án SHAttered năm 2017). Không dùng cho security; chỉ còn dùng làm checksum không cần chống tấn công</td></tr>
+<tr><td>SHA-256, SHA-384, SHA-512 (SHA-2)</td><td>Chuẩn hiện nay</td></tr>
+<tr><td>SHA-3, BLAKE2/BLAKE3</td><td>An toàn; BLAKE nhanh hơn</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy</b><ul>
+  <li><b>Hash không đảm bảo integrity trước kẻ tấn công.</b> Trudy sửa message rồi tính lại hash là xong; hash chỉ có giá trị khi chính nó được bảo vệ (ký, hoặc lấy từ nguồn tin cậy, như checksum trên trang tải về chính thức). Checksum của UDP/TCP (module 05) còn yếu hơn nữa.</li>
+  <li><b>Không hash mật khẩu bằng SHA-256.</b> SHA-256 được thiết kế để nhanh, nên GPU thử được hàng tỷ mật khẩu mỗi giây. Mật khẩu phải dùng hàm cố ý chậm có salt: Argon2, scrypt, bcrypt (module 12).</li>
+</ul></div>
+
+<h2>MAC: integrity và authentication bằng shared key</h2>
+<p><b>Message Authentication Code (MAC)</b> là "hash có key": chỉ ai có key K mới tính được MAC(K, m) đúng <span class="bk">§8.3.2</span>. Chuẩn phổ biến là <b>HMAC-SHA256</b> (Q2).</p>
+<script type="application/json" class="seq">
+{"title":"HMAC chặn sửa đổi, nhưng không chặn replay","actors":["Alice (có K)","Trudy","Bob (có K)"],"w":230,"steps":[
+ {"f":0,"t":1,"l":"m = amount=100\nHMAC(K, m)","m":1},
+ {"f":1,"t":2,"l":"m' = amount=999\nHMAC(K, m) cũ (Trudy không có K)","m":1,"k":"sec"},
+ {"note":"Bob tính HMAC(K, m') ≠ tag nhận được → từ chối","a":1,"b":2},
+ {"f":1,"t":2,"l":"gửi lại nguyên (m, HMAC) cũ","m":1,"k":"sec"},
+ {"note":"Hợp lệ! Cần thêm timestamp hoặc nonce\nvào phần được MAC để chống replay","a":1,"b":2}
+]}
+</script>
+<ul>
+  <li>Verify MAC bằng hàm so sánh <b>constant-time</b> (<code>hmac.compare_digest</code>, <code>CRYPTO_memcmp</code>). So sánh bằng <code>==</code> dừng ở byte sai đầu tiên, và thời gian phản hồi tiết lộ bao nhiêu byte đầu đã đúng (<i>timing attack</i>).</li>
+  <li>Không tự ghép <code>SHA256(key || message)</code>: SHA-256 bị <i>length extension attack</i> (Trudy nối thêm dữ liệu và tính được hash mới mà không cần key). HMAC được thiết kế để tránh đúng lỗi này.</li>
+  <li>Vì hai bên chung key, Bob cũng tạo được MAC giống hệt: MAC <b>không cho non-repudiation</b>, và mọi bên giữ key đều có thể giả mạo.</li>
+</ul>
+<div class="note job"><b>Liên hệ job</b><p>HMAC có mặt ở khắp nơi trong platform: JWT ký bằng HS256 (HMAC-SHA256, module 12), webhook gửi kèm chữ ký HMAC của body, cookie session được ký, và bên trong TLS để dẫn xuất key (HKDF). Điểm yếu cố hữu: mọi service cần verify đều phải giữ shared secret, nên một service bị chiếm là giả mạo được token cho cả hệ thống. Đó là lý do token giữa các service thường ký bằng private key (RS256/ES256) thay vì HS256.</p></div>
+
+<h2>Digital signature</h2>
+<p>Alice ký bằng <b>private key</b>, ai cũng verify được bằng <b>public key</b> của Alice. Thực tế ký lên <b>hash</b> của message (nhanh, độ dài cố định) <span class="bk">§8.3.3</span>:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 240" role="img" aria-label="Alice ký hash của message bằng private key; Bob verify bằng public key">
+  <text x="10" y="22" class="t-b">Alice ký</text>
+  <rect class="box" x="10" y="34" width="90" height="40" rx="6"/><text x="55" y="59" class="t-c t-mono">m</text>
+  <g class="t-base"><rect class="f" x="140" y="34" width="110" height="40" rx="6"/><text x="195" y="59" class="t-c">SHA-256</text></g>
+  <rect class="box" x="290" y="34" width="80" height="40" rx="6"/><text x="330" y="59" class="t-c t-mono">H(m)</text>
+  <g class="t-sec"><rect class="f" x="410" y="34" width="150" height="40" rx="6"/><text x="485" y="52" class="t-c">sign</text><text x="485" y="67" class="t-c t-s">private key của Alice</text></g>
+  <g class="t-sec"><rect class="f" x="600" y="34" width="110" height="40" rx="6"/><text x="655" y="59" class="t-c t-b">signature σ</text></g>
+  <path class="ln-ink" d="M100 54 H132 M250 54 H282 M370 54 H402 M560 54 H592"/>
+  <path class="ah" d="M140 54 l-9 -5 v10 z"/><path class="ah" d="M290 54 l-9 -5 v10 z"/><path class="ah" d="M410 54 l-9 -5 v10 z"/><path class="ah" d="M600 54 l-9 -5 v10 z"/>
+  <text x="360" y="108" class="t-c t-s t-m">gửi (m, σ) qua mạng; cả hai đều public</text>
+  <text x="10" y="142" class="t-b">Bob verify</text>
+  <rect class="box" x="10" y="154" width="90" height="40" rx="6"/><text x="55" y="179" class="t-c t-mono">m</text>
+  <g class="t-base"><rect class="f" x="140" y="154" width="110" height="40" rx="6"/><text x="195" y="179" class="t-c">SHA-256</text></g>
+  <rect class="box" x="290" y="154" width="80" height="40" rx="6"/><text x="330" y="179" class="t-c t-mono">H(m)</text>
+  <g class="t-net"><rect class="f" x="410" y="154" width="150" height="40" rx="6"/><text x="485" y="172" class="t-c">verify</text><text x="485" y="187" class="t-c t-s">public key của Alice</text></g>
+  <g class="t-sec"><rect class="f" x="600" y="200" width="110" height="34" rx="6"/><text x="655" y="222" class="t-c t-b">σ</text></g>
+  <rect class="box" x="600" y="154" width="110" height="40" rx="6"/><text x="655" y="179" class="t-c t-b">✔ / ✘</text>
+  <path class="ln-ink" d="M100 174 H132 M250 174 H282 M370 174 H402 M560 174 H592 M600 217 H485 V202"/>
+  <path class="ah" d="M140 174 l-9 -5 v10 z"/><path class="ah" d="M290 174 l-9 -5 v10 z"/><path class="ah" d="M410 174 l-9 -5 v10 z"/><path class="ah" d="M600 174 l-9 -5 v10 z"/><path class="ah" d="M485 194 l-5 10 h10 z"/>
+</svg></div></figure>
+<div class="tbl"><table>
+<thead><tr><th></th><th>MAC (HMAC)</th><th>Digital signature</th></tr></thead>
+<tbody>
+<tr><td>Key</td><td>Một shared secret, cả hai bên giữ</td><td>Private key (chỉ người ký) + public key (mọi người)</td></tr>
+<tr><td>Ai tạo được</td><td>Mọi bên có key</td><td>Chỉ người có private key</td></tr>
+<tr><td>Ai verify được</td><td>Mọi bên có key</td><td>Bất kỳ ai có public key</td></tr>
+<tr><td>Non-repudiation</td><td>Không</td><td>Có</td></tr>
+<tr><td>Tốc độ</td><td>Rất nhanh</td><td>Chậm hơn nhiều (ECDSA, Ed25519 chấp nhận được)</td></tr>
+<tr><td>Ví dụ</td><td>JWT HS256, webhook, TLS record (bên trong AEAD)</td><td>Certificate, JWT RS256/ES256, TLS CertificateVerify, code signing, DNSSEC</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy: ECDSA cần nonce ngẫu nhiên hoàn hảo</b><p>Mỗi chữ ký ECDSA dùng một số ngẫu nhiên k. Dùng lại k hai lần (hoặc k đoán được) thì ai cũng tính ra được <b>private key</b> từ hai chữ ký. Sony PlayStation 3 bị lộ key ký firmware năm 2010 vì đúng lỗi này. Ed25519 tránh vấn đề bằng cách sinh k xác định từ key và message.</p></div>
+
+<h3>Vấn đề còn lại: public key này của ai?</h3>
+<p>Digital signature chỉ chứng minh "người giữ private key tương ứng với public key này đã ký". Nếu Trudy đưa cho Bob public key của Trudy và nói đó là của Alice, mọi chữ ký của Trudy sẽ được Bob chấp nhận như của Alice. Cần một bên thứ ba đáng tin xác nhận "public key này thuộc về Alice": <b>Certification Authority (CA)</b> ký một <b>certificate</b> chứa tên Alice và public key của Alice <span class="bk">§8.3.3</span>. Đó là toàn bộ module 10.</p>
+
+<h2>Randomness và key management</h2>
+<ul>
+  <li>Key, nonce, IV, token, salt phải lấy từ <b>CSPRNG</b>: <code>secrets</code> hoặc <code>os.urandom</code> trong Python, <code>/dev/urandom</code> / <code>getrandom()</code>, <code>RAND_bytes</code> của OpenSSL, <code>openssl rand</code>. Module <code>random</code> của Python hay <code>rand()</code> của C đoán được, tuyệt đối không dùng.</li>
+  <li><b>Không để key trong code hay image.</b> Lưu trong Kubernetes Secret (tối thiểu), tốt hơn là secret manager / KMS (HashiCorp Vault, cloud KMS) hoặc <b>HSM</b> (phần cứng giữ private key, key không bao giờ rời thiết bị).</li>
+  <li>Mỗi key một mục đích (key ký token khác key mã hoá dữ liệu), có <b>key ID</b> để biết dùng key nào, và có quy trình <b>rotation</b> định kỳ mà không làm gián đoạn service.</li>
+</ul>
+<div class="note job"><b>Liên hệ job</b><p>Một platform cung cấp security service dùng chung thường có đúng các thành phần này: key management (sinh, lưu, xoay vòng key), certificate management (module 10), và token service (module 12). Khi đọc code của team, hãy để ý xem key đến từ đâu, có key ID không, và rotation diễn ra thế nào.</p></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m09" data-title="Kiểm tra module 09">
+[
+ {"q":"Service A gửi lệnh cho B qua kênh mà Trudy sửa được nội dung. A và B đã có chung một secret key. Cách tối thiểu để B phát hiện lệnh bị sửa?","o":["Gửi kèm SHA-256 của lệnh","Gửi kèm HMAC-SHA256(key, lệnh)","Mã hoá lệnh bằng AES-CBC","Gửi qua UDP"],"a":1,
+  "e":"SHA-256 thì Trudy tính lại được. AES-CBC không có integrity: lật bit ciphertext là đổi plaintext. HMAC cần key nên Trudy không tạo được tag hợp lệ. (AES-GCM cho cả confidentiality lẫn integrity.)"},
+ {"q":"Vì sao không dùng AES mode ECB?","o":["ECB chậm","Block plaintext giống nhau cho block ciphertext giống nhau, lộ cấu trúc dữ liệu","ECB cần key dài","ECB không giải mã được"],"a":1,
+  "e":"ECB mã hoá từng block độc lập, không có IV. Pattern của dữ liệu xuyên qua lớp mã hoá."},
+ {"q":"Một service mã hoá token bằng AES-GCM nhưng dùng nonce cố định <code>000…0</code> cho mọi token. Hậu quả?","o":["Không sao vì key bí mật","XOR hai ciphertext = XOR hai plaintext: biết một token là đọc được token khác; còn có thể giả mạo tag","Token dài hơn","Chỉ chậm hơn"],"a":1,
+  "e":"GCM dựa trên CTR mode: cùng key + nonce cho cùng keystream. Nonce reuse là lỗi nghiêm trọng nhất khi dùng AEAD."},
+ {"q":"Trong AES-GCM, associated data (AAD) là gì?","o":["Dữ liệu được mã hoá thêm lần nữa","Dữ liệu được xác thực (sửa là giải mã thất bại) nhưng không mã hoá","Key phụ","Nonce"],"a":1,
+  "e":"Dùng cho header, key ID, version: cần đọc được rõ ràng nhưng không được để Trudy sửa."},
+ {"q":"Vì sao TLS dùng public key cryptography để thoả thuận key rồi chuyển sang AES/ChaCha20 cho dữ liệu?","o":["Public key không mã hoá được dữ liệu","Public key chậm hơn symmetric hàng nghìn lần; symmetric thì cần chung key trước","Do luật","AES an toàn hơn RSA"],"a":1,
+  "e":"Hybrid cryptosystem: dùng điểm mạnh của mỗi loại. Q4 ở đầu bài cho thấy chênh lệch tốc độ."},
+ {"q":"Diffie-Hellman thuần (không ký) chống được kẻ nào?","o":["Kẻ chỉ nghe lén (passive eavesdropper)","Man-in-the-middle chủ động","Cả hai","Không ai"],"a":0,
+  "e":"Kẻ nghe lén chỉ thấy gᵃ, gᵇ, không tính được secret. Kẻ đứng giữa thì thay giá trị DH của mình vào cả hai phía. Cần authentication (signature + certificate)."},
+ {"q":"Forward secrecy nghĩa là gì?","o":["Key được gửi trước","Private key dài hạn của server bị lộ sau này cũng không giải mã được traffic đã ghi lại trước đó","Traffic được mã hoá hai lần","Client không cần certificate"],"a":1,
+  "e":"Nhờ ECDHE: mỗi connection có key pair tạm, xoá sau khi dùng. Private key dài hạn chỉ dùng để ký, không dùng để mã hoá session key."},
+ {"q":"Tính chất nào của hash function bị phá khi người ta tìm được hai file PDF khác nhau có cùng SHA-1?","o":["Preimage resistance","Collision resistance","Avalanche","Tốc độ"],"a":1,
+  "e":"SHAttered (2017) tạo collision cho SHA-1. Không còn dùng SHA-1 cho chữ ký hay certificate."},
+ {"q":"Vì sao không lưu mật khẩu dưới dạng SHA-256(password)?","o":["SHA-256 đã bị phá","SHA-256 quá nhanh: kẻ tấn công thử hàng tỷ mật khẩu/giây; thiếu salt thì còn dùng được bảng tra sẵn","SHA-256 dài quá","Vì không giải mã được"],"a":1,
+  "e":"Dùng Argon2id, scrypt hoặc bcrypt với salt riêng cho mỗi mật khẩu (module 12)."},
+ {"q":"Service verify HMAC bằng <code>if received_tag == expected_tag</code>. Rủi ro gì?","o":["Không có rủi ro","Timing attack: thời gian so sánh lộ số byte đúng, kẻ tấn công đoán dần tag","Sai kết quả","Chậm"],"a":1,
+  "e":"Dùng hmac.compare_digest (Python), CRYPTO_memcmp (OpenSSL), subtle.ConstantTimeCompare (Go)."},
+ {"q":"Ưu điểm nào chỉ digital signature có, MAC không có?","o":["Integrity","Non-repudiation, và người verify không thể tạo chữ ký giả","Nhanh hơn","Không cần key"],"a":1,
+  "e":"MAC dùng chung key nên bên verify cũng tạo được MAC. Signature chỉ người giữ private key tạo được; mọi người verify bằng public key."},
+ {"q":"Bob nhận được message có chữ ký hợp lệ verify bằng \"public key của Alice\" mà Bob tải từ một trang web không rõ nguồn. Bob kết luận được gì?","o":["Chắc chắn Alice đã ký","Chỉ biết người giữ private key tương ứng đã ký; chưa biết đó có phải Alice không","Message đã được mã hoá","Không kết luận gì về integrity"],"a":1,
+  "e":"Thiếu ràng buộc giữa danh tính và public key. Certificate do CA ký giải quyết vấn đề này (module 10)."}
+]
+</script>
+
+<h3>Ôn lại module 03–08</h3>
+<script type="application/json" class="quiz" data-id="m09-review" data-title="Ôn lại">
+[
+ {"q":"Checksum trong TCP/UDP header (module 05) có chống được kẻ cố ý sửa segment không?","o":["Có","Không: kẻ sửa tính lại checksum được, vì không có key","Chỉ với IPv6","Chỉ khi dùng TLS"],"a":1,
+  "e":"Checksum chỉ bắt lỗi ngẫu nhiên. Chống sửa có chủ đích cần MAC/AEAD/signature, như TLS làm."},
+ {"q":"ARP spoofing (module 08) đưa traffic của bạn qua máy kẻ tấn công. Nếu bạn dùng TLS với certificate verify, kẻ đó làm được gì?","o":["Đọc mọi thứ","Thấy IP, port, kích thước, thời gian, nhưng không đọc hay sửa được nội dung mà không bị phát hiện","Sửa nội dung tuỳ ý","Lấy private key"],"a":1,
+  "e":"AEAD bảo vệ nội dung; signature + certificate chống giả làm server. Metadata vẫn lộ, và kẻ tấn công vẫn có thể chặn (DoS)."},
+ {"q":"DNSSEC (module 03) dùng cơ chế nào trong module này?","o":["Symmetric encryption","Digital signature: zone ký record bằng private key, zone cha xác nhận public key của zone con","HMAC","Không dùng cryptography"],"a":1,
+  "e":"RRSIG là chữ ký, DNSKEY là public key, DS ở zone cha xác nhận key của zone con: một chain of trust, giống certificate chain."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"09 Cryptography căn bản","c":[
+ {"t":"Mục tiêu","col":"base","c":[{"t":"Confidentiality → encryption"},{"t":"Integrity → MAC, signature, AEAD"},{"t":"Authentication, non-repudiation"},{"t":"Freshness → nonce, timestamp"},{"t":"Đừng tự chế, dùng library"}]},
+ {"t":"Symmetric","col":"sec","c":[{"t":"AES, ChaCha20; bỏ DES, RC4"},{"t":"ECB lộ pattern"},{"t":"CBC cần IV, không có integrity"},{"t":"AEAD: AES-GCM, tag, AAD"},{"t":"Nonce reuse = thảm hoạ"}]},
+ {"t":"Public key","col":"net","c":[{"t":"Key pair: public / private"},{"t":"RSA, ECDSA, Ed25519"},{"t":"Hybrid: public key → session key"},{"t":"DH / ECDHE, forward secrecy"},{"t":"DH thuần bị MITM"},{"t":"Post-quantum: ML-KEM"}]},
+ {"t":"Hash","col":"app","c":[{"t":"Preimage, 2nd preimage, collision"},{"t":"MD5, SHA-1 đã bị phá"},{"t":"SHA-256, SHA-3, BLAKE"},{"t":"Hash một mình ≠ integrity"},{"t":"Mật khẩu: Argon2, bcrypt"}]},
+ {"t":"MAC & signature","col":"tra","c":[{"t":"HMAC-SHA256, shared key"},{"t":"Constant-time compare"},{"t":"MAC không chống replay"},{"t":"Signature: ký H(m) bằng private key"},{"t":"Non-repudiation"},{"t":"ECDSA nonce reuse lộ key"}]},
+ {"t":"Thực tế","col":"k8s","c":[{"t":"CSPRNG: secrets, RAND_bytes"},{"t":"Key trong Secret / Vault / HSM"},{"t":"Key ID, rotation"},{"t":"Public key của ai? → certificate"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 9.1 · ECB lộ pattern, CBC không có integrity</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">openssl · xxd · Bash</span><span class="chip t-base">25 phút</span></div>
+  <p>Hai thí nghiệm bằng <code>openssl enc</code>:</p>
+  <ol>
+    <li>Mã hoá 64 byte gồm 4 lần chuỗi 16 byte <code>ATTACK AT DAWN!!</code> bằng AES-128-ECB và AES-128-CBC (cùng key). So sánh ciphertext từng block.</li>
+    <li>Sửa một byte ở block thứ 2 của ciphertext CBC rồi giải mã. Có báo lỗi không? Plaintext thay đổi ở đâu?</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> chỉ ra được 4 block giống nhau trong output ECB, và giải thích được vì sao CBC giải mã "thành công" dù ciphertext đã bị sửa.</p>
+  <details><summary>Gợi ý</summary><p>Dùng <code>-K</code> (key hex) và <code>-iv</code> (IV hex) thay vì mật khẩu để kiểm soát chính xác; <code>-nopad</code> vì dữ liệu đã đúng bội số 16. <code>xxd -c 16</code> in mỗi dòng đúng một block.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ printf 'ATTACK AT DAWN!!%.0s' 1 2 3 4 > p.bin            # 64 byte = 4 block giống nhau
+$ KEY=$(openssl rand -hex 16); IV=$(openssl rand -hex 16)
+$ openssl enc -aes-128-ecb -K $KEY -nopad -in p.bin | xxd -c 16
+00000000: 5c3a 9f07 c1e2 …                           ◀ 4 dòng giống hệt nhau: lộ pattern
+00000010: 5c3a 9f07 c1e2 …
+00000020: 5c3a 9f07 c1e2 …
+00000030: 5c3a 9f07 c1e2 …
+$ openssl enc -aes-128-cbc -K $KEY -iv $IV -nopad -in p.bin -out c.bin; xxd -c 16 c.bin
+00000000: e4c0 9b17 …                                ◀ 4 dòng khác nhau
+$ printf '\xff' | dd of=c.bin bs=1 seek=20 conv=notrunc 2>/dev/null   # sửa byte 20 (block 2)
+$ openssl enc -d -aes-128-cbc -K $KEY -iv $IV -nopad -in c.bin | xxd -c 16
+00000000: 4154 5441 434b 2041 5420 4441 574e 2121  ATTACK AT DAWN!!
+00000010: 9d01 77e3 …                                ◀ block 2: rác hoàn toàn
+00000020: 4154 5441 ??4b 2041 …                      ◀ block 3: chỉ byte ở vị trí 4 (đếm từ 0) bị đổi
+00000030: 4154 5441 434b 2041 5420 4441 574e 2121  ATTACK AT DAWN!!
+$ echo $?
+0                                                   ◀ không có lỗi nào được báo
+</script>
+  <p>CBC: plaintext block i = Decrypt(C<sub>i</sub>) XOR C<sub>i−1</sub>. Sửa C<sub>2</sub> làm block 2 thành rác và lật đúng byte tương ứng ở block 3. Kẻ tấn công lợi dụng điều này để sửa có chủ đích (ví dụ đổi số tiền) nếu biết cấu trúc message. Không có MAC thì bên nhận không phát hiện được. <code>openssl enc</code> không hỗ trợ GCM, nên Lab 9.2 dùng Python.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 9.2 · AES-GCM: tag, AAD, và cái giá của nonce reuse</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · cryptography</span><span class="chip t-base">40 phút</span></div>
+  <p>Dùng <code>AESGCM</code> của thư viện <code>cryptography</code>:</p>
+  <ol>
+    <li>Mã hoá một token JSON với AAD chứa key ID. In độ dài ciphertext so với plaintext.</li>
+    <li>Lật 1 bit ciphertext, và riêng một lần đổi AAD: giải mã phải ném <code>InvalidTag</code>.</li>
+    <li>Đóng vai kẻ tấn công: service dùng lại cùng nonce cho hai message. Biết message thứ nhất (một HTTP request có cấu trúc quen thuộc), khôi phục message thứ hai chỉ từ hai ciphertext.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> bước 2 báo đúng hai lần InvalidTag, và bước 3 in ra được mật khẩu nằm trong message thứ hai.</p>
+  <details><summary>Gợi ý</summary><p>Cài <code>sudo apt install -y python3-cryptography</code>. <code>AESGCM(key).encrypt(nonce, data, aad)</code> trả về ciphertext nối tag 16 byte. Bước 3: XOR hai ciphertext rồi XOR với plaintext đã biết.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m09/aead.py">
+#!/usr/bin/env python3
+"""AES-GCM: tag, AAD, và vì sao nonce không bao giờ được lặp lại."""
+import json
+import os
+
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+key = AESGCM.generate_key(bit_length=256)
+aes = AESGCM(key)
+
+# 1. Mã hoá token, AAD = header không mã hoá nhưng được xác thực
+token = json.dumps({"sub": "svc-a", "scope": "secrets:read", "exp": 1794700000}).encode()
+aad = b'{"kid":"k1","alg":"A256GCM"}'
+nonce = os.urandom(12)                          # 96 bit ngẫu nhiên, mới cho mỗi message
+ct = aes.encrypt(nonce, token, aad)
+print(f"plaintext {len(token)} byte → ciphertext {len(ct)} byte (thêm 16 byte tag)")
+print("giải mã:", aes.decrypt(nonce, ct, aad).decode())
+
+# 2. Sửa 1 bit ciphertext, hoặc đổi AAD → bị phát hiện
+bad = bytearray(ct)
+bad[5] ^= 0x01
+for label, c, a in [("lật 1 bit ciphertext", bytes(bad), aad), ("đổi kid trong AAD", ct, b'{"kid":"k2","alg":"A256GCM"}')]:
+    try:
+        aes.decrypt(nonce, c, a)
+        print(f"{label}: ?! không bị phát hiện")
+    except InvalidTag:
+        print(f"{label}: InvalidTag → từ chối")
+
+# 3. Nonce reuse: kẻ tấn công biết p1 (cấu trúc HTTP quen thuộc), có c1 và c2
+fixed_nonce = b"\x00" * 12                      # LỖI: dùng lại nonce
+p1 = b"GET /index.html HTTP/1.1\r\nHost: api.example.internal\r\n\r\n"
+p2 = b"password=Tr0ub4dor&3;user=admin"
+c1 = aes.encrypt(fixed_nonce, p1, None)
+c2 = aes.encrypt(fixed_nonce, p2, None)
+xor = bytes(a ^ b for a, b in zip(c1, c2))      # = p1 XOR p2 (keystream triệt tiêu nhau)
+recovered = bytes(a ^ b for a, b in zip(xor, p1))[:len(p2)]
+print("kẻ tấn công khôi phục được:", recovered.decode())
+</script>
+<script type="text/plain" class="term">
+$ python3 aead.py
+plaintext 60 byte → ciphertext 76 byte (thêm 16 byte tag)
+giải mã: {"sub": "svc-a", "scope": "secrets:read", "exp": 1794700000}
+lật 1 bit ciphertext: InvalidTag → từ chối
+đổi kid trong AAD: InvalidTag → từ chối
+kẻ tấn công khôi phục được: password=Tr0ub4dor&3;user=admin
+</script>
+  <p>Kẻ tấn công không cần key. Với GCM, nonce reuse còn cho phép tính ra khoá xác thực nội bộ và giả mạo tag cho message tuỳ ý. Nếu không chắc nonce luôn mới (ví dụ nhiều instance cùng dùng một key), xem xét AES-GCM-SIV hoặc XChaCha20-Poly1305 (nonce 192 bit).</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 9.3 · Ký request bằng HMAC, rồi bằng Ed25519; RSA đồ chơi</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python</span><span class="chip t-base">45 phút</span></div>
+  <p>Ba phần:</p>
+  <ol>
+    <li><b>Request signing bằng HMAC</b> (kiểu webhook, API gateway): chữ ký = HMAC-SHA256 của <code>method \n path \n timestamp \n body</code>. Bên nhận verify bằng constant-time compare và từ chối request cũ hơn 5 phút (chống replay). Thử: request đúng, body bị sửa, request cũ bị gửi lại.</li>
+    <li><b>Ed25519</b>: service A ký, service B chỉ có public key và verify. Chứng minh B không ký được thay A.</li>
+    <li><b>RSA đồ chơi</b> với p = 61, q = 53, e = 17: tự tính n, φ, d, mã hoá m = 65, giải mã, ký và verify, chỉ bằng phép <code>pow</code>.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> phần 1 cho đúng 3 kết quả (OK / sai chữ ký / quá hạn), phần 2 verify đúng và báo lỗi khi sửa message, phần 3 ra c = 2790 và giải mã lại được 65.</p>
+  <details><summary>Gợi ý</summary><p><code>hmac.new(key, msg, hashlib.sha256).hexdigest()</code>, <code>hmac.compare_digest</code>. <code>Ed25519PrivateKey.generate()</code>, <code>.sign(m)</code>, <code>.public_key().verify(sig, m)</code> ném <code>InvalidSignature</code> khi sai. RSA: d là nghịch đảo của e modulo φ: <code>pow(e, -1, phi)</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m09/signing.py">
+#!/usr/bin/env python3
+"""HMAC request signing, Ed25519 signature, và RSA với số nhỏ."""
+import hashlib
+import hmac
+import secrets
+import time
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+# ---------- 1. HMAC request signing ----------
+SHARED_KEY = secrets.token_bytes(32)            # CSPRNG, không dùng module random
+MAX_AGE = 300                                   # giây
+
+
+def sign_request(method: str, path: str, body: bytes, ts: int) -> str:
+    msg = b"\n".join([method.encode(), path.encode(), str(ts).encode(), body])
+    return hmac.new(SHARED_KEY, msg, hashlib.sha256).hexdigest()
+
+
+def verify_request(method, path, body, ts, sig, now=None) -> str:
+    now = now or int(time.time())
+    if abs(now - ts) > MAX_AGE:
+        return "từ chối: quá hạn (có thể là replay)"
+    expected = sign_request(method, path, body, ts)
+    if not hmac.compare_digest(expected, sig):  # constant-time
+        return "từ chối: sai chữ ký"
+    return "OK"
+
+
+ts = int(time.time())
+body = b'{"amount":100}'
+sig = sign_request("POST", "/transfer", body, ts)
+print("1a. request đúng:     ", verify_request("POST", "/transfer", body, ts, sig))
+print("1b. body bị sửa:      ", verify_request("POST", "/transfer", b'{"amount":999}', ts, sig))
+print("1c. gửi lại sau 10 ph:", verify_request("POST", "/transfer", body, ts, sig, now=ts + 600))
+
+# ---------- 2. Ed25519 ----------
+priv_a = Ed25519PrivateKey.generate()           # chỉ service A giữ
+pub_a = priv_a.public_key()                     # service B chỉ có cái này
+msg = b"role=reader;sub=svc-b"
+sig = priv_a.sign(msg)
+print(f"\n2. chữ ký {len(sig)} byte")
+for label, m in [("message gốc", msg), ("message bị sửa", b"role=admin;sub=svc-b")]:
+    try:
+        pub_a.verify(sig, m)
+        print(f"   {label}: chữ ký hợp lệ")
+    except InvalidSignature:
+        print(f"   {label}: InvalidSignature")
+print("   B có hàm ký không?", hasattr(pub_a, "sign"))   # public key không ký được
+
+# ---------- 3. RSA đồ chơi (KHÔNG dùng thật: không padding, số quá nhỏ) ----------
+p, q, e = 61, 53, 17
+n, phi = p * q, (p - 1) * (q - 1)
+d = pow(e, -1, phi)                             # e·d ≡ 1 (mod φ)
+m = 65
+c = pow(m, e, n)                                # mã hoá bằng public key (e, n)
+print(f"\n3. n={n} φ={phi} d={d}")
+print(f"   encrypt {m} → {c}, decrypt → {pow(c, d, n)}")
+s = pow(m, d, n)                                # ký bằng private key (d, n)
+print(f"   sign {m} → {s}, verify: {pow(s, e, n) == m}")
+</script>
+<script type="text/plain" class="term">
+$ python3 signing.py
+1a. request đúng:      OK
+1b. body bị sửa:       từ chối: sai chữ ký
+1c. gửi lại sau 10 ph: từ chối: quá hạn (có thể là replay)
+
+2. chữ ký 64 byte
+   message gốc: chữ ký hợp lệ
+   message bị sửa: InvalidSignature
+   B có hàm ký không? False
+
+3. n=3233 φ=3120 d=2753
+   encrypt 65 → 2790, decrypt → 65
+   sign 65 → 588, verify: True
+</script>
+  <p class="small muted">Timestamp chỉ thu hẹp cửa sổ replay xuống 5 phút; muốn chặn hẳn thì bên nhận nhớ các nonce/request ID đã thấy trong cửa sổ đó. RSA thật dùng số 2,048 bit trở lên và luôn có padding (OAEP cho mã hoá, PSS cho chữ ký); "textbook RSA" như phần 3 có nhiều lỗ hổng.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 9.4 · SHA-256, HMAC, AES-GCM bằng OpenSSL EVP API trong C</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">C · libcrypto</span><span class="chip t-base">60 phút</span></div>
+  <p>Middleware C/C++ ở công ty gần như chắc chắn dùng OpenSSL (hoặc BoringSSL). Viết chương trình C dùng <b>EVP API</b> để: (1) tính SHA-256 của một chuỗi, (2) tính HMAC-SHA256, (3) mã hoá rồi giải mã bằng AES-256-GCM có AAD, (4) lật 1 bit và chứng minh giải mã thất bại. Đối chiếu kết quả (1), (2) với <code>sha256sum</code> và <code>openssl dgst -hmac</code>.</p>
+  <p class="done-when"><b>Xong khi:</b> hash và HMAC khớp với công cụ dòng lệnh, giải mã trả về đúng plaintext, và bản bị sửa bị từ chối.</p>
+  <details><summary>Gợi ý</summary><p>Cài <code>sudo apt install -y libssl-dev</code>, link với <code>-lcrypto</code>. Các hàm: <code>EVP_Digest</code>, <code>HMAC</code>, <code>EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), …)</code>, <code>EVP_EncryptUpdate</code> với output NULL cho AAD, <code>EVP_CIPHER_CTX_ctrl(…, EVP_CTRL_GCM_GET_TAG / SET_TAG, 16, tag)</code>. <code>EVP_DecryptFinal_ex</code> trả về ≤ 0 khi tag sai.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="c" data-file="~/netlab/m09/crypto_demo.c">
+// crypto_demo.c — SHA-256, HMAC-SHA256, AES-256-GCM bằng OpenSSL EVP API
+// Build: gcc -O2 -Wall -Wextra -o crypto_demo crypto_demo.c -lcrypto
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+#include <stdio.h>
+#include <string.h>
+
+static void hex(const char *label, const unsigned char *b, size_t n) {
+    printf("%-10s", label);
+    for (size_t i = 0; i < n; i++) printf("%02x", b[i]);
+    printf("\n");
+}
+
+/* Trả về độ dài ciphertext, hoặc -1 nếu lỗi. IV mặc định của GCM là 12 byte. */
+static int gcm_encrypt(const unsigned char *key, const unsigned char *iv,
+                       const unsigned char *aad, int aad_len,
+                       const unsigned char *pt, int pt_len,
+                       unsigned char *ct, unsigned char tag[16]) {
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    int len = 0, total = -1;
+    if (ctx &&
+        EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) == 1 &&
+        EVP_EncryptUpdate(ctx, NULL, &len, aad, aad_len) == 1 &&       /* AAD: xác thực, không mã hoá */
+        EVP_EncryptUpdate(ctx, ct, &len, pt, pt_len) == 1) {
+        total = len;
+        if (EVP_EncryptFinal_ex(ctx, ct + total, &len) == 1 &&
+            EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag) == 1)
+            total += len;
+        else
+            total = -1;
+    }
+    EVP_CIPHER_CTX_free(ctx);
+    return total;
+}
+
+/* Trả về độ dài plaintext, hoặc -1 nếu tag không khớp (dữ liệu bị sửa). */
+static int gcm_decrypt(const unsigned char *key, const unsigned char *iv,
+                       const unsigned char *aad, int aad_len,
+                       const unsigned char *ct, int ct_len,
+                       const unsigned char tag[16], unsigned char *pt) {
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    int len = 0, total = -1;
+    if (ctx &&
+        EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) == 1 &&
+        EVP_DecryptUpdate(ctx, NULL, &len, aad, aad_len) == 1 &&
+        EVP_DecryptUpdate(ctx, pt, &len, ct, ct_len) == 1) {
+        total = len;
+        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, (void *)tag);
+        if (EVP_DecryptFinal_ex(ctx, pt + total, &len) > 0)              /* kiểm tra tag ở đây */
+            total += len;
+        else
+            total = -1;
+    }
+    EVP_CIPHER_CTX_free(ctx);
+    return total;
+}
+
+int main(void) {
+    const char *msg = "{\"user\":\"alice\",\"role\":\"admin\"}";
+
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int md_len = 0;
+    EVP_Digest(msg, strlen(msg), md, &md_len, EVP_sha256(), NULL);
+    hex("SHA-256", md, md_len);
+
+    const char *mac_key = "secret-key";
+    unsigned char mac[EVP_MAX_MD_SIZE];
+    unsigned int mac_len = 0;
+    HMAC(EVP_sha256(), mac_key, (int)strlen(mac_key),
+         (const unsigned char *)msg, strlen(msg), mac, &mac_len);
+    hex("HMAC", mac, mac_len);
+
+    unsigned char key[32], iv[12], tag[16], ct[256], out[256];
+    if (RAND_bytes(key, sizeof key) != 1 || RAND_bytes(iv, sizeof iv) != 1) return 1;  /* CSPRNG */
+    const unsigned char aad[] = "kid=k1";
+    int n = gcm_encrypt(key, iv, aad, (int)sizeof aad - 1,
+                        (const unsigned char *)msg, (int)strlen(msg), ct, tag);
+    if (n < 0) return 1;
+    hex("cipher", ct, (size_t)n);
+    hex("tag", tag, sizeof tag);
+
+    int m = gcm_decrypt(key, iv, aad, (int)sizeof aad - 1, ct, n, tag, out);
+    if (m >= 0) { out[m] = '\0'; printf("decrypt   %s\n", (char *)out); }
+
+    ct[0] ^= 0x01;                                                        /* sửa 1 bit */
+    m = gcm_decrypt(key, iv, aad, (int)sizeof aad - 1, ct, n, tag, out);
+    printf("tampered  %s\n", m < 0 ? "tag không khớp → từ chối" : "?! không phát hiện");
+    return 0;
+}
+</script>
+<script type="text/plain" class="term">
+$ sudo apt install -y libssl-dev
+$ gcc -O2 -Wall -Wextra -o crypto_demo crypto_demo.c -lcrypto && ./crypto_demo
+SHA-256   3f2a…
+HMAC      b81c…
+cipher    9d4e…                                       ◀ đổi mỗi lần chạy (key, IV ngẫu nhiên)
+tag       07aa…
+decrypt   {"user":"alice","role":"admin"}
+tampered  tag không khớp → từ chối
+$ printf '%s' '{"user":"alice","role":"admin"}' | sha256sum                       # phải khớp dòng SHA-256
+$ printf '%s' '{"user":"alice","role":"admin"}' | openssl dgst -sha256 -hmac secret-key   # khớp dòng HMAC
+</script>
+  <p class="small muted">Code thật cần kiểm tra mọi giá trị trả về, xoá key khỏi bộ nhớ khi xong (<code>OPENSSL_cleanse</code>), và lấy key từ secret store thay vì sinh tại chỗ. Mở rộng: viết hàm verify HMAC dùng <code>CRYPTO_memcmp</code>.</p>
+  </details>
+</div>
+
+<div class="note more"><b>Bản C/C++</b><p><a href="#m17">Lab 17.1</a> gói SHA-256, HMAC (EVP_MAC), AES và KDF của Lab 9.4 thành thư viện C++17 dùng OpenSSL 3, có RAII cho mọi handle và unit test với test vector RFC 4231, FIPS-197. Nếu học song song, làm lab đó ngay sau module này.</p></div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m09"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §8.2 có phần block cipher và lý thuyết RSA chi tiết hơn (vì sao RSA đúng); §8.3 đọc kỹ. Chương 8 là chương quan trọng nhất của sách với công việc của bạn.</li>
+  <li><a href="https://cryptography.io/en/latest/" target="_blank" rel="noopener">Tài liệu thư viện Python cryptography</a>: phần "hazmat" có cảnh báo rõ khi nào dễ dùng sai.</li>
+  <li><a href="https://www.latacora.com/blog/2018/04/03/cryptographic-right-answers/" target="_blank" rel="noopener">Latacora: Cryptographic Right Answers</a>: danh sách ngắn "dùng cái gì cho việc gì".</li>
+  <li><a href="https://cryptopals.com/" target="_blank" rel="noopener">Cryptopals challenges</a>: bộ bài tập tự phá các lỗi dùng sai cryptography (ECB, CBC, nonce reuse…). Rất đáng làm nếu có thời gian.</li>
+  <li><a href="https://www.openssl.org/docs/man3.0/man7/evp.html" target="_blank" rel="noopener">OpenSSL EVP documentation</a>: tra cứu khi làm Lab 9.4.</li>
+</ul>

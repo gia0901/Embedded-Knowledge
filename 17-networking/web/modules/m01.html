@@ -1,0 +1,518 @@
+<!-- Core Net Lab · Module 01 · Bức tranh Internet (Kurose & Ross 8e, Ch.1) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Giải thích được Internet gồm những gì: host, link, packet switch, ISP, protocol.</li>
+  <li>Tính được 4 loại delay và throughput, đoán được loại delay nào chiếm ưu thế trong một tình huống.</li>
+  <li>Vẽ được 5 layer của mô hình Internet, chỉ ra mỗi layer thêm header gì, thiết bị nào xử lý tới layer nào.</li>
+  <li>Biết cơ chế security nào nằm ở layer nào, để tuần 3 có chỗ "treo" kiến thức.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<p>Đừng đọc gì cả, gõ trước đã. Mỗi lệnh kèm một câu hỏi. Ghi câu trả lời ra giấy, cuối bài quay lại xem mình đoán đúng bao nhiêu.</p>
+<script type="text/plain" class="term">
+$ ip -br addr                     # Q1: máy bạn có mấy IP address? cái nào là "thật"?
+lo       UNKNOWN  127.0.0.1/8
+eth0     UP       172.28.5.9/20                    ◀ IP của Ubuntu trong WSL
+$ ip route                        # Q2: packet đi ra Internet sẽ gửi cho ai trước tiên?
+default via 172.28.0.1 dev eth0                    ◀ default gateway: router đầu tiên
+$ ping -c 4 1.1.1.1               # Q3: vì sao 4 lần ping cho 4 RTT khác nhau?
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=57 time=6.21 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=57 time=5.87 ms
+$ ping -c 4 8.8.8.8
+$ ping -c 4 www.mit.edu           # Q4: vì sao server ở Mỹ có RTT lớn hơn hàng chục lần?
+$ traceroute -n 1.1.1.1           # Q5: mỗi dòng là gì? vì sao có dòng toàn dấu * ?
+ 1  172.28.0.1      0.4 ms                         ◀ Windows (NAT của WSL)
+ 2  192.168.1.1     2.1 ms                         ◀ home router
+ 3  * * *                                          ◀ router không trả lời: không phải lỗi
+ 4  100.64.12.1     5.3 ms                         ◀ bên trong ISP
+</script>
+<p class="small muted">Nếu <code>ping www.mit.edu</code> không có reply, thử <code>ping -c 4 www.ox.ac.uk</code> hoặc bất kỳ trang nào ở xa. Một số server chặn ping.</p>
+
+<h2>Internet là gì</h2>
+<p>Có hai cách nhìn, cả hai đều đúng và đều cần.</p>
+<div class="cols2">
+  <div class="note more" style="margin:0"><b>Nhìn phần cứng (nuts &amp; bolts)</b>
+    <p>Hàng tỷ <b>host</b> (end system) nối với nhau bằng <b>communication link</b> (cáp đồng, cáp quang, sóng vô tuyến) và <b>packet switch</b> (router, switch). Host vào Internet qua <b>ISP</b>. Các ISP nối với nhau thành một <b>network of networks</b>.</p></div>
+  <div class="note more" style="margin:0"><b>Nhìn theo service</b>
+    <p>Internet là hạ tầng cung cấp service cho <b>distributed application</b> (web, video call, các microservice). Application chạy ở host, không chạy ở router, và nói chuyện với network qua <b>socket API</b> (module 04).</p></div>
+</div>
+<h3>Protocol là gì</h3>
+<p>Mọi thứ trên Internet chạy theo <b>protocol</b>. Một protocol quy định ba thứ: <b>format</b> của message, <b>order</b> trao đổi, và <b>action</b> khi gửi hoặc nhận một message (hay khi có event như timeout). Con người cũng dùng protocol:</p>
+<div class="cols2">
+<script type="application/json" class="seq">
+{"title":"Protocol của con người","actors":["Bạn","Người lạ"],"w":160,"steps":[
+ {"f":0,"t":1,"l":"Chào anh"},
+ {"f":1,"t":0,"l":"Chào","d":1},
+ {"f":0,"t":1,"l":"Mấy giờ rồi ạ?"},
+ {"f":1,"t":0,"l":"2 giờ","d":1}
+]}
+</script>
+<script type="application/json" class="seq">
+{"title":"Protocol của máy","actors":["Client","Server"],"w":160,"steps":[
+ {"f":0,"t":1,"l":"TCP connection request","k":"tra"},
+ {"f":1,"t":0,"l":"TCP connection response","d":1,"k":"tra"},
+ {"f":0,"t":1,"l":"GET /index.html","m":1},
+ {"f":1,"t":0,"l":"<file>","m":1,"d":1}
+]}
+</script>
+</div>
+<p>Nếu người lạ không đáp "Chào" mà quay đi, bạn sẽ không hỏi giờ nữa. Protocol của máy cũng vậy: không có response thì client không gửi request, chờ hết timeout rồi báo lỗi.</p>
+<div class="note job"><b>Liên hệ job</b><p>Protocol được chuẩn hoá trong các tài liệu <b>RFC</b> của IETF (ví dụ HTTP/2 là RFC 9113, TLS 1.3 là RFC 8446). Mobile network có thêm chuẩn của <b>3GPP</b> (ví dụ TS 33.501 về security của 5G). Làm security cho core network nghĩa là sẽ đọc cả hai loại tài liệu này thường xuyên.</p></div>
+
+<h2>Edge và core</h2>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 760 280" role="img" aria-label="Edge gồm host và access network; core gồm các router của ISP; data center chứa cluster">
+  <rect class="sunk" x="10" y="20" width="200" height="240" rx="12"/>
+  <text x="26" y="44" class="t-b">Edge · access network</text>
+  <g class="t-base">
+    <rect class="f" x="30" y="66" width="70" height="34" rx="6"/><text x="65" y="88" class="t-c t-s">Laptop</text>
+    <rect class="f" x="30" y="114" width="70" height="34" rx="6"/><text x="65" y="136" class="t-c t-s">Điện thoại</text>
+    <rect class="f" x="30" y="162" width="70" height="34" rx="6"/><text x="65" y="184" class="t-c t-s">Camera IoT</text>
+  </g>
+  <g class="t-net"><circle class="f" cx="160" cy="130" r="20"/><text x="160" y="134" class="t-c t-s t-b">R</text></g>
+  <text x="160" y="170" class="t-c t-s t-m">home router</text>
+  <text x="26" y="228" class="t-s t-m">Wi-Fi, FTTH, 4G/5G, Ethernet</text>
+  <line class="ln" x1="100" y1="83" x2="141" y2="122"/><line class="ln" x1="100" y1="131" x2="140" y2="131"/><line class="ln" x1="100" y1="179" x2="141" y2="140"/>
+
+  <rect class="box" x="250" y="20" width="270" height="240" rx="12"/>
+  <text x="266" y="44" class="t-b">Core · network of networks</text>
+  <g class="t-net">
+    <circle class="f" cx="300" cy="130" r="20"/><circle class="f" cx="385" cy="85" r="20"/><circle class="f" cx="385" cy="185" r="20"/>
+    <circle class="f" cx="470" cy="130" r="20"/>
+  </g>
+  <g class="t-c t-s t-b"><text x="300" y="134" class="t-c">R</text><text x="385" y="89" class="t-c">R</text><text x="385" y="189" class="t-c">R</text><text x="470" y="134" class="t-c">R</text></g>
+  <line class="ln" x1="318" y1="121" x2="367" y2="94"/><line class="ln" x1="318" y1="139" x2="367" y2="176"/>
+  <line class="ln" x1="385" y1="105" x2="385" y2="165"/><line class="ln" x1="403" y1="94" x2="452" y2="121"/><line class="ln" x1="403" y1="176" x2="452" y2="139"/>
+  <text x="266" y="234" class="t-s t-m">access ISP (VNPT, Viettel, FPT)</text>
+  <text x="266" y="250" class="t-s t-m">→ regional ISP → tier-1 ISP, peering ở IXP</text>
+  <line class="ln" x1="180" y1="130" x2="280" y2="130"/>
+
+  <rect class="sunk" x="560" y="20" width="190" height="240" rx="12"/>
+  <text x="576" y="44" class="t-b">Data center</text>
+  <g class="t-k8s">
+    <rect class="f" x="584" y="64" width="140" height="28" rx="5"/><text x="654" y="83" class="t-c t-s">node 1 · pods</text>
+    <rect class="f" x="584" y="100" width="140" height="28" rx="5"/><text x="654" y="119" class="t-c t-s">node 2 · pods</text>
+    <rect class="f" x="584" y="136" width="140" height="28" rx="5"/><text x="654" y="155" class="t-c t-s">node 3 · pods</text>
+  </g>
+  <text x="576" y="196" class="t-s">Cluster platform</text>
+  <text x="576" y="212" class="t-s">của bạn ở đây</text>
+  <text x="576" y="236" class="t-s t-m">server cũng là host ở edge</text>
+  <line class="ln" x1="490" y1="130" x2="584" y2="130"/>
+</svg></div>
+<figcaption>Host (kể cả server trong data center) ở <b>edge</b>; router forward packet ở <b>core</b>. Core network của nhà mạng di động (5G core) là các network function chạy trên chính những data center như bên phải.</figcaption></figure>
+
+<h3>Packet switching và circuit switching</h3>
+<p>Có hai cách để dữ liệu đi qua core:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 190" role="img" aria-label="Circuit switching chia time slot cố định gây lãng phí khi user im lặng; packet switching gửi liên tục theo nhu cầu">
+  <text x="40" y="22" class="t-b">Circuit switching (TDM): mỗi user một time slot cố định, kể cả khi không có gì để gửi</text>
+  <g class="t-app"><rect class="f" x="40"  y="34" width="38" height="34" rx="3"/><text x="59"  y="56" class="t-c t-b">A</text></g>
+  <rect class="empty" x="80"  y="34" width="38" height="34" rx="3"/>
+  <g class="t-net"><rect class="f" x="120" y="34" width="38" height="34" rx="3"/><text x="139" y="56" class="t-c t-b">C</text></g>
+  <rect class="empty" x="160" y="34" width="38" height="34" rx="3"/>
+  <g class="t-app"><rect class="f" x="200" y="34" width="38" height="34" rx="3"/><text x="219" y="56" class="t-c t-b">A</text></g>
+  <rect class="empty" x="240" y="34" width="38" height="34" rx="3"/>
+  <g class="t-net"><rect class="f" x="280" y="34" width="38" height="34" rx="3"/><text x="299" y="56" class="t-c t-b">C</text></g>
+  <g class="t-sec"><rect class="f" x="320" y="34" width="38" height="34" rx="3"/><text x="339" y="56" class="t-c t-b">D</text></g>
+  <g class="t-app"><rect class="f" x="360" y="34" width="38" height="34" rx="3"/><text x="379" y="56" class="t-c t-b">A</text></g>
+  <rect class="empty" x="400" y="34" width="38" height="34" rx="3"/>
+  <rect class="empty" x="440" y="34" width="38" height="34" rx="3"/>
+  <g class="t-sec"><rect class="f" x="480" y="34" width="38" height="34" rx="3"/><text x="499" y="56" class="t-c t-b">D</text></g>
+  <rect class="empty" x="520" y="34" width="38" height="34" rx="3"/>
+  <rect class="empty" x="560" y="34" width="38" height="34" rx="3"/>
+  <g class="t-net"><rect class="f" x="600" y="34" width="38" height="34" rx="3"/><text x="619" y="56" class="t-c t-b">C</text></g>
+  <g class="t-sec"><rect class="f" x="640" y="34" width="38" height="34" rx="3"/><text x="659" y="56" class="t-c t-b">D</text></g>
+  <text x="40" y="86" class="t-s t-m">slot A · B · C · D lặp lại; B không gửi gì nhưng slot của B vẫn bị giữ → 7/16 slot bỏ trống</text>
+
+  <text x="40" y="122" class="t-b">Packet switching: gửi khi có dữ liệu, packet nào đến trước gửi trước</text>
+  <g class="t-app"><rect class="f" x="40"  y="134" width="38" height="34" rx="3"/><text x="59"  y="156" class="t-c t-b">A</text></g>
+  <g class="t-net"><rect class="f" x="80"  y="134" width="38" height="34" rx="3"/><text x="99"  y="156" class="t-c t-b">C</text></g>
+  <g class="t-app"><rect class="f" x="120" y="134" width="38" height="34" rx="3"/><text x="139" y="156" class="t-c t-b">A</text></g>
+  <g class="t-net"><rect class="f" x="160" y="134" width="38" height="34" rx="3"/><text x="179" y="156" class="t-c t-b">C</text></g>
+  <g class="t-sec"><rect class="f" x="200" y="134" width="38" height="34" rx="3"/><text x="219" y="156" class="t-c t-b">D</text></g>
+  <g class="t-app"><rect class="f" x="240" y="134" width="38" height="34" rx="3"/><text x="259" y="156" class="t-c t-b">A</text></g>
+  <g class="t-sec"><rect class="f" x="280" y="134" width="38" height="34" rx="3"/><text x="299" y="156" class="t-c t-b">D</text></g>
+  <g class="t-net"><rect class="f" x="320" y="134" width="38" height="34" rx="3"/><text x="339" y="156" class="t-c t-b">C</text></g>
+  <g class="t-sec"><rect class="f" x="360" y="134" width="38" height="34" rx="3"/><text x="379" y="156" class="t-c t-b">D</text></g>
+  <rect class="empty" x="400" y="134" width="278" height="34" rx="3"/>
+  <text x="539" y="156" class="t-c t-s t-m">link còn trống → phục vụ thêm user khác</text>
+  <text x="40" y="186" class="t-s t-m">cùng 9 packet, xong sớm hơn gần một nửa thời gian</text>
+</svg></div>
+<figcaption>Đổi lại, packet switching không hứa trước delay: nếu nhiều user cùng gửi một lúc, packet phải xếp hàng trong queue.</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Circuit switching</th><th>Packet switching (Internet)</th></tr></thead>
+<tbody>
+<tr><td>Tài nguyên</td><td>Reserve trước cho cả cuộc nối</td><td>Dùng chung, theo nhu cầu</td></tr>
+<tr><td>Delay</td><td>Cố định, được đảm bảo</td><td>Thay đổi, có queuing delay, có thể packet loss</td></tr>
+<tr><td>Hiệu quả khi traffic thất thường</td><td>Thấp (slot trống bị lãng phí)</td><td>Cao (statistical multiplexing)</td></tr>
+<tr><td>Ví dụ</td><td>Điện thoại cố định kiểu cũ</td><td>Internet, mạng 4G/5G (thoại cũng đi bằng packet: VoLTE, VoNR)</td></tr>
+</tbody></table></div>
+<p>Con số trong sách <span class="bk">§1.3.2</span>: link 1 Mbps, mỗi user cần 100 kbps khi hoạt động nhưng chỉ hoạt động 10% thời gian. Circuit switching chỉ phục vụ được <b>10 user</b>. Packet switching phục vụ <b>35 user</b> mà xác suất có hơn 10 user cùng gửi một lúc chỉ khoảng <b>0.0004</b>. Lab 1.2 sẽ tự tính con số này.</p>
+
+<h3>Store-and-forward, forwarding table, routing</h3>
+<ul>
+  <li><b>Store-and-forward</b>: router phải nhận <i>đủ cả packet</i> rồi mới forward tiếp. Packet L bit qua N link có rate R mất <code>N·L/R</code> giây (chưa tính propagation delay và queuing delay).</li>
+  <li>Mỗi router có <b>forwarding table</b>: destination address → output link. Đây là việc <i>nhanh</i>, làm cho từng packet (data plane, module 06).</li>
+  <li>Forwarding table do <b>routing protocol</b> (OSPF, BGP) tính ra. Đây là việc <i>chậm</i>, chạy nền (control plane, module 07).</li>
+</ul>
+
+<h2>Delay, packet loss, throughput</h2>
+<p>Đây là phần định lượng duy nhất của chương 1 và là phần bạn dùng nhiều nhất khi làm thật: đặt timeout, đọc kết quả <code>ping</code>, giải thích vì sao service chậm.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 200" role="img" aria-label="Bốn thành phần delay tại một router: processing, queuing, transmission, propagation">
+  <rect class="box" x="40" y="24" width="350" height="110" rx="10"/>
+  <text x="54" y="44" class="t-b">Router A</text>
+  <line class="ln-ink" x1="0" y1="86" x2="62" y2="86"/><path class="ah" d="M70 86 l-10 -5 v10 z"/>
+  <g class="t-app"><rect class="f" x="72" y="64" width="72" height="44" rx="6"/><text x="108" y="90" class="t-c t-s">lookup</text></g>
+  <line class="ln-ink" x1="144" y1="86" x2="168" y2="86"/>
+  <path class="ln" d="M170 64 H290 V108 H170" style="stroke:var(--ink)"/>
+  <g class="t-tra">
+    <rect class="f" x="226" y="70" width="18" height="32" rx="2"/><rect class="f" x="246" y="70" width="18" height="32" rx="2"/><rect class="f" x="266" y="70" width="18" height="32" rx="2"/>
+  </g>
+  <text x="196" y="90" class="t-c t-s t-m">…</text>
+  <g class="t-net"><circle class="f" cx="332" cy="86" r="24"/><text x="332" y="90" class="t-c t-s">transmit</text></g>
+  <line class="ln-ink" x1="290" y1="86" x2="308" y2="86"/>
+  <line class="ln-ink" x1="356" y1="86" x2="610" y2="86"/><path class="ah" d="M620 86 l-10 -5 v10 z"/>
+  <g class="t-lnk"><rect class="f" x="460" y="76" width="44" height="20" rx="3"/></g>
+  <text x="482" y="70" class="t-c t-s t-m">bit đang đi trên link</text>
+  <rect class="box" x="622" y="56" width="90" height="60" rx="10"/><text x="667" y="90" class="t-c t-b">Router B</text>
+  <g class="t-app"><text x="108" y="160" class="t-c t-b tc">d_proc</text><text x="108" y="176" class="t-c t-s t-m">đọc header</text><text x="108" y="190" class="t-c t-s t-m">cỡ µs</text></g>
+  <g class="t-tra"><text x="230" y="160" class="t-c t-b tc">d_queue</text><text x="230" y="176" class="t-c t-s t-m">chờ trong queue</text><text x="230" y="190" class="t-c t-s t-m">0 → nhiều ms</text></g>
+  <g class="t-net"><text x="340" y="160" class="t-c t-b tc">d_trans = L/R</text><text x="340" y="176" class="t-c t-s t-m">đẩy L bit lên link</text><text x="340" y="190" class="t-c t-s t-m">phụ thuộc rate R</text></g>
+  <g class="t-lnk"><text x="500" y="160" class="t-c t-b tc">d_prop = d/s</text><text x="500" y="176" class="t-c t-s t-m">bit đi hết khoảng cách</text><text x="500" y="190" class="t-c t-s t-m">phụ thuộc khoảng cách d</text></g>
+</svg></div></figure>
+<div class="formula">d_nodal = d_proc + d_queue + d_trans + d_prop
+<small>L: số bit của packet · R: transmission rate của link (bit/s) · d: chiều dài link (m) · s: propagation speed, khoảng 2×10⁸ m/s trong cáp quang và cáp đồng.</small></div>
+<div class="note trap"><b>Cạm bẫy số 1 của chương 1</b><p><b>Transmission delay</b> và <b>propagation delay</b> không liên quan gì nhau. d_trans là thời gian <i>đẩy</i> packet ra link (chỉ phụ thuộc L và R). d_prop là thời gian một bit <i>đi</i> tới đầu kia (chỉ phụ thuộc khoảng cách). Sách so sánh: d_trans như thời gian trạm thu phí cho cả đoàn xe đi qua; d_prop như thời gian xe chạy trên cao tốc tới trạm sau.</p></div>
+<h3>Thử với delay calculator</h3>
+<p>Bấm các mẫu và thay số. Trước mỗi lần bấm, <b>đoán trước</b> loại delay nào sẽ lớn nhất.</p>
+<div data-widget="delaycalc"></div>
+<div class="note key"><b>Ghi nhớ</b><ul>
+  <li>Link rate cao + khoảng cách xa (cáp quang xuyên lục địa): <b>propagation delay</b> thắng. Tăng bandwidth không giúp gì, chỉ có đặt server gần user (CDN, edge computing).</li>
+  <li>Link rate thấp + packet lớn: <b>transmission delay</b> thắng.</li>
+  <li>Network đông: <b>queuing delay</b> thắng và thay đổi liên tục; đó là lý do 4 lần ping cho 4 RTT khác nhau (Q3).</li>
+</ul></div>
+
+<h3>Queuing delay và packet loss</h3>
+<p>Packet đến router với tốc độ trung bình <b>a</b> packet/s, mỗi packet L bit, output link có rate R. Tỉ số <b>La/R</b> gọi là <b>traffic intensity</b>.</p>
+<div data-widget="rhochart"></div>
+<ul>
+  <li><b>La/R &gt; 1</b>: bit đến nhanh hơn khả năng gửi đi. Queue dài mãi. Không bao giờ thiết kế hệ thống như vậy.</li>
+  <li><b>La/R gần 1</b>: average queuing delay tăng vọt dù tải chỉ tăng một chút. Đây cũng là lý do server chạy ở 95% CPU có latency tệ hơn rất nhiều so với 70%.</li>
+  <li>Buffer của router có hạn. Khi buffer đầy, packet mới đến bị <b>drop</b> (packet loss). Layer phía trên (TCP) phải phát hiện và retransmit.</li>
+</ul>
+
+<h3>traceroute hoạt động thế nào</h3>
+<p>Trả lời Q5. Mỗi IP packet có field <b>TTL</b>. Mỗi router đi qua trừ TTL đi 1; về 0 thì router drop packet và gửi lại ICMP message <i>Time Exceeded</i>. traceroute lợi dụng điều này: gửi probe với TTL = 1, 2, 3… để từng router lần lượt "lộ mặt".</p>
+<script type="application/json" class="seq">
+{"title":"traceroute: mỗi TTL làm lộ một router","actors":["Máy bạn","Router 1","Router 2","Đích"],"w":165,"steps":[
+ {"f":0,"t":1,"l":"probe, TTL=1","m":1,"k":"net"},
+ {"f":1,"t":0,"l":"ICMP Time Exceeded","d":1,"m":1},
+ {"f":0,"t":2,"l":"probe, TTL=2 (R1 trừ còn 1)","m":1,"k":"net"},
+ {"f":2,"t":0,"l":"ICMP Time Exceeded","d":1,"m":1},
+ {"f":0,"t":3,"l":"probe, TTL=3","m":1,"k":"net"},
+ {"f":3,"t":0,"l":"ICMP Port Unreachable / Echo Reply","d":1,"m":1},
+ {"note":"Mỗi TTL gửi 3 probe → 3 giá trị RTT mỗi dòng.\nRouter không trả lời ICMP → dòng * * *","a":0,"b":3}
+]}
+</script>
+
+<h3>Throughput</h3>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 130" role="img" aria-label="Throughput bị giới hạn bởi bottleneck link">
+  <rect class="box" x="10" y="40" width="90" height="50" rx="8"/><text x="55" y="70" class="t-c t-b">Server</text>
+  <g class="t-tra"><rect class="f" x="100" y="45" width="250" height="40"/></g>
+  <text x="225" y="70" class="t-c t-b">Rs = 100 Mbps</text>
+  <g class="t-app"><rect class="f" x="350" y="57" width="250" height="16"/></g>
+  <text x="475" y="48" class="t-c t-b">Rc = 20 Mbps</text>
+  <rect class="box" x="600" y="40" width="100" height="50" rx="8"/><text x="650" y="70" class="t-c t-b">Client</text>
+  <text x="360" y="118" class="t-c">throughput = min(Rs, Rc) = <tspan class="t-b">20 Mbps</tspan> · link có rate thấp nhất là <tspan class="t-b">bottleneck link</tspan></text>
+</svg></div></figure>
+<p>Nếu 10 flow cùng đi qua một link chung có rate R, mỗi flow chỉ được khoảng R/10, và chính link chung có thể trở thành bottleneck: throughput = min(Rs, Rc, R/10). Trong thực tế, bottleneck thường ở <b>access network</b> (Wi-Fi, 4G) chứ không ở core.</p>
+
+<h2>Layering và encapsulation</h2>
+<p>Network được chia thành các <b>layer</b>. Mỗi layer cung cấp service cho layer trên và chỉ dùng service của layer ngay dưới. Nhờ vậy có thể thay Wi-Fi bằng 5G mà browser không cần biết.</p>
+<div class="tbl"><table>
+<thead><tr><th>Layer</th><th>Làm gì</th><th>PDU</th><th>Ví dụ protocol</th><th>Ai xử lý</th></tr></thead>
+<tbody>
+<tr class="t-app"><td><span class="lay"></span><b>Application</b></td><td>Logic của ứng dụng</td><td>message</td><td>HTTP, DNS, SMTP, gRPC</td><td>host</td></tr>
+<tr class="t-tra"><td><span class="lay"></span><b>Transport</b></td><td>Process tới process (port), reliability</td><td>segment</td><td>TCP, UDP, QUIC</td><td>host</td></tr>
+<tr class="t-net"><td><span class="lay"></span><b>Network</b></td><td>Host tới host qua nhiều router (IP address)</td><td>datagram</td><td>IP, ICMP, OSPF, BGP</td><td>host, router</td></tr>
+<tr class="t-lnk"><td><span class="lay"></span><b>Link</b></td><td>Qua một link tới node kế tiếp (MAC address)</td><td>frame</td><td>Ethernet, Wi-Fi, 5G NR</td><td>host, router, switch</td></tr>
+<tr class="t-base"><td><span class="lay"></span><b>Physical</b></td><td>Từng bit trên cáp hoặc sóng</td><td>bit</td><td>cáp quang, sóng vô tuyến</td><td>mọi thiết bị</td></tr>
+</tbody></table></div>
+<p class="small muted">OSI model 7 layer thêm <i>presentation</i> và <i>session</i> giữa application và transport. Mô hình Internet gộp hai layer đó vào application. Người làm nghề vẫn nói "L4 load balancer" (transport), "L7 proxy" (application) theo số layer của OSI.</p>
+
+<h3>Encapsulation</h3>
+<p>Khi gửi, mỗi layer thêm <b>header</b> của mình vào phía trước payload của layer trên. Khi nhận, mỗi layer bóc header của mình rồi chuyển phần còn lại lên trên (decapsulation).</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 680 270" role="img" aria-label="Encapsulation: message được thêm transport header, network header, link header rồi thành bit">
+  <g class="t-app"><text x="0" y="40" class="t-b tc">Application</text><text x="0" y="56" class="t-s t-m">message</text></g>
+  <g class="t-tra"><text x="0" y="90" class="t-b tc">Transport</text><text x="0" y="106" class="t-s t-m">segment</text></g>
+  <g class="t-net"><text x="0" y="140" class="t-b tc">Network</text><text x="0" y="156" class="t-s t-m">datagram</text></g>
+  <g class="t-lnk"><text x="0" y="190" class="t-b tc">Link</text><text x="0" y="206" class="t-s t-m">frame</text></g>
+  <g class="t-base"><text x="0" y="240" class="t-b tc">Physical</text><text x="0" y="256" class="t-s t-m">bit</text></g>
+  <g class="t-app"><rect class="f" x="440" y="26" width="160" height="34" rx="4"/><text x="520" y="48" class="t-c t-b">M</text></g>
+  <g class="t-tra"><rect class="f" x="380" y="76" width="60" height="34" rx="4"/><text x="410" y="98" class="t-c t-b">Ht</text></g>
+  <g class="t-app"><rect class="f" x="440" y="76" width="160" height="34" rx="4"/><text x="520" y="98" class="t-c t-b">M</text></g>
+  <g class="t-net"><rect class="f" x="320" y="126" width="60" height="34" rx="4"/><text x="350" y="148" class="t-c t-b">Hn</text></g>
+  <g class="t-tra"><rect class="f" x="380" y="126" width="60" height="34" rx="4"/><text x="410" y="148" class="t-c t-b">Ht</text></g>
+  <g class="t-app"><rect class="f" x="440" y="126" width="160" height="34" rx="4"/><text x="520" y="148" class="t-c t-b">M</text></g>
+  <g class="t-lnk"><rect class="f" x="260" y="176" width="60" height="34" rx="4"/><text x="290" y="198" class="t-c t-b">Hl</text></g>
+  <g class="t-net"><rect class="f" x="320" y="176" width="60" height="34" rx="4"/><text x="350" y="198" class="t-c t-b">Hn</text></g>
+  <g class="t-tra"><rect class="f" x="380" y="176" width="60" height="34" rx="4"/><text x="410" y="198" class="t-c t-b">Ht</text></g>
+  <g class="t-app"><rect class="f" x="440" y="176" width="160" height="34" rx="4"/><text x="520" y="198" class="t-c t-b">M</text></g>
+  <text x="260" y="246" class="t-mono t-m">0 1 1 0 1 0 0 1 1 1 0 1 0 1 1 0 0 1 0 1 1 0 …</text>
+  <line class="ln" x1="260" y1="254" x2="600" y2="254"/>
+  <g class="t-m t-s"><text x="150" y="85">+ source/dest port</text><text x="150" y="135">+ source/dest IP, TTL</text><text x="150" y="185">+ source/dest MAC</text></g>
+  <line class="ln" x1="640" y1="30" x2="640" y2="236"/><path class="ah-m" d="M640 246 l-5 -10 h10 z"/>
+  <text x="652" y="140" class="t-s t-m" transform="rotate(90 652 140)" style="text-anchor:middle">gửi đi</text>
+</svg></div>
+<figcaption>Bạn đã thấy đúng bảng này ở Lab 0.2: dòng Ethernet là Hl, dòng IP là Hn, dòng TCP là Ht, dòng HTTP là M.</figcaption></figure>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 260" role="img" aria-label="Host xử lý cả năm layer, switch chỉ tới link layer, router tới network layer">
+  <g class="t-app"><rect class="f" x="20" y="40" width="90" height="30"/><text x="65" y="60" class="t-c t-s">application</text></g>
+  <g class="t-tra"><rect class="f" x="20" y="70" width="90" height="30"/><text x="65" y="90" class="t-c t-s">transport</text></g>
+  <g class="t-net"><rect class="f" x="20" y="100" width="90" height="30"/><text x="65" y="120" class="t-c t-s">network</text></g>
+  <g class="t-lnk"><rect class="f" x="20" y="130" width="90" height="30"/><text x="65" y="150" class="t-c t-s">link</text></g>
+  <g class="t-base"><rect class="f" x="20" y="160" width="90" height="30"/><text x="65" y="180" class="t-c t-s">physical</text></g>
+  <g class="t-lnk"><rect class="f" x="220" y="130" width="90" height="30"/><text x="265" y="150" class="t-c t-s">link</text></g>
+  <g class="t-base"><rect class="f" x="220" y="160" width="90" height="30"/><text x="265" y="180" class="t-c t-s">physical</text></g>
+  <g class="t-net"><rect class="f" x="420" y="100" width="90" height="30"/><text x="465" y="120" class="t-c t-s">network</text></g>
+  <g class="t-lnk"><rect class="f" x="420" y="130" width="90" height="30"/><text x="465" y="150" class="t-c t-s">link</text></g>
+  <g class="t-base"><rect class="f" x="420" y="160" width="90" height="30"/><text x="465" y="180" class="t-c t-s">physical</text></g>
+  <g class="t-app"><rect class="f" x="610" y="40" width="90" height="30"/><text x="655" y="60" class="t-c t-s">application</text></g>
+  <g class="t-tra"><rect class="f" x="610" y="70" width="90" height="30"/><text x="655" y="90" class="t-c t-s">transport</text></g>
+  <g class="t-net"><rect class="f" x="610" y="100" width="90" height="30"/><text x="655" y="120" class="t-c t-s">network</text></g>
+  <g class="t-lnk"><rect class="f" x="610" y="130" width="90" height="30"/><text x="655" y="150" class="t-c t-s">link</text></g>
+  <g class="t-base"><rect class="f" x="610" y="160" width="90" height="30"/><text x="655" y="180" class="t-c t-s">physical</text></g>
+  <path class="ln-ink" d="M65 26 V206 H255 V146 M275 146 V206 H455 V114 M475 114 V206 H655 V36" style="stroke:var(--accent);stroke-width:2.2;opacity:.85"/>
+  <path class="ln-ink" d="M255 146 C255 136 275 136 275 146 M455 114 C455 104 475 104 475 114" style="stroke:var(--accent);stroke-width:2.2;opacity:.85"/>
+  <path d="M655 28 l-5 10 h10 z" style="fill:var(--accent)"/>
+  <text x="65" y="18" class="t-c t-b">Host gửi</text>
+  <text x="265" y="228" class="t-c t-b">Switch</text><text x="265" y="244" class="t-c t-s t-m">tới layer 2 (đọc MAC)</text>
+  <text x="465" y="228" class="t-c t-b">Router</text><text x="465" y="244" class="t-c t-s t-m">tới layer 3 (đọc IP)</text>
+  <text x="655" y="228" class="t-c t-b">Host nhận</text><text x="655" y="244" class="t-c t-s t-m">decapsulate đủ 5 layer</text>
+</svg></div>
+<figcaption>Router và switch chỉ bóc header tới layer chúng cần. Application và TCP chỉ chạy ở hai đầu: đó là <b>end-to-end principle</b> của Internet.</figcaption></figure>
+
+<h3>Security nằm ở layer nào</h3>
+<p>Bảng này là "giá treo" cho cả tuần 3. Mỗi layer có cơ chế bảo vệ riêng, và trong công việc bạn sẽ chạm vào hầu hết.</p>
+<div class="tbl"><table>
+<thead><tr><th>Layer</th><th>Cơ chế</th><th>Gặp ở đâu trong job</th><th>Module</th></tr></thead>
+<tbody>
+<tr class="t-app"><td><span class="lay"></span>Application</td><td>OAuth 2.0 token, OIDC, JWT, message signature</td><td>Service authentication cho user; NF 5G xin token từ NRF trước khi gọi nhau</td><td>12, 15</td></tr>
+<tr class="t-tra"><td><span class="lay"></span>Giữa application và transport</td><td>TLS, mTLS (DTLS cho UDP)</td><td>Mọi connection service-to-service trong cluster; SBI của 5G core</td><td>11, 14</td></tr>
+<tr class="t-net"><td><span class="lay"></span>Network</td><td>IPsec, firewall, Kubernetes NetworkPolicy</td><td>Kết nối giữa các site; interface N2/N3 tới base station; chặn pod gọi lung tung</td><td>07, 13, 14</td></tr>
+<tr class="t-lnk"><td><span class="lay"></span>Link</td><td>WPA3, 802.1X, MACsec</td><td>Ít gặp trực tiếp trong vai trò này</td><td>13</td></tr>
+</tbody></table></div>
+
+<h2>Network bị tấn công</h2>
+<p>Internet ban đầu được thiết kế cho một nhóm user tin nhau, nối vào một network trong suốt <span class="bk">§1.6</span>. Không có gì trong IP chứng minh một packet đến từ đúng người gửi. Bốn loại tấn công cơ bản:</p>
+<div class="tbl"><table>
+<thead><tr><th>Tấn công</th><th>Cách làm</th><th>Phòng chống (học ở)</th></tr></thead>
+<tbody>
+<tr><td><b>Malware, botnet</b></td><td>Mã độc chiếm máy, gom thành botnet do kẻ tấn công điều khiển</td><td>Vá lỗi, cô lập, IDS (13)</td></tr>
+<tr><td><b>DoS / DDoS</b></td><td>Làm ngập link, làm cạn connection (SYN flood), hoặc khai thác lỗi để làm sập service</td><td>Rate limiting, SYN cookie (05), firewall (13)</td></tr>
+<tr><td><b>Packet sniffing</b></td><td>Đọc packet trên môi trường dùng chung (Wi-Fi, network đã bị chiếm quyền)</td><td>Encryption: TLS (11), IPsec (13)</td></tr>
+<tr><td><b>IP spoofing</b> / giả mạo</td><td>Gửi packet với source IP giả, hoặc đứng giữa (man-in-the-middle)</td><td>Authentication đầu cuối: digital signature, certificate, mTLS (09–11)</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job</b><p>Cả team của bạn tồn tại vì hàng cuối của bảng: trong một cluster nhiều tenant, <b>không được tin IP address</b>. Mỗi service phải chứng minh mình là ai bằng certificate hoặc token. Mô hình này gọi là <i>zero trust</i>.</p></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m01" data-title="Kiểm tra module 01">
+[
+ {"q":"Packet 1,500 byte trên link 10 Mbps. Transmission delay d_trans là bao nhiêu?","o":["0.15 ms","1.2 ms","12 ms","150 ms"],"a":1,
+  "e":"L = 1,500 × 8 = 12,000 bit. d_trans = L/R = 12,000 / 10,000,000 = 0.0012 s = 1.2 ms. Lỗi hay gặp: quên nhân 8 (byte → bit) nên ra 0.15 ms."},
+ {"q":"Cáp quang Hà Nội – TP.HCM dài khoảng 1,700 km, propagation speed 2×10⁸ m/s. Propagation delay d_prop là bao nhiêu?","o":["0.85 ms","8.5 ms","85 ms","Phụ thuộc link rate"],"a":1,
+  "e":"d_prop = d/s = 1.7×10⁶ m / 2×10⁸ m/s = 8.5 ms. Không phụ thuộc link rate: link 1 Gbps hay 100 Gbps thì bit vẫn đi với tốc độ ánh sáng trong cáp. Vì thế RTT tối thiểu khoảng 17 ms."},
+ {"q":"Packet đi qua 3 link (2 router), mỗi link có L/R = 1 ms. Bỏ qua propagation, processing và queuing delay. Từ lúc bắt đầu gửi tới lúc đích nhận đủ packet mất bao lâu?","o":["1 ms","2 ms","3 ms","6 ms"],"a":2,
+  "e":"Store-and-forward: mỗi router phải nhận đủ packet mới forward tiếp, nên mỗi link tốn trọn L/R. Tổng N·L/R = 3 × 1 = 3 ms."},
+ {"q":"Server có Rs = 50 Mbps, đi qua một link chung R = 200 Mbps đang chia đều cho 10 flow, client có Rc = 30 Mbps. Throughput của flow này?","o":["50 Mbps","30 Mbps","20 Mbps","200 Mbps"],"a":2,
+  "e":"Mỗi flow trên link chung được R/10 = 20 Mbps. Throughput = min(50, 30, 20) = 20 Mbps. Bottleneck link ở đây là link chung, không phải phía client."},
+ {"q":"Router có traffic intensity La/R = 1.2 kéo dài. Điều gì xảy ra?","o":["Delay ổn định ở mức cao","Router tự tăng link rate","Queue dài mãi, buffer đầy và packet bị drop","Không ảnh hưởng vì TCP tự điều chỉnh ngay lập tức"],"a":2,
+  "e":"La/R > 1 nghĩa là bit đến nhanh hơn bit đi. Queue tăng không giới hạn, nhưng buffer có hạn nên packet bị drop. TCP có giảm tốc khi thấy packet loss (module 05), nhưng đó là phản ứng sau khi đã mất packet."},
+ {"q":"Router xử lý tới layer nào?","o":["Physical và link","Physical, link và network","Cả 5 layer","Chỉ network"],"a":1,
+  "e":"Router đọc IP header để chọn output link nên cần network layer, và tất nhiên cần link + physical để nhận/gửi frame. Router không đọc TCP hay HTTP (trừ khi nó còn làm firewall/NAT, gặp ở module 06–07)."},
+ {"q":"PDU đúng thứ tự từ trên xuống: application → transport → network → link là:","o":["message → datagram → segment → frame","message → segment → datagram → frame","segment → message → frame → datagram","frame → datagram → segment → message"],"a":1,
+  "e":"message (application) → segment (transport) → datagram (network) → frame (link). Ghi nhớ: <b>M-S-D-F</b>."},
+ {"q":"Protocol định nghĩa những gì?","o":["Format của message","Order trao đổi message","Action khi gửi/nhận message hoặc khi có event","Ngôn ngữ lập trình để cài đặt"],"a":[0,1,2],
+  "e":"Format, order, action. Protocol không quy định ngôn ngữ cài đặt: TLS có bản viết bằng C (OpenSSL), Go (crypto/tls), Rust (rustls)… chúng nói chuyện được với nhau vì cùng tuân theo RFC."},
+ {"q":"Ping tới server ở Mỹ có RTT 220 ms, tới server trong nước 8 ms. Nâng gói Internet từ 100 Mbps lên 1 Gbps thì RTT tới Mỹ thay đổi thế nào?","o":["Giảm khoảng 10 lần","Giảm khoảng một nửa","Gần như không đổi","Tăng lên"],"a":2,
+  "e":"Packet ping nhỏ (84 byte), transmission delay gần như bằng 0 ở cả hai rate. RTT 220 ms chủ yếu là propagation delay (hơn 10,000 km mỗi chiều) cộng queuing delay trên path. Tăng bandwidth không làm ánh sáng đi nhanh hơn."},
+ {"q":"traceroute biết được address của router thứ 3 trên path nhờ:","o":["Hỏi DNS","Router thứ 3 gửi ICMP Time Exceeded khi probe có TTL = 3 hết hạn tại đó","Đọc routing table của ISP","Router 3 trả về HTTP response"],"a":1,
+  "e":"Probe với TTL = 3 bị R1, R2 trừ còn 1, tới R3 trừ về 0 → R3 drop packet và gửi ICMP Time Exceeded, trong đó source IP chính là address của R3."},
+ {"q":"Trong cluster của bạn, service A nhận request từ IP 10.0.3.7, là IP của service B. Có nên coi request đó là của B và cho phép không?","o":["Có, IP nội bộ trong cluster là đáng tin","Không, IP có thể bị giả hoặc bị pod khác dùng lại; cần authentication bằng certificate (mTLS) hoặc token","Có, nếu đã có firewall","Chỉ khi dùng IPv6"],"a":1,
+  "e":"IP spoofing và việc IP của pod được cấp lại liên tục khiến IP không phải là identity. Đây là lý do platform cần authentication service mà bạn sẽ làm: mTLS (module 11) và token (module 12)."}
+]
+</script>
+
+<h3>Ôn lại module 00</h3>
+<script type="application/json" class="quiz" data-id="m01-review" data-title="Ôn lại">
+[
+ {"q":"Bạn muốn chỉ xem những packet đang mở TCP connection mới. Filter tcpdump nào?","o":["<code>port 80</code>","<code>'tcp[tcpflags] &amp; tcp-syn != 0'</code>","<code>-A</code>","<code>icmp</code>"],"a":1,
+  "e":"Packet mở connection là packet có flag SYN. Filter này bắt cả SYN và SYN-ACK."},
+ {"q":"Trong output của <code>ip route</code>, dòng <code>default via 172.28.0.1</code> cho biết điều gì?","o":["DNS server của máy","Router đầu tiên nhận mọi packet đi tới address không khớp route nào khác (default gateway)","IP của máy bạn","MAC address của interface"],"a":1,
+  "e":"Đây là default route. Mọi destination không khớp route cụ thể nào đều được gửi tới 172.28.0.1, chính là hop đầu tiên trong traceroute."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"01 Bức tranh Internet","c":[
+ {"t":"Internet là gì","col":"base","c":[{"t":"Phần cứng: host, link, packet switch, ISP"},{"t":"Service: application + socket API"},{"t":"Protocol: format, order, action"},{"t":"Chuẩn: RFC (IETF), 3GPP"}]},
+ {"t":"Edge","col":"app","c":[{"t":"Host = end system"},{"t":"Access network: Wi-Fi, FTTH, 4G/5G"},{"t":"Server trong data center cũng là host"}]},
+ {"t":"Core","col":"net","c":[{"t":"Packet switching","c":[{"t":"Store-and-forward: N·L/R"},{"t":"Statistical multiplexing"},{"t":"Queue đầy → packet loss"}]},{"t":"Circuit switching: TDM, FDM"},{"t":"Forwarding table ← routing protocol"},{"t":"Network of networks: tier-1, IXP"}]},
+ {"t":"Performance","col":"tra","c":[{"t":"d_proc + d_queue + d_trans + d_prop"},{"t":"d_trans = L/R ≠ d_prop = d/s"},{"t":"La/R → 1: queuing delay tăng vọt"},{"t":"Throughput = min(các link)"},{"t":"traceroute: TTL + ICMP"}]},
+ {"t":"Layering","col":"lnk","c":[{"t":"5 layer: application, transport, network, link, physical"},{"t":"PDU: message, segment, datagram, frame"},{"t":"Encapsulation / decapsulation"},{"t":"Host 5 · router 3 · switch 2"},{"t":"OSI 7 layer: L4, L7"}]},
+ {"t":"Security","col":"sec","c":[{"t":"Malware, botnet"},{"t":"DoS / DDoS"},{"t":"Sniffing → encryption"},{"t":"Spoofing → authentication"},{"t":"Security theo layer: OAuth, TLS, IPsec"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 1.1 · Đo RTT và jitter bằng Bash</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Bash · awk</span><span class="chip t-base">30 phút</span></div>
+  <p>Viết <code>rtt_stats.sh &lt;host&gt; [số_lần]</code>: ping host N lần (mặc định 20), in ra số packet gửi/nhận, tỉ lệ packet loss, RTT min/avg/max và <b>jitter</b> (trung bình trị tuyệt đối chênh lệch giữa hai RTT liên tiếp). Chạy với 3 đích: <code>1.1.1.1</code>, một trang trong nước, một trang ở Mỹ hoặc châu Âu.</p>
+  <p class="done-when"><b>Xong khi:</b> có bảng 3 dòng và giải thích được bằng các khái niệm trong bài: phần nào của RTT là propagation delay (ước lượng từ khoảng cách địa lý), phần nào là queuing delay (jitter).</p>
+  <details><summary>Gợi ý</summary><p>Mỗi dòng ping có dạng <code>... time=5.87 ms</code>. Trong awk, dùng <code>-F'time='</code> để tách, rồi <code>split($2, a, " ")</code> lấy số. Không dùng dòng tổng kết của ping, tự tính.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m01/rtt_stats.sh">
+#!/usr/bin/env bash
+# Dùng: ./rtt_stats.sh <host> [số_lần]
+host=${1:?Cần tên host, ví dụ: ./rtt_stats.sh 1.1.1.1}
+n=${2:-20}
+ping -c "$n" -i 0.2 "$host" | awk -v n="$n" -v host="$host" -F'time=' '
+  /time=/ {
+    split($2, a, " "); r = a[1] + 0
+    s += r; c++
+    if (c == 1 || r < mn) mn = r
+    if (r > mx) mx = r
+    if (c > 1) { d = r - prev; j += (d < 0 ? -d : d) }
+    prev = r
+  }
+  END {
+    if (!c) { print host ": không nhận được reply nào"; exit 1 }
+    printf "%-16s sent/received %d/%d  loss %.0f%%\n", host, n, c, 100 * (n - c) / n
+    printf "%-16s RTT min/avg/max = %.2f/%.2f/%.2f ms  jitter = %.2f ms\n",
+           "", mn, s / c, mx, (c > 1 ? j / (c - 1) : 0)
+  }'
+</script>
+<script type="text/plain" class="term">
+$ chmod +x rtt_stats.sh
+$ for h in 1.1.1.1 vnexpress.net www.mit.edu; do ./rtt_stats.sh $h 20; done
+</script>
+  <p><b>Đọc kết quả:</b> RTT min gần với "2 × propagation delay + phần cố định"; (avg − min) và jitter phản ánh queuing delay. Một đích ở Mỹ cách khoảng 13,000 km theo đường cáp, propagation delay một chiều khoảng 65 ms, nên RTT dưới 130 ms là không thể.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 1.2 · Vì sao Internet chọn packet switching</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Python</span><span class="chip t-base">30 phút</span></div>
+  <p>Link 1 Mbps. Mỗi user cần 100 kbps khi hoạt động và hoạt động ngẫu nhiên 10% thời gian. Viết chương trình Python:</p>
+  <ol>
+    <li>Tính chính xác xác suất có <b>hơn 10</b> user hoạt động cùng lúc khi có 35 user (phân phối nhị thức). Kết quả phải khoảng 0.0004.</li>
+    <li>In bảng xác suất đó cho 20, 35, 50, 70 user.</li>
+    <li>Kiểm chứng bằng mô phỏng Monte Carlo: tung ngẫu nhiên nhiều khoảnh khắc, đếm tỉ lệ khoảnh khắc link bị quá tải.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> hai cách cho cùng kết quả (sai khác nhỏ), và trả lời được: tối đa bao nhiêu user nếu chấp nhận quá tải 1% thời gian?</p>
+  <details><summary>Gợi ý</summary><p>P(X = k) = C(n, k)·p<sup>k</sup>·(1−p)<sup>n−k</sup>. Python có <code>math.comb</code>. Mô phỏng: mỗi khoảnh khắc đếm <code>sum(random.random() &lt; p for _ in range(n))</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m01/multiplexing.py">
+from math import comb
+import random
+
+LINK, PER_USER, P_ACTIVE = 1_000_000, 100_000, 0.1
+CAP = LINK // PER_USER          # tối đa 10 user cùng lúc
+
+def p_overload(n: int, p: float = P_ACTIVE, cap: int = CAP) -> float:
+    """Xác suất có hơn `cap` user hoạt động cùng lúc trong n user."""
+    return sum(comb(n, k) * p**k * (1 - p)**(n - k) for k in range(cap + 1, n + 1))
+
+def simulate(n: int, trials: int = 200_000, p: float = P_ACTIVE, cap: int = CAP) -> float:
+    over = 0
+    for _ in range(trials):
+        active = sum(random.random() < p for _ in range(n))
+        over += active > cap
+    return over / trials
+
+print(f"Circuit switching phục vụ tối đa {CAP} user.\n")
+print(f"{'users':>6} {'P(overload) công thức':>22} {'mô phỏng':>10}")
+for n in (20, 35, 50, 70):
+    print(f"{n:>6} {p_overload(n):>22.6f} {simulate(n, 50_000):>10.6f}")
+
+# Bao nhiêu user nếu chấp nhận overload ≤ 1% thời gian?
+n = CAP
+while p_overload(n + 1) <= 0.01:
+    n += 1
+print(f"\nChấp nhận overload ≤ 1%: tối đa {n} user (gấp {n / CAP:.1f} lần circuit switching)")
+</script>
+<script type="text/plain" class="term">
+$ python3 multiplexing.py
+Circuit switching phục vụ tối đa 10 user.
+
+ users  P(overload) công thức   mô phỏng
+    20               0.000001   0.000000
+    35               0.000424   0.000460        ◀ đúng con số 0.0004 trong sách
+    50               0.009355   0.009420
+    70               0.087269   0.086900
+
+Chấp nhận overload ≤ 1%: tối đa 50 user (gấp 5.0 lần circuit switching)
+</script>
+  <p class="small muted">Số mô phỏng thay đổi mỗi lần chạy. Mở rộng: đổi P_ACTIVE thành 0.5 (user hoạt động liên tục hơn), lợi thế của packet switching còn bao nhiêu?</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 1.3 · Bóc từng header bằng tshark</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">tshark</span><span class="chip t-base">20 phút</span></div>
+  <p>Dùng file <code>first.pcap</code> từ Lab 0.2. Với packet chứa HTTP GET, dùng <code>tshark</code> in ra cây decode đầy đủ. Tìm và ghi lại: <b>TTL</b> trong IP header, <b>header length</b> của IP và TCP (byte), tổng frame length. Tính: bao nhiêu phần trăm frame là header, bao nhiêu là HTTP payload?</p>
+  <p class="done-when"><b>Xong khi:</b> có con số header overhead cho packet GET (packet nhỏ) và cho một packet lớn của response. So sánh và giải thích vì sao gửi nhiều packet nhỏ thì tốn hơn.</p>
+  <details><summary>Gợi ý</summary><p><code>tshark -r first.pcap -Y http.request -V</code> in cây đầy đủ. Các field: <code>ip.ttl</code>, <code>ip.hdr_len</code>, <code>tcp.hdr_len</code>, <code>frame.len</code>, <code>tcp.len</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ tshark -r ~/netlab/pcaps/first.pcap -Y 'tcp.len > 0' -T fields \
+    -e frame.number -e frame.len -e ip.ttl -e ip.hdr_len -e tcp.hdr_len -e tcp.len
+4    141   64   20   32   75               ◀ GET: 14 (Ethernet) + 20 (IP) + 32 (TCP) = 66 byte header / 141
+6    1322  56   20   32   1256             ◀ response: 66 byte header / 1322
+</script>
+  <p>GET: 66/141 ≈ <b>47%</b> là header. Response: 66/1322 ≈ <b>5%</b>. Header có kích thước cố định nên packet càng nhỏ thì overhead càng lớn. TTL của response là 56: server Linux thường bắt đầu với TTL 64, vậy packet đã đi qua khoảng 8 router. So với số dòng traceroute của bạn xem có khớp không.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 1.4 · Network xấu làm chậm TCP thế nào</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Docker · tc netem · iperf3</span><span class="chip t-base">45 phút</span></div>
+  <p>Đây là kỹ thuật thật dùng để test phần mềm viễn thông: giả lập network chậm và có packet loss bằng <code>tc netem</code>. Dựng hai container (iperf3 server và client), đo TCP throughput rồi điền bảng:</p>
+  <div class="tbl"><table><thead><tr><th>Thêm delay</th><th>Packet loss</th><th>Dự đoán</th><th>Đo được (Mbit/s)</th></tr></thead>
+  <tbody><tr><td>0 ms</td><td>0%</td><td></td><td></td></tr><tr><td>20 ms</td><td>0%</td><td></td><td></td></tr><tr><td>100 ms</td><td>0%</td><td></td><td></td></tr><tr><td>20 ms</td><td>1%</td><td></td><td></td></tr><tr><td>100 ms</td><td>1%</td><td></td><td></td></tr></tbody></table></div>
+  <p><b>Ghi dự đoán trước khi đo.</b> Theo chương 1, delay không làm giảm rate của link. Kết quả có khớp không? Nếu không, ghi lại thắc mắc; module 05 (TCP congestion control) sẽ trả lời.</p>
+  <p class="done-when"><b>Xong khi:</b> bảng đủ 5 dòng và có một câu nhận xét về ảnh hưởng của delay và packet loss lên TCP throughput.</p>
+  <details><summary>Gợi ý</summary><p>Container cần quyền <code>--cap-add NET_ADMIN</code> để chạy <code>tc</code>. Thêm: <code>tc qdisc add dev eth0 root netem delay 20ms loss 1%</code>; đổi: <code>tc qdisc change ...</code>; xoá: <code>tc qdisc del dev eth0 root</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker network create netlab 2>/dev/null; true
+$ docker run -d --rm --name srv --network netlab nicolaka/netshoot iperf3 -s
+$ docker run -it --rm --name cli --network netlab --cap-add NET_ADMIN nicolaka/netshoot bash
+cli$ iperf3 -c srv -t 5 | tail -3                           # baseline: không thêm delay
+cli$ tc qdisc add dev eth0 root netem delay 20ms
+cli$ ping -c 3 srv                                          # kiểm tra: RTT ≈ 20 ms
+cli$ iperf3 -c srv -t 10 | tail -3
+cli$ tc qdisc change dev eth0 root netem delay 100ms
+cli$ iperf3 -c srv -t 10 | tail -3
+cli$ tc qdisc change dev eth0 root netem delay 20ms loss 1%
+cli$ iperf3 -c srv -t 10 | tail -3
+cli$ tc qdisc change dev eth0 root netem delay 100ms loss 1%
+cli$ iperf3 -c srv -t 10 | tail -3
+cli$ exit
+$ docker rm -f srv
+</script>
+  <p><b>Bạn sẽ thấy:</b> không có packet loss thì delay ảnh hưởng ít (TCP hiện đại mở window đủ lớn). Có 1% packet loss thì throughput giảm mạnh, và giảm càng mạnh khi delay càng lớn. Lý do: TCP coi packet loss là dấu hiệu congestion và tự giảm tốc; RTT càng dài thì tăng tốc lại càng chậm. Công thức xấp xỉ (Mathis): throughput ≈ 1.22 · MSS / (RTT · √loss). Chi tiết ở module 05.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m01"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §1.2 (các loại access network: DSL, cable, FTTH, 5G fixed wireless) và §1.3.3 (cấu trúc network of networks) đọc lướt là đủ. §1.7 (lịch sử Internet) tuỳ hứng thú.</li>
+  <li><a href="https://gaia.cs.umass.edu/kurose_ross/interactive/" target="_blank" rel="noopener">Interactive problems của tác giả</a>: bộ sinh đề tự động cho phần delay, encapsulation. Làm 5–10 câu chương 1.</li>
+  <li><a href="https://www.submarinecablemap.com/" target="_blank" rel="noopener">Submarine Cable Map</a>: bản đồ cáp quang biển. Xem cáp nào nối Việt Nam ra thế giới để ước lượng propagation delay.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc1958" target="_blank" rel="noopener">RFC 1958 – Architectural Principles of the Internet</a>: 10 trang, giải thích end-to-end principle.</li>
+  <li><a href="https://www.cloudflare.com/learning/ddos/glossary/open-systems-interconnection-model-osi/" target="_blank" rel="noopener">Cloudflare Learning: OSI model</a>: tóm tắt 7 layer, hữu ích khi đồng nghiệp nói "L4", "L7".</li>
+</ul>

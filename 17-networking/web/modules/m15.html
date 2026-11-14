@@ -1,0 +1,763 @@
+<!-- Core Net Lab · Module 15 · 4G/5G core network (Kurose & Ross 8e, §7.4–7.6, §8.8.2 + 3GPP) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Vẽ được kiến trúc 4G EPC và 5G core (SBA), biết mỗi network function (NF) làm gì và nói chuyện qua interface/protocol nào.</li>
+  <li>Hiểu tách control plane và user plane: GTP-U tunnel, PFCP, TEID.</li>
+  <li>Đọc được các identity: SUPI, SUCI, 5G-GUTI, và hiểu SUCI che danh tính thế nào.</li>
+  <li>Lần theo 5G-AKA từng bước, biết key hierarchy, và tự tính Milenage + 5G-AKA khớp test vector của 3GPP.</li>
+  <li>Hiểu cơ chế bảo mật của SBA: NRF (register, discover, OAuth2 token), TLS giữa NF, SEPP khi roaming. Đây là phần gần với job nhất.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ echo imsi-452040123456789 | sed -E 's/imsi-(...)(..)(.*)/MCC=\1 MNC=\2 MSIN=\3/'
+MCC=452 MNC=04 MSIN=0123456789                                ◀ Q1: MCC 452 là nước nào? MNC 04 là nhà mạng nào?
+$ B=https://raw.githubusercontent.com/jdegre/5GC_APIs/master
+$ curl -s $B/TS29509_Nausf_UEAuthentication.yaml | grep -E '^  /'
+  /ue-authentications:
+  /ue-authentications/{authCtxId}/5g-aka-confirmation:        ◀ Q2: đây là REST API (module 02). Ai gọi API này?
+  /ue-authentications/{authCtxId}/eap-session:
+  …
+$ curl -s $B/TS29509_Nausf_UEAuthentication.yaml | grep -A6 'securitySchemes:'
+    oAuth2ClientCredentials:
+      type: oauth2
+      flows:
+        clientCredentials:                                    ◀ Q3: grant này ở module 12. Ai là authorization server?
+          tokenUrl: '{nrfApiRoot}/oauth2/token'
+          scopes:
+            nausf-auth: Access to Nausf_UEAuthentication API
+</script>
+<p class="small muted">Thêm Q4: điện thoại của bạn đang ở 4G hay 5G, 5G NSA hay SA? (Android: Cài đặt → Giới thiệu điện thoại → Trạng thái SIM; bấm <code>*#06#</code> để xem IMEI, tức PEI trong 5G.) Repo <code>jdegre/5GC_APIs</code> chứa OpenAPI chính thức của 3GPP cho mọi SBI; nếu đường dẫn đổi, mở repo trên GitHub và tìm file theo tên TS.</p>
+
+<h2>Bức tranh lớn</h2>
+<p>Mạng di động gồm ba phần: <b>UE</b> (điện thoại, modem IoT, có USIM), <b>RAN</b> (trạm gốc: eNB trong 4G, gNB trong 5G) và <b>core network</b>. Core làm 4 việc: authenticate thuê bao, quản lý mobility (UE đang ở đâu, chuyển trạm), quản lý session (cấp IP, QoS) và chuyển tiếp user data ra Internet. <span class="bk">§7.4</span></p>
+<h3>4G: Evolved Packet Core (EPC)</h3>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 262" role="img" aria-label="Kiến trúc 4G EPC: UE, eNB, MME, HSS, S-GW, P-GW, PCRF và các interface">
+  <g class="t-app"><rect class="f" x="10" y="150" width="70" height="50" rx="7"/></g><text x="45" y="180" class="t-c t-b">UE</text>
+  <g class="t-net"><rect class="f" x="120" y="150" width="80" height="50" rx="7"/></g><text x="160" y="180" class="t-c t-b">eNB</text>
+  <g class="t-core"><rect class="f" x="270" y="40" width="110" height="50" rx="7"/><rect class="f" x="450" y="40" width="110" height="50" rx="7"/><rect class="f" x="610" y="80" width="100" height="44" rx="7"/></g>
+  <text x="325" y="62" class="t-c t-b">MME</text><text x="325" y="79" class="t-c t-s">mobility, auth</text>
+  <text x="505" y="62" class="t-c t-b">HSS</text><text x="505" y="79" class="t-c t-s">thuê bao, K</text>
+  <text x="660" y="99" class="t-c t-b">PCRF</text><text x="660" y="115" class="t-c t-s">policy</text>
+  <g class="t-tra"><rect class="f" x="270" y="150" width="110" height="50" rx="7"/><rect class="f" x="450" y="150" width="110" height="50" rx="7"/></g>
+  <text x="325" y="172" class="t-c t-b">S-GW</text><text x="325" y="189" class="t-c t-s">neo mobility</text>
+  <text x="505" y="172" class="t-c t-b">P-GW</text><text x="505" y="189" class="t-c t-s">cấp IP, ra Internet</text>
+  <rect class="box" x="610" y="150" width="100" height="50" rx="7"/><text x="660" y="180" class="t-c t-b">Internet</text>
+  <line class="ln-ink" x1="80" y1="175" x2="120" y2="175" style="stroke-width:3"/><text x="100" y="167" class="t-c t-s">Uu</text>
+  <line class="ln dash" x1="185" y1="150" x2="270" y2="80"/><text x="208" y="106" class="t-s">S1-MME</text>
+  <line class="ln-ink" x1="200" y1="175" x2="270" y2="175" style="stroke-width:3"/><text x="235" y="167" class="t-c t-s">S1-U</text>
+  <line class="ln dash" x1="325" y1="90" x2="325" y2="150"/><text x="331" y="124" class="t-s">S11</text>
+  <line class="ln dash" x1="380" y1="65" x2="450" y2="65"/><text x="415" y="58" class="t-c t-s">S6a</text><text x="415" y="82" class="t-c t-s t-m">Diameter</text>
+  <line class="ln-ink" x1="380" y1="175" x2="450" y2="175" style="stroke-width:3"/><text x="415" y="167" class="t-c t-s">S5/S8</text>
+  <line class="ln-ink" x1="560" y1="175" x2="610" y2="175" style="stroke-width:3"/><text x="585" y="167" class="t-c t-s">SGi</text>
+  <line class="ln dash" x1="540" y1="150" x2="625" y2="124"/><text x="590" y="150" class="t-s">Gx</text>
+  <line class="ln-ink" x1="20" y1="236" x2="60" y2="236" style="stroke-width:3"/><text x="68" y="240" class="t-s">user plane (GTP-U tunnel)</text>
+  <line class="ln dash" x1="250" y1="236" x2="290" y2="236"/><text x="298" y="240" class="t-s">control plane (S1AP, GTP-C, Diameter)</text>
+</svg></div>
+<figcaption>User data của UE đi trong <b>GTP-U tunnel</b> eNB → S-GW → P-GW; MME chỉ xử lý signaling, không chạm vào user data. P-GW là nơi UE "nhận IP" và đi ra Internet. Khi roaming, S8 nối S-GW của mạng đang ghé (visited) với P-GW ở mạng nhà (home).</figcaption></figure>
+
+<h3>5G core: Service-Based Architecture</h3>
+<p>5G core (5GC) giữ ý tưởng tách control/user plane nhưng thay các interface point-to-point (Diameter, GTP-C) bằng <b>SBA</b>: mỗi control plane NF là một tập <b>REST API trên HTTP/2</b> (SBI), NF nào cũng có thể gọi NF khác sau khi tìm thấy nó qua <b>NRF</b>. Đây chính là kiến trúc microservice mà module 02, 12, 14 đã chuẩn bị.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 290" role="img" aria-label="5G core SBA: các NF trên SBI bus, gNB, UPF và các interface N1 N2 N3 N4 N6">
+  <g class="t-k8s"><line class="st" x1="30" y1="108" x2="700" y2="108" style="stroke-width:4"/></g>
+  <text x="34" y="100" class="t-s t-b">SBI</text>
+  <g class="t-core">
+    <rect class="f" x="20" y="24" width="90" height="50" rx="7"/><rect class="f" x="120" y="24" width="90" height="50" rx="7"/><rect class="f" x="220" y="24" width="90" height="50" rx="7"/>
+    <rect class="f" x="320" y="24" width="90" height="50" rx="7"/><rect class="f" x="420" y="24" width="90" height="50" rx="7"/><rect class="f" x="520" y="24" width="90" height="50" rx="7"/><rect class="f" x="620" y="24" width="90" height="50" rx="7"/>
+    <rect class="f" x="120" y="140" width="90" height="50" rx="7"/><rect class="f" x="320" y="140" width="90" height="50" rx="7"/><rect class="f" x="620" y="140" width="90" height="50" rx="7"/>
+  </g>
+  <text x="65" y="45" class="t-c t-b">AUSF</text><text x="65" y="63" class="t-c t-s">xác thực UE</text>
+  <text x="165" y="45" class="t-c t-b">UDM</text><text x="165" y="63" class="t-c t-s">thuê bao, SIDF</text>
+  <text x="265" y="45" class="t-c t-b">UDR</text><text x="265" y="63" class="t-c t-s">database</text>
+  <text x="365" y="45" class="t-c t-b">NRF</text><text x="365" y="63" class="t-c t-s">đăng ký, token</text>
+  <text x="465" y="45" class="t-c t-b">PCF</text><text x="465" y="63" class="t-c t-s">policy</text>
+  <text x="565" y="45" class="t-c t-b">NSSF</text><text x="565" y="63" class="t-c t-s">chọn slice</text>
+  <text x="665" y="45" class="t-c t-b">NEF</text><text x="665" y="63" class="t-c t-s">API ra ngoài</text>
+  <text x="165" y="161" class="t-c t-b">AMF</text><text x="165" y="179" class="t-c t-s">mobility, SEAF</text>
+  <text x="365" y="161" class="t-c t-b">SMF</text><text x="365" y="179" class="t-c t-s">PDU session</text>
+  <text x="665" y="161" class="t-c t-b">SEPP</text><text x="665" y="179" class="t-c t-s">biên roaming</text>
+  <g class="ln"><line class="ln" x1="65" y1="74" x2="65" y2="108"/><line class="ln" x1="165" y1="74" x2="165" y2="108"/><line class="ln" x1="265" y1="74" x2="265" y2="108"/><line class="ln" x1="365" y1="74" x2="365" y2="108"/><line class="ln" x1="465" y1="74" x2="465" y2="108"/><line class="ln" x1="565" y1="74" x2="565" y2="108"/><line class="ln" x1="665" y1="74" x2="665" y2="108"/>
+  <line class="ln" x1="165" y1="108" x2="165" y2="140"/><line class="ln" x1="365" y1="108" x2="365" y2="140"/><line class="ln" x1="665" y1="108" x2="665" y2="140"/></g>
+  <text x="665" y="206" class="t-c t-s t-m">N32 → PLMN khác</text>
+  <g class="t-app"><rect class="f" x="20" y="232" width="90" height="44" rx="7"/></g><text x="65" y="259" class="t-c t-b">UE</text>
+  <g class="t-net"><rect class="f" x="120" y="232" width="90" height="44" rx="7"/></g><text x="165" y="259" class="t-c t-b">gNB</text>
+  <g class="t-tra"><rect class="f" x="320" y="232" width="90" height="44" rx="7"/></g><text x="365" y="259" class="t-c t-b">UPF</text>
+  <rect class="box" x="520" y="232" width="110" height="44" rx="7"/><text x="575" y="259" class="t-c t-b">Internet / IMS</text>
+  <line class="ln dash" x1="80" y1="232" x2="140" y2="190"/><text x="88" y="214" class="t-s">N1</text>
+  <line class="ln dash" x1="180" y1="232" x2="180" y2="190"/><text x="186" y="216" class="t-s">N2</text>
+  <line class="ln-ink" x1="210" y1="254" x2="320" y2="254" style="stroke-width:3"/><text x="265" y="246" class="t-c t-s">N3 GTP-U</text>
+  <line class="ln dash" x1="380" y1="190" x2="380" y2="232"/><text x="386" y="216" class="t-s">N4 PFCP</text>
+  <line class="ln-ink" x1="410" y1="254" x2="520" y2="254" style="stroke-width:3"/><text x="465" y="246" class="t-c t-s">N6</text>
+</svg></div>
+<figcaption>Mọi NF phía trên đường SBI nói chuyện bằng HTTP/2 + JSON, có TLS và OAuth2 token do NRF cấp. Phần dưới vẫn là "kiểu cũ": N1 (NAS, UE ↔ AMF, đi xuyên qua gNB), N2 (NGAP trên SCTP), N3 (GTP-U), N4 (PFCP để SMF điều khiển UPF).</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th>NF 5G</th><th>Làm gì</th><th>Tương đương 4G</th></tr></thead>
+<tbody>
+<tr><td><b>AMF</b></td><td>Đăng ký, mobility, kết thúc NAS; chứa <b>SEAF</b> (security anchor ở mạng đang phục vụ)</td><td>MME (phần mobility)</td></tr>
+<tr><td><b>SMF</b></td><td>Quản lý PDU session, cấp IP cho UE, điều khiển UPF qua PFCP</td><td>MME (phần session) + phần control của S-GW/P-GW</td></tr>
+<tr><td><b>UPF</b></td><td>Chuyển tiếp user data, đầu cuối GTP-U tunnel, áp QoS, đếm traffic</td><td>Phần user plane của S-GW/P-GW</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>AUSF</b></td><td>Thực hiện authentication cho home network (5G-AKA, EAP-AKA')</td><td>Một phần HSS</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>UDM</b> (+ ARPF, SIDF)</td><td>Dữ liệu thuê bao; ARPF giữ K và tạo authentication vector; SIDF giải SUCI → SUPI</td><td>HSS</td></tr>
+<tr><td><b>UDR</b></td><td>Database phía sau UDM, PCF, NEF</td><td>Database của HSS</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>NRF</b></td><td>Registry: NF đăng ký profile, NF khác discover; cấp OAuth2 access token</td><td>Không có (cấu hình tĩnh, DNS)</td></tr>
+<tr><td><b>PCF</b></td><td>Policy, QoS, charging rule</td><td>PCRF</td></tr>
+<tr><td><b>NSSF</b></td><td>Chọn network slice</td><td>Không có</td></tr>
+<tr><td><b>NEF</b></td><td>Mở API cho bên thứ ba (doanh nghiệp, app) một cách có kiểm soát</td><td>SCEF</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>SEPP</b></td><td>Bảo vệ biên giữa hai nhà mạng (roaming) trên N32</td><td>DEA/DRA cho Diameter roaming</td></tr>
+<tr><td><b>SCP</b></td><td>Proxy cho SBI (indirect communication): routing, discovery thay NF, load balancing</td><td>Không có</td></tr>
+</tbody></table></div>
+<div class="tbl"><table>
+<thead><tr><th>Interface</th><th>Giữa</th><th>Protocol</th><th>Transport</th></tr></thead>
+<tbody>
+<tr><td>N1</td><td>UE ↔ AMF</td><td>NAS (5GMM, 5GSM)</td><td>Bên trong NGAP</td></tr>
+<tr><td>N2</td><td>gNB ↔ AMF</td><td>NGAP</td><td>SCTP port 38412 (4G S1AP: 36412)</td></tr>
+<tr><td>N3 / N9</td><td>gNB ↔ UPF / UPF ↔ UPF</td><td>GTP-U</td><td>UDP 2152</td></tr>
+<tr><td>N4</td><td>SMF ↔ UPF</td><td>PFCP</td><td>UDP 8805</td></tr>
+<tr><td>SBI (Nxxx)</td><td>NF ↔ NF</td><td>HTTP/2 + JSON (OpenAPI)</td><td>TCP + TLS</td></tr>
+<tr><td>N32</td><td>SEPP ↔ SEPP</td><td>N32-c (TLS) + N32-f (TLS hoặc PRINS)</td><td>TCP</td></tr>
+<tr><td>4G S6a / S11</td><td>MME ↔ HSS / MME ↔ S-GW</td><td>Diameter / GTP-C</td><td>SCTP hoặc TCP 3868 / UDP 2123</td></tr>
+</tbody></table></div>
+
+<h2>User plane: GTP-U tunnel</h2>
+<p>IP của UE thuộc mạng của nhà mạng (do SMF/UPF cấp), còn gNB và UPF nằm ở mạng transport riêng. Để packet của UE đi qua mạng transport, gNB bọc nó trong <b>GTP-U</b> trên UDP, giống VXLAN bọc Ethernet (module 08). <b>TEID</b> cho biết packet thuộc tunnel (PDU session) nào:</p>
+<script type="application/json" class="pkt">
+{"title":"GTP-U header (8 byte, trên UDP 2152)","bits":32,"fields":[["Ver=1",3,"core"],["PT",1,"core"],["*",1,"core"],["E",1,"core"],["S",1,"core"],["PN",1,"core"],["Msg type = 255",8,"core"],["Length",16,"core"],["TEID (Tunnel Endpoint ID)",32,"sec"],["Packet IP của UE (inner): tới Internet / IMS","var","app"]]}
+</script>
+<div class="note trap"><b>Cạm bẫy: GTP-U không có bảo mật</b><p>GTP-U không mã hoá, không authenticate. Ai gửi được UDP 2152 tới UPF với TEID đúng là chèn được packet vào session của thuê bao (GTP spoofing), hoặc dò TEID để tấn công. Vì vậy N3 phải nằm trong mạng transport tách biệt và được bảo vệ bằng IPsec (module 13), UPF phải lọc nguồn, và firewall GTP ở biên roaming. Thêm nữa, mã hoá vô tuyến chỉ kéo dài tới gNB; từ gNB vào core, bảo vệ là việc của transport.</p></div>
+<p>Thiết lập một <b>PDU session</b> (UE xin "kết nối data"): UE gửi NAS tới AMF → AMF chọn SMF → SMF chọn UPF, cấp IP cho UE, dùng PFCP cài rule (TEID, QoS) xuống UPF → AMF bảo gNB dựng N3 tunnel. Từ đó user data đi UE → gNB → (GTP-U) → UPF → Internet, không qua NF control plane nào.</p>
+
+<h2>Identity trong 5G</h2>
+<div class="tbl"><table>
+<thead><tr><th>Identity</th><th>Ví dụ</th><th>Ý nghĩa</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>SUPI</b></td><td><code>imsi-452040123456789</code></td><td>Danh tính vĩnh viễn của thuê bao, thường là IMSI = MCC (452: Việt Nam) + MNC (04) + MSIN. <b>Bí mật</b>, không bao giờ gửi plaintext qua radio.</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>SUCI</b></td><td><code>suci-0-452-04-0000-1-1-&lt;scheme output&gt;</code></td><td>SUPI đã che: MCC, MNC, routing indicator, scheme (0 = null, 1 = Profile A, 2 = Profile B), key ID của home network, rồi MSIN đã mã hoá (ECIES). Mỗi lần một giá trị khác.</td></tr>
+<tr><td><b>5G-GUTI</b> / 5G-S-TMSI</td><td>do AMF cấp</td><td>Danh tính tạm thời dùng sau khi đăng ký; AMF nên đổi thường xuyên để chống theo dõi</td></tr>
+<tr><td><b>PEI</b></td><td>IMEI</td><td>Danh tính của thiết bị (máy), không phải thuê bao</td></tr>
+<tr><td><b>GPSI</b></td><td>MSISDN (số điện thoại)</td><td>Danh tính dùng bên ngoài 3GPP</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy: SUCI null scheme</b><p>Scheme 0 ("null scheme") nghĩa là MSIN đi nguyên văn bên trong SUCI, không che gì cả. Chuẩn cho phép dùng null scheme khi home network chưa cấp public key cho USIM. Một số mạng triển khai sớm bật 5G nhưng không cấu hình Profile A/B, nên IMSI catcher vẫn thu được danh tính. Khi review một hệ thống 5G, hãy hỏi: SUCI đang dùng scheme nào, private key của SIDF được giữ ở đâu (nên là HSM)?</p></div>
+
+<h2>5G-AKA: authentication có home network kiểm soát</h2>
+<p>Module 13 đã giới thiệu AKA: USIM và home network cùng giữ key <b>K</b>; mạng gửi RAND + AUTN; UE kiểm tra AUTN (đúng là mạng có K, SQN mới) rồi trả RES. <span class="bk">§8.8.2</span> 5G-AKA thêm hai điểm: home network (AUSF) tự kiểm tra kết quả chứ không phó mặc cho mạng đang phục vụ, và mọi giá trị đều gắn với <b>serving network name</b> (ví dụ <code>5G:mnc004.mcc452.3gppnetwork.org</code>), nên một mạng khác không thể dùng lại.</p>
+<script type="application/json" class="seq">
+{"title":"Registration với 5G-AKA (rút gọn)","actors":["UE (USIM)","gNB","AMF / SEAF","AUSF","UDM / ARPF"],"w":140,"steps":[
+ {"f":0,"t":2,"l":"Registration Request (SUCI)","m":1},
+ {"f":2,"t":3,"l":"POST /ue-authentications\n(SUCI, serving network name)","m":1,"k":"sec"},
+ {"f":3,"t":4,"l":"generate-auth-data","m":1,"k":"sec"},
+ {"note":"SIDF: SUCI → SUPI\nARPF: tạo HE AV","a":4,"b":4},
+ {"f":4,"t":3,"l":"RAND, AUTN, XRES*, KAUSF","m":1,"k":"sec","d":1},
+ {"note":"HXRES* = SHA-256(RAND ‖ XRES*)\ngiữ lại XRES*, KAUSF","a":3,"b":4},
+ {"f":3,"t":2,"l":"RAND, AUTN, HXRES*","m":1,"k":"sec","d":1},
+ {"f":2,"t":0,"l":"Authentication Request: RAND, AUTN","m":1,"k":"sec"},
+ {"note":"USIM kiểm tra AUTN\n(MAC, SQN); tính RES*","a":0,"b":1},
+ {"f":0,"t":2,"l":"Authentication Response: RES*","m":1,"k":"sec"},
+ {"note":"SEAF: SHA-256(RAND ‖ RES*) == HXRES* ?","a":1,"b":3},
+ {"f":2,"t":3,"l":"PUT …/5g-aka-confirmation (RES*)","m":1,"k":"sec"},
+ {"note":"home control: RES* == XRES* ?\n→ KSEAF, SUPI","a":3,"b":4},
+ {"f":3,"t":2,"l":"kết quả, SUPI, KSEAF","m":1,"k":"sec","d":1},
+ {"f":2,"t":0,"l":"Security Mode Command (NAS được bảo vệ)","m":1,"k":"sec"},
+ {"f":2,"t":4,"l":"UECM registration, SDM get","m":1,"k":"tra"},
+ {"f":2,"t":0,"l":"Registration Accept (5G-GUTI)","m":1,"k":"tra","d":1}
+]}
+</script>
+<ul>
+  <li>Mạng đang phục vụ (SEAF) chỉ nhận <b>HXRES*</b> (hash), nên kiểm tra được RES* của UE mà không biết trước giá trị để báo cáo gian. AUSF so <b>RES* với XRES*</b> mới là quyết định cuối: nếu visited network nói dối rằng UE đã authenticate, home network vẫn không xác nhận. Đó là <b>home control</b>.</li>
+  <li>SUPI chỉ được trả cho AMF <b>sau khi</b> authenticate thành công.</li>
+  <li><b>EAP-AKA'</b> là phương thức thay thế (cũng bắt buộc hỗ trợ) dùng khung EAP; hay gặp khi truy cập từ mạng non-3GPP như Wi-Fi.</li>
+</ul>
+<p>Thử tính toàn bộ phía home network và phía USIM ngay trong browser. Preset "Test Set 1" dùng đúng bộ test vector chính thức của Milenage (3GPP TS 35.208); các ô f1–f5 phải khớp đúng như chuẩn:</p>
+<div data-widget="aka"></div>
+<h3>Key hierarchy</h3>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 236" role="img" aria-label="Key hierarchy 5G: K → CK IK → KAUSF → KSEAF → KAMF → NAS keys và KgNB → RRC, UP keys">
+  <g class="t-sec"><rect class="f" x="10" y="20" width="110" height="50" rx="7"/></g><text x="65" y="41" class="t-c t-b">K</text><text x="65" y="59" class="t-c t-s">USIM, ARPF</text>
+  <g class="t-sec"><rect class="f" x="150" y="20" width="110" height="50" rx="7"/></g><text x="205" y="41" class="t-c t-b">CK ‖ IK</text><text x="205" y="59" class="t-c t-s">Milenage</text>
+  <g class="t-core"><rect class="f" x="290" y="20" width="120" height="50" rx="7"/></g><text x="350" y="41" class="t-c t-b">KAUSF</text><text x="350" y="59" class="t-c t-s">UE, AUSF</text>
+  <g class="t-core"><rect class="f" x="440" y="20" width="120" height="50" rx="7"/></g><text x="500" y="41" class="t-c t-b">KSEAF</text><text x="500" y="59" class="t-c t-s">UE, SEAF</text>
+  <g class="t-core"><rect class="f" x="590" y="20" width="120" height="50" rx="7"/></g><text x="650" y="41" class="t-c t-b">KAMF</text><text x="650" y="59" class="t-c t-s">UE, AMF</text>
+  <g class="t-app"><rect class="f" x="440" y="110" width="120" height="50" rx="7"/></g><text x="500" y="131" class="t-c t-b">KNASint/enc</text><text x="500" y="149" class="t-c t-s">bảo vệ NAS (N1)</text>
+  <g class="t-net"><rect class="f" x="590" y="110" width="120" height="50" rx="7"/></g><text x="650" y="131" class="t-c t-b">KgNB</text><text x="650" y="149" class="t-c t-s">UE, gNB</text>
+  <g class="t-net"><rect class="f" x="440" y="182" width="120" height="44" rx="7"/><rect class="f" x="590" y="182" width="120" height="44" rx="7"/></g>
+  <text x="500" y="200" class="t-c t-b t-s">KRRCint/enc</text><text x="500" y="216" class="t-c t-s">signaling radio</text>
+  <text x="650" y="200" class="t-c t-b t-s">KUPint/enc</text><text x="650" y="216" class="t-c t-s">user data radio</text>
+  <line class="ln-ink" x1="120" y1="45" x2="142" y2="45"/><path class="ah" d="M150 45 l-8 -4 v8 z"/>
+  <line class="ln-ink" x1="260" y1="45" x2="282" y2="45"/><path class="ah" d="M290 45 l-8 -4 v8 z"/>
+  <line class="ln-ink" x1="410" y1="45" x2="432" y2="45"/><path class="ah" d="M440 45 l-8 -4 v8 z"/>
+  <line class="ln-ink" x1="560" y1="45" x2="582" y2="45"/><path class="ah" d="M590 45 l-8 -4 v8 z"/>
+  <line class="ln-ink" x1="620" y1="70" x2="530" y2="104"/><path class="ah" d="M522 108 l5 -8 l4 7 z"/>
+  <line class="ln-ink" x1="650" y1="70" x2="650" y2="102"/><path class="ah" d="M650 110 l-4 -8 h8 z"/>
+  <line class="ln-ink" x1="620" y1="160" x2="530" y2="177"/><path class="ah" d="M522 180 l6 -7 l3 8 z"/>
+  <line class="ln-ink" x1="650" y1="160" x2="650" y2="174"/><path class="ah" d="M650 182 l-4 -8 h8 z"/>
+  <text x="10" y="112" class="t-s t-m">Mỗi bước là một KDF (HMAC-SHA-256).</text>
+  <text x="10" y="130" class="t-s t-m">K không bao giờ rời USIM và ARPF.</text>
+  <text x="10" y="148" class="t-s t-m">KAUSF gắn với serving network name;</text>
+  <text x="10" y="166" class="t-s t-m">KAMF gắn với SUPI; key radio đổi</text>
+  <text x="10" y="184" class="t-s t-m">khi handover sang gNB khác.</text>
+</svg></div>
+<figcaption>Lộ một key ở tầng dưới (ví dụ KgNB khi một trạm gốc bị chiếm) không suy ngược được key ở tầng trên. NAS và radio dùng thuật toán 128-NEA/NIA: 1 = SNOW 3G, 2 = AES (CTR / CMAC), 3 = ZUC. NEA0 là "không mã hoá"; NIA0 chỉ được phép cho cuộc gọi khẩn cấp không authenticate.</figcaption></figure>
+
+<h2>Bảo mật SBA: chỗ của platform</h2>
+<p>Đây là phần trùng với công việc "security và authentication services của cluster platform". Ba lớp, đúng như module 11, 12, 14:</p>
+<div class="tbl"><table>
+<thead><tr><th>Lớp</th><th>Trong 5GC</th><th>Đã học ở</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>Transport + NF authentication</b></td><td>TLS (thường là mTLS) giữa các NF trên SBI. Certificate của NF chứa NF instance ID trong SAN; CA của nhà mạng cấp và xoay vòng (TS 33.310).</td><td>10, 11, 14</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Authorization</b></td><td>NF consumer xin access token từ NRF (client credentials, scope = tên NF service như <code>nudm-uecm</code>); NF producer verify chữ ký của NRF, <code>aud</code>, <code>scope</code>, <code>exp</code>.</td><td>12</td></tr>
+<tr><td><b>Discovery có kiểm soát</b></td><td>NRF chỉ trả về NF mà profile cho phép requester (<code>allowedNfTypes</code>, <code>allowedPlmns</code>…).</td><td>Lab 15.2</td></tr>
+<tr><td><b>Biên roaming</b></td><td>SEPP: mọi traffic giữa hai nhà mạng đi qua cặp SEPP; N32-c bắt tay bằng TLS, N32-f bảo vệ bằng TLS hoặc <b>PRINS</b> (ký/mã hoá ở tầng application để IPX ở giữa chỉ sửa được field được phép).</td><td>13</td></tr>
+</tbody></table></div>
+<script type="application/json" class="seq">
+{"title":"AMF gọi UDM qua SBI","actors":["AMF (consumer)","NRF","UDM (producer)"],"w":230,"steps":[
+ {"sep":"mTLS giữa mọi NF; cert chứa NF instance ID"},
+ {"f":0,"t":1,"l":"GET /nnrf-disc/v1/nf-instances\n?target-nf-type=UDM&requester-nf-type=AMF","m":1},
+ {"f":1,"t":0,"l":"NFProfile của UDM (IP, FQDN, services)","m":1,"d":1},
+ {"f":0,"t":1,"l":"POST /oauth2/token (client_credentials,\nnfInstanceId, targetNfType=UDM, scope=nudm-uecm)","m":1,"k":"sec"},
+ {"note":"AMF đã đăng ký?\nUDM cho phép AMF?\nscope có trong profile UDM?","a":1,"b":1},
+ {"f":1,"t":0,"l":"access_token (JWT ký bởi NRF)","m":1,"k":"sec","d":1},
+ {"f":0,"t":2,"l":"PUT /nudm-uecm/v1/{supi}/registrations/amf-3gpp-access\nAuthorization: Bearer …","m":1,"k":"tra"},
+ {"note":"verify chữ ký NRF,\naud, scope, exp","a":2,"b":2},
+ {"f":2,"t":0,"l":"201 Created","m":1,"k":"tra","d":1}
+]}
+</script>
+<div class="note trap"><b>Cạm bẫy trong SBA</b><ul>
+  <li>Trong OpenAPI của 3GPP, phần <code>security</code> thường liệt kê cả <code>{}</code> lẫn OAuth2: nghĩa là OAuth2 là <b>tuỳ chọn theo triển khai</b>. Nhiều mạng tắt OAuth2 "vì trong nội bộ" và chỉ dựa vào mTLS. Khi đó bất kỳ NF nào có cert hợp lệ gọi được mọi API của UDM: authentication ≠ authorization (module 11).</li>
+  <li>NRF phải kiểm tra <code>nfInstanceId</code> trong token request khớp với identity trong client certificate. Không thì một NF nhận token đứng tên NF khác.</li>
+  <li>Producer phải kiểm tra <code>aud</code> và <code>scope</code>: token cấp cho UDM không được dùng ở PCF.</li>
+  <li>SUPI là dữ liệu cá nhân: log của NF, trace, metric label không được chứa SUPI plaintext.</li>
+</ul></div>
+<div class="note job"><b>Liên hệ job</b><p>Một platform cho core network thường cung cấp sẵn cho mọi NF: CA và quản lý certificate (cert-manager hoặc tương đương, module 14), thư viện/sidecar làm mTLS và kiểm tra token, NRF hoặc kết nối tới NRF, quản lý secret và key (HSM cho SIDF, private key của NRF), audit log. 3GPP còn có bộ <b>SCAS</b> (Security Assurance Specification: TS 33.117 cho yêu cầu chung, các TS 33.5xx cho từng NF như AMF, UDM, NRF, SEPP) liệt kê các bài test bảo mật mà NF phải qua. Đọc SCAS của NF mình làm là cách nhanh nhất để biết "cái gì sẽ bị kiểm tra".</p></div>
+
+<h2>Roaming và interconnect</h2>
+<p>Khi bạn ở nước ngoài, mạng đang ghé (visited) cần nói chuyện với mạng nhà (home) để authenticate và lấy dữ liệu thuê bao. Các nhà mạng nối với nhau qua mạng <b>IPX</b>. <span class="bk">§7.6</span></p>
+<div class="tbl"><table>
+<thead><tr><th>Thế hệ</th><th>Signaling giữa nhà mạng</th><th>Vấn đề</th></tr></thead>
+<tbody>
+<tr><td>2G/3G</td><td>SS7 (MAP)</td><td>Không authenticate bên gửi: ai vào được mạng SS7 là hỏi được vị trí thuê bao, chuyển hướng SMS. Năm 2017 ở Đức, kẻ tấn công đã chặn SMS OTP qua SS7 để rút tiền tài khoản ngân hàng.</td></tr>
+<tr><td>4G</td><td>Diameter</td><td>Kế thừa phần lớn vấn đề tin tưởng của SS7; bảo vệ dựa vào firewall signaling</td></tr>
+<tr class="t-sec"><td><span class="lay"></span>5G</td><td>HTTP/2 qua SEPP (N32)</td><td>SEPP authenticate nhà mạng bên kia bằng TLS, lọc message, kiểm tra PLMN ID trong message khớp với bên đã authenticate, chống giả mạo IE</td></tr>
+</tbody></table></div>
+<p>Hai kiểu đưa data khi roaming: <b>home-routed</b> (data quay về UPF/P-GW của mạng nhà, mặc định trong 4G) và <b>local breakout</b> (ra Internet ngay tại mạng đang ghé, độ trễ thấp hơn). Khi UE di chuyển giữa các trạm, <b>handover</b> chuyển kết nối radio và đổi đầu N3 tunnel, còn IP của UE giữ nguyên vì UPF/P-GW là điểm neo. Ở trạng thái idle, mạng chỉ biết UE trong một <b>tracking area</b> và tìm nó bằng <b>paging</b> khi có data tới. <span class="bk">§7.6.1</span></p>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m15" data-title="Kiểm tra module 15">
+[
+ {"q":"Trong 4G EPC, user data của UE đi qua những node nào?","o":["UE → eNB → MME → Internet","UE → eNB → S-GW → P-GW → Internet (GTP-U tunnel)","UE → HSS → P-GW","UE → MME → S-GW"],"a":1,
+  "e":"MME chỉ xử lý signaling. User plane đi trong GTP-U tunnel từ eNB tới S-GW rồi P-GW."},
+ {"q":"Khác biệt lớn nhất của 5G core so với EPC về kiến trúc?","o":["Không còn user plane","Control plane là các NF với REST API trên HTTP/2 (SBA), discover qua NRF","Bỏ authentication","Dùng Diameter cho mọi thứ"],"a":1,
+  "e":"Interface point-to-point (Diameter, GTP-C) được thay bằng SBI. N2, N3, N4 vẫn là protocol riêng (NGAP, GTP-U, PFCP)."},
+ {"q":"NF nào giữ key K và tạo authentication vector?","o":["AMF","AUSF","UDM/ARPF","NRF"],"a":2,
+  "e":"ARPF (trong UDM) giữ K. AUSF thực hiện authentication cho home network nhưng không giữ K."},
+ {"q":"TEID trong GTP-U header để làm gì?","o":["Mã hoá packet","Xác định tunnel (PDU session) mà packet thuộc về","Đánh số thứ tự","Chọn QoS"],"a":1,
+  "e":"Đầu nhận tra TEID để biết packet bên trong thuộc UE và session nào. GTP-U không có bảo mật nên N3 cần IPsec và lọc nguồn."},
+ {"q":"Vì sao SUPI không bao giờ gửi plaintext trên radio trong 5G?","o":["Vì quá dài","Để IMSI catcher không thu được danh tính và theo dõi thuê bao; UE gửi SUCI mã hoá bằng public key của home network","Vì gNB không đọc được","Không có lý do"],"a":1,
+  "e":"Trừ khi dùng null scheme: khi đó SUCI chứa MSIN nguyên văn."},
+ {"q":"Trong 5G-AKA, SEAF (ở AMF) nhận HXRES* thay vì XRES*. Mục đích?","o":["Tiết kiệm băng thông","SEAF kiểm tra được RES* của UE, nhưng quyết định cuối do AUSF so RES* với XRES* (home control)","Vì XRES* bí mật với UE","Để mã hoá NAS"],"a":1,
+  "e":"Visited network không thể tự tuyên bố UE đã authenticate; home network phải xác nhận qua 5g-aka-confirmation."},
+ {"q":"AUTN gửi cho UE chứa SQN ⊕ AK, AMF và MAC. Nhờ MAC, UE biết gì?","o":["Tốc độ mạng","Mạng có K của SIM (không phải trạm gốc giả) và AUTN không bị sửa","Vị trí của mạng","Không biết gì"],"a":1,
+  "e":"SQN (sau khi gỡ AK) còn cho UE biết đây không phải vector cũ bị replay."},
+ {"q":"RES* và KAUSF được derive có kèm serving network name. Điều này chống lại gì?","o":["DDoS","Mạng khác dùng lại kết quả authentication / key của mạng đang phục vụ (binding với mạng cụ thể)","Lỗi đồng hồ","Nghe lén radio"],"a":1,
+  "e":"Nếu visited network nói dối tên mình, RES* tính ở UE sẽ không khớp XRES* ở home network."},
+ {"q":"AMF muốn gọi API của UDM. Thứ tự đúng?","o":["Gọi thẳng IP cấu hình sẵn","Discover UDM qua NRF → xin access token từ NRF (scope nudm-…) → gọi UDM qua mTLS với Bearer token","Gọi qua Diameter","Hỏi AUSF"],"a":1,
+  "e":"Đây chính là client credentials của module 12 cộng mTLS của module 11."},
+ {"q":"OpenAPI của 3GPP ghi <code>security: [ {}, {oAuth2ClientCredentials: [nudm-uecm]} ]</code>. Nghĩa là gì?","o":["OAuth2 bắt buộc","OAuth2 là tuỳ chọn: triển khai có thể tắt, khi đó chỉ còn mTLS","Không dùng TLS","API công khai"],"a":1,
+  "e":"Tắt OAuth2 thì mọi NF có cert hợp lệ đều gọi được mọi API: kiểm tra kỹ cấu hình authorization."},
+ {"q":"Vì sao signaling roaming qua SS7 bị lạm dụng được (theo dõi vị trí, chặn SMS)?","o":["SS7 chậm","SS7 không authenticate bên gửi: ai có quyền truy cập mạng SS7 đều được tin","SS7 dùng UDP","SS7 không hỗ trợ SMS"],"a":1,
+  "e":"5G đặt SEPP ở biên để authenticate nhà mạng bên kia và lọc message."},
+ {"q":"Mạng triển khai 5G SA nhưng USIM chưa có public key của home network. SUCI dùng scheme nào và hậu quả?","o":["Profile A, an toàn","Null scheme: MSIN đi nguyên văn, IMSI catcher vẫn thu được danh tính","Profile B","Không đăng ký được"],"a":1,
+  "e":"Cấu hình Profile A/B và giữ private key của SIDF trong HSM."},
+ {"q":"Khi UE đi từ trạm này sang trạm khác trong lúc đang tải dữ liệu, IP của UE có đổi không?","o":["Có, mỗi gNB cấp IP riêng","Không: UPF/P-GW là điểm neo; handover chỉ đổi đầu N3 tunnel phía RAN","Tuỳ điện thoại","Có, DHCP lại"],"a":1,
+  "e":"Đây là cách mạng di động giải bài toán mobility ở tầng network (§7.6)."}
+]
+</script>
+
+<h3>Ôn lại module 02, 08, 12</h3>
+<script type="application/json" class="quiz" data-id="m15-review" data-title="Ôn lại">
+[
+ {"q":"SBI của 5GC chạy trên HTTP/2. Tính năng nào của HTTP/2 (module 02) giúp một AMF gửi hàng nghìn request song song tới UDM qua ít connection?","o":["Cookie","Multiplex nhiều stream trên một connection","Chunked encoding","Pipelining HTTP/1.1"],"a":1,
+  "e":"Mỗi request/response là một stream; không phải mở connection (và TLS handshake) mới cho mỗi request."},
+ {"q":"GTP-U giống VXLAN (module 08) ở điểm nào?","o":["Đều mã hoá","Đều bọc packet/frame vào UDP để đi qua mạng underlay, dùng một ID (TEID / VNI) để tách tunnel","Đều chạy trên TCP","Đều là routing protocol"],"a":1,
+  "e":"Và cùng một hệ quả: thêm header nên giảm MTU hiệu dụng, và không có bảo mật nếu không thêm IPsec."},
+ {"q":"Access token NRF cấp cho AMF có <code>aud: UDM</code>. UDM nên làm gì nếu nhận token có <code>aud: PCF</code>?","o":["Chấp nhận vì cùng NRF ký","Từ chối (401 invalid_token): token không dành cho mình","Chuyển cho PCF","Bỏ qua aud"],"a":1,
+  "e":"Bài học aud của module 12 áp dụng nguyên vẹn."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"15 4G/5G core network","c":[
+ {"t":"Kiến trúc","col":"base","c":[{"t":"UE, RAN (eNB/gNB), core"},{"t":"EPC: MME, S-GW, P-GW, HSS, PCRF"},{"t":"5GC SBA: AMF, SMF, UPF, AUSF, UDM, NRF…"},{"t":"Control plane tách user plane"}]},
+ {"t":"Interface","col":"net","c":[{"t":"N1 NAS, N2 NGAP/SCTP"},{"t":"N3 GTP-U, TEID, UDP 2152"},{"t":"N4 PFCP"},{"t":"SBI: HTTP/2 + JSON + TLS"}]},
+ {"t":"Identity","col":"app","c":[{"t":"SUPI = IMSI (MCC, MNC, MSIN)"},{"t":"SUCI: ECIES Profile A/B"},{"t":"Null scheme = không che"},{"t":"5G-GUTI, PEI, GPSI"}]},
+ {"t":"5G-AKA","col":"sec","c":[{"t":"Milenage f1–f5 từ K"},{"t":"RAND, AUTN, RES*, XRES*"},{"t":"HXRES* ở SEAF, home control ở AUSF"},{"t":"Gắn serving network name"},{"t":"KAUSF → KSEAF → KAMF → NAS, KgNB"}]},
+ {"t":"Bảo mật SBA","col":"k8s","c":[{"t":"mTLS, cert có NF instance ID"},{"t":"NRF: register, discover, token"},{"t":"Scope = tên NF service"},{"t":"OAuth2 tuỳ chọn: kiểm tra!"},{"t":"SCAS: TS 33.117, 33.5xx"}]},
+ {"t":"Roaming & mobility","col":"core","c":[{"t":"SS7, Diameter → SEPP"},{"t":"N32-c, N32-f, PRINS"},{"t":"Home-routed vs local breakout"},{"t":"Handover, tracking area, paging"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<p class="small muted">Các lab đều chạy bằng Python trong WSL, không cần core network thật. Thư mục: <code>~/netlab/m15</code>. Muốn chạy một 5GC đầy đủ để quan sát, có thể thử các dự án mã nguồn mở Open5GS hoặc free5GC cùng UERANSIM (giả lập gNB và UE) sau khoá học.</p>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 15.1 · Đọc SBI như đọc REST API</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Python · OpenAPI</span><span class="chip t-base">30 phút</span></div>
+  <p>Tải OpenAPI chính thức của NRF (NFManagement, NFDiscovery, AccessToken), AUSF và UDM (UEAU). Viết <code>sbi_paths.py</code> in ra cho mỗi file: tên API, đường dẫn gốc (<code>servers</code>), mọi path + method, và OAuth2 scope. Trả lời: AMF cần gọi những path nào khi authenticate UE? Token request gửi những field gì?</p>
+  <p class="done-when"><b>Xong khi:</b> liệt kê được các path của AUSF và UDM dùng trong sơ đồ 5G-AKA ở trên, và các field của token request NRF (<code>grant_type</code>, <code>nfInstanceId</code>, <code>scope</code>…).</p>
+  <details><summary>Gợi ý</summary><p><code>sudo apt install -y python3-yaml</code>. Mỗi file có <code>info.title</code>, <code>servers[0].url</code>, <code>paths</code> (key là path, value là dict method → operation), <code>components.securitySchemes</code>. Schema của token request nằm trong <code>components.schemas.AccessTokenReq</code> của file AccessToken.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m15/sbi_paths.py">
+#!/usr/bin/env python3
+"""In path, method và OAuth2 scope từ OpenAPI của 3GPP. Dùng: python3 sbi_paths.py *.yaml"""
+import sys
+
+import yaml
+
+METHODS = ("get", "put", "post", "patch", "delete")
+
+for path in sys.argv[1:]:
+    with open(path) as f:
+        api = yaml.safe_load(f)
+    info = api.get("info", {})
+    print(f"== {info.get('title')} {info.get('version')}")
+    print(f"   server: {api.get('servers', [{}])[0].get('url')}")
+    for p, ops in api.get("paths", {}).items():
+        for m in METHODS:
+            if m in ops:
+                print(f"   {m.upper():<6} {p}")
+    for name, scheme in api.get("components", {}).get("securitySchemes", {}).items():
+        flow = scheme.get("flows", {}).get("clientCredentials", {})
+        print(f"   OAuth2 ({name}): tokenUrl={flow.get('tokenUrl')} scopes={list(flow.get('scopes', {}))}")
+    req = api.get("components", {}).get("schemas", {}).get("AccessTokenReq")
+    if req:
+        print(f"   AccessTokenReq: required={req.get('required')}")
+        print(f"                   fields={list(req.get('properties', {}))[:10]} …")
+</script>
+<script type="text/plain" class="term">
+$ mkdir -p ~/netlab/m15 && cd ~/netlab/m15 && sudo apt install -y python3-yaml
+$ B=https://raw.githubusercontent.com/jdegre/5GC_APIs/master
+$ for f in TS29510_Nnrf_NFManagement TS29510_Nnrf_NFDiscovery TS29510_Nnrf_AccessToken TS29509_Nausf_UEAuthentication TS29503_Nudm_UEAU; do curl -sfO $B/$f.yaml || echo "thiếu $f"; done
+$ python3 sbi_paths.py TS29509_Nausf_UEAuthentication.yaml TS29503_Nudm_UEAU.yaml TS29510_Nnrf_AccessToken.yaml
+== Nausf_UEAuthentication 1.3.…
+   server: {apiRoot}/nausf-auth/v1
+   POST   /ue-authentications                                 ◀ AMF bắt đầu authentication
+   PUT    /ue-authentications/{authCtxId}/5g-aka-confirmation ◀ AMF gửi RES* để AUSF xác nhận
+   POST   /ue-authentications/{authCtxId}/eap-session
+   …
+   OAuth2 (oAuth2ClientCredentials): tokenUrl={nrfApiRoot}/oauth2/token scopes=['nausf-auth']
+== Nudm_UEAU 1.3.…
+   server: {apiRoot}/nudm-ueau/v1
+   POST   /{supiOrSuci}/security-information/generate-auth-data   ◀ AUSF xin authentication vector (SIDF giải SUCI)
+   POST   /{supi}/auth-events
+   …
+== Nnrf_AccessToken 1.3.…
+   server: {nrfApiRoot}
+   POST   /oauth2/token
+   AccessTokenReq: required=['grant_type', 'nfInstanceId', 'scope']
+                   fields=['grant_type', 'nfInstanceId', 'nfType', 'targetNfType', 'scope', 'targetNfInstanceId', …] …
+</script>
+  <p class="small muted">Version, thứ tự và một số path sẽ khác theo release 3GPP mà repo đang theo. Mở file YAML để xem chi tiết request/response: đây là "tài liệu kỹ thuật" thật mà đội phát triển NF làm việc hằng ngày.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 15.2 · Mini NRF: register, discover, cấp token</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · PyJWT · curl</span><span class="chip t-base">60 phút</span></div>
+  <p>Mở rộng token server của Lab 12.3 thành một NRF thu nhỏ theo TS 29.510:</p>
+  <ul>
+    <li><code>PUT /nnrf-nfm/v1/nf-instances/{nfInstanceId}</code>: NFRegister, lưu NFProfile.</li>
+    <li><code>GET /nnrf-disc/v1/nf-instances?target-nf-type=…&amp;requester-nf-type=…&amp;service-names=…</code>: NFDiscover, chỉ trả NF mà <code>allowedNfTypes</code> cho phép requester.</li>
+    <li><code>POST /oauth2/token</code>: client credentials. Consumer phải đã đăng ký đúng <code>nfType</code>; phải có producer thuộc <code>targetNfType</code> cho phép consumer và cung cấp mọi service trong <code>scope</code>. Token ES256 với <code>iss</code> = NRF instance ID, <code>sub</code> = consumer, <code>aud</code> = targetNfType.</li>
+  </ul>
+  <p class="done-when"><b>Xong khi:</b> AMF discover được UDM và lấy được token <code>nudm-uecm</code> (verify bằng public key của NRF); NEF bị loại khỏi kết quả discovery và bị <code>invalid_scope</code>; AMF xin scope UDM không có cũng bị từ chối; AMF tự khai <code>nfType=UDM</code> bị <code>invalid_client</code>.</p>
+  <details><summary>Gợi ý</summary><p>Dùng lại khung <code>BaseHTTPRequestHandler</code> của Lab 12.3. <code>urllib.parse.urlparse</code> và <code>parse_qs</code> cho query string. Lỗi theo kiểu 3GPP trả <code>application/problem+json</code> với <code>status</code>, <code>cause</code>; lỗi OAuth trả <code>{"error": …}</code> theo RFC 6749.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m15/nrf.py">
+#!/usr/bin/env python3
+"""Mini NRF: NFRegister, NFDiscover, AccessToken (client credentials). Rút gọn từ TS 29.510, chỉ để học.
+Thực tế NRF chạy sau mTLS và so nfInstanceId với identity trong client certificate."""
+import json
+import time
+import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
+
+import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+NRF_ID = str(uuid.uuid4())
+KEY = ec.generate_private_key(ec.SECP256R1())
+with open("nrf_pub.pem", "wb") as f:             # producer dùng public key này để verify token
+    f.write(KEY.public_key().public_bytes(serialization.Encoding.PEM,
+                                          serialization.PublicFormat.SubjectPublicKeyInfo))
+PROFILES: dict[str, dict] = {}                     # nfInstanceId → NFProfile
+
+
+def services(profile: dict) -> set[str]:
+    return {s["serviceName"] for s in profile.get("nfServices", [])}
+
+
+def allows(producer: dict, requester_type: str) -> bool:
+    return requester_type in producer.get("allowedNfTypes", [requester_type])   # không khai báo = cho tất cả
+
+
+class NRF(BaseHTTPRequestHandler):
+    def reply(self, code: int, body: dict, ctype: str = "application/json", extra: dict | None = None) -> None:
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def problem(self, code: int, cause: str, detail: str) -> None:
+        self.reply(code, {"status": code, "cause": cause, "detail": detail}, "application/problem+json")
+
+    def body(self) -> bytes:
+        return self.rfile.read(int(self.headers.get("Content-Length", 0)))
+
+    def do_PUT(self) -> None:                                         # NFRegister
+        parts = urlparse(self.path).path.strip("/").split("/")
+        if parts[:3] != ["nnrf-nfm", "v1", "nf-instances"] or len(parts) != 4:
+            return self.problem(404, "RESOURCE_URI_STRUCTURE_NOT_FOUND", self.path)
+        try:
+            prof = json.loads(self.body())
+        except ValueError:
+            return self.problem(400, "INVALID_MSG_FORMAT", "JSON hỏng")
+        if prof.get("nfInstanceId") != parts[3] or not prof.get("nfType"):
+            return self.problem(400, "MANDATORY_IE_INCORRECT", "nfInstanceId / nfType")
+        prof["nfStatus"] = "REGISTERED"
+        PROFILES[parts[3]] = prof
+        print(f"[register] {prof['nfType']:<4} {parts[3][:8]} services={sorted(services(prof))}")
+        self.reply(201, {**prof, "heartBeatTimer": 60}, extra={"Location": self.path})
+
+    def do_GET(self) -> None:                                         # NFDiscover
+        u = urlparse(self.path)
+        if u.path != "/nnrf-disc/v1/nf-instances":
+            return self.problem(404, "RESOURCE_URI_STRUCTURE_NOT_FOUND", u.path)
+        q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        target, requester = q.get("target-nf-type"), q.get("requester-nf-type")
+        if not target or not requester:
+            return self.problem(400, "MANDATORY_QUERY_PARAM_MISSING", "target-nf-type, requester-nf-type")
+        want = set(q["service-names"].split(",")) if "service-names" in q else set()
+        found = [p for p in PROFILES.values()
+                 if p["nfType"] == target and p["nfStatus"] == "REGISTERED" and allows(p, requester) and want <= services(p)]
+        print(f"[discover] {requester} → {target} {sorted(want)}: {len(found)} kết quả")
+        self.reply(200, {"validityPeriod": 60, "nfInstances": found})
+
+    def do_POST(self) -> None:                                        # AccessToken
+        if urlparse(self.path).path != "/oauth2/token":
+            return self.problem(404, "RESOURCE_URI_STRUCTURE_NOT_FOUND", self.path)
+        f = {k: v[0] for k, v in parse_qs(self.body().decode()).items()}
+        if f.get("grant_type") != "client_credentials":
+            return self.reply(400, {"error": "unsupported_grant_type"})
+        consumer = PROFILES.get(f.get("nfInstanceId", ""))
+        if not consumer or consumer["nfType"] != f.get("nfType"):   # NF phải đăng ký đúng loại đã khai
+            return self.reply(400, {"error": "invalid_client"})
+        scopes = set(f.get("scope", "").split())
+        ok = [p for p in PROFILES.values()
+              if p["nfType"] == f.get("targetNfType") and allows(p, consumer["nfType"]) and scopes and scopes <= services(p)]
+        if not ok:
+            print(f"[token] từ chối {consumer['nfType']} → {f.get('targetNfType')} scope={sorted(scopes)}")
+            return self.reply(400, {"error": "invalid_scope"})
+        now = int(time.time())
+        claims = {"iss": NRF_ID, "sub": consumer["nfInstanceId"], "aud": f["targetNfType"],
+                  "scope": " ".join(sorted(scopes)), "iat": now, "exp": now + 300}
+        token = jwt.encode(claims, KEY, algorithm="ES256")
+        print(f"[token] cấp cho {consumer['nfType']} → {claims['aud']} scope={claims['scope']}")
+        self.reply(200, {"access_token": token, "token_type": "Bearer", "expires_in": 300, "scope": claims["scope"]})
+
+    def log_message(self, *args) -> None:
+        pass
+
+
+if __name__ == "__main__":
+    print(f"NRF {NRF_ID} trên http://127.0.0.1:8000")
+    ThreadingHTTPServer(("127.0.0.1", 8000), NRF).serve_forever()
+</script>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m15/profiles.sh (tạo 3 NFProfile mẫu)">
+#!/usr/bin/env bash
+# Sinh udm.json, amf.json, nef.json với nfInstanceId ngẫu nhiên
+set -euo pipefail
+mk() {  # mk <file> <nfType> <ip> <allowedNfTypes JSON> <service...>
+  local file=$1 type=$2 ip=$3 allowed=$4; shift 4
+  local svcs; svcs=$(printf '{"serviceInstanceId":"%s","serviceName":"%s","scheme":"https","nfServiceStatus":"REGISTERED","versions":[{"apiVersionInUri":"v1","apiFullVersion":"1.0.0"}]},' $(for s in "$@"; do echo "$s $s"; done))
+  printf '{"nfInstanceId":"%s","nfType":"%s","nfStatus":"REGISTERED","ipv4Addresses":["%s"],"allowedNfTypes":%s,"nfServices":[%s]}\n' \
+    "$(cat /proc/sys/kernel/random/uuid)" "$type" "$ip" "$allowed" "${svcs%,}" > "$file"
+}
+mk udm.json UDM 10.0.5.10 '["AMF","AUSF"]' nudm-uecm nudm-ueau nudm-sdm
+mk amf.json AMF 10.0.5.20 '["SMF","AUSF"]' namf-comm
+mk nef.json NEF 10.0.5.30 '["AF"]' nnef-eventexposure
+echo "OK: udm.json amf.json nef.json"
+</script>
+<script type="text/plain" class="term">
+$ sudo apt install -y python3-jwt python3-cryptography jq
+$ python3 nrf.py &
+$ bash profiles.sh
+$ for nf in udm amf nef; do curl -s -o /dev/null -w "$nf %{http_code}\n" -X PUT -H 'Content-Type: application/json' \
+>   --data @$nf.json http://127.0.0.1:8000/nnrf-nfm/v1/nf-instances/$(jq -r .nfInstanceId $nf.json); done
+[register] UDM  5a7bd676 services=['nudm-sdm', 'nudm-ueau', 'nudm-uecm']
+udm 201
+…
+$ D='http://127.0.0.1:8000/nnrf-disc/v1/nf-instances?target-nf-type=UDM&service-names=nudm-uecm'
+$ curl -s "$D&requester-nf-type=AMF" | jq -c '.nfInstances[] | {nfInstanceId, ipv4Addresses}'
+{"nfInstanceId":"5a7bd676-…","ipv4Addresses":["10.0.5.10"]}
+$ curl -s "$D&requester-nf-type=NEF" | jq -c .nfInstances
+[]                                                            ◀ UDM không cho NEF thấy mình
+$ tok() { curl -s -d grant_type=client_credentials -d nfInstanceId=$(jq -r .nfInstanceId $1.json) -d nfType=$2 \
+>   -d targetNfType=UDM -d "scope=$3" http://127.0.0.1:8000/oauth2/token; }
+$ T=$(tok amf AMF nudm-uecm | jq -r .access_token)
+$ python3 -c 'import jwt,sys; print(jwt.decode(sys.argv[1], open("nrf_pub.pem").read(), algorithms=["ES256"], audience="UDM"))' "$T"
+{'iss': '9e1c…', 'sub': '8f3c…', 'aud': 'UDM', 'scope': 'nudm-uecm', 'iat': …, 'exp': …}   ◀ UDM verify được
+$ tok nef NEF nudm-uecm
+{"error": "invalid_scope"}                                    ◀ NEF không được UDM cho phép
+$ tok amf AMF nudm-pp
+{"error": "invalid_scope"}                                    ◀ UDM không cung cấp service này
+$ tok amf UDM nudm-uecm
+{"error": "invalid_client"}                                   ◀ AMF tự khai là UDM
+$ kill %1
+</script>
+  <p class="small muted">Instance ID của bạn sẽ khác. <b>Mở rộng:</b> (1) đặt NRF sau mTLS (Lab 11.3) và so <code>nfInstanceId</code> với SAN của client certificate (thực tế dạng URI <code>urn:uuid:…</code>); (2) thêm <code>PATCH</code> heartbeat và tự chuyển NF sang <code>SUSPENDED</code> khi quá hạn; (3) viết một "UDM" nhỏ verify token bằng <code>nrf_pub.pem</code> và trả 403 <code>insufficient_scope</code> khi scope không đủ. Module 16 sẽ ghép các phần này lại.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 15.3 · Milenage và 5G-AKA từ đầu đến cuối</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · cryptography</span><span class="chip t-base">60 phút</span></div>
+  <p>Cài đặt Milenage (f1–f5) theo TS 35.206 và kiểm tra với Test Set 1 của TS 35.208. Trên đó dựng 5G-AKA theo TS 33.501 Annex A: UDM/ARPF tạo HE AV (RAND, AUTN, XRES*, KAUSF); AUSF tính HXRES* và KSEAF; USIM kiểm tra AUTN rồi tính RES*; SEAF và AUSF lần lượt kiểm tra. Chạy 4 kịch bản: hợp lệ; replay RAND/AUTN cũ; mạng giả không có K; mạng khai sai serving network name.</p>
+  <p class="done-when"><b>Xong khi:</b> f1–f5 khớp test vector; kịch bản hợp lệ cho cùng KSEAF ở UE và mạng (và khớp widget ở trên với preset Test Set 1); 3 kịch bản còn lại thất bại đúng ở bước và đúng lý do.</p>
+  <details><summary>Gợi ý</summary><p>Milenage: OPc = E<sub>K</sub>(OP) ⊕ OP; TEMP = E<sub>K</sub>(RAND ⊕ OPc); OUT<sub>i</sub> = E<sub>K</sub>(rot(TEMP ⊕ OPc, r<sub>i</sub>) ⊕ c<sub>i</sub>) ⊕ OPc với (r, c) = (0, 1), (32 bit, 2), (64 bit, 4), (96 bit, 8); riêng OUT1 dùng IN1 = SQN‖AMF‖SQN‖AMF, rot 64 bit. KDF (TS 33.220): HMAC-SHA-256(key, FC ‖ P0 ‖ L0 ‖ P1 ‖ L1 …), L là độ dài 2 byte. FC: 0x6A cho KAUSF, 0x6B cho RES*/XRES* (lấy 128 bit cuối), 0x6C cho KSEAF. HXRES* = 128 bit cuối của SHA-256(RAND ‖ XRES*).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m15/aka.py">
+#!/usr/bin/env python3
+"""Milenage (TS 35.206) + 5G-AKA (TS 33.501 Annex A). Mô phỏng ARPF/UDM, AUSF, SEAF và USIM. Chỉ để học."""
+import hashlib
+import hmac
+import os
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+
+def aes(k: bytes, block: bytes) -> bytes:
+    e = Cipher(algorithms.AES(k), modes.ECB()).encryptor()
+    return e.update(block) + e.finalize()
+
+
+def xor(a: bytes, b: bytes) -> bytes:
+    return bytes(x ^ y for x, y in zip(a, b))
+
+
+def rot(x: bytes, nbytes: int) -> bytes:
+    return x[nbytes:] + x[:nbytes]
+
+
+def opc_of(k: bytes, op: bytes) -> bytes:
+    return xor(aes(k, op), op)
+
+
+def milenage(k: bytes, opc: bytes, rand: bytes, sqn: bytes, amf: bytes) -> dict:
+    temp = aes(k, xor(rand, opc))
+    out1 = xor(aes(k, xor(temp, rot(xor(sqn + amf + sqn + amf, opc), 8))), opc)    # c1 = 0
+    t = xor(temp, opc)
+    out = lambda r, c: xor(aes(k, xor(rot(t, r), bytes(15) + bytes([c]))), opc)
+    o2, o3, o4 = out(0, 1), out(4, 2), out(8, 4)
+    return {"mac_a": out1[:8], "res": o2[8:], "ak": o2[:6], "ck": o3, "ik": o4}
+
+
+def kdf(key: bytes, fc: int, *params: bytes) -> bytes:                       # TS 33.220 Annex B
+    s = bytes([fc]) + b"".join(p + len(p).to_bytes(2, "big") for p in params)
+    return hmac.new(key, s, hashlib.sha256).digest()
+
+
+class AuthError(Exception):
+    pass
+
+
+def udm_generate(k, opc, sqn, amf, rand, snn) -> dict:                       # ARPF trong UDM
+    m = milenage(k, opc, rand, sqn, amf)
+    sqn_ak = xor(sqn, m["ak"])
+    ckik = m["ck"] + m["ik"]
+    return {"rand": rand, "autn": sqn_ak + amf + m["mac_a"],
+            "xres_star": kdf(ckik, 0x6B, snn, rand, m["res"])[16:],
+            "kausf": kdf(ckik, 0x6A, snn, sqn_ak)}
+
+
+def ausf_prepare(he_av: dict, snn: bytes) -> tuple[dict, bytes]:
+    hxres = hashlib.sha256(he_av["rand"] + he_av["xres_star"]).digest()[16:]
+    return {"rand": he_av["rand"], "autn": he_av["autn"], "hxres_star": hxres}, kdf(he_av["kausf"], 0x6C, snn)
+
+
+class USIM:
+    def __init__(self, k: bytes, opc: bytes):
+        self.k, self.opc, self.sqn_ms = k, opc, -1                              # SQN cao nhất đã chấp nhận
+
+    def authenticate(self, rand: bytes, autn: bytes, snn: bytes) -> tuple[bytes, bytes]:
+        ak = milenage(self.k, self.opc, rand, bytes(6), bytes(2))["ak"]        # f5 chỉ phụ thuộc K, OPc, RAND
+        sqn, amf, mac = xor(autn[:6], ak), autn[6:8], autn[8:]
+        m = milenage(self.k, self.opc, rand, sqn, amf)
+        if not hmac.compare_digest(m["mac_a"], mac):
+            raise AuthError("MAC failure: mạng không có K của SIM này")
+        if int.from_bytes(sqn, "big") <= self.sqn_ms:
+            raise AuthError("Synch failure: SQN cũ, có thể là replay")
+        self.sqn_ms = int.from_bytes(sqn, "big")
+        ckik = m["ck"] + m["ik"]
+        res_star = kdf(ckik, 0x6B, snn, rand, m["res"])[16:]
+        kseaf = kdf(kdf(ckik, 0x6A, snn, xor(sqn, ak)), 0x6C, snn)
+        return res_star, kseaf
+
+
+def run(name, usim, net_k, opc, sqn, snn_ue, snn_net, rand=None, replay=None):
+    print(f"\n# {name}")
+    try:
+        he_av = replay or udm_generate(net_k, opc, sqn, bytes.fromhex("b9b9"), rand or os.urandom(16), snn_net)
+        se_av, kseaf_net = ausf_prepare(he_av, snn_net)
+        res_star, kseaf_ue = usim.authenticate(se_av["rand"], se_av["autn"], snn_ue)
+        if hashlib.sha256(se_av["rand"] + res_star).digest()[16:] != se_av["hxres_star"]:
+            raise AuthError("SEAF: HXRES* không khớp")
+        if not hmac.compare_digest(res_star, he_av["xres_star"]):
+            raise AuthError("AUSF: RES* ≠ XRES*")
+        print(f"  ✔ thành công, KSEAF giống nhau: {kseaf_ue == kseaf_net}  KSEAF={kseaf_ue.hex()[:16]}…")
+        return he_av
+    except AuthError as e:
+        print(f"  ✘ {e}")
+
+
+if __name__ == "__main__":
+    K = bytes.fromhex("465b5ce8b199b49faa5f0a2ee238a6bc")
+    OPC = opc_of(K, bytes.fromhex("cdc202d5123e20f62b6d676ac72cb318"))
+    RAND, SQN = bytes.fromhex("23553cbe9637a89d218ae64dae47bf35"), bytes.fromhex("ff9bb4d0b607")
+    m = milenage(K, OPC, RAND, SQN, bytes.fromhex("b9b9"))
+    expect = {"mac_a": "4a9ffac354dfafb3", "res": "a54211d5e3ba50bf", "ak": "aa689c648370",
+              "ck": "b40ba9a3c58b2a05bbf0d987b21bf8cb", "ik": "f769bcd751044604127672711c6d3441"}
+    assert OPC.hex() == "cd63cb71954a9f4e48a5994e37a02baf" and all(m[k].hex() == v for k, v in expect.items())
+    print("Milenage Test Set 1 (TS 35.208): OK")
+
+    SNN = b"5G:mnc004.mcc452.3gppnetwork.org"
+    he = udm_generate(K, OPC, SQN, bytes.fromhex("b9b9"), RAND, SNN)
+    print("AUTN =", he["autn"].hex(), "\nXRES* =", he["xres_star"].hex(), "\nKAUSF =", he["kausf"].hex())
+
+    usim = USIM(K, OPC)
+    good = run("Hợp lệ (Test Set 1)", usim, K, OPC, SQN, SNN, SNN, rand=RAND)
+    run("Replay RAND/AUTN cũ", usim, K, OPC, SQN, SNN, SNN, replay=good)
+    run("Mạng giả không có K", USIM(K, OPC), os.urandom(16), OPC, SQN, SNN, SNN)
+    run("Mạng khai sai serving network name", USIM(K, OPC), K, OPC, SQN, SNN, b"5G:mnc099.mcc452.3gppnetwork.org")
+</script>
+<script type="text/plain" class="term">
+$ python3 aka.py
+Milenage Test Set 1 (TS 35.208): OK
+AUTN = 55f328b43577b9b94a9ffac354dfafb3
+XRES* = a95d06cbfcc4eb30f2ef2f60089c5778
+KAUSF = 32f3afc00d86a29bc8c929a7cc77053e386ab5977da13e5f00ce7e9acfaa6f24
+
+# Hợp lệ (Test Set 1)
+  ✔ thành công, KSEAF giống nhau: True  KSEAF=1070b0681638cff6…
+
+# Replay RAND/AUTN cũ
+  ✘ Synch failure: SQN cũ, có thể là replay
+
+# Mạng giả không có K
+  ✘ MAC failure: mạng không có K của SIM này
+
+# Mạng khai sai serving network name
+  ✘ SEAF: HXRES* không khớp                                   ◀ UE tính RES* theo tên mạng thật nó đang thấy
+</script>
+  <p><b>Đọc kết quả:</b> AUTN, XRES*, KAUSF và KSEAF ở trên đã được đối chiếu chéo giữa hai bản cài đặt độc lập (PowerShell/.NET và widget JavaScript/WebCrypto của trang này); f1–f5 khớp test vector chính thức. Ở kịch bản cuối, RES* của UE không khớp vì UE derive theo tên mạng mà chính nó quan sát được. Kể cả khi một SEAF gian lận bỏ qua bước kiểm tra HXRES*, AUSF vẫn so RES* với XRES* và từ chối: đúng ý nghĩa của home control (thử xoá dòng kiểm tra của SEAF để thấy). Thực tế USIM dùng mảng SEQ/IND và cửa sổ cho phép SQN lệch, còn khi synch failure thì UE gửi AUTS để home network đồng bộ lại; ở đây đã đơn giản hoá.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 15.4 · SUCI Profile A: che SUPI bằng ECIES X25519</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Python · cryptography</span><span class="chip t-base">50 phút</span></div>
+  <p>Cài đặt SUCI Profile A (TS 33.501 Annex C): UE sinh ephemeral X25519 key pair, thoả thuận shared secret với public key của home network, dùng ANSI X9.63 KDF (SHA-256, SharedInfo = ephemeral public key) ra 64 byte: 16 byte AES key, 16 byte ICB (counter block), 32 byte MAC key; mã hoá MSIN (dạng BCD) bằng AES-128-CTR; MAC = 8 byte đầu của HMAC-SHA-256 trên ciphertext. Scheme output = ephemeral public key ‖ ciphertext ‖ MAC. Viết cả phía SIDF giải ngược.</p>
+  <p class="done-when"><b>Xong khi:</b> hai lần che cùng một SUPI cho hai SUCI khác hẳn nhau nhưng SIDF đều giải ra đúng SUPI; sửa 1 bit của SUCI thì SIDF từ chối; bạn giải thích được vì sao kẻ nghe lén không liên kết được hai SUCI với nhau.</p>
+  <details><summary>Gợi ý</summary><p><code>X25519PrivateKey.generate()</code>, <code>.exchange(peer_public)</code>, <code>X963KDF(algorithm=hashes.SHA256(), length=64, sharedinfo=eph_pub)</code>, <code>Cipher(algorithms.AES(key), modes.CTR(icb))</code>. BCD (TBCD): mỗi byte chứa hai chữ số, chữ số đứng sau ở nibble cao; số chữ số lẻ thì đệm <code>F</code>. Đây là bài để hiểu cơ chế; khi cần tương thích thật, hãy kiểm tra với test vector ở TS 33.501 Annex C.4.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m15/suci.py">
+#!/usr/bin/env python3
+"""SUCI Profile A (TS 33.501 Annex C): UE che MSIN bằng ECIES X25519; SIDF trong UDM giải ra SUPI. Chỉ để học."""
+import hashlib
+import hmac
+
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.x963kdf import X963KDF
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+
+def raw(pub: X25519PublicKey) -> bytes:
+    return pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
+
+
+def derive(shared: bytes, eph_pub: bytes) -> tuple[bytes, bytes, bytes]:
+    k = X963KDF(algorithm=hashes.SHA256(), length=64, sharedinfo=eph_pub).derive(shared)
+    return k[:16], k[16:32], k[32:]                         # AES key, ICB, MAC key
+
+
+def bcd(digits: str) -> bytes:                              # "0123456789" → 10 32 54 76 98
+    digits += "F" * (len(digits) % 2)
+    return bytes(int(digits[i + 1], 16) << 4 | int(digits[i], 16) for i in range(0, len(digits), 2))
+
+
+def unbcd(b: bytes) -> str:
+    return "".join(f"{x & 0xF:X}{x >> 4:X}" for x in b).rstrip("F")
+
+
+def conceal(msin: str, hn_pub: X25519PublicKey) -> bytes:   # chạy trong USIM / UE
+    eph = X25519PrivateKey.generate()                       # mới cho MỖI lần che
+    eph_pub = raw(eph.public_key())
+    key, icb, mac_key = derive(eph.exchange(hn_pub), eph_pub)
+    e = Cipher(algorithms.AES(key), modes.CTR(icb)).encryptor()
+    ct = e.update(bcd(msin)) + e.finalize()
+    return eph_pub + ct + hmac.new(mac_key, ct, hashlib.sha256).digest()[:8]
+
+
+def deconceal(out: bytes, hn_priv: X25519PrivateKey) -> str:   # chạy trong SIDF (UDM), key nên nằm trong HSM
+    eph_pub, ct, tag = out[:32], out[32:-8], out[-8:]
+    key, icb, mac_key = derive(hn_priv.exchange(X25519PublicKey.from_public_bytes(eph_pub)), eph_pub)
+    if not hmac.compare_digest(hmac.new(mac_key, ct, hashlib.sha256).digest()[:8], tag):
+        raise ValueError("MAC sai: SUCI đã bị sửa")
+    d = Cipher(algorithms.AES(key), modes.CTR(icb)).decryptor()
+    return unbcd(d.update(ct) + d.finalize())
+
+
+if __name__ == "__main__":
+    MCC, MNC, MSIN = "452", "04", "0123456789"
+    hn_priv = X25519PrivateKey.generate()                   # home network giữ private key
+    hn_pub = hn_priv.public_key()                           # public key được ghi vào USIM khi phát hành
+    print(f"SUPI: imsi-{MCC}{MNC}{MSIN}")
+    for i in (1, 2):
+        out = conceal(MSIN, hn_pub)
+        print(f"SUCI #{i}: suci-0-{MCC}-{MNC}-0000-1-1-{out.hex()[:24]}…  ({len(out)} byte)")
+        print(f"   SIDF giải ra: imsi-{MCC}{MNC}{deconceal(out, hn_priv)}")
+    bad = bytearray(out)
+    bad[33] ^= 0x01                                         # lật 1 bit trong ciphertext
+    try:
+        deconceal(bytes(bad), hn_priv)
+    except ValueError as e:
+        print("SUCI bị sửa 1 bit:", e)
+</script>
+<script type="text/plain" class="term">
+$ python3 suci.py
+SUPI: imsi-452040123456789
+SUCI #1: suci-0-452-04-0000-1-1-6b1f0c9d27e4a3b85f0d12c4…  (45 byte)
+   SIDF giải ra: imsi-452040123456789
+SUCI #2: suci-0-452-04-0000-1-1-e2905d7a1c3f6b48a90e7d21…  (45 byte)   ◀ khác hẳn lần trước
+   SIDF giải ra: imsi-452040123456789
+SUCI bị sửa 1 bit: MAC sai: SUCI đã bị sửa
+</script>
+  <p><b>Vì sao không liên kết được:</b> mỗi lần che dùng một ephemeral key mới, nên shared secret, key và ciphertext đều mới; kẻ nghe lén không có private key của home network thì thấy hai chuỗi ngẫu nhiên không liên quan. 45 byte = 32 byte ephemeral public key + 5 byte MSIN (10 chữ số BCD) + 8 byte MAC. MCC, MNC và routing indicator vẫn để trần vì mạng cần chúng để định tuyến tới đúng UDM. Giá trị hex của bạn sẽ khác mỗi lần chạy.</p>
+  </details>
+</div>
+
+<div class="note more"><b>Bản C/C++</b><p><a href="#m17">Lab 17.4</a> cài Milenage, 5G-AKA và SUCI Profile A bằng C++ với cùng test vector (Test Set 1 và các giá trị đã đối chiếu ở widget phía trên), rồi giải SUCI do <code>suci.py</code> tạo ra. <a href="#m17">Lab 17.5</a> viết parser GTP-U và tìm bug của nó bằng ASan/UBSan và libFuzzer.</p></div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m15"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §7.4 (4G LTE, 5G), §7.5–7.6 (mobility), §8.8.2 (authentication trong 4G/5G).</li>
+  <li><a href="https://www.3gpp.org/ftp/Specs/archive/33_series/33.501/" target="_blank" rel="noopener">3GPP TS 33.501</a>: kiến trúc và thủ tục bảo mật 5G. Đọc §6.1 (authentication), §13 (SBA, NRF, SEPP), Annex A (KDF) và Annex C (SUCI).</li>
+  <li><a href="https://www.3gpp.org/ftp/Specs/archive/23_series/23.501/" target="_blank" rel="noopener">3GPP TS 23.501</a>: kiến trúc hệ thống 5G (NF, interface, reference point).</li>
+  <li><a href="https://github.com/jdegre/5GC_APIs" target="_blank" rel="noopener">jdegre/5GC_APIs</a>: OpenAPI của mọi SBI, kèm công cụ xem trực tuyến.</li>
+  <li><a href="https://open5gs.org/open5gs/docs/" target="_blank" rel="noopener">Open5GS documentation</a>: core network mã nguồn mở để tự dựng một mạng 4G/5G lab với UERANSIM.</li>
+</ul>

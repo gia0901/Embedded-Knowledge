@@ -1,0 +1,488 @@
+<!-- Core Net Lab · Module 05 · UDP & TCP (Kurose & Ross 8e, Ch.3) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Đọc được UDP header và TCP header, giải thích seq number, ACK number, flag, window trong output tcpdump.</li>
+  <li>Hiểu các cơ chế của reliable data transfer: checksum, ACK, sequence number, timer, retransmit, pipelining. Tự cài được một protocol stop-and-wait trên UDP.</li>
+  <li>Tính được throughput tối đa từ window và RTT (bandwidth-delay product).</li>
+  <li>Giải thích TCP handshake, teardown, flow control, congestion control (slow start, AIMD), và vì sao packet loss làm TCP chậm hẳn (trả lời thắc mắc ở Lab 1.4).</li>
+  <li>Biết QUIC và SCTP khác TCP ở đâu, và các cơ chế security ở transport layer: random ISN, SYN cookies, port scanning.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ sudo tcpdump -i any -nn -S 'tcp port 80 and host example.com' &     # -S: in seq number tuyệt đối
+$ curl -s -o /dev/null http://example.com
+Flags [S],  seq 1000, win 64240, options [mss 1460,sackOK,TS val … ,nop,wscale 7]  ◀ Q1: options là gì?
+Flags [S.], seq 5000, ack 1001, win 65535, options [mss 1460,…]                    ◀ Q2: vì sao ack = 1001?
+Flags [.],  ack 5001
+Flags [P.], seq 1001:1076, ack 5001, length 75: HTTP: GET / HTTP/1.1               ◀ 75 byte: seq 1001 → 1075
+Flags [.],  ack 1076                                                               ◀ Q3: ack 1076 nghĩa là gì?
+Flags [P.], seq 5001:6257, ack 1076, length 1256: HTTP: HTTP/1.1 200 OK
+Flags [F.], seq 1076, ack 6257
+$ sudo pkill tcpdump
+$ curl -s -o /dev/null 'https://speed.cloudflare.com/__down?bytes=200000000' &
+$ sleep 2; ss -tin '( dport = :443 )' | grep -o 'cubic.*' | head -1                # Q4: cwnd, rtt, rto là gì?
+cubic wscale:7,7 rto:204 rtt:3.2/1.1 mss:1448 cwnd:180 ssthresh:120 bytes_acked:… retrans:0/3 …
+$ kill %1
+</script>
+<p class="small muted">Số seq thật là số ngẫu nhiên rất lớn; ở đây làm tròn cho dễ đọc. Không có <code>-S</code>, tcpdump in seq <i>tương đối</i> (bắt đầu từ 0 hoặc 1).</p>
+
+<h2>Transport layer làm gì</h2>
+<p>Network layer (IP) đưa packet từ <b>host</b> tới <b>host</b>, best-effort: có thể mất, trùng, sai thứ tự. Transport layer đưa dữ liệu từ <b>process</b> tới <b>process</b> <span class="bk">§3.1</span>, và (với TCP) biến dịch vụ không tin cậy đó thành một byte stream tin cậy. Phần chọn đúng process nhờ port là <b>multiplexing/demultiplexing</b>: UDP dựa vào (destination IP, destination port), TCP dựa vào 4-tuple. Bạn đã thấy điều này ở module 04 <span class="bk">§3.2</span>.</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>UDP</th><th>TCP</th><th>SCTP</th><th>QUIC</th></tr></thead>
+<tbody>
+<tr><td>Connection / handshake</td><td>Không</td><td>Có, 1 RTT</td><td>Có, 4-way (có cookie)</td><td>Có, gộp với TLS: 1 RTT</td></tr>
+<tr><td>Reliable, đúng thứ tự</td><td>Không</td><td>Có</td><td>Có, theo từng stream</td><td>Có, theo từng stream</td></tr>
+<tr><td>Ranh giới message</td><td>Giữ</td><td>Không (byte stream)</td><td>Giữ</td><td>Byte stream mỗi stream</td></tr>
+<tr><td>Congestion control</td><td>Không</td><td>Có</td><td>Có</td><td>Có</td></tr>
+<tr><td>Encryption sẵn có</td><td>Không</td><td>Không (thêm TLS)</td><td>Không (thêm DTLS)</td><td>Bắt buộc (TLS 1.3 bên trong)</td></tr>
+<tr><td>Gặp ở đâu</td><td>DNS, GTP-U, PFCP, RTP, syslog</td><td>HTTP/1.1, HTTP/2, 5G SBI, LDAP, database</td><td>NGAP (N2), Diameter, S1-AP</td><td>HTTP/3</td></tr>
+</tbody></table></div>
+
+<h2>UDP</h2>
+<p>UDP gần như chỉ là IP cộng thêm port và checksum <span class="bk">§3.3</span>. Header 8 byte:</p>
+<script type="application/json" class="pkt">
+{"title":"UDP header (RFC 768)","bits":32,"fields":[["Source port",16,"tra"],["Destination port",16,"tra"],["Length",16,"tra"],["Checksum",16,"sec"],["Application data (payload)","var","app"]]}
+</script>
+<p>Vì sao vẫn có người chọn UDP?</p>
+<ul>
+  <li><b>Không có handshake</b>: DNS chỉ cần 1 RTT cho cả câu hỏi và câu trả lời.</li>
+  <li><b>Application tự quyết thời điểm gửi</b>: không bị congestion control của TCP làm chậm. Video call thà mất một frame còn hơn chờ retransmit.</li>
+  <li><b>Header nhỏ, không có state</b>: server phục vụ được rất nhiều client.</li>
+  <li><b>Làm nền cho protocol mới</b>: QUIC xây toàn bộ reliability trên UDP vì middlebox trên Internet không cho protocol mới đi qua, chỉ cho TCP và UDP.</li>
+</ul>
+<p><b>Checksum</b> là tổng bù một (1s complement) của các word 16 bit. Bên nhận cộng lại, nếu không ra toàn bit 1 thì segment có lỗi và bị bỏ. Checksum <b>phát hiện</b> lỗi ngẫu nhiên, không sửa lỗi, và không chống được kẻ cố ý sửa dữ liệu (kẻ đó tính lại checksum được). Chống sửa đổi có chủ đích cần MAC hoặc digital signature (module 09).</p>
+<div class="note job"><b>Liên hệ job</b><p>Trong core network, user traffic của thuê bao di động chạy trong tunnel <b>GTP-U trên UDP</b> (port 2152), và control plane giữa SMF và UPF dùng <b>PFCP trên UDP</b> (port 8805). Vì UDP không có reliability, PFCP tự có sequence number, timer và retransmit ở application layer, đúng như Lab 4.1 và Lab 5.2.</p></div>
+
+<h2>Nguyên lý reliable data transfer</h2>
+<p>Làm sao gửi tin cậy qua một kênh có thể làm hỏng, làm mất và làm trùng packet? Sách xây dựng dần từng bước (rdt1.0 → rdt3.0) <span class="bk">§3.4.1</span>. Kết quả là 5 cơ chế, và TCP dùng đủ cả 5:</p>
+<div class="tbl"><table>
+<thead><tr><th>Vấn đề</th><th>Cơ chế</th><th>Trong TCP</th></tr></thead>
+<tbody>
+<tr><td>Bit bị lật</td><td><b>Checksum</b></td><td>Checksum trong header</td></tr>
+<tr><td>Sender không biết gửi đã tới chưa</td><td><b>ACK</b> (acknowledgment)</td><td>ACK number, cumulative</td></tr>
+<tr><td>Packet hoặc ACK bị mất</td><td><b>Timer</b> + <b>retransmit</b></td><td>Retransmission timeout (RTO), fast retransmit</td></tr>
+<tr><td>Retransmit tạo bản trùng</td><td><b>Sequence number</b></td><td>Seq number đánh số theo byte</td></tr>
+<tr><td>Chờ ACK từng packet thì quá chậm</td><td><b>Pipelining</b> + window</td><td>Sliding window, cwnd, rwnd</td></tr>
+</tbody></table></div>
+<div class="cols2">
+<script type="application/json" class="seq">
+{"title":"Mất packet → timeout → retransmit","actors":["Sender","Receiver"],"w":170,"steps":[
+ {"f":0,"t":1,"l":"pkt0","m":1},
+ {"f":1,"t":0,"l":"ACK0","m":1,"d":1},
+ {"f":0,"t":1,"l":"pkt1  ✗ mất","m":1,"k":"sec"},
+ {"note":"timer hết hạn","a":0,"b":0},
+ {"f":0,"t":1,"l":"pkt1 (retransmit)","m":1},
+ {"f":1,"t":0,"l":"ACK1","m":1,"d":1}
+]}
+</script>
+<script type="application/json" class="seq">
+{"title":"Mất ACK → bản trùng → seq number cứu","actors":["Sender","Receiver"],"w":170,"steps":[
+ {"f":0,"t":1,"l":"pkt0","m":1},
+ {"f":1,"t":0,"l":"ACK0  ✗ mất","m":1,"d":1,"k":"sec"},
+ {"note":"timer hết hạn","a":0,"b":0},
+ {"f":0,"t":1,"l":"pkt0 (retransmit)","m":1},
+ {"note":"seq 0 đã nhận: bỏ bản trùng,\nnhưng vẫn ACK lại","a":1,"b":1},
+ {"f":1,"t":0,"l":"ACK0","m":1,"d":1}
+]}
+</script>
+</div>
+
+<h3>Stop-and-wait chậm đến mức nào</h3>
+<p>Gửi một packet rồi chờ ACK mới gửi tiếp. Ví dụ trong sách <span class="bk">§3.4.2</span>: link 1 Gbps, RTT 30 ms, packet 1,000 byte. d_trans = 8 µs, nhưng mỗi packet phải chờ thêm 30 ms:</p>
+<div class="formula">U_sender = (L/R) / (RTT + L/R) = 0.008 / 30.008 ≈ 0.00027
+<small>Link 1 Gbps mà chỉ đạt khoảng 267 kbit/s. Lời giải là <b>pipelining</b>: cho phép tối đa W byte "đang bay" chưa được ACK. Throughput tối đa ≈ W / RTT.</small></div>
+<p>Để dùng hết link, window phải chứa đủ dữ liệu cho cả một RTT: W ≥ R × RTT. Tích này gọi là <b>bandwidth-delay product (BDP)</b>. Thử với các mẫu dưới đây:</p>
+<div data-widget="bdp"></div>
+<p>Hai cách pipelining kinh điển <span class="bk">§3.4.3–3.4.4</span>:</p>
+<ul>
+  <li><b>Go-Back-N</b>: receiver chỉ nhận đúng thứ tự, ACK là cumulative. Mất một packet thì sender gửi lại packet đó và <i>tất cả</i> packet sau nó.</li>
+  <li><b>Selective Repeat</b>: receiver đệm packet đến sai thứ tự, ACK riêng từng packet. Sender chỉ gửi lại packet bị mất.</li>
+</ul>
+<p>TCP là lai của hai cách: ACK cumulative như Go-Back-N, nhưng receiver đệm segment sai thứ tự và (với option <b>SACK</b>) báo chính xác đoạn nào đã nhận, nên sender chỉ gửi lại phần thiếu.</p>
+
+<h2>TCP: segment và seq/ACK</h2>
+<p>TCP connection là <b>point-to-point</b> (đúng hai đầu), <b>full-duplex</b> (hai chiều cùng lúc) và là byte stream <span class="bk">§3.5.1</span>. TCP cắt stream thành segment, mỗi segment tối đa <b>MSS</b> byte dữ liệu. Với Ethernet (MTU 1,500 byte): MSS = 1,500 − 20 (IP) − 20 (TCP) = 1,460; trừ thêm 12 byte timestamp option thì còn 1,448 như <code>mss:1448</code> ở Q4.</p>
+<script type="application/json" class="pkt">
+{"title":"TCP header (RFC 9293), tối thiểu 20 byte","bits":32,"fields":[["Source port",16,"tra"],["Destination port",16,"tra"],["Sequence number",32,"net"],["Acknowledgment number",32,"net"],["Hdr len",4,"base"],["Rsvd",4,"base"],["Flags",8,"sec"],["Receive window",16,"app"],["Checksum",16,"sec"],["Urgent pointer",16,"base"],["Options (MSS, SACK, window scale, timestamps)","var","base"],["Data","var","app"]]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Field</th><th>Ý nghĩa</th></tr></thead>
+<tbody>
+<tr><td><b>Sequence number</b></td><td>Số thứ tự của <b>byte đầu tiên</b> trong segment (đánh số theo byte, không theo segment). Bắt đầu từ một số ngẫu nhiên: <b>ISN</b> (initial sequence number)</td></tr>
+<tr><td><b>Acknowledgment number</b></td><td>Số thứ tự của byte <b>tiếp theo</b> mà bên này đang chờ. ACK 1076 = "đã nhận đủ tới byte 1075" (Q3). Đây là <b>cumulative ACK</b></td></tr>
+<tr><td><b>Flags</b> (8 bit: CWR ECE URG ACK PSH RST SYN FIN)</td><td>SYN: mở connection · ACK: field ACK có nghĩa · FIN: hết dữ liệu · RST: huỷ ngay · PSH: đẩy lên app · ECE/CWR: báo congestion qua ECN</td></tr>
+<tr><td><b>Receive window</b></td><td>Số byte bên này còn chỗ nhận (flow control). Nhân thêm 2<sup>wscale</sup> nếu dùng window scaling</td></tr>
+<tr><td><b>Options</b></td><td>MSS, SACK permitted, window scale, timestamps: chỉ thoả thuận trong SYN và SYN-ACK (Q1)</td></tr>
+</tbody></table></div>
+<p>SYN và FIN mỗi cái "tiêu" một số seq dù không mang dữ liệu. Vì vậy server trả <code>ack 1001</code> cho <code>SYN seq 1000</code> (Q2).</p>
+
+<h3>RTT và timeout</h3>
+<p>Timeout quá ngắn thì retransmit thừa; quá dài thì phản ứng chậm khi mất packet. TCP đo RTT liên tục và tính <span class="bk">§3.5.3</span>:</p>
+<div class="formula">EstimatedRTT = 0.875 · EstimatedRTT + 0.125 · SampleRTT
+DevRTT       = 0.75 · DevRTT + 0.25 · |SampleRTT − EstimatedRTT|
+TimeoutInterval = EstimatedRTT + 4 · DevRTT
+<small>RTT càng dao động (jitter lớn) thì timeout càng rộng. Mỗi lần timeout, TCP nhân đôi timeout (exponential backoff). Linux đặt RTO tối thiểu 200 ms, đó là lý do <code>rto:204</code> ở Q4 dù RTT chỉ 3.2 ms.</small></div>
+
+<h3>Fast retransmit</h3>
+<p>Chờ timeout tốn ít nhất 200 ms. Có cách nhanh hơn: khi một segment bị mất, các segment sau vẫn tới và receiver liên tục gửi lại cùng một ACK (<b>duplicate ACK</b>). Nhận <b>3 duplicate ACK</b> thì sender retransmit ngay, không chờ timer <span class="bk">§3.5.4</span>.</p>
+<script type="application/json" class="seq">
+{"title":"Fast retransmit: 3 duplicate ACK","actors":["Sender","Receiver"],"w":230,"steps":[
+ {"f":0,"t":1,"l":"seq 100 (100 byte)","m":1},
+ {"f":0,"t":1,"l":"seq 200  ✗ mất","m":1,"k":"sec"},
+ {"f":1,"t":0,"l":"ACK 200","m":1,"d":1},
+ {"f":0,"t":1,"l":"seq 300","m":1},
+ {"f":1,"t":0,"l":"ACK 200 (duplicate 1)","m":1,"d":1,"k":"app"},
+ {"f":0,"t":1,"l":"seq 400","m":1},
+ {"f":1,"t":0,"l":"ACK 200 (duplicate 2)","m":1,"d":1,"k":"app"},
+ {"f":0,"t":1,"l":"seq 500","m":1},
+ {"f":1,"t":0,"l":"ACK 200 (duplicate 3)","m":1,"d":1,"k":"app"},
+ {"f":0,"t":1,"l":"seq 200 (fast retransmit)","m":1,"k":"tra"},
+ {"f":1,"t":0,"l":"ACK 600 (đã có đủ 200–599)","m":1,"d":1}
+]}
+</script>
+
+<h3>Flow control</h3>
+<p>Receiver có buffer giới hạn; nếu application đọc chậm, buffer đầy. Receiver quảng bá chỗ trống còn lại trong field <b>receive window (rwnd)</b>, sender đảm bảo số byte chưa ACK không vượt rwnd <span class="bk">§3.5.5</span>. Field chỉ 16 bit (tối đa 64 KB), quá nhỏ so với BDP ngày nay, nên có option <b>window scaling</b> (<code>wscale 7</code> = nhân 128). Khi rwnd = 0 (<i>zero window</i>), sender dừng hẳn: dấu hiệu application phía nhận không đọc kịp, không phải lỗi network.</p>
+
+<h2>TCP connection management</h2>
+<div class="cols2">
+<script type="application/json" class="seq">
+{"title":"3-way handshake","actors":["Client","Server"],"w":175,"steps":[
+ {"note":"CLOSED → SYN_SENT","a":0,"b":0},
+ {"f":0,"t":1,"l":"SYN, seq=x","m":1,"k":"tra"},
+ {"note":"LISTEN → SYN_RCVD","a":1,"b":1},
+ {"f":1,"t":0,"l":"SYN+ACK, seq=y, ack=x+1","m":1,"d":1,"k":"tra"},
+ {"f":0,"t":1,"l":"ACK, ack=y+1 (+ data)","m":1,"k":"tra"},
+ {"note":"cả hai ESTABLISHED","a":0,"b":1}
+]}
+</script>
+<script type="application/json" class="seq">
+{"title":"Đóng connection","actors":["Client","Server"],"w":175,"steps":[
+ {"f":0,"t":1,"l":"FIN","m":1,"k":"sec"},
+ {"note":"FIN_WAIT_1","a":0,"b":0},
+ {"f":1,"t":0,"l":"ACK","m":1,"d":1},
+ {"note":"CLOSE_WAIT\n(chờ app gọi close)","a":1,"b":1},
+ {"f":1,"t":0,"l":"FIN","m":1,"d":1,"k":"sec"},
+ {"f":0,"t":1,"l":"ACK","m":1},
+ {"note":"TIME_WAIT 2·MSL → CLOSED","a":0,"b":0}
+]}
+</script>
+</div>
+<p>Vì sao 3 bước mà không phải 2? Mỗi bên cần chọn ISN của mình <b>và</b> biết bên kia đã nhận được ISN đó <span class="bk">§3.5.6</span>. Bên đóng trước vào <b>TIME_WAIT</b> (2 × Maximum Segment Lifetime, Linux là 60 giây) để ACK cuối có cơ hội gửi lại nếu bị mất, và để segment cũ còn lạc trên mạng không lẫn vào connection mới cùng 4-tuple.</p>
+<div class="tbl"><table>
+<thead><tr><th>Cơ chế security ở transport layer</th><th>Chống gì</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>ISN ngẫu nhiên</b></td><td>Kẻ tấn công không thấy traffic thì không đoán được seq, nên không chèn được segment giả hay RST giả vào connection của người khác</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>SYN cookies</b></td><td><b>SYN flood</b>: gửi hàng loạt SYN với IP giả để làm đầy hàng đợi SYN_RCVD. Với SYN cookies, server mã hoá state vào chính ISN của SYN-ACK và không lưu gì cho tới khi ACK hợp lệ quay về (<code>sysctl net.ipv4.tcp_syncookies</code>)</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>RST và port scanning</b></td><td>SYN tới port không ai listen → RST (closed). SYN-ACK → port open. Không có gì → filtered (firewall DROP). <code>nmap</code> dựa vào đúng điều này (Lab 5.4)</td></tr>
+</tbody></table></div>
+
+<h2>Congestion control</h2>
+<p>Flow control bảo vệ <b>receiver</b>. Congestion control bảo vệ <b>network</b>: khi quá nhiều sender cùng đẩy dữ liệu, queue ở router đầy, queuing delay tăng và packet bị drop (module 01: La/R tiến về 1). Sender lại retransmit, làm network càng nghẽn <span class="bk">§3.6</span>.</p>
+<p>TCP không được router báo gì (trừ ECN), nên nó tự suy ra: <b>packet loss = có congestion</b>. Sender giữ thêm biến <b>congestion window (cwnd)</b>; số byte chưa ACK ≤ min(cwnd, rwnd), nên tốc độ gửi ≈ cwnd / RTT <span class="bk">§3.7.1</span>.</p>
+<div class="tbl"><table>
+<thead><tr><th>Giai đoạn</th><th>Quy tắc (TCP Reno)</th></tr></thead>
+<tbody>
+<tr class="t-tra"><td><span class="lay"></span><b>Slow start</b></td><td>Bắt đầu cwnd nhỏ (sách: 1 MSS; Linux: 10 MSS), <b>nhân đôi mỗi RTT</b> cho tới khi chạm <b>ssthresh</b></td></tr>
+<tr class="t-net"><td><span class="lay"></span><b>Congestion avoidance</b></td><td>Từ ssthresh trở đi, <b>+1 MSS mỗi RTT</b> (additive increase)</td></tr>
+<tr class="t-app"><td><span class="lay"></span><b>3 duplicate ACK</b></td><td>Loss nhẹ (các segment khác vẫn tới): ssthresh = cwnd/2, cwnd giảm còn khoảng một nửa (multiplicative decrease), vào fast recovery</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Timeout</b></td><td>Loss nặng: ssthresh = cwnd/2, <b>cwnd = 1 MSS</b>, slow start lại từ đầu</td></tr>
+</tbody></table></div>
+<p>Thử đặt loss event ở các round khác nhau và quan sát cwnd:</p>
+<div data-widget="cwnd"></div>
+<div class="formula">throughput ≈ 1.22 · MSS / (RTT · √p)
+<small>Công thức Mathis cho TCP Reno ở trạng thái ổn định, p là tỉ lệ packet loss. Throughput tỉ lệ nghịch với <b>RTT</b> và với <b>căn bậc hai của loss</b>. Ví dụ MSS 1,448 byte, RTT 100 ms, loss 1%: ≈ 1.4 Mbit/s, bất kể link có 1 Gbps. Đây chính là đáp án cho bảng ở Lab 1.4.</small></div>
+<div class="tbl"><table>
+<thead><tr><th>Thuật toán</th><th>Ý tưởng</th><th>Ở đâu</th></tr></thead>
+<tbody>
+<tr><td><b>Reno</b></td><td>AIMD như trên</td><td>Sách, nền tảng</td></tr>
+<tr><td><b>CUBIC</b></td><td>cwnd tăng theo hàm bậc ba của thời gian từ lần loss gần nhất; hồi phục nhanh trên link có BDP lớn</td><td>Mặc định của Linux (thấy <code>cubic</code> ở Q4)</td></tr>
+<tr><td><b>BBR</b></td><td>Đo bottleneck bandwidth và RTT tối thiểu thay vì chờ loss; ít bị loss ngẫu nhiên đánh gục</td><td>Google, một số CDN</td></tr>
+<tr><td><b>ECN</b></td><td>Router đánh dấu packet thay vì drop; receiver báo lại bằng flag ECE, sender giảm cwnd và báo CWR <span class="bk">§3.7.2</span></td><td>Data center (DCTCP)</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job</b><ul>
+  <li>Connection mới luôn bắt đầu bằng slow start, nên request đầu tiên trên connection mới chậm hơn. Thêm một lý do để dùng connection pool. Lưu ý Linux mặc định reset cwnd về nhỏ sau khi connection idle (<code>net.ipv4.tcp_slow_start_after_idle</code>).</li>
+  <li>Gọi service ở site khác (RTT lớn) qua link có loss nhẹ: throughput giảm mạnh dù băng thông dư thừa. Khi đồng nghiệp nói "link 10 Gbps mà copy chỉ được 50 Mbit/s", hãy hỏi RTT và loss trước.</li>
+  <li>HTTP/2 multiplex mọi stream trên <b>một</b> TCP connection: một segment bị mất làm <i>mọi</i> stream phải chờ (HOL blocking ở tầng TCP). Đó là động lực của QUIC.</li>
+</ul></div>
+
+<h2>QUIC và SCTP</h2>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 680 220" role="img" aria-label="So sánh stack HTTP/2 trên TLS và TCP với HTTP/3 trên QUIC và UDP">
+  <text x="130" y="20" class="t-c t-b">HTTP/2</text>
+  <g class="t-app"><rect class="f" x="40" y="32" width="180" height="32" rx="5"/><text x="130" y="53" class="t-c">HTTP/2</text></g>
+  <g class="t-sec"><rect class="f" x="40" y="68" width="180" height="32" rx="5"/><text x="130" y="89" class="t-c">TLS 1.3</text></g>
+  <g class="t-tra"><rect class="f" x="40" y="104" width="180" height="32" rx="5"/><text x="130" y="125" class="t-c">TCP</text></g>
+  <g class="t-net"><rect class="f" x="40" y="140" width="180" height="32" rx="5"/><text x="130" y="161" class="t-c">IP</text></g>
+  <text x="130" y="196" class="t-c t-s t-m">handshake TCP + TLS: 2 RTT</text>
+  <text x="130" y="211" class="t-c t-s t-m">1 segment mất → mọi stream chờ</text>
+  <text x="440" y="20" class="t-c t-b">HTTP/3</text>
+  <g class="t-app"><rect class="f" x="350" y="32" width="180" height="32" rx="5"/><text x="440" y="53" class="t-c">HTTP/3</text></g>
+  <g class="t-tra"><rect class="f" x="350" y="68" width="180" height="68" rx="5"/><text x="440" y="90" class="t-c t-b">QUIC</text><text x="440" y="108" class="t-c t-s">stream, reliability, congestion</text><text x="440" y="124" class="t-c t-s">control + TLS 1.3 bên trong</text></g>
+  <g class="t-tra"><rect class="f" x="350" y="140" width="85" height="32" rx="5"/><text x="392" y="161" class="t-c">UDP</text></g>
+  <g class="t-net"><rect class="f" x="445" y="140" width="85" height="32" rx="5"/><text x="487" y="161" class="t-c">IP</text></g>
+  <text x="440" y="196" class="t-c t-s t-m">handshake gộp: 1 RTT (0-RTT khi resume)</text>
+  <text x="440" y="211" class="t-c t-s t-m">loss chỉ chặn stream bị mất</text>
+  <text x="600" y="90" class="t-c t-s t-m">chạy trong</text><text x="600" y="104" class="t-c t-s t-m">user space</text>
+</svg></div></figure>
+<ul>
+  <li><b>QUIC</b> <span class="bk">§3.8</span>: chạy trên UDP, tự làm reliability và congestion control theo <b>từng stream</b>, bắt buộc encrypt bằng TLS 1.3 (kể cả phần lớn header). Dùng <b>connection ID</b> thay vì 4-tuple nên điện thoại chuyển từ Wi-Fi sang 4G không phải mở lại connection.</li>
+  <li><b>SCTP</b>: protocol của thế giới telecom. Giữ ranh giới message, có <b>multi-streaming</b> (không HOL giữa các stream) và <b>multi-homing</b> (một association dùng nhiều IP, link này đứt thì chuyển sang link kia). NGAP giữa base station và AMF trong 5G chạy trên SCTP.</li>
+</ul>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m05" data-title="Kiểm tra module 05">
+[
+ {"q":"Segment có <code>seq 1001</code>, <code>length 75</code>. Receiver nhận đủ thì trả ACK number bao nhiêu?","o":["1001","1075","1076","76"],"a":2,
+  "e":"Segment mang byte 1001 → 1075. ACK là byte tiếp theo đang chờ: 1076."},
+ {"q":"Client gửi SYN với <code>seq=4000</code>. SYN-ACK của server có ACK number bao nhiêu?","o":["4000","4001","0","Số ngẫu nhiên của server"],"a":1,
+  "e":"SYN tiêu một số seq dù không có dữ liệu, nên server ACK 4001. Seq của SYN-ACK mới là ISN ngẫu nhiên của server."},
+ {"q":"Link 1 Gbps, RTT 200 ms, TCP window bị giới hạn 64 KB (không window scaling). Throughput tối đa khoảng bao nhiêu?","o":["1 Gbit/s","320 Mbit/s","2.6 Mbit/s","64 KB/s"],"a":2,
+  "e":"W/RTT = 65,536 × 8 / 0.2 ≈ 2.6 Mbit/s. BDP là 1 Gbps × 0.2 s = 25 MB, window phải lớn cỡ đó mới dùng hết link. Vì vậy cần window scaling."},
+ {"q":"Sender nhận 3 duplicate ACK cùng là <code>ACK 200</code>. TCP làm gì?","o":["Chờ timeout","Retransmit ngay segment bắt đầu từ byte 200 (fast retransmit) và giảm cwnd khoảng một nửa","Đóng connection","Gửi lại toàn bộ window"],"a":1,
+  "e":"Duplicate ACK nghĩa là các segment sau vẫn tới, chỉ thiếu segment 200: loss nhẹ. Fast retransmit, ssthresh = cwnd/2, vào fast recovery."},
+ {"q":"Khác biệt giữa timeout và 3 duplicate ACK đối với cwnd trong TCP Reno?","o":["Không khác","Timeout: cwnd về 1 MSS và slow start lại; 3 dup ACK: cwnd còn khoảng một nửa","Timeout: cwnd giảm một nửa; dup ACK: cwnd về 1","Cả hai đều tăng cwnd"],"a":1,
+  "e":"Timeout cho thấy có thể đã mất nhiều thứ (không ACK nào quay về), nên TCP phản ứng mạnh. Dup ACK cho thấy network vẫn chuyển được dữ liệu."},
+ {"q":"<code>ss -ti</code> cho thấy <code>rtt:3.2</code> nhưng <code>rto:204</code>. Vì sao RTO lớn hơn RTT nhiều vậy?","o":["Đo sai","Linux đặt RTO tối thiểu 200 ms","RTO luôn bằng 64 × RTT","Do cwnd nhỏ"],"a":1,
+  "e":"Công thức cho EstimatedRTT + 4·DevRTT khá nhỏ, nhưng Linux kẹp RTO ≥ 200 ms để tránh retransmit thừa. Hệ quả: mất packet mà phải chờ timeout thì tốn ít nhất 200 ms."},
+ {"q":"Mathis: throughput ≈ 1.22·MSS/(RTT·√p). Giữ nguyên RTT, loss tăng từ 0.01% lên 1% thì throughput thay đổi thế nào?","o":["Giảm 100 lần","Giảm 10 lần","Giảm một nửa","Không đổi"],"a":1,
+  "e":"p tăng 100 lần → √p tăng 10 lần → throughput giảm 10 lần."},
+ {"q":"Receiver quảng bá <code>win 0</code> trong nhiều giây. Nguyên nhân hợp lý nhất?","o":["Network nghẽn","Application phía nhận không đọc dữ liệu kịp, buffer đầy","Firewall chặn","Mất packet"],"a":1,
+  "e":"Receive window là flow control: chỗ trống trong buffer của receiver. Zero window chỉ ra application phía nhận chậm (ví dụ thread bị block), không phải lỗi network."},
+ {"q":"Vì sao ISN được chọn ngẫu nhiên thay vì luôn bắt đầu từ 0?","o":["Để nén header","Kẻ tấn công không đoán được seq nên khó chèn segment hoặc RST giả; segment cũ của connection trước cũng không bị nhầm","Để tăng throughput","Do UDP yêu cầu"],"a":1,
+  "e":"Seq đoán được thì kẻ tấn công off-path có thể giả mạo segment hợp lệ. ISN ngẫu nhiên là một lớp bảo vệ tối thiểu; bảo vệ thật sự vẫn là TLS."},
+ {"q":"nmap gửi SYN tới port 9090 và không nhận được gì (sau vài lần thử). nmap kết luận port đó là:","o":["open","closed","filtered","listening"],"a":2,
+  "e":"SYN-ACK → open. RST → closed (host trả lời nhưng không ai listen). Im lặng → filtered: firewall đang DROP. Đây cũng là sự khác nhau giữa ECONNREFUSED và ETIMEDOUT ở module 04."},
+ {"q":"Protocol nào dưới đây chạy trên UDP?","o":["QUIC","DNS (thường)","GTP-U","NGAP"],"a":[0,1,2],
+  "e":"QUIC, DNS, GTP-U đều trên UDP. NGAP (base station ↔ AMF) chạy trên SCTP."},
+ {"q":"Vì sao HTTP/3 chuyển sang QUIC thay vì giữ TCP?","o":["UDP nhanh hơn ánh sáng","Tránh HOL blocking ở tầng TCP, gộp handshake với TLS, hỗ trợ đổi IP mà không mất connection","Vì TCP không có congestion control","Để bỏ encryption"],"a":1,
+  "e":"Một segment mất trong TCP làm mọi stream HTTP/2 chờ. QUIC xử lý loss theo từng stream, handshake 1 RTT, và dùng connection ID nên chuyển mạng vẫn giữ connection."}
+]
+</script>
+
+<h3>Ôn lại module 02–04</h3>
+<script type="application/json" class="quiz" data-id="m05-review" data-title="Ôn lại">
+[
+ {"q":"Lab 4.2 cần <code>recv_exact()</code> vì:","o":["UDP có thể mất packet","TCP là byte stream: recv() có thể trả ít hơn một message","Python chậm","DNS chưa resolve xong"],"a":1,
+  "e":"Bây giờ bạn biết lý do ở tầng dưới: TCP cắt stream thành segment theo MSS và cwnd, không theo message của bạn."},
+ {"q":"DNS query thường dùng UDP. Khi nào nó chuyển sang TCP?","o":["Luôn luôn","Khi reply bị truncated (flag TC=1) hoặc khi zone transfer","Khi tên có dấu chấm cuối","Khi dùng IPv6"],"a":1,
+  "e":"Module 03. Reply quá lớn cho một UDP datagram thì resolver hỏi lại qua TCP."},
+ {"q":"Service gọi API qua HTTP/2 tới site khác có RTT 80 ms và loss 0.5%. Đồng nghiệp đề xuất nâng link từ 1 Gbps lên 10 Gbps để nhanh hơn. Bạn trả lời gì?","o":["Đồng ý, nhanh gấp 10","Throughput bị giới hạn bởi RTT và loss (congestion control), nâng băng thông gần như không giúp; cần giảm loss hoặc RTT, hoặc dùng nhiều connection/QUIC","Chuyển sang UDP thuần","Tắt TLS"],"a":1,
+  "e":"Theo Mathis, throughput mỗi connection ≈ 1.22·MSS/(RTT·√p), không phụ thuộc link rate khi link rộng hơn nhiều."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"05 UDP & TCP","c":[
+ {"t":"Transport layer","col":"base","c":[{"t":"Process ↔ process (IP: host ↔ host)"},{"t":"Demux: port / 4-tuple"},{"t":"UDP, TCP, SCTP, QUIC"}]},
+ {"t":"UDP","col":"app","c":[{"t":"Header 8 byte"},{"t":"Không handshake, không congestion control"},{"t":"Checksum chỉ phát hiện lỗi"},{"t":"DNS, GTP-U, PFCP, QUIC"}]},
+ {"t":"Reliable data transfer","col":"tra","c":[{"t":"Checksum, ACK, seq number, timer"},{"t":"Stop-and-wait: U rất thấp"},{"t":"Pipelining: GBN, Selective Repeat"},{"t":"BDP = R × RTT; throughput ≤ W/RTT"}]},
+ {"t":"TCP","col":"net","c":[{"t":"Seq = byte đầu; ACK = byte tiếp theo"},{"t":"MSS, options trong SYN"},{"t":"RTO = EstRTT + 4·DevRTT"},{"t":"Fast retransmit: 3 dup ACK"},{"t":"Flow control: rwnd, window scaling"}]},
+ {"t":"Connection","col":"sec","c":[{"t":"3-way handshake, ISN ngẫu nhiên"},{"t":"FIN, TIME_WAIT, CLOSE_WAIT"},{"t":"SYN flood → SYN cookies"},{"t":"Port scan: open / closed / filtered"}]},
+ {"t":"Congestion control","col":"k8s","c":[{"t":"cwnd; rate ≈ cwnd/RTT"},{"t":"Slow start, ssthresh"},{"t":"AIMD: +1 MSS, ÷2"},{"t":"Mathis: ∝ 1/(RTT·√p)"},{"t":"CUBIC, BBR, ECN"}]},
+ {"t":"QUIC & SCTP","col":"core","c":[{"t":"QUIC: UDP + TLS 1.3, stream, connection ID"},{"t":"HTTP/3"},{"t":"SCTP: multi-stream, multi-homing, NGAP"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 5.1 · Mổ xẻ một TCP connection</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">tcpdump · tshark</span><span class="chip t-base">30 phút</span></div>
+  <p>Capture trọn một connection tải file khoảng 1 MB qua HTTP. Dùng <code>tshark</code> trả lời:</p>
+  <ol>
+    <li>Option nào được thoả thuận trong SYN và SYN-ACK (MSS, SACK, window scale, timestamps)? Giá trị bao nhiêu?</li>
+    <li>RTT đo từ handshake (thời gian SYN → SYN-ACK) là bao nhiêu? So với <code>ping</code>.</li>
+    <li>Bao nhiêu segment dữ liệu, trung bình mấy segment thì có một ACK (delayed ACK)?</li>
+    <li>Có retransmission hay duplicate ACK không?</li>
+    <li>Ai gửi FIN trước? Bên đó sẽ vào state nào?</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> trả lời đủ 5 câu bằng số liệu từ chính capture của bạn.</p>
+  <details><summary>Gợi ý</summary><p>Field hữu ích: <code>tcp.flags.str</code>, <code>tcp.seq</code>, <code>tcp.ack</code>, <code>tcp.len</code>, <code>tcp.options.mss_val</code>, <code>tcp.options.wscale.shift</code>, <code>tcp.analysis.ack_rtt</code>. Display filter <code>tcp.analysis.flags</code> lọc ra retransmission, dup ACK, zero window.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ sudo -v
+$ sudo tcpdump -i eth0 -w ~/netlab/pcaps/tcp1.pcap 'tcp port 80' &
+$ sleep 1; curl -s -o /dev/null http://speedtest.tele2.net/1MB.zip; sudo pkill tcpdump
+$ tshark -r ~/netlab/pcaps/tcp1.pcap -Y 'tcp.flags.syn==1' -T fields \
+    -e frame.time_relative -e tcp.flags.str -e tcp.options.mss_val -e tcp.options.wscale.shift -e tcp.options.sack_perm
+0.000000   ··········S·   1460   7   1
+0.031000   ·······A··S·   1460   9   1      ◀ RTT handshake ≈ 31 ms
+$ tshark -r ~/netlab/pcaps/tcp1.pcap -Y 'tcp.len>0' | wc -l         # số segment có dữ liệu
+$ tshark -r ~/netlab/pcaps/tcp1.pcap -Y 'tcp.len==0 && tcp.flags.ack==1 && !(tcp.flags.syn==1) && !(tcp.flags.fin==1)' | wc -l
+$ tshark -r ~/netlab/pcaps/tcp1.pcap -Y 'tcp.analysis.flags' | head
+$ tshark -r ~/netlab/pcaps/tcp1.pcap -Y 'tcp.flags.fin==1' -T fields -e ip.src | head -1
+</script>
+  <p class="small muted">Nếu <code>speedtest.tele2.net</code> không truy cập được, dùng bất kỳ file khoảng 1 MB qua HTTP, hoặc tự dựng: <code>head -c 1M /dev/urandom &gt; f.bin; python3 -m http.server 8000</code> trong container rồi tải từ container khác. Thông thường cứ 2 segment dữ liệu thì có một ACK (delayed ACK, RFC 1122).</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 5.2 · Tự cài reliable data transfer trên UDP</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python</span><span class="chip t-base">60 phút</span></div>
+  <p>Cài protocol <b>rdt 3.0</b> (stop-and-wait, alternating bit) trên UDP để gửi một file. Packet có header 4 byte: type (DATA/ACK/FIN), seq (0 hoặc 1), độ dài payload. Cả hai phía cố ý bỏ một tỉ lệ packet để giả lập packet loss. Đo throughput với loss 0%, 10%, 30%, và kiểm tra file nhận được giống hệt file gửi.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>sha256sum</code> hai file khớp ở mọi mức loss, và bạn giải thích được vì sao throughput giảm mạnh theo loss bằng con số TIMEOUT. Bonus: đổi sang Go-Back-N với window 8 và so sánh.</p>
+  <details><summary>Gợi ý</summary><ul>
+    <li>Sender: gửi, chờ ACK đúng seq; timeout thì gửi lại; đúng ACK thì đảo seq (<code>seq ^= 1</code>).</li>
+    <li>Receiver: packet có seq đang chờ thì ghi dữ liệu và đảo seq chờ; packet trùng (seq cũ) thì bỏ dữ liệu nhưng <b>vẫn ACK lại</b> (nếu không, sender kẹt mãi khi ACK bị mất).</li>
+    <li>Kết thúc: gửi FIN như một packet thường. Receiver nán lại 1 giây để ACK lại FIN nếu sender gửi lại.</li>
+  </ul></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m05/rdt.py">
+#!/usr/bin/env python3
+"""rdt 3.0 (stop-and-wait, alternating bit) trên UDP, có giả lập packet loss.
+Dùng:  python3 rdt.py recv out.bin [loss]     (cửa sổ 1)
+       python3 rdt.py send in.bin  [loss]     (cửa sổ 2)"""
+import random
+import socket
+import struct
+import sys
+import time
+
+ADDR = ("127.0.0.1", 9500)
+CHUNK, TIMEOUT = 1000, 0.2
+HDR = struct.Struct("!BBH")            # type (0=DATA, 1=ACK, 2=FIN), seq (0/1), payload length
+DATA, ACK, FIN = 0, 1, 2
+
+
+def lossy_send(sock: socket.socket, pkt: bytes, addr, loss: float) -> None:
+    if random.random() >= loss:        # giả lập packet bị drop trên đường đi
+        sock.sendto(pkt, addr)
+
+
+def sender(path: str, loss: float) -> None:
+    data = open(path, "rb").read()
+    chunks = [data[i:i + CHUNK] for i in range(0, len(data), CHUNK)]
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    seq, sent, t0 = 0, 0, time.perf_counter()
+    for i, chunk in enumerate(chunks + [b""]):
+        kind = DATA if i < len(chunks) else FIN
+        pkt = HDR.pack(kind, seq, len(chunk)) + chunk
+        acked = False
+        while not acked:
+            lossy_send(s, pkt, ADDR, loss)
+            sent += 1
+            deadline = time.perf_counter() + TIMEOUT
+            while (left := deadline - time.perf_counter()) > 0:   # chờ đúng ACK tới hết timer
+                s.settimeout(left)
+                try:
+                    reply, _ = s.recvfrom(64)
+                except TimeoutError:
+                    break
+                k, aseq, _ = HDR.unpack(reply[:HDR.size])
+                if k == ACK and aseq == seq:
+                    acked = True
+                    break                  # ACK cũ (trùng) thì bỏ qua, chờ tiếp
+        seq ^= 1
+    dt = time.perf_counter() - t0
+    print(f"{len(data)} byte, {len(chunks)} chunk, {sent} lần gửi "
+          f"({sent - len(chunks) - 1} retransmit), {dt:.2f} s, {len(data) * 8 / dt / 1e6:.2f} Mbit/s")
+
+
+def receiver(path: str, loss: float) -> None:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind(ADDR)
+    expect, out, done_at = 0, bytearray(), None
+    print(f"receiver on {ADDR}, loss={loss:.0%}")
+    while True:
+        if done_at is not None:            # đã nhận FIN: nán lại 1 s để ACK lại FIN nếu bị gửi lại
+            s.settimeout(max(0.01, done_at + 1 - time.time()))
+        try:
+            pkt, addr = s.recvfrom(2048)
+        except TimeoutError:
+            break
+        kind, seq, n = HDR.unpack(pkt[:HDR.size])
+        if seq == expect:                  # packet mới
+            if kind == DATA:
+                out += pkt[HDR.size:HDR.size + n]
+            elif kind == FIN:
+                done_at = time.time()
+            expect ^= 1
+        lossy_send(s, HDR.pack(ACK, seq, 0), addr, loss)   # mới hay trùng đều ACK lại
+    open(path, "wb").write(out)
+    print(f"đã ghi {len(out)} byte vào {path}")
+
+
+if __name__ == "__main__":
+    mode, path = sys.argv[1], sys.argv[2]
+    loss = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
+    (sender if mode == "send" else receiver)(path, loss)
+</script>
+<script type="text/plain" class="term">
+$ head -c 200000 /dev/urandom > in.bin
+$ python3 rdt.py recv out.bin 0.1 &
+$ python3 rdt.py send in.bin 0.1
+200000 byte, 200 chunk, 247 lần gửi (46 retransmit), 9.35 s, 0.17 Mbit/s
+$ sha256sum in.bin out.bin                     # hai dòng phải giống nhau
+</script>
+  <p><b>Giải thích:</b> không loss, mỗi chunk tốn khoảng 1 RTT trên localhost (vài chục µs), nên rất nhanh. Có loss, mỗi lần mất DATA hoặc mất ACK tốn trọn TIMEOUT = 200 ms. Với loss 10% ở mỗi chiều, khoảng 19% lượt gửi thất bại, tức khoảng 46 lần × 0.2 s ≈ 9 s. Đây là lý do TCP cần fast retransmit và pipelining, và vì sao RTO tối thiểu 200 ms của Linux đáng kể.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 5.3 · Nhìn cwnd sống: CUBIC và BBR dưới loss</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Docker · tc netem · iperf3 · ss</span><span class="chip t-base">40 phút</span></div>
+  <p>Quay lại thí nghiệm Lab 1.4, lần này nhìn vào bên trong TCP. Đặt delay 50 ms và loss 1% trên client, chạy iperf3 với congestion control <code>cubic</code> rồi <code>bbr</code>, vừa chạy vừa lấy mẫu <code>cwnd</code> bằng <code>ss</code> mỗi 0.5 giây.</p>
+  <p class="done-when"><b>Xong khi:</b> có hai dãy cwnd (thấy hình răng cưa với CUBIC), hai con số throughput, và một câu giải thích vì sao BBR ít bị loss ngẫu nhiên ảnh hưởng hơn.</p>
+  <details><summary>Gợi ý</summary><p><code>iperf3 -C bbr</code> chọn thuật toán cho riêng connection đó. Kernel phải có BBR: kiểm tra <code>cat /proc/sys/net/ipv4/tcp_available_congestion_control</code>; nếu thiếu, thử <code>sudo modprobe tcp_bbr</code> trên Ubuntu, nếu vẫn không có thì chỉ làm phần CUBIC.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ cat /proc/sys/net/ipv4/tcp_available_congestion_control
+reno cubic bbr
+$ docker network create netlab 2>/dev/null; true
+$ docker run -d --rm --name srv --network netlab nicolaka/netshoot iperf3 -s
+$ docker run -it --rm --name cli --network netlab --cap-add NET_ADMIN nicolaka/netshoot bash
+cli$ tc qdisc add dev eth0 root netem delay 50ms loss 1%
+cli$ iperf3 -c srv -t 20 -C cubic > /tmp/cubic.txt &
+cli$ for i in $(seq 36); do ss -tin '( dport = :5201 )' | grep -o 'cwnd:[0-9]*' | sort -t: -k2 -n | tail -1; sleep 0.5; done
+# iperf3 mở 2 connection (control + data); lấy cwnd lớn nhất là connection data
+cwnd:10
+cwnd:38
+cwnd:21                                              ◀ loss → cwnd giảm
+cwnd:29
+cli$ tail -3 /tmp/cubic.txt
+cli$ iperf3 -c srv -t 20 -C bbr | tail -3
+</script>
+  <p>CUBIC coi mọi loss là congestion và giảm cwnd, nên với 1% loss ngẫu nhiên (không phải do nghẽn) nó liên tục tự kìm mình lại. BBR ước lượng bandwidth và RTT tối thiểu của path rồi gửi đúng mức đó, nên loss ngẫu nhiên ít ảnh hưởng tới throughput. Đổi lại, BBR có thể không công bằng với CUBIC khi chạy chung một bottleneck link.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 5.4 · Port scanning: open, closed, filtered</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Docker · nmap · iptables · tcpdump</span><span class="chip t-base">30 phút</span></div>
+  <p>Dựng một container "target" có hai port open (5201, 8080), một port bị firewall DROP (9090), còn lại là closed. Từ container khác, quét bằng <code>nmap -sS</code>, đồng thời capture trên target để thấy từng loại phản hồi (SYN-ACK, RST, không có gì). Cuối cùng kiểm tra SYN cookies đã bật chưa.</p>
+  <p class="done-when"><b>Xong khi:</b> kết quả nmap khớp với thiết kế, và bạn chỉ ra được trong capture packet nào làm nmap kết luận open, closed, filtered.</p>
+  <div class="note trap" style="margin:10px 0 0"><b>Lưu ý</b><p>Chỉ quét hệ thống của chính bạn. Quét hệ thống của người khác khi chưa được phép có thể vi phạm chính sách công ty và pháp luật.</p></div>
+  <details><summary>Gợi ý</summary><p>Container thứ ba có thể dùng chung network namespace với target bằng <code>--network container:target</code>, rất tiện để tcpdump. Firewall trong target: <code>iptables -A INPUT -p tcp --dport 9090 -j DROP</code> (cần <code>--cap-add NET_ADMIN</code>).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker run -d --rm --name target --network netlab --cap-add NET_ADMIN nicolaka/netshoot sh -c \
+    'iptables -A INPUT -p tcp --dport 9090 -j DROP && iperf3 -s -D && exec socat TCP-LISTEN:8080,fork,reuseaddr EXEC:cat'
+$ docker run -d --rm --name sniff --network container:target nicolaka/netshoot \
+    tcpdump -nn -i eth0 'tcp[tcpflags] & (tcp-syn|tcp-rst) != 0'
+$ docker run --rm --network netlab nicolaka/netshoot nmap -sS -p 22,5201,8080,9090 target
+PORT     STATE    SERVICE
+22/tcp   closed   ssh
+5201/tcp open     targus-getdata1                 ◀ tên service chỉ là đoán theo số port
+8080/tcp open     http-proxy
+9090/tcp filtered zeus-admin
+$ docker logs sniff                               # output dưới đây đã rút gọn, ghép request và reply
+… > 172.20.0.2.22: Flags [S]       → 172.20.0.2.22 > …: Flags [R.]     ◀ closed: trả RST
+… > 172.20.0.2.5201: Flags [S]     → 172.20.0.2.5201 > …: Flags [S.]   ◀ open: trả SYN-ACK
+… > 172.20.0.2.9090: Flags [S]     (lặp lại, không có reply)           ◀ filtered: bị DROP
+$ docker exec target sysctl net.ipv4.tcp_syncookies
+net.ipv4.tcp_syncookies = 1                                            ◀ SYN cookies đang bật
+$ docker rm -f target sniff
+</script>
+  <p>Với port open, nmap gửi RST ngay sau khi nhận SYN-ACK thay vì hoàn tất handshake (vì vậy gọi là "half-open scan"). Trong cluster, NetworkPolicy chặn traffic cũng cho kết quả kiểu <i>filtered</i>: client gặp ETIMEDOUT thay vì ECONNREFUSED.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m05"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §3.4 (rdt) đọc kỹ các hình FSM nếu muốn hiểu sâu; §3.6 (nguyên lý congestion) và §3.7.3 (fairness) đọc lướt.</li>
+  <li><a href="https://gaia.cs.umass.edu/kurose_ross/interactive/" target="_blank" rel="noopener">Interactive problems của tác giả</a>: phần TCP seq/ACK, RTT estimation, cwnd evolution rất hợp để luyện.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc9293" target="_blank" rel="noopener">RFC 9293 – TCP</a> (bản hợp nhất năm 2022) và <a href="https://www.rfc-editor.org/rfc/rfc9000" target="_blank" rel="noopener">RFC 9000 – QUIC</a>: tra cứu.</li>
+  <li><a href="https://blog.cloudflare.com/the-road-to-quic/" target="_blank" rel="noopener">Cloudflare: The Road to QUIC</a>: vì sao QUIC ra đời, dễ đọc.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc4960" target="_blank" rel="noopener">RFC 4960 – SCTP</a> §1: phần giới thiệu ngắn về multi-streaming và multi-homing (nền cho module 15).</li>
+</ul>

@@ -1,0 +1,575 @@
+<!-- Core Net Lab · Module 13 · Network security operations (Kurose & Ross 8e, §8.7–8.9) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Thiết kế firewall theo zone: default deny, established, egress filtering, logging; biết các loại firewall và chỗ đặt chúng.</li>
+  <li>Hiểu IDS/IPS: signature vs anomaly, cách đọc và viết một rule Suricata.</li>
+  <li>Hiểu IPsec (ESP, SA, SPI, transport/tunnel mode, IKEv2) và WireGuard; tự dựng ESP giữa hai host bằng <code>ip xfrm</code>.</li>
+  <li>Biết Wi-Fi được bảo vệ thế nào (WPA2 4-way handshake, WPA3 SAE, 802.1X) và vì sao WPA2-PSK yếu bị dò offline.</li>
+  <li>Nắm ý tưởng AKA trong 4G/5G: mutual authentication bằng key K trong SIM, SQN chống replay, SUCI che danh tính.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ sudo nft list ruleset | grep -E '^table|policy'
+table ip filter                                               ◀ Q1: ai tạo các table này? (Docker? ufw? bạn?)
+		type filter hook forward priority filter; policy drop;
+table ip nat
+…
+$ ss -tlnH | awk '{print $4}' | sort -u
+0.0.0.0:22                                                    ◀ Q2: port nào nghe trên mọi interface? có cần không?
+127.0.0.53%lo:53
+$ ip xfrm state; ip xfrm policy                               # Q3: trống. xfrm là phần nào của kernel?
+$ sudo nmap -sS -p 1-1024 --reason 127.0.0.1 | grep -E 'open|filtered'
+22/tcp open  ssh  syn-ack ttl 64                              ◀ Q4: kẻ tấn công trong cùng mạng thấy gì?
+PS> netsh wlan show interfaces | Select-String 'SSID|Authentication|Cipher'
+    SSID                   : MyHome
+    Authentication         : WPA2-Personal                    ◀ Q5: Wi-Fi của bạn dùng gì? đủ an toàn không?
+    Cipher                 : CCMP
+</script>
+<p class="small muted">Lệnh <code>PS&gt;</code> chạy trong PowerShell trên Windows (WSL không thấy card Wi-Fi). Output của bạn sẽ khác: không có Docker thì có thể không có table nào; máy bàn không có Wi-Fi thì bỏ qua Q5.</p>
+
+<h2>Defense in depth</h2>
+<p>Không có một lớp bảo vệ nào hoàn hảo, nên ta xếp nhiều lớp, mỗi lớp giả định lớp trước có thể đã bị vượt qua. Đây là toàn cảnh mà module 09–12 và module này ghép lại:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 236" role="img" aria-label="Internet, edge firewall, DMZ, internal firewall, cluster; IDS nhận bản sao traffic">
+  <rect class="box" x="10" y="60" width="100" height="60" rx="10"/>
+  <text x="60" y="86" class="t-c t-b">Internet</text><text x="60" y="104" class="t-c t-s t-m">user, attacker</text>
+  <g class="t-sec"><rect class="f" x="140" y="50" width="110" height="80" rx="8"/></g>
+  <text x="195" y="74" class="t-c t-b">Edge firewall</text><text x="195" y="94" class="t-c t-s">DDoS scrubbing</text><text x="195" y="111" class="t-c t-s t-m">chỉ mở 443</text>
+  <rect class="empty" x="280" y="26" width="140" height="128" rx="10"/>
+  <text x="350" y="44" class="t-c t-s t-b t-m">DMZ</text>
+  <g class="t-net"><rect class="f" x="292" y="54" width="116" height="36" rx="6"/><rect class="f" x="292" y="102" width="116" height="36" rx="6"/></g>
+  <text x="350" y="76" class="t-c t-s t-b">Ingress / LB</text><text x="350" y="124" class="t-c t-s t-b">VPN gateway</text>
+  <g class="t-sec"><rect class="f" x="450" y="50" width="100" height="80" rx="8"/></g>
+  <text x="500" y="74" class="t-c t-b">Internal FW</text><text x="500" y="94" class="t-c t-s">segmentation</text><text x="500" y="111" class="t-c t-s t-m">chỉ 8443</text>
+  <rect class="empty" x="575" y="26" width="135" height="128" rx="10"/>
+  <text x="642" y="44" class="t-c t-s t-b t-m">Cluster</text>
+  <g class="t-k8s"><rect class="f" x="587" y="54" width="111" height="36" rx="6"/></g>
+  <text x="642" y="76" class="t-c t-s t-b">auth service</text>
+  <text x="642" y="114" class="t-c t-s">NetworkPolicy,</text><text x="642" y="130" class="t-c t-s">mTLS, AuthZ</text>
+  <line class="ln-ink" x1="110" y1="90" x2="132" y2="90"/><path class="ah" d="M140 90 l-9 -4.5 v9 z"/>
+  <line class="ln-ink" x1="250" y1="72" x2="284" y2="72"/><path class="ah" d="M292 72 l-9 -4.5 v9 z"/>
+  <line class="ln-ink" x1="408" y1="72" x2="442" y2="72"/><path class="ah" d="M450 72 l-9 -4.5 v9 z"/>
+  <line class="ln-ink" x1="550" y1="72" x2="579" y2="72"/><path class="ah" d="M587 72 l-9 -4.5 v9 z"/>
+  <path class="ln dash" d="M266 72 V206 H282"/>
+  <g class="t-app"><rect class="f" x="282" y="184" width="268" height="44" rx="8"/></g>
+  <text x="416" y="203" class="t-c t-s t-b">IDS: Suricata, Zeek</text><text x="416" y="219" class="t-c t-s">nhận bản sao traffic (TAP / SPAN), cảnh báo</text>
+  <text x="10" y="160" class="t-s t-m">Mỗi lớp giả định</text><text x="10" y="176" class="t-s t-m">lớp trước đã thủng</text>
+</svg></div>
+<figcaption>Kẻ tấn công vượt edge firewall (lỗi ở ingress) vẫn gặp internal firewall; chiếm được một pod vẫn gặp NetworkPolicy, mTLS và authorization. Mục tiêu là chặn <b>lateral movement</b>: đi ngang từ chỗ đã chiếm sang chỗ quan trọng hơn.</figcaption></figure>
+
+<h2>Firewall</h2>
+<p>Sách chia firewall thành 3 loại <span class="bk">§8.9.1</span>. Module 07 đã đi vào cơ chế netfilter/nftables; ở đây ta tập trung vào <b>thiết kế policy</b>.</p>
+<div class="tbl"><table>
+<thead><tr><th>Loại</th><th>Nhìn vào</th><th>Làm được</th><th>Không làm được</th></tr></thead>
+<tbody>
+<tr><td><b>Stateless packet filter</b></td><td>Từng packet riêng lẻ: IP, port, protocol, TCP flags</td><td>Chặn theo address/port, rất nhanh (router ACL)</td><td>Biết packet có thuộc connection đã cho phép không</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Stateful packet filter</b></td><td>+ bảng connection (conntrack)</td><td>"Chỉ cho reply của connection mình mở"</td><td>Hiểu nội dung application</td></tr>
+<tr><td><b>Application gateway / proxy</b>, WAF</td><td>Nội dung HTTP, SQL, DNS…</td><td>Chặn theo URL, user, chữ ký tấn công trong payload</td><td>Đọc traffic TLS mà không terminate TLS</td></tr>
+</tbody></table></div>
+<p>Năm nguyên tắc thiết kế policy:</p>
+<ol>
+  <li><b>Default deny</b>: policy drop, chỉ mở đúng những gì cần. Policy accept + danh sách cấm sẽ luôn sót.</li>
+  <li><b>Established trước</b>: rule <code>ct state established,related accept</code> đứng đầu, vừa nhanh vừa không phải viết rule cho chiều về.</li>
+  <li><b>Thứ tự là ngữ nghĩa</b>: rule đầu tiên khớp thắng. Rule rộng đứng trước rule hẹp là lỗi phổ biến nhất.</li>
+  <li><b>Egress filtering</b>: chặn cả chiều <b>đi ra</b>. Service bị chiếm mà không ra được Internet thì không tải thêm mã độc, không gửi dữ liệu ra ngoài, không nói chuyện với C2 server.</li>
+  <li><b>Log có giới hạn</b>: log các packet bị drop (kèm rate limit để không tự DoS ổ đĩa), đếm counter, và xem lại định kỳ.</li>
+</ol>
+<p>Thử viết rule trong simulator dưới đây. Mỗi dòng có dạng <code>action proto source dport state</code>. Bấm từng preset để thấy 3 lỗi kinh điển:</p>
+<div data-widget="fw"></div>
+<div class="note trap"><b>Cạm bẫy: Docker vượt mặt ufw</b><p>Bạn đặt <code>ufw deny 8080</code>, nhưng container chạy <code>-p 8080:80</code> vẫn bị truy cập từ ngoài. Lý do (module 07): Docker DNAT packet ở PREROUTING, nên packet đi vào chain FORWARD chứ không vào INPUT nơi ufw đặt rule. Muốn chặn phải đặt rule ở chain <code>DOCKER-USER</code>, hoặc publish port chỉ trên localhost (<code>-p 127.0.0.1:8080:80</code>). Bài học chung: <b>luôn kiểm tra firewall từ bên ngoài</b> (nmap từ máy khác), đừng chỉ đọc cấu hình.</p></div>
+<div class="note job"><b>Liên hệ job</b><p>Trong cluster, firewall có nhiều tầng: security group của cloud hoặc firewall vật lý quanh node, nftables trên node (kube-proxy, CNI), NetworkPolicy cho pod (module 14), và authorization trong service. Khi "service A không gọi được B", hãy đi từng tầng theo đường của packet. Trong core network nhà mạng, các zone thường tách theo plane: OAM (quản trị), signaling (SBI, N2), user plane (N3, N6), và interconnect với nhà mạng khác.</p></div>
+
+<h2>IDS và IPS</h2>
+<p>Firewall quyết định theo header; <b>IDS</b> (Intrusion Detection System) soi sâu vào nội dung và hành vi để phát hiện tấn công. <span class="bk">§8.9.3</span></p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Cách hoạt động</th><th>Điểm mạnh</th><th>Điểm yếu</th></tr></thead>
+<tbody>
+<tr><td><b>Signature-based</b></td><td>So với bộ rule mô tả tấn công đã biết</td><td>Chính xác, giải thích được</td><td>Không thấy tấn công mới (zero-day); cần cập nhật rule</td></tr>
+<tr><td><b>Anomaly-based</b></td><td>Học "bình thường" rồi báo khi lệch</td><td>Có thể thấy tấn công chưa biết</td><td>Nhiều <b>false positive</b>, khó giải thích</td></tr>
+</tbody></table></div>
+<p><b>IDS</b> nhận bản sao traffic (TAP, SPAN port) và chỉ cảnh báo; <b>IPS</b> đứng inline và drop được packet. Cái giá của IPS: một false positive là một sự cố mất dịch vụ. Công cụ phổ biến: <b>Suricata</b> và <b>Snort</b> (signature, cú pháp rule gần giống nhau), <b>Zeek</b> (ghi log hành vi mạng chi tiết để phân tích). Traffic TLS thì IDS chỉ thấy metadata (SNI, certificate với TLS 1.2, JA3/JA4 fingerprint) trừ khi được giải mã. Một rule Suricata trông như sau:</p>
+<script type="text/plain" class="code" data-lang="plaintext" data-file="Rule Suricata (Lab 13.2)">
+alert http any any -> any any (msg:"NETLAB admin path accessed"; http.uri; content:"/admin"; startswith; sid:1000001; rev:1;)
+│     │    │   │      │   │    └─ option: thông báo; soi http.uri; URI bắt đầu bằng /admin; ID của rule
+│     │    │   │      │   └─ dst port
+│     │    │   │      └─ dst address
+│     │    │   └─ src port
+│     │    └─ src address
+│     └─ protocol (Suricata tự nhận diện HTTP trên mọi port)
+└─ action: alert, drop (IPS), pass
+</script>
+
+<h2>IPsec và VPN</h2>
+<p><b>IPsec</b> bảo vệ ở <b>network layer</b>: mọi packet IP giữa hai host hoặc hai gateway đều được mã hoá và xác thực, application không cần biết gì. <span class="bk">§8.7</span> Dùng nhiều nhất cho <b>VPN</b>: site-to-site (nối hai mạng qua Internet) và remote access.</p>
+<div class="tbl"><table>
+<thead><tr><th>Thành phần</th><th>Ý nghĩa</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>ESP</b> (protocol 50)</td><td>Encapsulating Security Payload: mã hoá + integrity. Gần như mọi triển khai dùng ESP.</td></tr>
+<tr><td><b>AH</b> (protocol 51)</td><td>Authentication Header: chỉ integrity, không mã hoá; xác thực cả IP header nên hỏng khi qua NAT. Ít dùng.</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>SA</b> (Security Association)</td><td>"Connection" <b>một chiều</b> giữa hai đầu: thuật toán, key, SPI, sequence number. Hai chiều cần 2 SA. Lưu trong <b>SAD</b>.</td></tr>
+<tr><td><b>SPI</b></td><td>Security Parameter Index 32 bit trong ESP header: bên nhận tra SPI để biết dùng SA (key) nào.</td></tr>
+<tr><td><b>SP</b> (Security Policy)</td><td>Traffic nào phải đi qua IPsec, traffic nào bypass hay drop. Lưu trong <b>SPD</b>. Trên Linux: <code>ip xfrm state</code> = SAD, <code>ip xfrm policy</code> = SPD (Q3).</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>IKEv2</b> (UDP 500 / 4500)</td><td>Protocol tự động authenticate hai đầu (certificate hoặc PSK) và tạo SA, định kỳ đổi key. Phần mềm: strongSwan, libreswan.</td></tr>
+</tbody></table></div>
+<script type="application/json" class="pkt">
+{"title":"ESP packet","bits":32,"fields":[["Security Parameter Index (SPI)",32,"sec"],["Sequence number (chống replay)",32,"sec"],["Payload: IV + packet bên trong (mã hoá)","var","app"],["Padding",16,"app"],["Pad length",8,"app"],["Next header",8,"app"],["ICV: integrity check value (auth tag)","var","sec"]]}
+</script>
+<p>ESP chạy ở hai mode:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 214" role="img" aria-label="So sánh packet gốc, ESP transport mode, ESP tunnel mode">
+  <text x="10" y="40" class="t-b">Gốc</text>
+  <g class="t-net"><rect class="f" x="130" y="20" width="80" height="30"/></g><text x="170" y="40" class="t-c t-s">IP hdr</text>
+  <g class="t-tra"><rect class="f" x="210" y="20" width="60" height="30"/></g><text x="240" y="40" class="t-c t-s">TCP</text>
+  <g class="t-app"><rect class="f" x="270" y="20" width="150" height="30"/></g><text x="345" y="40" class="t-c t-s">Data</text>
+
+  <text x="10" y="94" class="t-b">Transport</text><text x="10" y="110" class="t-s t-m">host ↔ host</text>
+  <g class="t-net"><rect class="f" x="130" y="80" width="80" height="30"/></g><text x="170" y="100" class="t-c t-s">IP hdr</text>
+  <g class="t-sec"><rect class="f" x="210" y="80" width="60" height="30"/></g><text x="240" y="100" class="t-c t-s">ESP</text>
+  <g class="t-tra"><rect class="f" x="270" y="80" width="60" height="30"/></g><text x="300" y="100" class="t-c t-s">TCP</text>
+  <g class="t-app"><rect class="f" x="330" y="80" width="150" height="30"/></g><text x="405" y="100" class="t-c t-s">Data</text>
+  <g class="t-sec"><rect class="f" x="480" y="80" width="80" height="30"/><rect class="f" x="560" y="80" width="50" height="30"/></g>
+  <text x="520" y="100" class="t-c t-s">trailer</text><text x="585" y="100" class="t-c t-s">ICV</text>
+  <line class="ln-ink" x1="270" y1="118" x2="560" y2="118"/><text x="566" y="122" class="t-s t-b">mã hoá</text>
+  <line class="ln" x1="210" y1="130" x2="560" y2="130"/><text x="566" y="134" class="t-s t-m">integrity</text>
+
+  <text x="10" y="164" class="t-b">Tunnel</text><text x="10" y="180" class="t-s t-m">gateway ↔ gateway</text>
+  <g class="t-k8s"><rect class="f" x="130" y="150" width="90" height="30"/></g><text x="175" y="170" class="t-c t-s">IP hdr mới</text>
+  <g class="t-sec"><rect class="f" x="220" y="150" width="60" height="30"/></g><text x="250" y="170" class="t-c t-s">ESP</text>
+  <g class="t-net"><rect class="f" x="280" y="150" width="80" height="30"/></g><text x="320" y="170" class="t-c t-s">IP hdr</text>
+  <g class="t-tra"><rect class="f" x="360" y="150" width="60" height="30"/></g><text x="390" y="170" class="t-c t-s">TCP</text>
+  <g class="t-app"><rect class="f" x="420" y="150" width="140" height="30"/></g><text x="490" y="170" class="t-c t-s">Data</text>
+  <g class="t-sec"><rect class="f" x="560" y="150" width="50" height="30"/><rect class="f" x="610" y="150" width="40" height="30"/></g>
+  <text x="585" y="170" class="t-c t-s">trailer</text><text x="630" y="170" class="t-c t-s">ICV</text>
+  <line class="ln-ink" x1="280" y1="188" x2="610" y2="188"/><text x="656" y="192" class="t-s t-b">mã hoá</text>
+  <line class="ln" x1="220" y1="200" x2="610" y2="200"/><text x="656" y="204" class="t-s t-m">integrity</text>
+</svg></div>
+<figcaption>Tunnel mode gói <b>cả</b> packet gốc vào trong, nên người nghe lén chỉ thấy địa chỉ của hai gateway, không thấy host nào trong hai site đang nói chuyện với nhau. Site-to-site VPN luôn dùng tunnel mode.</figcaption></figure>
+<script type="application/json" class="seq">
+{"title":"IKEv2: tạo IKE SA và Child SA trong 2 round trip","actors":["Initiator (SEG A)","Responder (SEG B)"],"w":320,"steps":[
+ {"f":0,"t":1,"l":"IKE_SA_INIT: thuật toán đề xuất, KE (DH public), Ni","m":1},
+ {"f":1,"t":0,"l":"IKE_SA_INIT: thuật toán đã chọn, KE, Nr, CERTREQ","m":1,"d":1},
+ {"note":"hai bên tính DH secret → key cho IKE SA; từ đây mọi message được mã hoá { }","a":0,"b":1},
+ {"f":0,"t":1,"l":"{IKE_AUTH: IDi, CERT, AUTH (chữ ký), SA + TS cho Child SA}","m":1,"k":"sec"},
+ {"f":1,"t":0,"l":"{IKE_AUTH: IDr, CERT, AUTH, SA + TS}","m":1,"k":"sec","d":1},
+ {"sep":"IKE SA + Child SA (ESP) sẵn sàng"},
+ {"f":0,"t":1,"l":"[ESP] traffic giữa hai site","m":1,"k":"tra"},
+ {"f":0,"t":1,"l":"{CREATE_CHILD_SA}: đổi key định kỳ (rekey)","m":1,"k":"sec"}
+]}
+</script>
+<p>Hãy so với TLS 1.3 (module 11): cùng một mẫu. DH ephemeral cho forward secrecy (IPsec gọi là PFS), nonce chống replay, chữ ký bằng private key của certificate để authenticate (AUTH ≈ CertificateVerify). <b>TS</b> (traffic selector) thoả thuận dải IP nào đi qua tunnel. ESP không có port, nên khi một trong hai đầu ở sau NAT, IKEv2 tự chuyển sang <b>NAT-T</b>: bọc ESP trong UDP 4500.</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>IPsec (IKEv2 + ESP)</th><th>WireGuard</th><th>TLS VPN (OpenVPN…)</th></tr></thead>
+<tbody>
+<tr><td><b>Layer</b></td><td>Network (trong kernel)</td><td>Network (interface <code>wg0</code>, trong kernel)</td><td>Tunnel trên TLS, userspace</td></tr>
+<tr><td><b>Cấu hình</b></td><td>Nhiều tuỳ chọn, dễ sai, interop tốt giữa vendor</td><td>Rất ít: key pair, peer, allowed-ips</td><td>Trung bình</td></tr>
+<tr><td><b>Crypto</b></td><td>Thương lượng (AES-GCM, …)</td><td>Cố định: Curve25519, ChaCha20-Poly1305, BLAKE2s</td><td>Như TLS</td></tr>
+<tr><td><b>Gặp ở đâu</b></td><td>Thiết bị mạng, nhà mạng (chuẩn 3GPP), cloud VPN</td><td>VPN hiện đại, Kubernetes CNI (Calico, Cilium tuỳ chọn mã hoá)</td><td>Remote access</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job: IPsec trong mạng di động</b><p>3GPP dùng IPsec làm lớp bảo vệ network layer giữa các "security domain" (NDS/IP, TS 33.210): mỗi domain có <b>SEG</b> (Security Gateway), giữa các SEG là ESP tunnel mode với IKEv2 và certificate. Interface N2 (signaling) và N3 (user plane, GTP-U) giữa gNB và core cũng được bảo vệ bằng IPsec (TS 33.501), vì trạm gốc thường đặt ở nơi không kiểm soát vật lý được. Khi debug: <code>ip xfrm state</code> xem SA, <code>ip -s xfrm state</code> xem counter, tcpdump thấy <code>ESP(spi=…)</code> hoặc UDP 4500.</p></div>
+
+<h2>Wi-Fi</h2>
+<p>Trong mạng không dây, ai ở gần cũng nghe được mọi frame, nên link layer phải tự authenticate và mã hoá. <span class="bk">§8.8.1</span></p>
+<div class="tbl"><table>
+<thead><tr><th>Chuẩn</th><th>Mã hoá</th><th>Tình trạng</th></tr></thead>
+<tbody>
+<tr><td>WEP (1999)</td><td>RC4, IV 24 bit</td><td>Bị phá hoàn toàn trong vài phút. Không dùng.</td></tr>
+<tr><td>WPA (TKIP)</td><td>RC4 vá tạm</td><td>Lỗi thời</td></tr>
+<tr><td><b>WPA2</b> (2004)</td><td>CCMP (AES-CCM)</td><td>Phổ biến nhất. Personal (PSK) bị dò offline nếu passphrase yếu (Lab 13.4).</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>WPA3</b> (2018)</td><td>CCMP / GCMP</td><td>Personal dùng <b>SAE</b>: mỗi lần đoán password phải tương tác với AP, có forward secrecy</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Enterprise</b> (802.1X)</td><td>như trên</td><td>Mỗi user một credential, authenticate qua EAP tới <b>RADIUS</b> server (EAP-TLS dùng client certificate)</td></tr>
+</tbody></table></div>
+<script type="application/json" class="seq">
+{"title":"WPA2 4-way handshake","actors":["Client (supplicant)","Access point (authenticator)"],"w":320,"steps":[
+ {"note":"cả hai đã có PMK: WPA2-Personal: PMK = PBKDF2(passphrase, SSID, 4096)\nEnterprise: PMK có từ 802.1X/EAP với RADIUS","a":0,"b":1},
+ {"f":1,"t":0,"l":"Msg 1: ANonce","m":1},
+ {"note":"client tính PTK = PRF(PMK, ANonce, SNonce, MAC hai bên)","a":0,"b":1},
+ {"f":0,"t":1,"l":"Msg 2: SNonce + MIC (ký bằng KCK, một phần của PTK)","m":1,"k":"sec"},
+ {"note":"AP tính PTK, kiểm tra MIC → client chứng minh có PMK","a":0,"b":1},
+ {"f":1,"t":0,"l":"Msg 3: GTK (key broadcast, đã mã hoá) + MIC","m":1,"k":"sec"},
+ {"f":0,"t":1,"l":"Msg 4: ACK + MIC","m":1,"k":"sec"},
+ {"sep":"dữ liệu được mã hoá bằng CCMP với key từ PTK"}
+]}
+</script>
+<div class="note trap"><b>Vì sao WPA2-PSK yếu</b><p>Ai bắt được Msg 1 và Msg 2 (chỉ cần ngồi gần lúc một client kết nối) là có đủ ANonce, SNonce, MAC và MIC. Sau đó kẻ tấn công về nhà <b>đoán passphrase offline</b>: với mỗi từ, tính PMK → PTK → MIC rồi so. GPU thử được cỡ triệu passphrase mỗi giây. WPA3-SAE chặn đúng điểm này: không có gì để đoán offline. Năm 2017, KRACK cho thấy cả WPA2 có thể bị ép dùng lại nonce khi gửi lại Msg 3; lỗi đã được vá ở client và AP. Nhắc lại: chỉ thử trên mạng và dữ liệu của chính bạn.</p></div>
+
+<h2>4G/5G: SIM authenticate với mạng, và mạng authenticate với SIM</h2>
+<p>Mỗi SIM (USIM) chứa một key bí mật <b>K</b>, chỉ có một bản copy khác ở <b>home network</b> của nhà mạng (HSS trong 4G, UDM/ARPF trong 5G). Protocol <b>AKA</b> (Authentication and Key Agreement) dùng K để hai bên authenticate <b>lẫn nhau</b>, mà K không bao giờ đi trên dây. <span class="bk">§8.8.2</span></p>
+<script type="application/json" class="seq">
+{"title":"AKA (4G EPS-AKA, rút gọn)","actors":["UE (USIM có K)","Mạng phục vụ (MME / AMF)","Home network (có K)"],"w":230,"steps":[
+ {"f":0,"t":1,"l":"Attach / Registration: IMSI\n(5G: SUCI đã mã hoá)","m":1},
+ {"f":1,"t":2,"l":"xin authentication vector","m":1},
+ {"note":"sinh RAND; từ K tính XRES,\nAUTN (có SQN + MAC), key","a":2,"b":2},
+ {"f":2,"t":1,"l":"RAND, AUTN, XRES, key","m":1,"k":"sec","d":1},
+ {"f":1,"t":0,"l":"RAND, AUTN","m":1,"k":"sec"},
+ {"note":"kiểm tra AUTN bằng K:\nđúng là mạng thật, SQN mới\n(không replay); tính RES","a":0,"b":0},
+ {"f":0,"t":1,"l":"RES","m":1,"k":"sec"},
+ {"note":"RES == XRES?\n→ UE đã authenticate","a":1,"b":1},
+ {"sep":"hai bên derive cùng key → mã hoá NAS và radio"}
+]}
+</script>
+<ul>
+  <li><b>AUTN</b> chứa MAC tính từ K: UE kiểm tra được mạng này thật sự có K, tức là mạng của nhà mạng mình. Đó là bài học từ 2G (GSM chỉ có mạng authenticate thuê bao), nơi trạm gốc giả (<b>IMSI catcher</b>) lừa được điện thoại.</li>
+  <li><b>SQN</b> (sequence number) trong AUTN khiến RAND/AUTN cũ không replay được, giống nonce của ap4.0 (module 12).</li>
+  <li>5G bổ sung hai điểm. Thứ nhất, danh tính vĩnh viễn (<b>SUPI</b>, tương đương IMSI) không bao giờ gửi plaintext: UE mã hoá nó thành <b>SUCI</b> bằng public key của home network, nên IMSI catcher không theo dõi được. Thứ hai, <b>home network control</b>: trong 5G-AKA, home network (AUSF) tự kiểm tra kết quả, không phó mặc cho mạng đang phục vụ (quan trọng khi roaming). Chi tiết 5G-AKA, key hierarchy và vai trò của AUSF/UDM/SEAF ở module 15.</li>
+</ul>
+
+<h2>Tổng hợp: attack nào, chặn ở đâu</h2>
+<div class="tbl"><table>
+<thead><tr><th>Attack</th><th>Layer</th><th>Phòng thủ</th><th>Module</th></tr></thead>
+<tbody>
+<tr><td>Port scan, khai thác service lộ ra ngoài</td><td>Transport</td><td>Default deny, giảm port lắng nghe, IDS</td><td>05, 07, 13</td></tr>
+<tr><td>SYN flood, DDoS volumetric (botnet Mirai 2016)</td><td>Transport / Network</td><td>SYN cookies, rate limit, anycast + scrubbing, CDN</td><td>05, 07</td></tr>
+<tr><td>IP spoofing</td><td>Network</td><td>rp_filter, ingress filtering ở nhà cung cấp (BCP 38)</td><td>06, 07</td></tr>
+<tr><td>BGP hijacking</td><td>Network</td><td>RPKI / ROA</td><td>07</td></tr>
+<tr><td>ARP spoofing, MAC flooding</td><td>Link</td><td>Dynamic ARP inspection, port security, segmentation</td><td>08</td></tr>
+<tr><td>DNS spoofing / cache poisoning</td><td>Application</td><td>Random port + ID, DNSSEC, DoT/DoH</td><td>03</td></tr>
+<tr><td>Nghe lén, MITM</td><td>Mọi layer</td><td>TLS/mTLS, IPsec, WPA2/3, verify certificate</td><td>09–11, 13</td></tr>
+<tr><td>Credential stuffing, token bị đánh cắp</td><td>Application</td><td>MFA, rate limit, token ngắn hạn, certificate-bound token</td><td>11, 12</td></tr>
+<tr><td>Lateral movement sau khi chiếm một host</td><td>Mọi layer</td><td>Segmentation, egress filtering, NetworkPolicy, mTLS + authorization</td><td>12–14</td></tr>
+<tr><td>Trạm gốc giả, theo dõi thuê bao</td><td>Radio</td><td>Mutual authentication (AKA), SUCI</td><td>13, 15</td></tr>
+</tbody></table></div>
+<div class="note more"><b>Vận hành hằng ngày</b><p>Phần lớn sự cố bảo mật thực tế không đến từ crypto bị phá, mà từ: service lộ ra ngoài ngoài ý muốn, phần mềm chưa vá CVE, credential bị lộ, và không ai xem log. Việc thường ngày của người vận hành là: quét định kỳ từ bên ngoài (nmap), vá theo CVE, gom log firewall/IDS/auth vào một nơi (<b>SIEM</b>) có cảnh báo, và diễn tập xử lý sự cố.</p></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m13" data-title="Kiểm tra module 13">
+[
+ {"q":"Muốn \"chỉ cho reply của connection do host bên trong mở\" đi vào. Loại firewall nào làm được?","o":["Stateless packet filter","Stateful packet filter","Không loại nào","Chỉ application gateway"],"a":1,
+  "e":"Stateless chỉ thấy từng packet riêng lẻ (cùng lắm đoán bằng flag ACK, dễ bị lừa). Stateful theo dõi bảng connection."},
+ {"q":"Vì sao default policy nên là drop?","o":["Nhanh hơn","Thứ gì không được cho phép rõ ràng đều bị chặn; với accept, bất kỳ thứ gì bạn quên cấm đều lọt","Để log ít hơn","Bắt buộc theo RFC"],"a":1,
+  "e":"Danh sách những gì cần mở thì ngắn và biết trước; danh sách những gì cần cấm thì vô tận."},
+ {"q":"Egress filtering (chặn chiều đi ra) giúp gì khi một service đã bị chiếm?","o":["Không giúp gì","Hạn chế tải thêm mã độc, liên lạc C2, đưa dữ liệu ra ngoài","Tăng tốc service","Chặn DDoS từ ngoài vào"],"a":1,
+  "e":"Một auth service hiếm khi cần gọi ra Internet tuỳ ý; chỉ mở đúng đích cần (IdP, NTP, DNS nội bộ)."},
+ {"q":"Khác biệt chính giữa IDS và IPS?","o":["IDS nhanh hơn","IDS nhận bản sao và cảnh báo; IPS đứng inline và drop được, nên false positive gây mất dịch vụ","IPS không dùng rule","Không khác"],"a":1,
+  "e":"Thường bật IDS trước, tinh chỉnh rule cho bớt false positive rồi mới chuyển rule chắc chắn sang chế độ drop."},
+ {"q":"Signature-based IDS khó phát hiện loại tấn công nào?","o":["Tấn công đã biết","Tấn công mới chưa có rule (zero-day) hoặc được biến đổi để né signature","Port scan","SQL injection phổ biến"],"a":1,
+  "e":"Anomaly-based bù chỗ này nhưng đổi lại nhiều false positive."},
+ {"q":"Vì sao hầu như mọi VPN dùng ESP chứ không dùng AH?","o":["AH chậm hơn","AH không mã hoá, và xác thực cả IP header nên hỏng khi đi qua NAT","AH đã bị cấm","ESP không cần key"],"a":1,
+  "e":"ESP cho cả confidentiality và integrity; với NAT thì dùng NAT-T (UDP 4500)."},
+ {"q":"Hai văn phòng nối với nhau qua Internet bằng hai gateway. Mode nào phù hợp?","o":["Transport mode","Tunnel mode","Không cần IPsec","AH transport"],"a":1,
+  "e":"Tunnel mode gói cả packet gốc (IP của host bên trong) vào packet mới giữa hai gateway."},
+ {"q":"Một ESP connection hai chiều giữa A và B cần bao nhiêu SA (không tính IKE SA)?","o":["1","2: SA là một chiều","4","Tuỳ số packet"],"a":1,
+  "e":"Mỗi chiều có SPI, key và sequence number riêng. Lab 13.3 cài đúng 2 SA trên mỗi bên."},
+ {"q":"IPsec giữa hai site, một site ở sau NAT. Vì sao IKEv2 chuyển sang UDP 4500?","o":["Để nhanh hơn","ESP không có port nên NAT không phân biệt và dịch được; bọc trong UDP thì NAT xử lý như mọi UDP flow","Vì port 500 bị chặn","Để mã hoá mạnh hơn"],"a":1,
+  "e":"Đó là NAT traversal (NAT-T). Firewall giữa hai site phải mở UDP 500, UDP 4500 (và ESP nếu không có NAT)."},
+ {"q":"Kẻ tấn công bắt được 4-way handshake của mạng WPA2-Personal. Họ làm được gì?","o":["Không gì cả","Đoán passphrase offline bằng dictionary: mỗi từ tính PMK → PTK → MIC rồi so","Giải mã ngay mọi traffic","Đổi password của AP"],"a":1,
+  "e":"Phòng thủ: passphrase dài ngẫu nhiên, WPA3-SAE, hoặc Enterprise (802.1X) với credential riêng từng user."},
+ {"q":"Trong AKA, AUTN giúp UE biết điều gì?","o":["Tốc độ mạng","Mạng đang nói chuyện có K của nhà mạng mình (không phải trạm gốc giả), và đây không phải bản replay cũ (SQN)","Vị trí của UE","Không gì"],"a":1,
+  "e":"Đây là mutual authentication mà GSM 2G thiếu, khiến IMSI catcher hoạt động được."},
+ {"q":"SUCI trong 5G giải quyết vấn đề gì?","o":["Tăng tốc đăng ký","Danh tính vĩnh viễn (SUPI/IMSI) không còn gửi plaintext qua radio, nên khó theo dõi thuê bao","Thay thế K","Mã hoá user plane"],"a":1,
+  "e":"UE mã hoá SUPI bằng public key của home network (ECIES); chỉ home network giải mã được."},
+ {"q":"Container chạy <code>-p 8080:80</code>, admin đặt <code>ufw deny 8080</code> nhưng từ ngoài vẫn truy cập được. Vì sao?","o":["ufw lỗi","Docker DNAT ở PREROUTING nên packet đi chain FORWARD, không qua INPUT nơi ufw đặt rule","Port 8080 đặc biệt","Container dùng IPv6"],"a":1,
+  "e":"Đặt rule ở chain DOCKER-USER hoặc publish trên 127.0.0.1. Luôn kiểm tra từ bên ngoài."}
+]
+</script>
+
+<h3>Ôn lại module 07, 09, 11</h3>
+<script type="application/json" class="quiz" data-id="m13-review" data-title="Ôn lại">
+[
+ {"q":"Firewall dùng DROP thay vì REJECT cho port không mở. nmap từ ngoài thấy port đó ở trạng thái nào?","o":["open","closed","filtered","unknown"],"a":2,
+  "e":"DROP: không có phản hồi → filtered. REJECT: trả RST → closed (module 05, 07)."},
+ {"q":"IKEv2 dùng Diffie-Hellman ephemeral cho mỗi IKE SA và khi rekey. Tính chất nào của module 09 có được nhờ vậy?","o":["Non-repudiation","Forward secrecy (PFS): lộ key dài hạn sau này không giải mã được traffic cũ","Collision resistance","Không có gì"],"a":1,
+  "e":"Private key của certificate chỉ dùng để ký AUTH, không dùng để thoả thuận key."},
+ {"q":"So sánh TLS (module 11) và IPsec: cái nào bảo vệ được traffic của một application cũ không hỗ trợ TLS mà không sửa code?","o":["TLS","IPsec: hoạt động ở network layer, application không cần biết","Không cái nào","Cả hai đều phải sửa code"],"a":1,
+  "e":"Đổi lại, TLS cho authentication theo tên service (SAN), còn IPsec authenticate theo gateway/host. Service mesh mTLS là cách thứ ba: sidecar làm TLS thay application."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"13 Network security ops","c":[
+ {"t":"Defense in depth","col":"base","c":[{"t":"Zone: Internet, DMZ, internal"},{"t":"Segmentation chống lateral movement"},{"t":"Kiểm tra từ bên ngoài"}]},
+ {"t":"Firewall","col":"sec","c":[{"t":"Stateless, stateful, app gateway / WAF"},{"t":"Default deny, established trước"},{"t":"Thứ tự rule, egress filtering"},{"t":"Log có rate limit"},{"t":"Docker vượt ufw"}]},
+ {"t":"IDS / IPS","col":"app","c":[{"t":"Signature vs anomaly"},{"t":"TAP/SPAN vs inline"},{"t":"Suricata, Snort, Zeek"},{"t":"False positive"}]},
+ {"t":"IPsec / VPN","col":"net","c":[{"t":"ESP, SA một chiều, SPI"},{"t":"SAD / SPD = ip xfrm"},{"t":"Transport vs tunnel mode"},{"t":"IKEv2, NAT-T UDP 4500"},{"t":"WireGuard; 3GPP NDS/IP, SEG"}]},
+ {"t":"Wi-Fi","col":"lnk","c":[{"t":"WEP chết, WPA2 CCMP"},{"t":"4-way handshake: PMK → PTK"},{"t":"PSK bị dò offline"},{"t":"WPA3 SAE, 802.1X + RADIUS"}]},
+ {"t":"4G/5G","col":"core","c":[{"t":"K trong USIM và home network"},{"t":"AKA: RAND, AUTN, RES"},{"t":"Mutual auth, SQN chống replay"},{"t":"SUCI che SUPI"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 13.1 · Firewall 3 zone bằng nftables</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Bash · ip netns · nftables · nc</span><span class="chip t-base">45 phút</span></div>
+  <p>Lab 7.2 làm firewall cho <b>một host</b>. Lab này làm firewall cho <b>mạng</b>: một namespace <code>fw</code> làm router giữa 3 zone <code>ext</code> (giả lập Internet, 10.13.1.0/24), <code>dmz</code> (10.13.2.0/24), <code>app</code> (10.13.3.0/24). Viết ruleset nftables cho chain forward:</p>
+  <ul>
+    <li>Internet chỉ vào được DMZ port 443. DMZ chỉ vào được app port 8443.</li>
+    <li>App chỉ được đi ra đúng một đích: <code>10.13.1.10:443</code> (giả làm IdP của partner). Mọi đích khác bị chặn (egress filtering).</li>
+    <li>SSH (22) vào app chỉ từ bastion <code>10.13.1.99</code>.</li>
+    <li>Mọi thứ khác drop và được log (có rate limit).</li>
+  </ul>
+  <p class="done-when"><b>Xong khi:</b> 7 phép thử trong lời giải cho đúng kết quả, và bạn đọc được dòng log của một packet bị drop (zone vào, zone ra, port).</p>
+  <details><summary>Gợi ý</summary><p>Tạo veth với một đầu đặt luôn vào namespace: <code>ip link add fw-ext type veth peer name eth0 netns ext</code>. Bật <code>net.ipv4.ip_forward=1</code> bên trong <code>fw</code>. Trong nftables, match zone bằng <code>iifname</code>/<code>oifname</code>, dùng <code>set</code> cho danh sách admin. Kernel mặc định không ghi log netfilter từ namespace khác init: bật <code>sysctl net.netfilter.nf_log_all_netns=1</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m13/zones.sh">
+#!/usr/bin/env bash
+# 3 zone: ext (giả lập Internet) — fw — dmz, app. Chạy: sudo bash zones.sh   |   dọn: sudo bash zones.sh down
+set -euo pipefail
+if [[ ${1:-} == down ]]; then
+  for n in ext dmz app fw; do ip netns del "$n" 2>/dev/null || true; done
+  exit 0
+fi
+ip netns add fw
+ip netns exec fw sysctl -qw net.ipv4.ip_forward=1
+ip -n fw link set lo up
+i=1
+for z in ext dmz app; do
+  ip netns add "$z"
+  ip link add "fw-$z" type veth peer name eth0 netns "$z"
+  ip link set "fw-$z" netns fw
+  ip -n fw addr add "10.13.$i.1/24" dev "fw-$z"
+  ip -n fw link set "fw-$z" up
+  ip -n "$z" addr add "10.13.$i.10/24" dev eth0
+  ip -n "$z" link set eth0 up
+  ip -n "$z" link set lo up
+  ip -n "$z" route add default via "10.13.$i.1"
+  i=$((i + 1))
+done
+ip -n ext addr add 10.13.1.99/24 dev eth0      # bastion: một address thứ hai trong zone ext
+modprobe nf_log_syslog 2>/dev/null || true
+sysctl -qw net.netfilter.nf_log_all_netns=1 || echo "cảnh báo: không bật được log từ namespace"
+echo "OK: ext=10.13.1.10 (+ bastion .99), dmz=10.13.2.10, app=10.13.3.10"
+</script>
+<script type="text/plain" class="code" data-lang="plaintext" data-file="~/netlab/m13/zones.nft">
+flush ruleset
+table inet zfw {
+  set admin_src {
+    type ipv4_addr
+    elements = { 10.13.1.99 }
+  }
+  chain forward {
+    type filter hook forward priority filter; policy drop;
+    ct state established,related accept
+    ct state invalid drop
+    iifname "fw-ext" oifname "fw-dmz" tcp dport 443 accept comment "Internet -> ingress"
+    iifname "fw-dmz" oifname "fw-app" tcp dport 8443 accept comment "ingress -> auth"
+    iifname "fw-ext" oifname "fw-app" ip saddr @admin_src tcp dport 22 accept comment "bastion -> SSH"
+    iifname "fw-app" oifname "fw-ext" ip daddr 10.13.1.10 tcp dport 443 accept comment "egress: chi toi IdP"
+    limit rate 5/second log prefix "zfw-drop: " level info
+    counter comment "bi drop boi policy"
+  }
+  chain input {
+    type filter hook input priority filter; policy drop;
+    ct state established,related accept
+    iif "lo" accept
+    icmp type echo-request limit rate 5/second accept
+  }
+}
+</script>
+<script type="text/plain" class="term">
+$ mkdir -p ~/netlab/m13 && cd ~/netlab/m13 && sudo apt install -y nftables netcat-openbsd
+$ sudo bash zones.sh && sudo ip netns exec fw nft -f zones.nft
+OK: ext=10.13.1.10 (+ bastion .99), dmz=10.13.2.10, app=10.13.3.10
+$ for p in "dmz 443" "app 8443" "app 22" "ext 443" "ext 80"; do set -- $p; sudo ip netns exec $1 nc -lk $2 & done
+$ t() { sudo ip netns exec "$@" 2>&1 | sed 's/^/  /'; }      # t <ns> nc … : chạy nc trong namespace
+$ t ext nc -zv -w2 10.13.2.10 443                    # 1. Internet → DMZ:443
+  Connection to 10.13.2.10 443 port [tcp/https] succeeded!
+$ t ext nc -zv -w2 10.13.3.10 8443                   # 2. Internet → app:8443 (phải qua DMZ)
+  nc: connect to 10.13.3.10 port 8443 (tcp) timed out: Operation now in progress
+$ t dmz nc -zv -w2 10.13.3.10 8443                   # 3. DMZ → app:8443
+  Connection to 10.13.3.10 8443 port [tcp/*] succeeded!
+$ t ext nc -zv -w2 -s 10.13.1.10 10.13.3.10 22       # 4. SSH từ Internet thường
+  nc: connect to 10.13.3.10 port 22 (tcp) timed out: Operation now in progress
+$ t ext nc -zv -w2 -s 10.13.1.99 10.13.3.10 22       # 5. SSH từ bastion
+  Connection to 10.13.3.10 22 port [tcp/ssh] succeeded!
+$ t app nc -zv -w2 10.13.1.10 443                    # 6. egress tới IdP
+  Connection to 10.13.1.10 443 port [tcp/https] succeeded!
+$ t app nc -zv -w2 10.13.1.10 80                     # 7. egress tới đích khác: bị chặn
+  nc: connect to 10.13.1.10 port 80 (tcp) timed out: Operation now in progress
+$ sudo dmesg | grep zfw-drop | tail -1
+zfw-drop: IN=fw-app OUT=fw-ext SRC=10.13.3.10 DST=10.13.1.10 … PROTO=TCP SPT=40312 DPT=80 … SYN
+$ sudo ip netns exec fw nft list chain inet zfw forward | grep counter
+		counter packets 9 bytes 540 comment "bi drop boi policy"
+$ sudo pkill -f 'nc -lk'; sudo bash zones.sh down
+</script>
+  <p class="small muted">Comment trong nftables để không dấu cho chắc với mọi phiên bản. Thử thêm: đổi dòng cuối thành <code>reject with tcp reset</code> và quan sát phép thử 2 chuyển từ "timed out" sang "Connection refused" (module 07). Muốn xem từng packet đi qua rule nào, thêm <code>meta nftrace set 1</code> rồi chạy <code>nft monitor trace</code> trong namespace <code>fw</code>.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 13.2 · Viết rule IDS và chạy Suricata trên capture</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Suricata · tcpdump · nmap · jq</span><span class="chip t-base">45 phút</span></div>
+  <p>Capture traffic trên <code>lo</code> trong lúc: gọi một HTTP server nội bộ (có request tới <code>/admin</code>), quét port bằng nmap, và gọi HTTPS server của Lab 10.2 bằng SNI <code>auth.security.svc.cluster.local</code>. Viết 4 rule Suricata: truy cập <code>/admin</code>, User-Agent là curl, SYN scan (nhiều SYN từ một nguồn trong thời gian ngắn), TLS tới SNI nội bộ. Chạy Suricata offline trên file pcap rồi đọc <code>fast.log</code> và <code>eve.json</code>.</p>
+  <p class="done-when"><b>Xong khi:</b> cả 4 rule đều sinh alert; bạn giải thích được vì sao rule TLS vẫn khớp dù traffic đã mã hoá, và vì sao rule scan dùng <code>threshold</code>.</p>
+  <details><summary>Gợi ý</summary><p><code>sudo apt install -y suricata jq</code>. Chạy offline: <code>suricata -r file.pcap -S local.rules -l outdir -k none</code>. <code>-S</code> chỉ nạp file rule của bạn; <code>-k none</code> tắt kiểm tra checksum (traffic trên <code>lo</code> thường có checksum chưa tính do offload, Suricata sẽ bỏ qua packet nếu không tắt). Keyword hữu ích: <code>http.uri</code>, <code>http.user_agent</code>, <code>tls.sni</code>, <code>flags:S,12</code>, <code>threshold: type both, track by_src, count N, seconds S</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="plaintext" data-file="~/netlab/m13/local.rules">
+alert http any any -> any any (msg:"NETLAB admin path accessed"; flow:to_server,established; http.uri; content:"/admin"; startswith; sid:1000001; rev:1;)
+alert http any any -> any any (msg:"NETLAB curl user-agent"; flow:to_server,established; http.user_agent; content:"curl/"; startswith; sid:1000002; rev:1;)
+alert tcp any any -> any any (msg:"NETLAB possible SYN scan"; flags:S,12; threshold: type both, track by_src, count 50, seconds 5; sid:1000003; rev:1;)
+alert tls any any -> any any (msg:"NETLAB TLS to internal auth service"; tls.sni; content:"auth.security.svc.cluster.local"; sid:1000004; rev:1;)
+</script>
+<script type="text/plain" class="term">
+$ sudo apt install -y suricata jq nmap && cd ~/netlab/m13
+$ python3 -m http.server 8000 >/dev/null 2>&1 &
+$ (cd ~/netlab/m10/pki && openssl s_server -accept 8443 -cert server.crt -key server.key -cert_chain inter.crt -www -quiet &)
+$ sudo -v
+$ sudo tcpdump -i lo -w ids.pcap &
+$ curl -s -o /dev/null http://127.0.0.1:8000/admin
+$ curl -s -o /dev/null --cacert ~/netlab/m10/pki/root.crt --resolve auth.security.svc.cluster.local:8443:127.0.0.1 \
+    https://auth.security.svc.cluster.local:8443/
+$ sudo nmap -sS -p 1-2000 127.0.0.1 >/dev/null
+$ sleep 1; sudo pkill tcpdump; kill %1; pkill -f 's_server -accept 8443'
+$ mkdir -p out && suricata -r ids.pcap -S local.rules -l out -k none
+… Notice: suricata: This is Suricata version 7.0.3 RELEASE running in USER mode
+$ cut -c 27- out/fast.log | sort | uniq -c
+      1 [**] [1:1000001:1] NETLAB admin path accessed [**] … {TCP} 127.0.0.1:47102 -> 127.0.0.1:8000
+      1 [**] [1:1000002:1] NETLAB curl user-agent [**] … {TCP} 127.0.0.1:47102 -> 127.0.0.1:8000
+      1 [**] [1:1000003:1] NETLAB possible SYN scan [**] … {TCP} 127.0.0.1:61520 -> 127.0.0.1:…
+      1 [**] [1:1000004:1] NETLAB TLS to internal auth service [**] … {TCP} 127.0.0.1:52210 -> 127.0.0.1:8443
+$ jq -c 'select(.event_type=="alert") | {sig: .alert.signature, dst: .dest_port}' out/eve.json
+{"sig":"NETLAB admin path accessed","dst":8000}
+…
+$ jq -c 'select(.event_type=="tls") | .tls | {sni, version}' out/eve.json
+{"sni":"auth.security.svc.cluster.local","version":"TLS 1.3"}   ◀ IDS thấy SNI và version, không thấy nội dung
+</script>
+  <p><b>Đọc kết quả:</b> rule TLS khớp vì SNI nằm plaintext trong ClientHello (module 11); với TLS 1.3, IDS không thấy certificate hay request. Rule scan cần <code>threshold</code> vì một SYN đơn lẻ là chuyện bình thường; chỉ hàng chục SYN trong vài giây từ cùng một nguồn mới đáng nghi, và <code>type both</code> chỉ báo một lần mỗi chu kỳ thay vì 2000 alert. Thời gian ở đầu dòng <code>fast.log</code> đã được cắt bỏ; port nguồn và version Suricata của bạn sẽ khác. Trong production, Suricata đọc trực tiếp từ interface (AF_PACKET) và dùng bộ rule cộng đồng như ET Open, cập nhật bằng <code>suricata-update</code>.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 13.3 · IPsec ESP bằng tay với ip xfrm</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Bash · ip xfrm · tcpdump</span><span class="chip t-base">45 phút</span></div>
+  <p>Không dùng IKE, tự cài SA và SP bằng <code>ip xfrm</code> để thấy IPsec trong kernel hoạt động thế nào. Hai namespace <code>left</code> (10.13.9.1) và <code>right</code> (10.13.9.2) nối bằng veth; ESP transport mode, AES-GCM-128, mỗi chiều một SA với SPI và key riêng. Kiểm tra: ping chạy, tcpdump chỉ thấy <code>ESP(spi=…)</code>; counter của SA tăng; đổi key một bên thì packet bị drop và <code>/proc/net/xfrm_stat</code> ghi lỗi.</p>
+  <p class="done-when"><b>Xong khi:</b> tcpdump trên veth chỉ thấy ESP, không thấy ICMP; đổi key làm ping thất bại và bạn chỉ ra được counter lỗi nào tăng.</p>
+  <details><summary>Gợi ý</summary><p>AEAD <code>rfc4106(gcm(aes))</code> với AES-128 cần key 20 byte: 16 byte key + 4 byte salt (<code>openssl rand -hex 20</code>), ICV 128 bit. Mỗi namespace cần cả 2 SA (một để gửi, một để nhận) và 2 policy (<code>dir out</code> bắt buộc mã hoá traffic gửi đi, <code>dir in</code> bắt buộc traffic nhận vào phải đến từ ESP). <code>ip -n NS xfrm …</code> chạy lệnh trong namespace.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m13/ipsec.sh">
+#!/usr/bin/env bash
+# ESP transport mode giữa 2 namespace bằng key tĩnh (không IKE; chỉ để học). sudo bash ipsec.sh | sudo bash ipsec.sh down
+set -euo pipefail
+if [[ ${1:-} == down ]]; then ip netns del left 2>/dev/null || true; ip netns del right 2>/dev/null || true; exit 0; fi
+L=10.13.9.1; R=10.13.9.2
+ip netns add left; ip netns add right
+ip link add vl netns left type veth peer name vr netns right
+ip -n left addr add $L/24 dev vl;  ip -n left link set vl up;  ip -n left link set lo up
+ip -n right addr add $R/24 dev vr; ip -n right link set vr up; ip -n right link set lo up
+
+K1=0x$(openssl rand -hex 20)    # chiều left → right: AES-128 key + 4 byte salt
+K2=0x$(openssl rand -hex 20)    # chiều right → left
+ALG="rfc4106(gcm(aes))"
+for ns in left right; do        # SAD: cả hai bên đều có cả hai SA
+  ip -n $ns xfrm state add src $L dst $R proto esp spi 0x1001 reqid 1 mode transport aead "$ALG" "$K1" 128
+  ip -n $ns xfrm state add src $R dst $L proto esp spi 0x2002 reqid 2 mode transport aead "$ALG" "$K2" 128
+done
+# SPD: traffic giữa L và R bắt buộc đi qua ESP, cả chiều ra lẫn chiều vào
+ip -n left  xfrm policy add src $L dst $R dir out tmpl proto esp reqid 1 mode transport
+ip -n left  xfrm policy add src $R dst $L dir in  tmpl proto esp reqid 2 mode transport
+ip -n right xfrm policy add src $R dst $L dir out tmpl proto esp reqid 2 mode transport
+ip -n right xfrm policy add src $L dst $R dir in  tmpl proto esp reqid 1 mode transport
+echo "ESP sẵn sàng: $L <-> $R"
+</script>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m13 && sudo bash ipsec.sh
+ESP sẵn sàng: 10.13.9.1 <-> 10.13.9.2
+$ sudo ip netns exec right tcpdump -ni vr -c 4 2>/dev/null &
+$ sudo ip netns exec left ping -c 2 -q 10.13.9.2 | tail -2
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+IP 10.13.9.1 > 10.13.9.2: ESP(spi=0x00001001,seq=0x1), length 100     ◀ không còn thấy ICMP
+IP 10.13.9.2 > 10.13.9.1: ESP(spi=0x00002002,seq=0x1), length 100
+IP 10.13.9.1 > 10.13.9.2: ESP(spi=0x00001001,seq=0x2), length 100     ◀ sequence number tăng: chống replay
+IP 10.13.9.2 > 10.13.9.1: ESP(spi=0x00002002,seq=0x2), length 100
+$ sudo ip -n left -s xfrm state | grep -E '^src|lifetime current' -A1 | grep -E '^src|bytes'
+src 10.13.9.1 dst 10.13.9.2
+  168(bytes), 2(packets), …                                           ◀ counter của SA chiều đi
+…
+$ sudo ip -n right xfrm state update src 10.13.9.1 dst 10.13.9.2 proto esp spi 0x1001 reqid 1 mode transport \
+    aead 'rfc4106(gcm(aes))' 0x$(openssl rand -hex 20) 128            # right dùng nhầm key cho chiều vào
+$ sudo ip netns exec left ping -c 2 -W 1 -q 10.13.9.2 | tail -2 | head -1
+2 packets transmitted, 0 received, 100% packet loss, time 1013ms
+$ sudo ip netns exec right grep -v ' 0$' /proc/net/xfrm_stat
+XfrmInStateProtoError   	2                                          ◀ ICV sai: AES-GCM giải mã thất bại, packet bị drop
+$ sudo bash ipsec.sh down
+</script>
+  <p class="small muted">Con số <code>length</code> và counter có thể khác chút. Trong thực tế không ai đặt key tay: IKEv2 (strongSwan) tạo SA, đổi key định kỳ và authenticate hai đầu bằng certificate, ví dụ bằng PKI của Lab 10.2. <b>Mở rộng:</b> dựng lại cùng topology bằng WireGuard (<code>sudo apt install -y wireguard-tools</code>; <code>wg genkey | tee left.key | wg pubkey &gt; left.pub</code>; <code>ip -n left link add wg0 type wireguard</code>; <code>ip netns exec left wg set wg0 private-key ./left.key listen-port 51820 peer &lt;right.pub&gt; allowed-ips 10.99.0.2/32 endpoint 10.13.9.2:51820</code>, làm tương tự bên right) và so số dòng cấu hình.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 13.4 · Vì sao WPA2-PSK yếu: tự mô phỏng handshake và dò passphrase</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Python</span><span class="chip t-base">50 phút</span></div>
+  <p>Không cần card Wi-Fi. Viết <code>wpa2_sim.py</code> mô phỏng phần key của 4-way handshake: PMK = PBKDF2-HMAC-SHA1(passphrase, SSID, 4096, 32 byte); PTK = PRF-512(PMK, "Pairwise key expansion", MAC + nonce của hai bên); KCK = 16 byte đầu của PTK; MIC = HMAC-SHA1(KCK, frame Msg 2)[:16]. Tạo một handshake với passphrase của bạn, chỉ giữ lại những gì kẻ nghe lén bắt được (SSID, MAC, ANonce, SNonce, frame, MIC), rồi viết hàm dò passphrase từ wordlist. Đo tốc độ và ước lượng thời gian cho passphrase 8 ký tự thường + số và cho passphrase 20 ký tự ngẫu nhiên.</p>
+  <p class="done-when"><b>Xong khi:</b> hàm dò tìm lại đúng passphrase yếu từ wordlist, và bạn giải thích được bằng con số vì sao passphrase dài ngẫu nhiên (hoặc WPA3-SAE) khiến cách này vô dụng.</p>
+  <details><summary>Gợi ý</summary><p><code>hashlib.pbkdf2_hmac("sha1", pw, ssid, 4096, 32)</code>. PRF-512: nối <code>HMAC-SHA1(PMK, label + b"\x00" + data + bytes([i]))</code> với i = 0..3, lấy 64 byte. <code>data = min(AA, SPA) + max(AA, SPA) + min(ANonce, SNonce) + max(ANonce, SNonce)</code>. Hàm tốn thời gian nhất là PBKDF2 (4096 vòng HMAC): đó chính là "cố ý chậm" của module 12, nhưng vẫn chưa đủ chậm trước GPU.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m13/wpa2_sim.py">
+#!/usr/bin/env python3
+"""Mô phỏng phần key của WPA2-PSK 4-way handshake và dò passphrase offline.
+Chỉ chạy trên dữ liệu tự tạo; bắt handshake của mạng không phải của bạn là vi phạm pháp luật."""
+import hashlib
+import hmac
+import itertools
+import os
+import time
+
+
+def pmk(passphrase: str, ssid: str) -> bytes:
+    return hashlib.pbkdf2_hmac("sha1", passphrase.encode(), ssid.encode(), 4096, 32)
+
+
+def prf512(key: bytes, label: bytes, data: bytes) -> bytes:
+    return b"".join(hmac.new(key, label + b"\x00" + data + bytes([i]), hashlib.sha1).digest() for i in range(4))[:64]
+
+
+def ptk(pmk_: bytes, aa: bytes, spa: bytes, anonce: bytes, snonce: bytes) -> bytes:
+    data = min(aa, spa) + max(aa, spa) + min(anonce, snonce) + max(anonce, snonce)
+    return prf512(pmk_, b"Pairwise key expansion", data)
+
+
+def mic(kck: bytes, frame: bytes) -> bytes:
+    return hmac.new(kck, frame, hashlib.sha1).digest()[:16]
+
+
+def make_handshake(passphrase: str, ssid: str) -> dict:
+    """Phía AP + client thật. Trả về đúng những gì kẻ nghe lén thấy trên sóng."""
+    aa, spa = b"\x02" + os.urandom(5), b"\x02" + os.urandom(5)      # MAC của AP và client
+    anonce, snonce = os.urandom(32), os.urandom(32)                 # Msg 1, Msg 2
+    frame = b"\x01\x03\x00\x75" + snonce + b"\x00" * 16             # Msg 2 với field MIC để 0 khi tính
+    kck = ptk(pmk(passphrase, ssid), aa, spa, anonce, snonce)[:16]
+    return {"ssid": ssid, "aa": aa, "spa": spa, "anonce": anonce, "snonce": snonce,
+            "frame": frame, "mic": mic(kck, frame)}
+
+
+def crack(cap: dict, candidates) -> tuple[str | None, int, float]:
+    t0, n = time.perf_counter(), 0
+    for word in candidates:
+        n += 1
+        kck = ptk(pmk(word, cap["ssid"]), cap["aa"], cap["spa"], cap["anonce"], cap["snonce"])[:16]
+        if hmac.compare_digest(mic(kck, cap["frame"]), cap["mic"]):
+            return word, n, time.perf_counter() - t0
+    return None, n, time.perf_counter() - t0
+
+
+if __name__ == "__main__":
+    cap = make_handshake("sunshine2024", "NetLab-WiFi")
+    print(f"Bắt được: SSID={cap['ssid']} ANonce={cap['anonce'][:4].hex()}… MIC={cap['mic'].hex()[:16]}…")
+    words = ["password", "netlab", "sunshine", "dragon", "letmein", "qwerty", "admin", "welcome", "iloveyou", "monkey"]
+    wordlist = (w + suffix for w, suffix in itertools.product(words, ["", "123", "!", *map(str, range(2015, 2027))]))
+    found, tries, secs = crack(cap, wordlist)
+    rate = tries / secs
+    print(f"Tìm thấy: {found!r} sau {tries} lần thử, {secs:.2f} giây (~{rate:,.0f} lần/giây trên 1 core Python)")
+    for label, space in (("8 ký tự a-z0-9", 36 ** 8), ("20 ký tự ngẫu nhiên a-zA-Z0-9", 62 ** 20)):
+        for who, r in (("CPU này", rate), ("GPU ~1 triệu/giây", 1e6)):
+            years = space / r / 3600 / 24 / 365
+            print(f"  {label:<30} {who:<18} ≈ {years:.3g} năm (thử hết)")
+</script>
+<script type="text/plain" class="term">
+$ python3 wpa2_sim.py
+Bắt được: SSID=NetLab-WiFi ANonce=7c1e09a2… MIC=5b0d9f3c71a2e84d…
+Tìm thấy: 'sunshine2024' sau 43 lần thử, 0.10 giây (~450 lần/giây trên 1 core Python)
+  8 ký tự a-z0-9                 CPU này            ≈ 199 năm (thử hết)
+  8 ký tự a-z0-9                 GPU ~1 triệu/giây  ≈ 0.0895 năm (thử hết)      ◀ khoảng 1 tháng, nhiều GPU còn nhanh hơn
+  20 ký tự ngẫu nhiên a-zA-Z0-9  CPU này            ≈ 4.96e+25 năm (thử hết)
+  20 ký tự ngẫu nhiên a-zA-Z0-9  GPU ~1 triệu/giây  ≈ 2.23e+22 năm (thử hết)
+</script>
+  <p><b>Đọc kết quả:</b> passphrase theo kiểu "từ + năm" rơi trong tích tắc vì nằm trong wordlist; 8 ký tự ngẫu nhiên vẫn trong tầm tay một dàn GPU; 20 ký tự ngẫu nhiên thì không. WPA3-SAE thay đổi bản chất bài toán: handshake không để lại thứ gì để thử offline, mỗi lần đoán phải nói chuyện với AP (bị giới hạn tốc độ). Tốc độ và nonce của bạn sẽ khác. Kẻ tấn công thật còn có cách lấy PMKID từ AP mà không cần chờ client kết nối, nên "không ai kết nối lúc đó" không phải là phòng thủ.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m13"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §8.7 (IPsec, VPN), §8.8 (Wi-Fi, 4G/5G), §8.9 (firewall, IDS).</li>
+  <li><a href="https://wiki.nftables.org/wiki-nftables/index.php/Main_Page" target="_blank" rel="noopener">nftables wiki</a>: sets, maps, logging, tracing.</li>
+  <li><a href="https://docs.suricata.io/en/latest/rules/intro.html" target="_blank" rel="noopener">Suricata rules</a>: cú pháp rule và các keyword theo protocol.</li>
+  <li><a href="https://docs.strongswan.org/docs/latest/howtos/introduction.html" target="_blank" rel="noopener">strongSwan documentation</a>: IKEv2 với certificate, bước tiếp theo sau Lab 13.3.</li>
+  <li><a href="https://www.wireguard.com/papers/wireguard.pdf" target="_blank" rel="noopener">WireGuard whitepaper</a>: thiết kế VPN tối giản, đọc phần 1–5.</li>
+  <li><a href="https://docs.docker.com/engine/network/packet-filtering-firewalls/" target="_blank" rel="noopener">Docker: packet filtering and firewalls</a>: DOCKER-USER và vì sao ufw không chặn được port publish.</li>
+</ul>

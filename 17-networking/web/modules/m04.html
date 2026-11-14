@@ -1,0 +1,614 @@
+<!-- Core Net Lab · Module 04 · Socket programming (Kurose & Ross 8e, §2.7 + framing, concurrency, socket state) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Viết được UDP và TCP client/server bằng Python và C, biết thứ tự các system call: <code>socket</code>, <code>bind</code>, <code>listen</code>, <code>accept</code>, <code>connect</code>, <code>send</code>/<code>recv</code>, <code>close</code>.</li>
+  <li>Phân biệt listening socket và connection socket; biết 4-tuple xác định một TCP connection.</li>
+  <li>Hiểu TCP là <b>byte stream</b>, không giữ ranh giới message, và tự làm <b>message framing</b> đúng cách.</li>
+  <li>Chọn được concurrency model: thread-per-connection hay event loop (epoll).</li>
+  <li>Đọc được socket state (<code>CLOSE-WAIT</code>, <code>TIME-WAIT</code>) và error (<code>ECONNREFUSED</code>, <code>ETIMEDOUT</code>, <code>ECONNRESET</code>) khi debug middleware.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<p>Mở 3 cửa sổ Ubuntu. Bạn sẽ dựng một "chat server" chỉ bằng <code>nc</code>.</p>
+<div class="cols2">
+<script type="text/plain" class="term" data-title="Cửa sổ 1 · server">
+$ nc -l 9000
+xin chào                      ◀ chữ gõ ở cửa sổ 2 hiện ra ở đây
+</script>
+<script type="text/plain" class="term" data-title="Cửa sổ 2 · client">
+$ nc localhost 9000
+xin chào
+</script>
+</div>
+<script type="text/plain" class="term" data-title="Cửa sổ 3 · quan sát">
+$ ss -tnp | grep 9000         # Q1: có mấy dòng? port của client là bao nhiêu, ai chọn nó?
+ESTAB 0 0 127.0.0.1:9000   127.0.0.1:51234 users:(("nc",pid=812,fd=4))   ◀ phía server
+ESTAB 0 0 127.0.0.1:51234  127.0.0.1:9000  users:(("nc",pid=815,fd=3))   ◀ phía client
+$ cat /proc/sys/net/ipv4/ip_local_port_range   # Q2: dải port mà OS chọn cho client
+32768   60999
+# Nhấn Ctrl+C ở cửa sổ 2 (client đóng trước), rồi chạy lại:
+$ ss -tan | grep 9000         # Q3: state nào còn lại? Ở phía nào?
+TIME-WAIT 0 0 127.0.0.1:51234 127.0.0.1:9000
+$ nc -vz localhost 9999       # Q4: không có ai listen thì sao? Nhanh hay chậm?
+nc: connect to localhost port 9999 (tcp) failed: Connection refused
+$ nc -vz -w 3 10.255.255.1 80 # Q5: còn với một IP không có ai trả lời?
+nc: connect to 10.255.255.1 port 80 (tcp) timed out: Operation now in progress
+</script>
+
+<h2>Socket API</h2>
+<p><b>Socket</b> là "cánh cửa" giữa process và transport layer (module 02). API gần như mọi ngôn ngữ dùng là <b>Berkeley sockets</b> từ Unix những năm 1980. Trên Linux, một socket là một <b>file descriptor</b>: một con số, đọc ghi bằng <code>read</code>/<code>write</code> như file. Python, Go, Java… đều gọi xuống đúng các system call này.</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>UDP (<code>SOCK_DGRAM</code>)</th><th>TCP (<code>SOCK_STREAM</code>)</th></tr></thead>
+<tbody>
+<tr><td>Server</td><td><code>socket</code> → <code>bind</code> → lặp <code>recvfrom</code> / <code>sendto</code></td><td><code>socket</code> → <code>bind</code> → <code>listen</code> → lặp <code>accept</code> → <code>recv</code>/<code>send</code> → <code>close</code></td></tr>
+<tr><td>Client</td><td><code>socket</code> → <code>sendto(addr)</code> → <code>recvfrom</code></td><td><code>socket</code> → <code>connect(addr)</code> → <code>send</code>/<code>recv</code> → <code>close</code></td></tr>
+<tr><td>Address đích</td><td>Ghi kèm <b>mỗi</b> datagram</td><td>Chỉ lúc <code>connect</code>; sau đó connection tự biết</td></tr>
+<tr><td>Đơn vị dữ liệu</td><td>Mỗi <code>recvfrom</code> nhận đúng <b>một datagram</b></td><td><b>Byte stream</b>, không có ranh giới message</td></tr>
+<tr><td>Mất packet</td><td>App tự phát hiện (timeout) và gửi lại</td><td>TCP tự retransmit</td></tr>
+</tbody></table></div>
+
+<h3>TCP: các system call theo thời gian</h3>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 400" role="img" aria-label="Thứ tự system call của TCP server và client">
+  <text x="160" y="22" class="t-c t-b">Server</text><text x="560" y="22" class="t-c t-b">Client</text>
+  <g class="t-tra">
+    <rect class="f" x="70" y="36" width="180" height="30" rx="6"/><text x="160" y="56" class="t-c t-mono">socket()</text>
+    <rect class="f" x="70" y="80" width="180" height="30" rx="6"/><text x="160" y="100" class="t-c t-mono">bind(0.0.0.0:8443)</text>
+    <rect class="f" x="70" y="124" width="180" height="30" rx="6"/><text x="160" y="144" class="t-c t-mono">listen(backlog)</text>
+    <rect class="f" x="70" y="168" width="180" height="30" rx="6"/><text x="160" y="188" class="t-c t-mono">accept()  ⏸ chờ</text>
+    <rect class="f" x="70" y="256" width="180" height="30" rx="6"/><text x="160" y="276" class="t-c t-mono">recv() / send()</text>
+    <rect class="f" x="70" y="336" width="180" height="30" rx="6"/><text x="160" y="356" class="t-c t-mono">close()</text>
+  </g>
+  <g class="t-app">
+    <rect class="f" x="470" y="36" width="180" height="30" rx="6"/><text x="560" y="56" class="t-c t-mono">socket()</text>
+    <rect class="f" x="470" y="168" width="180" height="30" rx="6"/><text x="560" y="188" class="t-c t-mono">connect(server:8443)</text>
+    <rect class="f" x="470" y="256" width="180" height="30" rx="6"/><text x="560" y="276" class="t-c t-mono">send() / recv()</text>
+    <rect class="f" x="470" y="336" width="180" height="30" rx="6"/><text x="560" y="356" class="t-c t-mono">close()</text>
+  </g>
+  <path class="ln" d="M160 66 V80 M160 110 V124 M160 154 V168 M160 198 V256 M160 286 V336 M560 66 V168 M560 198 V256 M560 286 V336"/>
+  <line class="ln-ink" x1="470" y1="183" x2="262" y2="183"/><path class="ah" d="M252 183 l10 -5 v10 z"/>
+  <text x="360" y="176" class="t-c t-s">SYN · SYN-ACK · ACK</text>
+  <text x="360" y="204" class="t-c t-s t-m">3-way handshake do kernel làm</text>
+  <text x="172" y="226" class="t-s t-m">accept() trả về một</text>
+  <text x="172" y="240" class="t-s t-m">connection socket MỚI</text>
+  <line class="ln-ink" x1="470" y1="266" x2="262" y2="266"/><path class="ah" d="M252 266 l10 -5 v10 z"/>
+  <text x="360" y="260" class="t-c t-s">request</text>
+  <line class="ln-ink dash" x1="250" y1="282" x2="458" y2="282"/><path class="ah" d="M468 282 l-10 -5 v10 z"/>
+  <text x="360" y="298" class="t-c t-s">response</text>
+  <line class="ln-ink" x1="470" y1="351" x2="262" y2="351"/><path class="ah" d="M252 351 l10 -5 v10 z"/>
+  <text x="360" y="344" class="t-c t-s">FIN</text>
+  <text x="360" y="386" class="t-c t-s t-m">bên close() trước sẽ vào TIME-WAIT (Q3)</text>
+</svg></div>
+<figcaption>Client không cần <code>bind</code>: kernel tự chọn một <b>ephemeral port</b> trong dải 32768–60999 (Q1, Q2). <code>listen</code> chỉ báo kernel "chấp nhận connection vào port này"; handshake do kernel làm, <code>accept</code> chỉ lấy connection đã xong khỏi hàng đợi (backlog).</figcaption></figure>
+
+<h3>Listening socket và connection socket</h3>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Một listening socket và nhiều connection socket, mỗi connection có một 4-tuple riêng">
+  <rect class="box" x="20" y="14" width="390" height="200" rx="10"/>
+  <text x="36" y="36" class="t-b">Server process (auth service)</text>
+  <g class="t-sec"><rect class="f" x="40" y="48" width="350" height="30" rx="5"/><text x="56" y="68" class="t-mono">listening socket  *:8443  LISTEN</text></g>
+  <g class="t-tra">
+    <rect class="f" x="40" y="96" width="350" height="30" rx="5"/><text x="56" y="116" class="t-mono">10.0.0.9:8443 ↔ 10.0.0.5:51000  ESTAB</text>
+    <rect class="f" x="40" y="132" width="350" height="30" rx="5"/><text x="56" y="152" class="t-mono">10.0.0.9:8443 ↔ 10.0.0.5:51002  ESTAB</text>
+    <rect class="f" x="40" y="168" width="350" height="30" rx="5"/><text x="56" y="188" class="t-mono">10.0.0.9:8443 ↔ 10.0.0.7:40110  ESTAB</text>
+  </g>
+  <rect class="box" x="520" y="60" width="180" height="36" rx="7"/><text x="610" y="83" class="t-c">client mới</text>
+  <rect class="box" x="520" y="112" width="180" height="56" rx="7"/><text x="610" y="134" class="t-c">pod 10.0.0.5</text><text x="610" y="152" class="t-c t-s t-m">2 connection</text>
+  <rect class="box" x="520" y="176" width="180" height="36" rx="7"/><text x="610" y="199" class="t-c">pod 10.0.0.7</text>
+  <line class="ln dash" x1="520" y1="78" x2="390" y2="63"/><text x="455" y="60" class="t-c t-s t-m">SYN</text>
+  <line class="ln" x1="520" y1="130" x2="390" y2="111"/><line class="ln" x1="520" y1="150" x2="390" y2="147"/><line class="ln" x1="520" y1="194" x2="390" y2="183"/>
+</svg></div>
+<figcaption>Cả 4 socket cùng port 8443. Kernel phân biệt connection bằng <b>4-tuple</b> (source IP, source port, destination IP, destination port). Hai connection từ cùng pod 10.0.0.5 khác nhau ở source port. Việc chọn đúng socket cho mỗi segment đến gọi là <b>demultiplexing</b> <span class="bk">§3.2</span>.</figcaption></figure>
+<div class="note job"><b>Liên hệ job</b><p>Một proxy hoặc middleware gọi cùng một backend (cùng destination IP và port) chỉ còn đổi được source port, tức tối đa khoảng 28,000 connection đồng thời từ một IP. Mở rồi đóng connection liên tục, mỗi connection còn nằm trong <code>TIME-WAIT</code> 60 giây: hết ephemeral port, <code>connect()</code> báo <code>EADDRNOTAVAIL</code>. Đây là một lý do nữa để dùng connection pool (module 02).</p></div>
+
+<h2>TCP là byte stream: message framing</h2>
+<p>TCP đảm bảo <b>đúng byte, đúng thứ tự</b>, nhưng <b>không giữ ranh giới</b> giữa các lần <code>send()</code>. Bên nhận có thể nhận gộp hoặc nhận vụn:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 180" role="img" aria-label="Hai lần send có thể thành hai lần recv cắt ở vị trí khác">
+  <text x="10" y="40" class="t-b">send() ×2</text>
+  <g class="t-app"><rect class="f" x="150" y="20" width="150" height="32" rx="4"/><text x="225" y="41" class="t-c t-mono">"HELLO\n"</text></g>
+  <g class="t-tra"><rect class="f" x="300" y="20" width="150" height="32" rx="4"/><text x="375" y="41" class="t-c t-mono">"WORLD\n"</text></g>
+  <text x="10" y="96" class="t-b">trên dây</text>
+  <text x="10" y="112" class="t-s t-m">(segment)</text>
+  <g class="t-base"><rect class="f" x="150" y="78" width="90" height="32" rx="4"/><text x="195" y="99" class="t-c t-mono">HEL</text>
+  <rect class="f" x="240" y="78" width="150" height="32" rx="4"/><text x="315" y="99" class="t-c t-mono">LO\nWOR</text>
+  <rect class="f" x="390" y="78" width="60" height="32" rx="4"/><text x="420" y="99" class="t-c t-mono">LD\n</text></g>
+  <text x="10" y="156" class="t-b">recv() ×2</text>
+  <g class="t-net"><rect class="f" x="150" y="136" width="240" height="32" rx="4"/><text x="270" y="157" class="t-c t-mono">"HELLO\nWOR"</text>
+  <rect class="f" x="390" y="136" width="60" height="32" rx="4"/><text x="420" y="157" class="t-c t-mono">"LD\n"</text></g>
+  <text x="480" y="40" class="t-s t-m">ranh giới app muốn</text>
+  <text x="480" y="99" class="t-s t-m">TCP tự chia segment</text>
+  <text x="480" y="157" class="t-s t-m">recv() trả "những gì đã tới"</text>
+</svg></div>
+<figcaption>Trên localhost với message nhỏ, bạn hiếm khi thấy điều này, nên code sai vẫn chạy được trong lúc test và chỉ hỏng khi lên production với network thật. Lab 4.2 cố ý gửi từng byte để lộ lỗi.</figcaption></figure>
+<p>Application phải tự đánh dấu ranh giới message. Ba cách phổ biến:</p>
+<div class="tbl"><table>
+<thead><tr><th>Cách framing</th><th>Ví dụ protocol thật</th><th>Ưu / nhược</th></tr></thead>
+<tbody>
+<tr><td><b>Delimiter</b> (ký tự kết thúc)</td><td>HTTP/1.1 header kết thúc bằng <code>\r\n\r\n</code>; Redis, SMTP dùng <code>\r\n</code></td><td>Dễ debug bằng mắt; phải escape nếu dữ liệu chứa delimiter</td></tr>
+<tr><td><b>Length-prefix</b> (độ dài ở đầu)</td><td>HTTP/2 frame (Length 24 bit), DNS over TCP (2 byte), TLS record (2 byte), gRPC</td><td>Nhanh, nhận binary tuỳ ý; <b>phải giới hạn độ dài tối đa</b></td></tr>
+<tr><td><b>Fixed size</b></td><td>Một số protocol telecom cũ, header cố định</td><td>Đơn giản nhất; lãng phí, kém linh hoạt</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy security</b><ul>
+  <li>Đọc length-prefix 4 byte rồi cấp phát buffer đúng bằng số đó: kẻ tấn công gửi <code>0xFFFFFFFF</code> và service của bạn cố cấp phát 4 GB. Luôn kiểm tra <b>độ dài tối đa</b> trước khi đọc tiếp.</li>
+  <li><code>send()</code> cũng có thể gửi <b>ít hơn</b> số byte yêu cầu. Python có <code>sendall()</code>; trong C phải tự lặp tới khi gửi hết.</li>
+  <li>Không có <b>timeout</b>, một client mở connection rồi im lặng sẽ giữ thread/socket của bạn mãi. Tấn công <i>Slowloris</i> làm đúng điều này với hàng nghìn connection.</li>
+</ul></div>
+
+<h2>Concurrency model</h2>
+<p>Server thật phải phục vụ nhiều client cùng lúc. Các cách phổ biến:</p>
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Cách làm</th><th>Hợp khi</th><th>Gặp ở đâu</th></tr></thead>
+<tbody>
+<tr><td><b>Iterative</b></td><td>Một vòng lặp, phục vụ xong client này mới <code>accept</code> client sau</td><td>Demo (như ví dụ trong sách §2.7)</td><td>Không dùng thật</td></tr>
+<tr><td><b>Thread-per-connection</b></td><td>Mỗi connection một thread, code blocking dễ đọc</td><td>Vài trăm đến vài nghìn connection</td><td>Python <code>ThreadingHTTPServer</code>, Java servlet cũ</td></tr>
+<tr><td><b>Event loop</b> (I/O multiplexing)</td><td>Một thread hỏi kernel "socket nào sẵn sàng?" bằng <code>epoll</code> (Linux), xử lý socket đó, lặp lại</td><td>Hàng chục nghìn connection (bài toán C10K)</td><td>nginx, Envoy, Netty, Node.js, Python <code>asyncio</code>, Go runtime</td></tr>
+<tr><td><b>Event loop × N thread</b></td><td>Mỗi CPU core một event loop</td><td>Service hiệu năng cao</td><td>Envoy, Netty, Seastar; nhiều NF 5G viết bằng C++</td></tr>
+</tbody></table></div>
+<p>Thread-per-connection tốn bộ nhớ (stack mỗi thread cỡ vài MB) và chi phí context switch. Event loop tốn ít tài nguyên nhưng mỗi handler <b>không được block</b>: chỉ cần một lệnh chậm (đọc file lớn, gọi DNS đồng bộ) là mọi connection khác cùng đứng. Lab 4.3 viết một event loop bằng <code>epoll</code> trong C.</p>
+
+<h2>Socket state và error khi debug</h2>
+<h3>Error hay gặp</h3>
+<div class="tbl"><table>
+<thead><tr><th>Error (errno)</th><th>Nghĩa trên dây</th><th>Thường do</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><code>ECONNREFUSED</code></td><td>Gửi SYN, nhận về RST <b>ngay lập tức</b></td><td>Host sống nhưng không có process listen ở port đó; hoặc firewall REJECT</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>ETIMEDOUT</code></td><td>Gửi SYN, <b>không có gì</b> quay về; kernel retransmit SYN nhiều lần rồi bỏ cuộc</td><td>Firewall DROP, NetworkPolicy chặn, route sai, host chết</td></tr>
+<tr><td><code>ECONNRESET</code></td><td>Đang dùng thì nhận RST</td><td>Peer crash, proxy cắt connection idle, peer đóng khi còn dữ liệu chưa đọc</td></tr>
+<tr><td><code>EPIPE</code> (+ <code>SIGPIPE</code>)</td><td>Ghi vào connection mà peer đã đóng</td><td>Trong C, signal này mặc định <b>giết process</b>; server phải bỏ qua nó (<code>signal(SIGPIPE, SIG_IGN)</code> hoặc flag <code>MSG_NOSIGNAL</code>)</td></tr>
+<tr><td><code>EADDRINUSE</code></td><td>Không <code>bind</code> được port</td><td>Process khác đang dùng port, hoặc connection cũ còn TIME-WAIT; đặt <code>SO_REUSEADDR</code> trước <code>bind</code></td></tr>
+<tr><td><code>EACCES</code> khi bind</td><td>Không có quyền</td><td>Port dưới 1024 cần root hoặc capability <code>CAP_NET_BIND_SERVICE</code></td></tr>
+</tbody></table></div>
+<div class="note key"><b>Ghi nhớ: refused hay timeout?</b><p>Hai lỗi này trả lời hai câu hỏi khác nhau. <b>Refused</b> (nhanh): packet <i>tới được</i> máy đích, nhưng không ai nghe ở port đó, nên hãy kiểm tra service và port. <b>Timeout</b> (chậm): packet <i>không tới được</i> hoặc bị bỏ đi âm thầm, nên hãy kiểm tra route, firewall, NetworkPolicy. Chỉ riêng việc phân biệt hai lỗi này đã thu hẹp vùng cần debug đi một nửa.</p></div>
+
+<h3>State hay gặp trong <code>ss</code></h3>
+<div class="tbl"><table>
+<thead><tr><th>State</th><th>Nghĩa</th><th>Khi nào đáng lo</th></tr></thead>
+<tbody>
+<tr><td><code>LISTEN</code></td><td>Listening socket chờ connection</td><td>Không thấy port của service bạn → service chưa chạy hoặc bind sai address</td></tr>
+<tr><td><code>SYN-SENT</code></td><td>Đã gửi SYN, chưa có reply</td><td>Kéo dài → sắp ETIMEDOUT</td></tr>
+<tr><td><code>ESTAB</code></td><td>Connection đang dùng</td><td>Số lượng tăng mãi → client không dùng lại connection</td></tr>
+<tr><td><code>TIME-WAIT</code></td><td>Bên <b>đóng trước</b> chờ khoảng 60 s để packet cũ hết lưu hành</td><td>Bình thường; hàng chục nghìn → mở/đóng connection quá nhiều</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>CLOSE-WAIT</code></td><td>Peer đã đóng, <b>app của bạn chưa gọi close()</b></td><td>Luôn là bug của app: socket leak. Tích tụ tới khi hết file descriptor</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy: bind address</b><ul>
+  <li><code>127.0.0.1</code>: chỉ process trên cùng máy (hoặc cùng pod) gọi được. Service "chạy ngon trên laptop" nhưng không ai trong cluster gọi tới được thường là do bind nhầm vào đây.</li>
+  <li><code>0.0.0.0</code>: nghe trên mọi interface. Tiện, nhưng một admin port hay debug port bind ở đây là lộ ra ngoài.</li>
+  <li>Container chạy non-root (khuyến nghị security) không bind được port dưới 1024: dùng 8443 thay cho 443, hoặc cấp riêng <code>CAP_NET_BIND_SERVICE</code>.</li>
+</ul></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m04" data-title="Kiểm tra module 04">
+[
+ {"q":"TCP server đang có 3 client kết nối. Process server đang giữ bao nhiêu TCP socket?","o":["1","3","4","6"],"a":2,
+  "e":"1 listening socket + 3 connection socket (mỗi lần accept() trả về một socket mới). Listening socket vẫn tiếp tục nhận connection mới."},
+ {"q":"Hai connection từ cùng pod 10.0.0.5 tới cùng server 10.0.0.9:8443. Kernel của server phân biệt segment thuộc connection nào bằng gì?","o":["Destination port","Source IP","4-tuple: source IP, source port, destination IP, destination port","Process ID của client"],"a":2,
+  "e":"Ba trong bốn giá trị giống nhau, chỉ source port khác. Đó là lý do mỗi connection từ client cần một ephemeral port riêng."},
+ {"q":"Client gọi <code>send(\"PING\\n\")</code> hai lần liên tiếp. Server gọi <code>recv(1024)</code> một lần. Server có thể nhận được gì?","o":["<code>\"PING\\n\"</code>","<code>\"PING\\nPING\\n\"</code>","<code>\"PI\"</code>","Không bao giờ nhận gộp, vì đó là hai lần send"],"a":[0,1,2],
+  "e":"TCP là byte stream: recv() trả những byte đã tới, có thể ít hơn một message, đúng một message, hoặc gộp nhiều message. Vì vậy cần framing và vòng lặp đọc cho đủ."},
+ {"q":"Server dùng length-prefix 4 byte. Một client gửi độ dài <code>4294967295</code>. Server nên làm gì?","o":["Cấp phát buffer 4 GB rồi đọc","Chờ đủ 4 GB dữ liệu","So với giới hạn tối đa, từ chối và đóng connection","Bỏ qua 4 byte đó, đọc tiếp"],"a":2,
+  "e":"Không bao giờ tin độ dài do client gửi. Kiểm tra với MAX_MSG (vd 64 KB) và đóng connection nếu vượt. Đây là lỗi DoS rất phổ biến trong parser tự viết."},
+ {"q":"<code>connect()</code> tới service B báo lỗi ngay lập tức với <code>ECONNREFUSED</code>. Kết luận nào hợp lý nhất?","o":["Network giữa A và B bị đứt","Packet tới được máy B, nhưng không có process nào listen ở port đó (hoặc firewall REJECT)","DNS sai","Certificate hết hạn"],"a":1,
+  "e":"Refused = nhận về RST. Kiểm tra service có chạy không, có bind đúng port và đúng address không. Nếu packet bị DROP âm thầm thì lỗi sẽ là ETIMEDOUT, sau một khoảng chờ dài."},
+ {"q":"<code>ss -tan</code> trên pod của service bạn cho thấy 3,000 socket ở state <code>CLOSE-WAIT</code> và đang tăng. Nguyên nhân?","o":["Network chậm","Client mở quá nhiều connection","Peer đã đóng connection nhưng code của bạn không gọi close(): socket leak","Bình thường, kernel sẽ tự dọn sau 60 giây"],"a":2,
+  "e":"CLOSE-WAIT chỉ thoát khi chính app gọi close(). Kernel không tự dọn. Tìm chỗ code bỏ quên socket ở nhánh lỗi, exception, hoặc khi recv() trả về 0."},
+ {"q":"Restart server và <code>bind()</code> báo <code>EADDRINUSE</code>, dù process cũ đã tắt. Cách sửa chuẩn?","o":["Đổi sang port khác mỗi lần","Đặt <code>SO_REUSEADDR</code> trước khi bind","Chờ 1 giờ","Chạy bằng root"],"a":1,
+  "e":"Các connection cũ còn ở TIME-WAIT giữ address. SO_REUSEADDR cho phép bind lại ngay. Mọi server production đều đặt option này."},
+ {"q":"Vì sao server cần 50,000 connection đồng thời thường dùng event loop (epoll) thay vì thread-per-connection?","o":["epoll encrypt dữ liệu","Mỗi thread tốn bộ nhớ stack và chi phí context switch; một thread với epoll xử lý được rất nhiều socket","Thread không dùng được với TCP","epoll nhanh hơn vì dùng UDP"],"a":1,
+  "e":"50,000 thread × vài MB stack là rất nhiều bộ nhớ, cộng chi phí chuyển đổi giữa các thread. epoll cho biết socket nào sẵn sàng để một thread xử lý lần lượt, không phải chờ."},
+ {"q":"UDP client gửi 3 datagram bằng 3 lần <code>sendto()</code>. Server gọi <code>recvfrom()</code>. Điều nào đúng?","o":["Mỗi recvfrom() nhận đúng một datagram nguyên vẹn","Có thể nhận gộp 3 datagram trong một lần","Datagram có thể mất hoặc đến sai thứ tự","UDP tự retransmit datagram bị mất"],"a":[0,2],
+  "e":"UDP giữ ranh giới message (mỗi datagram là một đơn vị) nhưng không đảm bảo tới nơi hay đúng thứ tự. Application phải tự timeout và gửi lại, như Lab 4.1 và DNS client ở module 03."},
+ {"q":"Service chạy trong container non-root bị lỗi <code>EACCES</code> khi bind port 443. Cách xử lý hợp lý?","o":["Chạy container bằng root","Listen port 8443 (Service/Ingress của Kubernetes map 443 → 8443)","Tắt firewall","Dùng UDP"],"a":1,
+  "e":"Port dưới 1024 cần đặc quyền. Chạy non-root là best practice về security; Service hoặc Ingress lo việc map port bên ngoài vào 8443."},
+ {"q":"Service chạy tốt khi test trên laptop, nhưng pod khác trong cluster gọi tới thì bị <code>ECONNREFUSED</code>. <code>ss -tln</code> trong pod cho thấy <code>127.0.0.1:8080 LISTEN</code>. Vấn đề là gì?","o":["Service bind vào loopback nên chỉ process trong cùng pod gọi được","Port 8080 bị cấm","Thiếu DNS record","TLS cấu hình sai"],"a":0,
+  "e":"Cần bind 0.0.0.0 (hoặc IP của pod). Packet từ pod khác tới interface eth0, nơi không có ai listen, nên kernel trả RST."}
+]
+</script>
+
+<h3>Ôn lại module 01–03</h3>
+<script type="application/json" class="quiz" data-id="m04-review" data-title="Ôn lại">
+[
+ {"q":"Middleware trong pod gọi <code>api.partner.com</code> qua <code>getaddrinfo()</code>, pod có <code>ndots:5</code> và 3 search domain. Vì sao lần resolve đầu tiên chậm?","o":["TCP handshake chậm","Resolver thử 3 tên ghép search domain (đều NXDOMAIN) trước tên thật","Certificate sai","Thiếu SRV record"],"a":1,
+  "e":"Module 03: tên có ít hơn 5 dấu chấm được ghép với search domain trước. Gọi bằng FQDN có dấu chấm cuối để tránh."},
+ {"q":"Client mở connection mới cho mỗi HTTPS request tới server có RTT 20 ms. Riêng TCP handshake và TLS 1.3 handshake tốn thêm bao nhiêu trước khi request được gửi đi?","o":["0 ms","20 ms","40 ms","80 ms"],"a":2,
+  "e":"TCP handshake 1 RTT + TLS 1.3 handshake 1 RTT = 2 RTT = 40 ms mỗi request. Persistent connection hoặc connection pool trả chi phí này một lần duy nhất."},
+ {"q":"Router chuyển tiếp TCP segment của bạn. Router đọc tới header nào?","o":["Chỉ Ethernet","Ethernet và IP","Ethernet, IP và TCP","Cả HTTP"],"a":1,
+  "e":"Router xử lý tới network layer. TCP port, socket, connection chỉ tồn tại ở hai host đầu cuối (end-to-end principle, module 01)."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"04 Socket programming","c":[
+ {"t":"Socket API","col":"base","c":[{"t":"Berkeley sockets, file descriptor"},{"t":"UDP: sendto / recvfrom"},{"t":"TCP: bind, listen, accept, connect"},{"t":"Client: ephemeral port do kernel chọn"}]},
+ {"t":"TCP connection","col":"tra","c":[{"t":"Listening socket vs connection socket"},{"t":"4-tuple → demultiplexing"},{"t":"Handshake do kernel làm"},{"t":"Hết ephemeral port → EADDRNOTAVAIL"}]},
+ {"t":"Framing","col":"app","c":[{"t":"TCP = byte stream, không ranh giới"},{"t":"Delimiter: \\r\\n"},{"t":"Length-prefix: HTTP/2, TLS, DNS/TCP"},{"t":"recv_exact, sendall"},{"t":"Giới hạn độ dài tối đa"}]},
+ {"t":"Concurrency","col":"k8s","c":[{"t":"Iterative"},{"t":"Thread-per-connection"},{"t":"Event loop: epoll, asyncio"},{"t":"Handler không được block"}]},
+ {"t":"Debug","col":"sec","c":[{"t":"Refused = RST: không ai listen"},{"t":"Timeout = bị DROP / không tới"},{"t":"CLOSE-WAIT = app quên close()"},{"t":"TIME-WAIT: bên đóng trước"},{"t":"SO_REUSEADDR, SIGPIPE"}]},
+ {"t":"Security","col":"net","c":[{"t":"Bind 127.0.0.1 vs 0.0.0.0"},{"t":"Port < 1024 cần đặc quyền"},{"t":"Timeout chống Slowloris"},{"t":"Max message size chống DoS"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 4.1 · UDP client có timeout và retry</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Python</span><span class="chip t-base">30 phút</span></div>
+  <p>Viết UDP server ở port 9000 trả lại câu nhận được dưới dạng chữ hoa (giống ví dụ <code>UDPServer</code> trong sách §2.7.1), nhưng có thêm tham số để <b>cố ý bỏ</b> một tỉ lệ datagram, giả lập packet loss. Viết client đọc từng dòng từ stdin, gửi đi, chờ tối đa 0.5 giây, gửi lại tối đa 3 lần, in RTT mỗi lần thành công.</p>
+  <p class="done-when"><b>Xong khi:</b> với server bỏ 30% datagram, client vẫn nhận đủ câu trả lời (thỉnh thoảng phải retry), và bạn chỉ ra được một trường hợp client có thể nhận <b>nhầm</b> reply của câu trước.</p>
+  <details><summary>Gợi ý</summary><p><code>socket.settimeout(0.5)</code> làm <code>recvfrom()</code> ném <code>TimeoutError</code>. Server dùng <code>recvfrom()</code> để biết address người gửi rồi <code>sendto()</code> trả về đúng address đó.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m04/udp_server.py">
+#!/usr/bin/env python3
+"""UDP server: trả lại câu nhận được dưới dạng chữ hoa. Tham số: tỉ lệ cố ý drop (0..1)."""
+import random
+import socket
+import sys
+
+DROP = float(sys.argv[1]) if len(sys.argv) > 1 else 0.0
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+    s.bind(("0.0.0.0", 9000))
+    print(f"UDP server on :9000, drop={DROP:.0%}")
+    while True:
+        data, addr = s.recvfrom(2048)        # mỗi lần nhận đúng một datagram + address người gửi
+        if random.random() < DROP:
+            print(f"  drop {data!r} from {addr}")
+            continue
+        s.sendto(data.upper(), addr)         # UDP: phải chỉ rõ gửi cho ai
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m04/udp_client.py">
+#!/usr/bin/env python3
+"""UDP client có timeout + retry: UDP không retransmit, application tự lo."""
+import socket
+import sys
+import time
+
+SERVER = (sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1", 9000)
+TIMEOUT, RETRIES = 0.5, 3
+
+
+def request(sock: socket.socket, msg: bytes) -> bytes | None:
+    for attempt in range(1, RETRIES + 1):
+        t0 = time.perf_counter()
+        sock.sendto(msg, SERVER)
+        try:
+            data, _ = sock.recvfrom(2048)
+            print(f"  attempt {attempt}: RTT {(time.perf_counter() - t0) * 1000:.2f} ms")
+            return data
+        except TimeoutError:
+            print(f"  attempt {attempt}: timeout sau {TIMEOUT}s")
+    return None
+
+
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+    s.settimeout(TIMEOUT)
+    for line in sys.stdin:
+        reply = request(s, line.strip().encode())
+        print(reply.decode() if reply else f"→ bỏ cuộc sau {RETRIES} lần")
+</script>
+<script type="text/plain" class="term">
+$ python3 udp_server.py 0.3 &
+$ printf 'hello\nsocket\nnetlab\nudp\n' | python3 udp_client.py
+  attempt 1: RTT 0.21 ms
+HELLO
+  attempt 1: timeout sau 0.5s                 ◀ datagram bị server "drop"
+  attempt 2: RTT 0.18 ms
+SOCKET
+</script>
+  <p><b>Lỗi tiềm ẩn:</b> nếu reply của lần gửi thứ nhất chỉ đến muộn (không mất), client đã gửi lại và chuyển sang câu tiếp theo; reply muộn đó sẽ bị đọc như câu trả lời của câu sau. Cách sửa: gắn <b>sequence number</b> vào mỗi request và bỏ qua reply không khớp. DNS dùng đúng cách này với field ID (module 03). TCP giải quyết vấn đề này ở transport layer (module 05).</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 4.2 · Key-value server TCP với length-prefix framing</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python</span><span class="chip t-base">60 phút</span></div>
+  <p>Viết một server TCP port 9100 lưu key-value trong bộ nhớ. Protocol tự thiết kế:</p>
+  <ul>
+    <li>Mỗi message = 4 byte độ dài (big-endian) + JSON. Request: <code>{"op":"set|get|del","key":…,"value":…}</code>. Response: <code>{"ok":true,…}</code>.</li>
+    <li>Một connection gửi được nhiều request liên tiếp (persistent).</li>
+    <li>Thread-per-connection. Message dài quá 64 KB thì đóng connection. Client im lặng quá 30 giây thì đóng connection.</li>
+  </ul>
+  <p>Viết thêm client <code>kvcli.py</code>. Rồi chứng minh framing đúng bằng ba phép thử: client gửi <b>từng byte một</b>; client gửi độ dài giả <code>0xFFFFFFFF</code>; client mở connection rồi im lặng.</p>
+  <p class="done-when"><b>Xong khi:</b> cả ba phép thử cho đúng kết quả trong log server, và <code>ss -tnp | grep 9100</code> không còn socket nào treo sau khi client đi hết.</p>
+  <details><summary>Gợi ý</summary><p>Viết hàm <code>recv_exact(conn, n)</code> lặp <code>recv()</code> tới khi đủ n byte; <code>recv()</code> trả về <code>b""</code> nghĩa là peer đã đóng. <code>struct.pack("!I", n)</code> cho 4 byte big-endian. Dùng <code>with conn:</code> để chắc chắn socket được close ở mọi nhánh (tránh CLOSE-WAIT).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m04/kvserver.py">
+#!/usr/bin/env python3
+"""Key-value server: TCP + length-prefix framing + thread-per-connection."""
+import json
+import socket
+import struct
+import threading
+
+HOST, PORT = "0.0.0.0", 9100
+MAX_MSG = 64 * 1024          # chặn độ dài giả để DoS
+IDLE_TIMEOUT = 30            # giây; chống client giữ connection mà không gửi gì
+store, lock = {}, threading.Lock()
+
+
+def recv_exact(conn: socket.socket, n: int) -> bytes:
+    """Đọc đúng n byte. TCP là byte stream nên một recv() có thể trả ít hơn."""
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = conn.recv(n - len(buf))
+        if not chunk:                                # b"" = peer đã đóng connection
+            raise ConnectionError("peer closed")
+        buf += chunk
+    return bytes(buf)
+
+
+def recv_msg(conn: socket.socket) -> dict:
+    (length,) = struct.unpack("!I", recv_exact(conn, 4))
+    if length > MAX_MSG:
+        raise ValueError(f"message {length} byte vượt giới hạn {MAX_MSG}")
+    return json.loads(recv_exact(conn, length))
+
+
+def send_msg(conn: socket.socket, obj: dict) -> None:
+    data = json.dumps(obj).encode()
+    conn.sendall(struct.pack("!I", len(data)) + data)   # sendall lặp tới khi gửi hết
+
+
+def handle(req: dict) -> dict:
+    op, key = req.get("op"), req.get("key")
+    with lock:                                           # nhiều thread dùng chung store
+        if op == "set":
+            store[key] = req.get("value")
+            return {"ok": True}
+        if op == "get":
+            return {"ok": key in store, "value": store.get(key)}
+        if op == "del":
+            return {"ok": store.pop(key, None) is not None}
+    return {"ok": False, "error": f"unknown op {op!r}"}
+
+
+def serve_client(conn: socket.socket, addr) -> None:
+    conn.settimeout(IDLE_TIMEOUT)
+    print(f"+ {addr} connected ({threading.active_count() - 1} clients)")
+    try:
+        with conn:                                       # luôn close, kể cả khi có exception
+            while True:
+                send_msg(conn, handle(recv_msg(conn)))
+    except (ConnectionError, TimeoutError, ValueError) as e:
+        print(f"- {addr} closed: {e}")
+
+
+def main() -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as ls:
+        ls.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        ls.bind((HOST, PORT))
+        ls.listen(128)
+        print(f"listening on {HOST}:{PORT}")
+        while True:
+            conn, addr = ls.accept()                     # mỗi client một connection socket mới
+            threading.Thread(target=serve_client, args=(conn, addr), daemon=True).start()
+
+
+if __name__ == "__main__":
+    main()
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m04/kvcli.py">
+#!/usr/bin/env python3
+"""Client cho kvserver. Dùng: kvcli.py set KEY VALUE | get KEY | del KEY"""
+import socket
+import sys
+
+from kvserver import recv_msg, send_msg     # dùng lại đúng hàm framing của server
+
+op, key, *rest = sys.argv[1:]
+req = {"op": op, "key": key}
+if rest:
+    req["value"] = rest[0]
+with socket.create_connection(("127.0.0.1", 9100), timeout=3) as s:
+    send_msg(s, req)
+    print(recv_msg(s))
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m04/slow_client.py">
+#!/usr/bin/env python3
+"""Phép thử framing: gửi request từng byte một, nghỉ 20 ms giữa các byte."""
+import json
+import socket
+import struct
+import time
+
+from kvserver import recv_msg
+
+body = json.dumps({"op": "get", "key": "token"}).encode()
+msg = struct.pack("!I", len(body)) + body
+with socket.create_connection(("127.0.0.1", 9100)) as s:
+    for b in msg:
+        s.send(bytes([b]))       # mỗi lần send một byte → server nhận rất nhiều mảnh nhỏ
+        time.sleep(0.02)
+    print(recv_msg(s))
+</script>
+<script type="text/plain" class="term" data-title="Cửa sổ 2 · thử nghiệm">
+$ python3 kvcli.py set token abc123
+{'ok': True}
+$ python3 kvcli.py get token
+{'ok': True, 'value': 'abc123'}
+# Phép thử 1: gửi từng byte
+$ python3 slow_client.py
+{'ok': True, 'value': 'abc123'}                       ◀ framing đúng dù dữ liệu đến vụn
+# Phép thử 2: độ dài giả
+$ printf '\xff\xff\xff\xff' | nc -N localhost 9100
+# Phép thử 3: mở rồi im lặng 30 giây
+$ nc localhost 9100
+</script>
+<script type="text/plain" class="term" data-title="Cửa sổ 1 · log server">
+$ python3 kvserver.py
+listening on 0.0.0.0:9100
++ ('127.0.0.1', 51544) connected (1 clients)
+- ('127.0.0.1', 51544) closed: peer closed
++ ('127.0.0.1', 51560) connected (1 clients)
+- ('127.0.0.1', 51560) closed: message 4294967295 byte vượt giới hạn 65536
++ ('127.0.0.1', 51574) connected (1 clients)
+- ('127.0.0.1', 51574) closed: timed out                ◀ sau 30 giây
+</script>
+  <p class="small muted">Log server ở trên có thêm một cặp dòng +/− cho mỗi lệnh <code>kvcli.py</code> và <code>slow_client.py</code>. Mở rộng: thêm field <code>"auth": token</code> vào mỗi request và từ chối nếu sai; rồi capture bằng tcpdump để thấy token đi plaintext (giống Lab 2.3).</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 4.3 · Echo server một thread với epoll</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">C · epoll</span><span class="chip t-base">60 phút</span></div>
+  <p>Viết TCP echo server port 9200 bằng C, <b>một thread duy nhất</b>, dùng <code>epoll</code> để phục vụ nhiều client: listening socket và mọi connection socket đều non-blocking và đăng ký vào cùng một epoll instance. In log khi có client vào/ra. Sau đó dùng script Python mở <b>500 connection cùng lúc</b> để kiểm tra.</p>
+  <p class="done-when"><b>Xong khi:</b> 500/500 connection nhận echo đúng, <code>ss -tn | grep -c 9200</code> cho thấy hàng trăm connection trong khi <code>ps -T</code> cho thấy server chỉ có 1 thread, và khi client đóng hết thì không còn socket CLOSE-WAIT nào.</p>
+  <details><summary>Gợi ý</summary><ul>
+    <li><code>epoll_create1</code> → <code>epoll_ctl(EPOLL_CTL_ADD, listen_fd)</code> → lặp <code>epoll_wait</code>.</li>
+    <li>Sự kiện trên listening socket nghĩa là có connection mới: <code>accept4(…, SOCK_NONBLOCK)</code> trong vòng lặp tới khi gặp <code>EAGAIN</code>, rồi đăng ký fd mới.</li>
+    <li>Sự kiện trên connection socket: <code>read</code>; trả về 0 nghĩa là peer đã đóng → <code>EPOLL_CTL_DEL</code> và <code>close</code>.</li>
+  </ul></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="c" data-file="~/netlab/m04/echo_epoll.c">
+// echo_epoll.c — TCP echo server một thread, nhiều client, dùng epoll (Linux)
+#define _GNU_SOURCE
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#define PORT 9200
+#define MAX_EVENTS 64
+
+static void die(const char *msg) { perror(msg); exit(1); }
+
+int main(void) {
+    signal(SIGPIPE, SIG_IGN);                     // ghi vào socket đã đóng: nhận EPIPE thay vì chết
+
+    int lfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (lfd < 0) die("socket");
+    int one = 1;
+    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+    struct sockaddr_in addr = { .sin_family = AF_INET, .sin_port = htons(PORT),
+                                .sin_addr.s_addr = htonl(INADDR_ANY) };
+    if (bind(lfd, (struct sockaddr *)&addr, sizeof addr) < 0) die("bind");
+    if (listen(lfd, SOMAXCONN) < 0) die("listen");
+
+    int ep = epoll_create1(0);
+    if (ep < 0) die("epoll_create1");
+    struct epoll_event ev = { .events = EPOLLIN, .data.fd = lfd };
+    if (epoll_ctl(ep, EPOLL_CTL_ADD, lfd, &ev) < 0) die("epoll_ctl");
+    printf("echo server on :%d (1 thread, epoll)\n", PORT);
+
+    struct epoll_event events[MAX_EVENTS];
+    int clients = 0;
+    for (;;) {
+        int n = epoll_wait(ep, events, MAX_EVENTS, -1);   // ngủ tới khi có fd sẵn sàng
+        if (n < 0) { if (errno == EINTR) continue; die("epoll_wait"); }
+        for (int i = 0; i < n; i++) {
+            int fd = events[i].data.fd;
+            if (fd == lfd) {                       // listening socket: có connection mới
+                for (;;) {
+                    struct sockaddr_in peer;
+                    socklen_t len = sizeof peer;
+                    int cfd = accept4(lfd, (struct sockaddr *)&peer, &len, SOCK_NONBLOCK);
+                    if (cfd < 0) break;            // EAGAIN: đã lấy hết connection đang chờ
+                    struct epoll_event cev = { .events = EPOLLIN, .data.fd = cfd };
+                    epoll_ctl(ep, EPOLL_CTL_ADD, cfd, &cev);
+                    clients++;
+                    if (clients % 100 == 1) {      // log thưa để không làm chậm load test
+                        char ip[INET_ADDRSTRLEN];
+                        inet_ntop(AF_INET, &peer.sin_addr, ip, sizeof ip);
+                        printf("+ %s:%d fd=%d (%d clients)\n", ip, ntohs(peer.sin_port), cfd, clients);
+                    }
+                }
+            } else {                               // connection socket: có dữ liệu hoặc peer đã đóng
+                char buf[4096];
+                ssize_t r = read(fd, buf, sizeof buf);
+                if (r > 0) {
+                    // Demo: giả định write() ghi hết. Code thật phải giữ phần chưa ghi
+                    // và đăng ký EPOLLOUT để ghi tiếp khi socket sẵn sàng.
+                    if (write(fd, buf, (size_t)r) < 0 && errno != EAGAIN) perror("write");
+                } else if (r == 0 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                    epoll_ctl(ep, EPOLL_CTL_DEL, fd, NULL);
+                    close(fd);                     // quên dòng này → CLOSE-WAIT tích tụ
+                    clients--;
+                    if (clients == 0) printf("- all clients gone\n");
+                }
+            }
+        }
+    }
+}
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m04/loadtest.py">
+#!/usr/bin/env python3
+"""Mở N connection cùng lúc tới echo server, mỗi connection gửi một dòng và kiểm tra echo."""
+import socket
+import sys
+import time
+
+N = int(sys.argv[1]) if len(sys.argv) > 1 else 500
+t0 = time.perf_counter()
+socks = [socket.create_connection(("127.0.0.1", 9200)) for _ in range(N)]
+for i, s in enumerate(socks):
+    s.sendall(f"hello {i}\n".encode())
+ok = sum(s.recv(64) == f"hello {i}\n".encode() for i, s in enumerate(socks))
+print(f"{ok}/{N} echo đúng trong {time.perf_counter() - t0:.2f}s")
+input("Enter để đóng hết connection (trước đó thử: ss -tn | grep -c 9200) ")
+for s in socks:
+    s.close()
+</script>
+<script type="text/plain" class="term">
+$ gcc -O2 -Wall -Wextra -o echo_epoll echo_epoll.c && ./echo_epoll &
+$ python3 loadtest.py 500
+500/500 echo đúng trong 0.31s
+Enter để đóng hết connection …
+# Ở cửa sổ khác, trước khi nhấn Enter:
+$ ss -tn | grep -c ':9200'
+1000                                                   ◀ 500 phía client + 500 phía server
+$ ps -T -p $(pgrep echo_epoll) | tail -n +2 | wc -l
+1                                                      ◀ chỉ một thread
+</script>
+  <p class="small muted">Muốn thử vài nghìn connection, tăng giới hạn file descriptor trước: <code>ulimit -n 8192</code> ở cả hai cửa sổ. Mở rộng: xoá dòng <code>close(fd)</code>, chạy lại load test, rồi xem <code>ss -tan state close-wait | wc -l</code>.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 4.4 · Bắt quả tang socket leak</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · ss · Bash</span><span class="chip t-base">25 phút</span></div>
+  <p>Đây là sự cố thật hay gặp với middleware: service dần dần "chết" vì hết file descriptor. Chạy server có bug dưới đây, tạo traffic, rồi dùng <code>ss</code> và <code>/proc</code> để chứng minh nó leak socket và chỉ ra state của các socket bị leak. Sau đó sửa bug.</p>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m04/buggy_server.py">
+#!/usr/bin/env python3
+"""Server có bug: đọc xong thì quên close() connection."""
+import socket
+
+ls = socket.socket()
+ls.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+ls.bind(("127.0.0.1", 9300))
+ls.listen()
+leaked = []
+while True:
+    conn, _ = ls.accept()
+    conn.recv(100)
+    leaked.append(conn)          # giữ reference nên Python không tự đóng socket
+    print("sockets đang giữ:", len(leaked))
+</script>
+  <p class="done-when"><b>Xong khi:</b> có output <code>ss</code> cho thấy socket ở state CLOSE-WAIT, đếm được số file descriptor của process tăng theo traffic, và bản sửa làm số đó đứng yên.</p>
+  <details><summary>Gợi ý</summary><p>Tạo 20 client: <code>for i in $(seq 20); do echo hi | nc -N 127.0.0.1 9300; done</code>. Lọc state: <code>ss -tan state close-wait</code>. Số file descriptor của một process: <code>ls /proc/PID/fd | wc -l</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ python3 buggy_server.py &
+$ for i in $(seq 20); do echo hi | nc -N 127.0.0.1 9300; done
+$ ss -tan state close-wait '( sport = :9300 )' | tail -n +2 | wc -l
+20                                                     ◀ client đã đóng (FIN), server chưa close()
+$ ls /proc/$(pgrep -f buggy_server)/fd | wc -l
+24                                                     ◀ 20 socket leak + stdin/stdout/stderr + listening socket
+$ ulimit -n
+1024                                                   ◀ tới giới hạn này, accept() báo EMFILE: service "chết"
+</script>
+  <p><b>Sửa:</b> dùng <code>with conn:</code> (hoặc <code>try/finally: conn.close()</code>) quanh phần xử lý, và bỏ list <code>leaked</code>. Chạy lại: <code>ss</code> không còn CLOSE-WAIT, số fd đứng yên ở 4.</p>
+  <p class="small muted">Ở công ty, cùng quy trình áp dụng cho pod: <code>kubectl exec</code> vào pod rồi chạy <code>ss -tan</code>, hoặc xem metric số file descriptor đang mở của process.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m04"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §2.7 có ví dụ UDP/TCP client-server bằng Python, đọc để so với Lab 4.1 và 4.2. §3.2 (multiplexing/demultiplexing) đọc trước cho module 05.</li>
+  <li><a href="https://beej.us/guide/bgnet/" target="_blank" rel="noopener">Beej's Guide to Network Programming</a>: tài liệu kinh điển về socket API trong C, miễn phí. Đọc chương 5–7.</li>
+  <li><a href="https://docs.python.org/3/howto/sockets.html" target="_blank" rel="noopener">Python Socket Programming HOWTO</a>: ngắn, nói rõ vụ "recv có thể trả ít hơn".</li>
+  <li><a href="https://man7.org/linux/man-pages/man7/epoll.7.html" target="_blank" rel="noopener">man 7 epoll</a>: level-triggered và edge-triggered.</li>
+  <li><a href="https://blog.cloudflare.com/this-is-strictly-a-violation-of-the-tcp-specification/" target="_blank" rel="noopener">Cloudflare blog: chuyện CLOSE-WAIT</a>: một sự cố production thật về state này.</li>
+</ul>

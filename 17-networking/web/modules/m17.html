@@ -1,0 +1,1819 @@
+<!-- Core Net Lab · Module 17 · C/C++ cho security services (OpenSSL 3 + C++17) -->
+<div class="goals"><h4>Sau module này bạn</h4><ul>
+  <li>Dựng được một thư viện C++17 dùng OpenSSL 3 đúng cách: RAII cho mọi handle, đọc error queue, dùng EVP API thay vì API đã deprecated.</li>
+  <li>Viết mTLS server bắt buộc client cert, đọc SPIFFE ID, tự nạp lại cert, và tránh các bẫy kinh điển của libssl.</li>
+  <li>Verify JWT ES256 với JWKS cache có thời hạn; xử lý chữ ký raw r‖s và allowlist thuật toán.</li>
+  <li>Cài đặt Milenage, 5G-AKA, SUCI bằng C++ và kiểm chứng bằng test vector 3GPP, đúng loại code của AUSF/UDM.</li>
+  <li>Tìm bug trong parser protocol bằng sanitizer và libFuzzer.</li>
+  <li>Thay orders-api của capstone bằng bản C++ và vẫn qua nguyên bộ <code>test.sh</code>.</li>
+</ul></div>
+
+<h2>Vì sao có module này, và học lúc nào</h2>
+<p>Module 00–16 dùng Python và Bash để học khái niệm nhanh. Nhưng service trong core network, kể cả phần security và authentication của platform, phần lớn viết bằng C/C++ và gọi thẳng OpenSSL. Phần khó khi viết C++ (quản lý handle, error queue, thread, bộ nhớ chứa secret, parser an toàn) là chung cho mọi bài, nên được gom vào một module. Mỗi lab là một bước của cùng một project <code>netsec</code>, và bản Python ở các module trước đóng vai <b>bản đối chứng</b>: cùng test vector, cùng bộ test, hai bản phải ra cùng kết quả.</p>
+<div class="tbl"><table>
+<thead><tr><th>Lab</th><th>Nội dung</th><th>Học song song: làm ngay sau</th><th>Bản đối chứng</th></tr></thead>
+<tbody>
+<tr><td>17.1</td><td>Khung project, RAII, EVP: SHA-256, HMAC, AES, KDF</td><td>Module 09</td><td>Lab 9.4, test vector RFC 4231 / FIPS-197</td></tr>
+<tr><td>17.2</td><td>mTLS server: client cert bắt buộc, SPIFFE ID, hot reload</td><td>Module 11</td><td>Lab 11.2, 11.3</td></tr>
+<tr><td>17.3</td><td>JWT ES256 + JWKS cache</td><td>Module 12</td><td>PyJWT, Lab 12.2</td></tr>
+<tr><td>17.4</td><td>Milenage, 5G-AKA, SUCI Profile A</td><td>Module 15</td><td>Lab 15.3, 15.4, widget module 15</td></tr>
+<tr><td>17.5</td><td>Parser GTP-U + ASan/UBSan + libFuzzer</td><td>Module 15</td><td>Unit test với packet mẫu</td></tr>
+<tr><td>17.6</td><td>orders-api bản C++ trên kind</td><td>Module 16</td><td><code>test.sh</code> của capstone</td></tr>
+</tbody></table></div>
+<p>Hai cách học đều được: làm liền trong <b>tuần 5</b> (khoảng 2 giờ mỗi ngày), hoặc rải từng lab ngay sau module tương ứng như cột thứ ba.</p>
+
+<h2>Kiến trúc project</h2>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 248" role="img" aria-label="Các chương trình dùng thư viện libnetsec, thư viện dựa trên OpenSSL 3, nlohmann/json và POSIX socket">
+  <g class="t-app">
+    <rect class="f" x="20" y="18" width="120" height="44" rx="7"/><rect class="f" x="160" y="18" width="120" height="44" rx="7"/><rect class="f" x="300" y="18" width="120" height="44" rx="7"/>
+    <rect class="f" x="440" y="18" width="120" height="44" rx="7"/><rect class="f" x="580" y="18" width="120" height="44" rx="7"/>
+  </g>
+  <text x="80" y="37" class="t-c t-mono">mtls_hello</text><text x="80" y="54" class="t-c t-s t-m">Lab 17.2</text>
+  <text x="220" y="37" class="t-c t-mono">jwt_check</text><text x="220" y="54" class="t-c t-s t-m">Lab 17.3</text>
+  <text x="360" y="37" class="t-c t-mono">suci_check</text><text x="360" y="54" class="t-c t-s t-m">Lab 17.4</text>
+  <text x="500" y="37" class="t-c t-mono">test_*, fuzz</text><text x="500" y="54" class="t-c t-s t-m">ctest, libFuzzer</text>
+  <text x="640" y="37" class="t-c t-mono">orders_api</text><text x="640" y="54" class="t-c t-s t-m">Lab 17.6, trên kind</text>
+  <line class="ln" x1="80" y1="62" x2="80" y2="90"/><line class="ln" x1="220" y1="62" x2="220" y2="90"/><line class="ln" x1="360" y1="62" x2="360" y2="90"/><line class="ln" x1="500" y1="62" x2="500" y2="90"/><line class="ln" x1="640" y1="62" x2="640" y2="90"/>
+  <g class="t-cpp"><rect class="f" x="20" y="90" width="680" height="80" rx="9"/></g>
+  <text x="32" y="107" class="t-s t-b">libnetsec (static library, C++17)</text>
+  <rect class="box" x="34" y="116" width="86" height="40" rx="6"/><rect class="box" x="129" y="116" width="86" height="40" rx="6"/><rect class="box" x="224" y="116" width="86" height="40" rx="6"/>
+  <rect class="box" x="319" y="116" width="86" height="40" rx="6"/><rect class="box" x="414" y="116" width="86" height="40" rx="6"/><rect class="box" x="509" y="116" width="86" height="40" rx="6"/><rect class="box" x="604" y="116" width="86" height="40" rx="6"/>
+  <text x="77" y="140" class="t-c t-mono">crypto</text><text x="172" y="140" class="t-c t-mono">tls</text><text x="267" y="140" class="t-c t-mono">http</text>
+  <text x="362" y="140" class="t-c t-mono">jwt</text><text x="457" y="140" class="t-c t-mono">fiveg</text><text x="552" y="140" class="t-c t-mono">gtpu</text><text x="647" y="140" class="t-c t-mono">log</text>
+  <line class="ln" x1="160" y1="170" x2="160" y2="196"/><line class="ln" x1="410" y1="170" x2="410" y2="196"/><line class="ln" x1="610" y1="170" x2="610" y2="196"/>
+  <g class="t-sec"><rect class="f" x="20" y="196" width="280" height="40" rx="7"/></g><text x="160" y="221" class="t-c t-s t-b">OpenSSL 3: libssl, libcrypto</text>
+  <rect class="box" x="320" y="196" width="180" height="40" rx="7"/><text x="410" y="221" class="t-c t-s t-b">nlohmann/json</text>
+  <rect class="box" x="520" y="196" width="180" height="40" rx="7"/><text x="610" y="221" class="t-c t-s t-b">POSIX socket, thread</text>
+</svg></div>
+<figcaption>Mỗi lab thêm một file vào <code>src/</code> và một chương trình vào <code>apps/</code> hoặc <code>tests/</code>. CMake tự nhận file mới, không phải sửa build.</figcaption></figure>
+<script type="text/plain" class="code" data-lang="plaintext" data-file="~/netlab/m17/netsec (khi xong cả 6 lab)">
+netsec/
+├── CMakeLists.txt
+├── Dockerfile.cpp            # Lab 17.6: image orders-api C++
+├── include/netsec/
+│   ├── ossl.hpp              # RAII cho handle OpenSSL, đọc error queue
+│   ├── crypto.hpp  log.hpp   # 17.1
+│   ├── tls.hpp               # 17.2
+│   ├── jwt.hpp               # 17.3
+│   ├── fiveg.hpp             # 17.4
+│   ├── gtpu.hpp              # 17.5
+│   └── http.hpp              # 17.6
+├── src/                      # mỗi header một file .cpp tương ứng
+├── apps/                     # mtls_hello, jwt_check, suci_check, orders_api
+├── tests/                    # check.hpp, test_crypto, test_fiveg, test_gtpu (chạy bằng ctest)
+└── fuzz/fuzz_gtpu.cpp        # build riêng bằng clang
+</script>
+
+<h2>Bẫy OpenSSL trong C/C++</h2>
+<p>Gần như mọi lỗi bảo mật khi dùng libssl/libcrypto rơi vào một trong các dòng dưới đây. Code của module tránh tất cả, và quiz cuối module hỏi lại từng dòng.</p>
+<div class="tbl"><table>
+<thead><tr><th>Bẫy</th><th>Hậu quả</th><th>Cách đúng (ở file nào)</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span>Server đặt <code>SSL_VERIFY_PEER</code> nhưng quên <code>SSL_VERIFY_FAIL_IF_NO_PEER_CERT</code></td><td>Client <b>không gửi cert</b> vẫn qua handshake</td><td>Đặt cả hai cờ (<code>tls.cpp</code>)</td></tr>
+<tr class="t-sec"><td><span class="lay"></span>Client quên <code>SSL_set1_host</code></td><td>Chấp nhận cert hợp lệ của <b>bất kỳ</b> tên nào (Lab 11.4)</td><td>Luôn set host và SNI (<code>http.cpp</code>)</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>if (EVP_DigestVerify(...))</code></td><td>Hàm trả <code>-1</code> khi lỗi, và <code>-1</code> là "true" trong C: chữ ký hỏng được coi là đúng</td><td>So đúng <code>== 1</code> (<code>jwt.cpp</code>)</td></tr>
+<tr><td><code>memcmp</code> để so MAC, tag, RES*</td><td>Timing attack (module 09)</td><td><code>CRYPTO_memcmp</code> (<code>crypto.cpp</code>)</td></tr>
+<tr><td>Không đọc hết error queue</td><td>Lỗi cũ hiện ra ở lần gọi sau, log chỉ sai chỗ; queue là riêng cho từng thread</td><td>Đọc hết queue ngay khi có lỗi (<code>ossl.hpp</code>)</td></tr>
+<tr><td>Đưa chữ ký JWT ES256 thẳng vào EVP</td><td>JWT dùng raw r‖s 64 byte, EVP cần DER: verify luôn sai, hoặc ai đó "sửa" bằng cách chấp nhận DER trong token</td><td>Chuyển raw → DER bằng <code>ECDSA_SIG</code> (<code>jwt.cpp</code>)</td></tr>
+<tr><td>Gọi <code>*_free</code> bằng tay</td><td>Leak khi có exception, double free</td><td><code>std::unique_ptr</code> với deleter riêng (<code>ossl.hpp</code>)</td></tr>
+<tr><td>API deprecated: <code>HMAC_CTX</code>, <code>EC_KEY</code>, <code>SSL_get_peer_certificate</code></td><td>Warning ở OpenSSL 3, sẽ bị gỡ</td><td><code>EVP_MAC</code>, <code>EVP_PKEY_fromdata</code>, <code>SSL_get1_peer_certificate</code></td></tr>
+<tr><td>Ghi vào socket mà bên kia đã đóng</td><td>SIGPIPE giết cả process</td><td><code>signal(SIGPIPE, SIG_IGN)</code> (<code>tls.cpp</code>)</td></tr>
+<tr><td>Key nằm trong <code>std::vector</code> rồi bị bỏ đó</td><td>Key còn trong RAM, lọt vào core dump</td><td><code>OPENSSL_cleanse</code> qua hàm <code>wipe()</code></td></tr>
+<tr><td>Sửa <code>SSL_CTX</code> đang được các connection dùng</td><td>Data race</td><td>Tạo <code>SSL_CTX</code> mới rồi đổi con trỏ; connection cũ giữ ctx cũ (<code>shared_ptr</code>)</td></tr>
+</tbody></table></div>
+
+<h2>Bài tập</h2>
+<p class="small muted">Mọi lab chạy trong WSL Ubuntu 24.04 (OpenSSL 3.0, g++ 13, CMake 3.28). Thư mục: <code>~/netlab/m17/netsec</code>. Code trong module này được viết cẩn thận theo API của OpenSSL 3.0 nhưng chưa được biên dịch trên máy soạn bài; unit test với test vector chuẩn là cách bạn biết nó đúng.</p>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 17.1 · Khung project, RAII và EVP</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">C++17 · CMake · libcrypto</span><span class="chip t-base">90 phút</span></div>
+  <p>Dựng project CMake có thư viện tĩnh <code>libnetsec</code>, bật warning và tuỳ chọn sanitizer. Viết <code>ossl.hpp</code> (deleter cho mọi handle, hàm đọc error queue), <code>crypto.cpp</code> (hex, base64url, SHA-256, HMAC-SHA-256 bằng <code>EVP_MAC</code>, AES-128 ECB/CTR, KDF của 3GPP TS 33.220, X9.63 KDF, so sánh constant-time, xoá secret) và <code>log.cpp</code> (audit log JSON một dòng, giống capstone). Unit test với test vector chuẩn, chạy cả bản thường lẫn bản có ASan/UBSan.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>ctest</code> đạt ở cả hai bản build; không có warning nào; không có dòng <code>*_free</code> nào được gọi bằng tay ngoài deleter.</p>
+  <details><summary>Gợi ý</summary><p><code>template &lt;auto Fn&gt; struct Deleter</code> (C++17) cho phép viết <code>std::unique_ptr&lt;EVP_MD_CTX, Deleter&lt;EVP_MD_CTX_free&gt;&gt;</code>. HMAC trong OpenSSL 3: <code>EVP_MAC_fetch(nullptr, "HMAC", nullptr)</code>, tham số <code>"digest" = "SHA256"</code> qua <code>OSSL_PARAM</code>. Phần lớn hàm trả <code>1</code> khi thành công; hàm trả con trỏ thì <code>nullptr</code> là lỗi.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="cmake" data-file="~/netlab/m17/netsec/CMakeLists.txt">
+cmake_minimum_required(VERSION 3.16)
+project(netsec LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)            # cho clangd / VS Code
+
+find_package(OpenSSL 3.0 REQUIRED)
+find_package(nlohmann_json 3 REQUIRED)
+find_package(Threads REQUIRED)
+
+option(NETSEC_SANITIZE "Bật AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+if(NETSEC_SANITIZE)
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+add_compile_options(-Wall -Wextra -Wpedantic)
+
+# Thư viện dùng chung: mọi file trong src/ (mỗi lab thêm một file)
+file(GLOB NETSEC_SRC CONFIGURE_DEPENDS src/*.cpp)
+add_library(netsec STATIC ${NETSEC_SRC})
+target_include_directories(netsec PUBLIC include)
+target_link_libraries(netsec PUBLIC OpenSSL::SSL OpenSSL::Crypto nlohmann_json::nlohmann_json Threads::Threads)
+
+# Mỗi file trong apps/ và tests/ là một chương trình; tests/ được đăng ký với ctest
+enable_testing()
+file(GLOB NETSEC_APPS CONFIGURE_DEPENDS apps/*.cpp)
+file(GLOB NETSEC_TESTS CONFIGURE_DEPENDS tests/*.cpp)
+foreach(src IN LISTS NETSEC_APPS NETSEC_TESTS)
+  get_filename_component(name ${src} NAME_WE)
+  add_executable(${name} ${src})
+  target_link_libraries(${name} PRIVATE netsec)
+endforeach()
+foreach(src IN LISTS NETSEC_TESTS)
+  get_filename_component(name ${src} NAME_WE)
+  add_test(NAME ${name} COMMAND ${name})
+endforeach()
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/ossl.hpp">
+// RAII cho handle của OpenSSL và cách biến error queue thành exception có nghĩa.
+#pragma once
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+
+namespace netsec {
+
+using Bytes = std::vector<unsigned char>;
+
+// Deleter<SSL_CTX_free>, Deleter<EVP_PKEY_free>…: không bao giờ gọi *_free bằng tay
+template <auto Fn>
+struct Deleter {
+    template <class T>
+    void operator()(T* p) const noexcept { Fn(p); }
+};
+using SslPtr = std::unique_ptr<SSL, Deleter<SSL_free>>;
+using X509Ptr = std::unique_ptr<X509, Deleter<X509_free>>;
+using PkeyPtr = std::unique_ptr<EVP_PKEY, Deleter<EVP_PKEY_free>>;
+using PkeyCtxPtr = std::unique_ptr<EVP_PKEY_CTX, Deleter<EVP_PKEY_CTX_free>>;
+using MdCtxPtr = std::unique_ptr<EVP_MD_CTX, Deleter<EVP_MD_CTX_free>>;
+using CipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, Deleter<EVP_CIPHER_CTX_free>>;
+
+// Đọc hết error queue (riêng cho từng thread). Không đọc thì lỗi cũ sẽ hiện ra ở lần gọi sau.
+inline std::string ossl_errors() {
+    std::string out;
+    char buf[256];
+    for (unsigned long e = ERR_get_error(); e != 0; e = ERR_get_error()) {
+        ERR_error_string_n(e, buf, sizeof buf);
+        out += "\n  ";
+        out += buf;
+    }
+    return out;
+}
+
+[[noreturn]] inline void throw_ossl(const std::string& what) { throw std::runtime_error(what + ossl_errors()); }
+
+// Phần lớn API của OpenSSL trả 1 khi thành công. Không dùng if (rc): có hàm trả -1 khi lỗi.
+inline void check(int rc, const char* what) {
+    if (rc != 1) throw_ossl(what);
+}
+
+template <class T>
+T* check_ptr(T* p, const char* what) {
+    if (p == nullptr) throw_ossl(what);
+    return p;
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/crypto.hpp">
+#pragma once
+#include <cstddef>
+#include <initializer_list>
+#include <string>
+
+#include "netsec/ossl.hpp"
+
+namespace netsec {
+
+Bytes from_hex(const std::string& hex);
+std::string to_hex(const Bytes& b);
+std::string b64url_encode(const Bytes& b);            // không padding, như JWT
+Bytes b64url_decode(const std::string& s);            // throw std::invalid_argument nếu ký tự lạ
+
+Bytes sha256(const Bytes& data);
+Bytes hmac_sha256(const Bytes& key, const Bytes& data);
+Bytes kdf_3gpp(const Bytes& key, unsigned char fc, std::initializer_list<Bytes> params);   // TS 33.220 Annex B
+Bytes x963_kdf_sha256(const Bytes& z, const Bytes& shared_info, std::size_t len);          // ANSI X9.63, cho SUCI
+Bytes aes128_ecb_block(const Bytes& key, const Bytes& block);                               // một block, cho Milenage
+Bytes aes128_ctr(const Bytes& key, const Bytes& iv, const Bytes& data);
+
+bool equal_ct(const Bytes& a, const Bytes& b);        // so sánh constant-time
+void wipe(Bytes& secret);                             // OPENSSL_cleanse rồi xoá
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/src/crypto.cpp">
+#include "netsec/crypto.hpp"
+
+#include <cstdint>
+#include <iomanip>
+#include <sstream>
+
+#include <openssl/core_names.h>
+#include <openssl/crypto.h>
+#include <openssl/params.h>
+
+namespace netsec {
+
+Bytes from_hex(const std::string& hex) {
+    if (hex.size() % 2 != 0) throw std::invalid_argument("chuỗi hex có số ký tự lẻ");
+    Bytes out(hex.size() / 2);
+    for (std::size_t i = 0; i < out.size(); ++i)
+        out[i] = static_cast<unsigned char>(std::stoi(hex.substr(2 * i, 2), nullptr, 16));
+    return out;
+}
+
+std::string to_hex(const Bytes& b) {
+    std::ostringstream os;
+    for (unsigned char c : b) os << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c);
+    return os.str();
+}
+
+static const char kB64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+std::string b64url_encode(const Bytes& b) {
+    std::string out;
+    std::size_t i = 0;
+    for (; i + 2 < b.size(); i += 3) {
+        std::uint32_t v = b[i] << 16 | b[i + 1] << 8 | b[i + 2];
+        out += {kB64[v >> 18 & 63], kB64[v >> 12 & 63], kB64[v >> 6 & 63], kB64[v & 63]};
+    }
+    if (i + 1 == b.size()) {
+        std::uint32_t v = b[i] << 16;
+        out += {kB64[v >> 18 & 63], kB64[v >> 12 & 63]};
+    } else if (i + 2 == b.size()) {
+        std::uint32_t v = b[i] << 16 | b[i + 1] << 8;
+        out += {kB64[v >> 18 & 63], kB64[v >> 12 & 63], kB64[v >> 6 & 63]};
+    }
+    return out;
+}
+
+Bytes b64url_decode(const std::string& s) {
+    Bytes out;
+    std::uint32_t acc = 0;
+    int bits = 0;
+    for (char c : s) {
+        int v;
+        if (c >= 'A' && c <= 'Z') v = c - 'A';
+        else if (c >= 'a' && c <= 'z') v = c - 'a' + 26;
+        else if (c >= '0' && c <= '9') v = c - '0' + 52;
+        else if (c == '-') v = 62;
+        else if (c == '_') v = 63;
+        else throw std::invalid_argument("ký tự base64url không hợp lệ");
+        acc = (acc << 6) | static_cast<std::uint32_t>(v);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back(static_cast<unsigned char>((acc >> bits) & 0xff));
+        }
+    }
+    return out;
+}
+
+Bytes sha256(const Bytes& data) {
+    Bytes out(EVP_MAX_MD_SIZE);
+    unsigned int len = 0;
+    check(EVP_Digest(data.data(), data.size(), out.data(), &len, EVP_sha256(), nullptr), "EVP_Digest");
+    out.resize(len);
+    return out;
+}
+
+Bytes hmac_sha256(const Bytes& key, const Bytes& data) {
+    std::unique_ptr<EVP_MAC, Deleter<EVP_MAC_free>> mac(check_ptr(EVP_MAC_fetch(nullptr, "HMAC", nullptr), "EVP_MAC_fetch"));
+    std::unique_ptr<EVP_MAC_CTX, Deleter<EVP_MAC_CTX_free>> ctx(check_ptr(EVP_MAC_CTX_new(mac.get()), "EVP_MAC_CTX_new"));
+    char digest[] = "SHA256";
+    OSSL_PARAM params[] = {OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST, digest, 0), OSSL_PARAM_construct_end()};
+    check(EVP_MAC_init(ctx.get(), key.data(), key.size(), params), "EVP_MAC_init");
+    check(EVP_MAC_update(ctx.get(), data.data(), data.size()), "EVP_MAC_update");
+    Bytes out(32);
+    std::size_t len = 0;
+    check(EVP_MAC_final(ctx.get(), out.data(), &len, out.size()), "EVP_MAC_final");
+    out.resize(len);
+    return out;
+}
+
+// S = FC ‖ P0 ‖ L0 ‖ P1 ‖ L1 …, L là độ dài 2 byte big-endian; output = HMAC-SHA-256(key, S)
+Bytes kdf_3gpp(const Bytes& key, unsigned char fc, std::initializer_list<Bytes> params) {
+    Bytes s{fc};
+    for (const Bytes& p : params) {
+        s.insert(s.end(), p.begin(), p.end());
+        s.push_back(static_cast<unsigned char>(p.size() >> 8));
+        s.push_back(static_cast<unsigned char>(p.size() & 0xff));
+    }
+    return hmac_sha256(key, s);
+}
+
+// K = SHA-256(Z ‖ counter(4 byte, bắt đầu từ 1) ‖ SharedInfo) nối liên tiếp
+Bytes x963_kdf_sha256(const Bytes& z, const Bytes& shared_info, std::size_t len) {
+    Bytes out;
+    for (std::uint32_t counter = 1; out.size() < len; ++counter) {
+        Bytes block(z);
+        for (int shift = 24; shift >= 0; shift -= 8) block.push_back(static_cast<unsigned char>(counter >> shift));
+        block.insert(block.end(), shared_info.begin(), shared_info.end());
+        Bytes h = sha256(block);
+        out.insert(out.end(), h.begin(), h.end());
+        wipe(block);
+    }
+    out.resize(len);
+    return out;
+}
+
+Bytes aes128_ecb_block(const Bytes& key, const Bytes& block) {
+    if (key.size() != 16 || block.size() != 16) throw std::invalid_argument("AES-128 cần key và block 16 byte");
+    CipherCtxPtr ctx(check_ptr(EVP_CIPHER_CTX_new(), "EVP_CIPHER_CTX_new"));
+    check(EVP_EncryptInit_ex2(ctx.get(), EVP_aes_128_ecb(), key.data(), nullptr, nullptr), "EVP_EncryptInit_ex2");
+    EVP_CIPHER_CTX_set_padding(ctx.get(), 0);
+    Bytes out(16);
+    int len = 0;
+    check(EVP_EncryptUpdate(ctx.get(), out.data(), &len, block.data(), 16), "EVP_EncryptUpdate");
+    return out;
+}
+
+Bytes aes128_ctr(const Bytes& key, const Bytes& iv, const Bytes& data) {
+    if (key.size() != 16 || iv.size() != 16) throw std::invalid_argument("AES-128-CTR cần key và IV 16 byte");
+    CipherCtxPtr ctx(check_ptr(EVP_CIPHER_CTX_new(), "EVP_CIPHER_CTX_new"));
+    check(EVP_EncryptInit_ex2(ctx.get(), EVP_aes_128_ctr(), key.data(), iv.data(), nullptr), "EVP_EncryptInit_ex2");
+    Bytes out(data.size());
+    int len = 0;
+    if (!data.empty())
+        check(EVP_EncryptUpdate(ctx.get(), out.data(), &len, data.data(), static_cast<int>(data.size())), "EVP_EncryptUpdate");
+    return out;
+}
+
+bool equal_ct(const Bytes& a, const Bytes& b) {
+    return a.size() == b.size() && CRYPTO_memcmp(a.data(), b.data(), a.size()) == 0;
+}
+
+void wipe(Bytes& secret) {
+    if (!secret.empty()) OPENSSL_cleanse(secret.data(), secret.size());
+    secret.clear();
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/log.hpp">
+#pragma once
+#include <string>
+
+#include <nlohmann/json.hpp>
+
+namespace netsec {
+// Audit log: mỗi sự kiện một dòng JSON trên stdout (kubectl logs … | jq), cùng định dạng với capstone
+void log_json(const std::string& event, nlohmann::json fields = nlohmann::json::object());
+}
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/src/log.cpp">
+#include "netsec/log.hpp"
+
+#include <ctime>
+#include <iostream>
+#include <mutex>
+
+namespace netsec {
+
+void log_json(const std::string& event, nlohmann::json fields) {
+    char ts[32];
+    std::time_t t = std::time(nullptr);
+    std::tm tm{};
+    gmtime_r(&t, &tm);
+    std::strftime(ts, sizeof ts, "%Y-%m-%dT%H:%M:%SZ", &tm);
+    nlohmann::json line = {{"ts", ts}, {"event", event}};
+    if (fields.is_object()) line.update(fields);
+    static std::mutex mu;
+    std::lock_guard<std::mutex> lock(mu);
+    // replace: dữ liệu từ client có thể không phải UTF-8 hợp lệ, không được làm dump() throw
+    std::cout << line.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) << std::endl;
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/tests/check.hpp">
+// Khung test tối giản, không cần thư viện ngoài
+#pragma once
+#include <exception>
+#include <iostream>
+
+inline int g_failures = 0;
+
+#define CHECK_EQ(actual, expected)                                                              \
+    do {                                                                                        \
+        auto a_ = (actual);                                                                     \
+        auto e_ = (expected);                                                                   \
+        if (a_ == e_) {                                                                         \
+            std::cout << "  ✔ " #actual "\n";                                                  \
+        } else {                                                                                \
+            std::cout << "  ✘ " #actual "\n      nhận:     " << a_ << "\n      mong đợi: " << e_ << "\n"; \
+            ++g_failures;                                                                       \
+        }                                                                                       \
+    } while (0)
+
+#define CHECK_THROWS(expr)                                                                      \
+    do {                                                                                        \
+        bool t_ = false;                                                                        \
+        try { (void)(expr); } catch (const std::exception&) { t_ = true; }                      \
+        if (t_) std::cout << "  ✔ throw: " #expr "\n";                                          \
+        else { std::cout << "  ✘ không throw: " #expr "\n"; ++g_failures; }                     \
+    } while (0)
+
+inline int test_result() {
+    std::cout << (g_failures ? "THẤT BẠI\n" : "OK\n");
+    return g_failures ? 1 : 0;
+}
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/tests/test_crypto.cpp">
+#include <cstring>
+
+#include "check.hpp"
+#include "netsec/crypto.hpp"
+
+using namespace netsec;
+
+static Bytes str(const char* s) { return Bytes(s, s + std::strlen(s)); }
+
+int main() {
+    std::cout << "SHA-256, HMAC (RFC 4231), AES (FIPS-197)\n";
+    CHECK_EQ(to_hex(sha256(str("abc"))), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    CHECK_EQ(to_hex(hmac_sha256(Bytes(20, 0x0b), str("Hi There"))),
+             "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7");
+    CHECK_EQ(to_hex(hmac_sha256(str("Jefe"), str("what do ya want for nothing?"))),
+             "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
+    CHECK_EQ(to_hex(aes128_ecb_block(from_hex("000102030405060708090a0b0c0d0e0f"),
+                                     from_hex("00112233445566778899aabbccddeeff"))),
+             "69c4e0d86a7b0430d8cdb78070b4c55a");
+
+    std::cout << "base64url\n";
+    CHECK_EQ(b64url_encode(Bytes{0xfb, 0xff}), "-_8");
+    CHECK_EQ(to_hex(b64url_decode("-_8")), "fbff");
+    CHECK_THROWS(b64url_decode("ab+c"));
+
+    std::cout << "Kiểm tra đầu vào và so sánh constant-time\n";
+    CHECK_EQ(equal_ct(str("abc"), str("abc")), true);
+    CHECK_EQ(equal_ct(str("abc"), str("abd")), false);
+    CHECK_EQ(equal_ct(str("abc"), str("ab")), false);
+    CHECK_THROWS(aes128_ecb_block(Bytes(15), Bytes(16)));
+    Bytes secret = str("k");
+    wipe(secret);
+    CHECK_EQ(secret.size(), std::size_t{0});
+    return test_result();
+}
+</script>
+<script type="text/plain" class="term">
+$ sudo apt install -y g++ cmake libssl-dev nlohmann-json3-dev clang
+$ mkdir -p ~/netlab/m17/netsec/{include/netsec,src,apps,tests,fuzz} && cd ~/netlab/m17/netsec
+$ cmake -S . -B build && cmake --build build -j && (cd build && ctest --output-on-failure)
+1/1 Test #1: test_crypto ......................   Passed    0.01 sec
+100% tests passed, 0 tests failed out of 1
+$ cmake -S . -B build-asan -DNETSEC_SANITIZE=ON && cmake --build build-asan -j && ./build-asan/test_crypto
+SHA-256, HMAC (RFC 4231), AES (FIPS-197)
+  ✔ to_hex(sha256(str("abc")))
+  …
+  ✔ secret.size()
+OK                                                            ◀ không có báo cáo nào của ASan/UBSan
+$ grep -rn '_free(' src include | grep -v Deleter
+$                                                             ◀ không có lệnh free bằng tay
+</script>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 17.2 · mTLS server: client cert bắt buộc, SPIFFE ID, hot reload</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">C++17 · libssl · socket</span><span class="chip t-base">120 phút</span></div>
+  <p>Viết <code>tls.cpp</code>: tạo <code>SSL_CTX</code> chỉ nhận TLS 1.3, server bắt buộc client cert có EKU clientAuth, client kiểm tra cert server có EKU serverAuth; lớp <code>ReloadingTlsCtx</code> tạo <code>SSL_CTX</code> mới khi file cert đổi (giữ ctx cũ nếu file mới hỏng); hàm <code>peer_identity</code> lấy đúng một SPIFFE ID trong SAN và thumbprint <code>x5t#S256</code>; vòng lặp <code>serve_tls</code> một thread mỗi connection, ghi log mọi lần từ chối kèm lý do verify. Viết <code>mtls_hello</code>: chào client có SPIFFE ID trong allowlist, từ chối client khác.</p>
+  <p class="done-when"><b>Xong khi:</b> với PKI của Lab 10.2 và 11.3: svc-a được chào; svc-b bị từ chối ở tầng ứng dụng; không có cert và dùng server cert làm client cert đều bị từ chối ở TLS với lý do rõ ràng trong log; thay cert trên đĩa thì serial đổi mà không restart process.</p>
+  <details><summary>Gợi ý</summary><p><code>SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr)</code>, <code>SSL_CTX_set_purpose(ctx, X509_PURPOSE_SSL_CLIENT)</code>. SAN: <code>X509_get_ext_d2i(cert, NID_subject_alt_name, …)</code> trả <code>GENERAL_NAMES*</code>; mục URI có <code>type == GEN_URI</code>. DER của cert: <code>i2d_X509</code>. Lý do verify thất bại: <code>X509_verify_cert_error_string(SSL_get_verify_result(ssl))</code>. <code>std::filesystem::last_write_time</code> đi theo symlink, giống cách kubelet cập nhật Secret.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/tls.hpp">
+#pragma once
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include "netsec/ossl.hpp"
+
+namespace netsec {
+
+struct Peer {
+    std::string spiffe_id;   // rỗng nếu cert không có đúng một SPIFFE ID
+    std::string x5t_s256;    // base64url(SHA-256(DER của cert)), như claim cnf ở capstone
+};
+
+// server = true: bắt buộc client cert có EKU clientAuth. server = false: verify server cert có EKU serverAuth.
+std::shared_ptr<SSL_CTX> make_tls_ctx(bool server, const std::string& cert_chain, const std::string& key,
+                                      const std::string& ca);
+
+// Tạo SSL_CTX mới khi file cert đổi. Connection đang mở giữ ctx cũ (SSL giữ tham chiếu tới SSL_CTX).
+class ReloadingTlsCtx {
+public:
+    ReloadingTlsCtx(bool server, std::string cert_chain, std::string key, std::string ca);
+    std::shared_ptr<SSL_CTX> get();
+
+private:
+    bool server_;
+    std::string cert_, key_, ca_;
+    std::mutex mu_;
+    std::shared_ptr<SSL_CTX> ctx_;
+    std::filesystem::file_time_type mtime_{};
+};
+
+Peer peer_identity(SSL* ssl);
+
+using Handler = std::function<void(SSL*, const Peer&)>;
+[[noreturn]] void serve_tls(std::uint16_t port, ReloadingTlsCtx& tls, const Handler& handler);
+int connect_tcp(const std::string& host, std::uint16_t port);
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/src/tls.cpp">
+#include "netsec/tls.hpp"
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <csignal>
+#include <thread>
+
+#include <openssl/x509v3.h>
+
+#include "netsec/crypto.hpp"
+#include "netsec/log.hpp"
+
+namespace netsec {
+
+std::shared_ptr<SSL_CTX> make_tls_ctx(bool server, const std::string& cert_chain, const std::string& key,
+                                      const std::string& ca) {
+    std::shared_ptr<SSL_CTX> ctx(check_ptr(SSL_CTX_new(server ? TLS_server_method() : TLS_client_method()), "SSL_CTX_new"),
+                                 SSL_CTX_free);
+    check(SSL_CTX_set_min_proto_version(ctx.get(), TLS1_3_VERSION), "SSL_CTX_set_min_proto_version");
+    check(SSL_CTX_use_certificate_chain_file(ctx.get(), cert_chain.c_str()), "SSL_CTX_use_certificate_chain_file");
+    check(SSL_CTX_use_PrivateKey_file(ctx.get(), key.c_str(), SSL_FILETYPE_PEM), "SSL_CTX_use_PrivateKey_file");
+    check(SSL_CTX_check_private_key(ctx.get()), "cert và key không khớp");
+    check(SSL_CTX_load_verify_locations(ctx.get(), ca.c_str(), nullptr), "SSL_CTX_load_verify_locations");
+    // Thiếu SSL_VERIFY_FAIL_IF_NO_PEER_CERT thì client không gửi cert vẫn qua handshake
+    SSL_CTX_set_verify(ctx.get(), SSL_VERIFY_PEER | (server ? SSL_VERIFY_FAIL_IF_NO_PEER_CERT : 0), nullptr);
+    // EKU: server chỉ nhận client cert (clientAuth), client chỉ nhận server cert (serverAuth)
+    check(SSL_CTX_set_purpose(ctx.get(), server ? X509_PURPOSE_SSL_CLIENT : X509_PURPOSE_SSL_SERVER), "SSL_CTX_set_purpose");
+    return ctx;
+}
+
+ReloadingTlsCtx::ReloadingTlsCtx(bool server, std::string cert_chain, std::string key, std::string ca)
+    : server_(server), cert_(std::move(cert_chain)), key_(std::move(key)), ca_(std::move(ca)) {}
+
+std::shared_ptr<SSL_CTX> ReloadingTlsCtx::get() {
+    std::lock_guard<std::mutex> lock(mu_);
+    try {
+        auto mtime = std::filesystem::last_write_time(cert_);
+        if (!ctx_ || mtime != mtime_) {
+            ctx_ = make_tls_ctx(server_, cert_, key_, ca_);
+            mtime_ = mtime;
+            log_json("tls_context_loaded", {{"side", server_ ? "server" : "client"}, {"cert", cert_}});
+        }
+    } catch (const std::exception& e) {
+        if (!ctx_) throw;                              // lần đầu mà hỏng: không chạy được
+        log_json("tls_reload_failed", {{"error", e.what()}});   // file đang ghi dở: dùng tiếp ctx cũ
+    }
+    return ctx_;
+}
+
+Peer peer_identity(SSL* ssl) {
+    Peer peer;
+    X509Ptr cert(SSL_get1_peer_certificate(ssl));
+    if (!cert) return peer;
+    std::unique_ptr<GENERAL_NAMES, Deleter<GENERAL_NAMES_free>> sans(
+        static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert.get(), NID_subject_alt_name, nullptr, nullptr)));
+    int found = 0;
+    std::string id;
+    for (int i = 0; sans && i < sk_GENERAL_NAME_num(sans.get()); ++i) {
+        const GENERAL_NAME* gn = sk_GENERAL_NAME_value(sans.get(), i);
+        if (gn->type != GEN_URI) continue;
+        const ASN1_IA5STRING* s = gn->d.uniformResourceIdentifier;
+        std::string uri(reinterpret_cast<const char*>(ASN1_STRING_get0_data(s)), static_cast<std::size_t>(ASN1_STRING_length(s)));
+        if (uri.rfind("spiffe://", 0) == 0) {
+            id = uri;
+            ++found;
+        }
+    }
+    if (found == 1) peer.spiffe_id = id;               // 0 hoặc nhiều hơn 1: coi như không có identity
+    unsigned char* der = nullptr;
+    int len = i2d_X509(cert.get(), &der);
+    if (len > 0) {
+        Bytes d(der, der + len);
+        OPENSSL_free(der);
+        peer.x5t_s256 = b64url_encode(sha256(d));
+    }
+    return peer;
+}
+
+static int listen_tcp(std::uint16_t port) {
+    int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) throw std::runtime_error("socket() thất bại");
+    int one = 1;
+    ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(port);
+    if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof addr) < 0 || ::listen(fd, 128) < 0)
+        throw std::runtime_error("không bind/listen được port " + std::to_string(port));
+    return fd;
+}
+
+void serve_tls(std::uint16_t port, ReloadingTlsCtx& tls, const Handler& handler) {
+    std::signal(SIGPIPE, SIG_IGN);                     // ghi vào socket đã đóng không được giết process
+    tls.get();                                         // nạp cert ngay, hỏng thì dừng sớm
+    int lfd = listen_tcp(port);
+    log_json("listening", {{"port", port}});
+    for (;;) {
+        sockaddr_in addr{};
+        socklen_t alen = sizeof addr;
+        int fd = ::accept(lfd, reinterpret_cast<sockaddr*>(&addr), &alen);
+        if (fd < 0) continue;
+        char ip[INET_ADDRSTRLEN] = "?";
+        ::inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof ip);
+        std::shared_ptr<SSL_CTX> ctx = tls.get();
+        std::thread([fd, ctx, &handler, client = std::string(ip)] {
+            timeval tv{10, 0};                         // client im lặng 10 giây thì bỏ
+            ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+            SslPtr ssl(SSL_new(ctx.get()));
+            if (ssl && SSL_set_fd(ssl.get(), fd) == 1 && SSL_accept(ssl.get()) == 1) {
+                try {
+                    handler(ssl.get(), peer_identity(ssl.get()));
+                } catch (const std::exception& e) {
+                    log_json("handler_error", {{"client", client}, {"error", e.what()}});
+                }
+                SSL_shutdown(ssl.get());
+            } else {
+                long vr = ssl ? SSL_get_verify_result(ssl.get()) : X509_V_OK;
+                log_json("tls_reject", {{"client", client},
+                                        {"verify", X509_verify_cert_error_string(vr)},
+                                        {"error", ossl_errors()}});
+            }
+            ::close(fd);
+        }).detach();
+    }
+}
+
+int connect_tcp(const std::string& host, std::uint16_t port) {
+    addrinfo hints{};
+    hints.ai_socktype = SOCK_STREAM;
+    addrinfo* res = nullptr;
+    if (int rc = ::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res); rc != 0)
+        throw std::runtime_error("getaddrinfo " + host + ": " + ::gai_strerror(rc));
+    std::unique_ptr<addrinfo, decltype(&::freeaddrinfo)> guard(res, ::freeaddrinfo);
+    for (addrinfo* p = res; p != nullptr; p = p->ai_next) {
+        int fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (fd < 0) continue;
+        timeval tv{5, 0};
+        ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+        if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) return fd;
+        ::close(fd);
+    }
+    throw std::runtime_error("không kết nối được " + host + ":" + std::to_string(port));
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/apps/mtls_hello.cpp">
+// mtls_hello <port> <cert_chain> <key> <ca> [SPIFFE ID được phép …]
+// mTLS server: authenticate bằng client cert, rồi authorize theo SPIFFE ID (module 11: authN ≠ authZ).
+#include <iostream>
+#include <set>
+#include <string>
+
+#include "netsec/log.hpp"
+#include "netsec/tls.hpp"
+
+int main(int argc, char** argv) {
+    if (argc < 5) {
+        std::cerr << "Dùng: mtls_hello <port> <cert_chain> <key> <ca> [spiffe-id …]\n";
+        return 2;
+    }
+    const std::set<std::string> allowed(argv + 5, argv + argc);
+    netsec::ReloadingTlsCtx tls(true, argv[2], argv[3], argv[4]);
+    const netsec::Handler handler = [&](SSL* ssl, const netsec::Peer& peer) {
+        const bool ok = allowed.count(peer.spiffe_id) == 1;
+        netsec::log_json(ok ? "allow" : "deny", {{"client", peer.spiffe_id}, {"x5t", peer.x5t_s256}});
+        const std::string msg = ok ? "xin chào " + peer.spiffe_id + "\n"
+                                   : "403: " + peer.spiffe_id + " không được phép\n";
+        SSL_write(ssl, msg.data(), static_cast<int>(msg.size()));
+    };
+    try {
+        netsec::serve_tls(static_cast<std::uint16_t>(std::stoi(argv[1])), tls, handler);
+    } catch (const std::exception& e) {
+        std::cerr << "lỗi: " << e.what() << "\n";
+        return 1;
+    }
+}
+</script>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m17/netsec && cmake --build build -j
+$ P=~/netlab/m10/pki; mkdir -p run && cp $P/server-chain.crt run/tls.crt && cp $P/server.key run/tls.key
+$ ./build/mtls_hello 9443 run/tls.crt run/tls.key $P/root.crt spiffe://netlab.local/ns/default/sa/svc-a &
+{"ts":"…","event":"tls_context_loaded","side":"server","cert":"run/tls.crt"}
+{"ts":"…","event":"listening","port":9443}
+$ hello() { openssl s_client -connect localhost:9443 -servername localhost -CAfile $P/root.crt "$@" -quiet -ign_eof </dev/null 2>/dev/null; }
+$ hello -cert $P/client.crt -key $P/client.key -cert_chain $P/inter.crt
+{"ts":"…","event":"allow","client":"spiffe://netlab.local/ns/default/sa/svc-a","x5t":"…"}
+xin chào spiffe://netlab.local/ns/default/sa/svc-a
+$ hello -cert $P/svc-b.crt -key $P/svc-b.key -cert_chain $P/inter.crt
+403: spiffe://netlab.local/ns/default/sa/svc-b không được phép     ◀ authenticated, không authorized
+$ hello                                                             # không có client cert
+{"ts":"…","event":"tls_reject","client":"127.0.0.1","verify":"ok","error":"\n  error:0A0000C7:SSL routines::peer did not return a certificate"}
+$ hello -cert $P/server.crt -key $P/server.key -cert_chain $P/inter.crt   # server cert làm client cert
+{"ts":"…","event":"tls_reject","client":"127.0.0.1","verify":"unsupported certificate purpose","error":"…certificate verify failed"}
+# Hot reload: ký lại server cert (serial mới) rồi thay file một cách atomic, như kubelet
+$ serial() { openssl s_client -connect localhost:9443 -servername localhost -CAfile $P/root.crt \
+>   -cert $P/client.crt -key $P/client.key -cert_chain $P/inter.crt </dev/null 2>/dev/null | openssl x509 -noout -serial; }
+$ serial
+serial=5F3A…
+$ (cd $P && openssl x509 -req -in server.csr -CA inter.crt -CAkey inter.key -CAcreateserial -days 30 -sha256 \
+>   -extfile <(printf '%s\n' "basicConstraints=critical,CA:FALSE" "keyUsage=critical,digitalSignature" "extendedKeyUsage=serverAuth" \
+>   "subjectAltName=DNS:auth.security.svc.cluster.local,DNS:auth.security,DNS:localhost,IP:127.0.0.1") -out server2.crt)
+$ cat $P/server2.crt $P/inter.crt > run/tls.new && mv run/tls.new run/tls.crt
+$ serial
+{"ts":"…","event":"tls_context_loaded","side":"server","cert":"run/tls.crt"}
+serial=7C41…                                                        ◀ cert mới, process không restart
+$ kill %1
+</script>
+  <p class="small muted">Lý do <code>verify: ok</code> ở dòng "không có client cert" là đúng: không có cert nào để verify, handshake thất bại vì <code>SSL_VERIFY_FAIL_IF_NO_PEER_CERT</code>. Thử xoá cờ đó, build lại và chạy <code>hello</code> không cert: server chấp nhận connection với <code>client</code> rỗng. Đây là bẫy số 1 trong bảng. <code>svc-b.crt</code> được tạo ở Lab 11.3. Serial của bạn sẽ khác.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 17.3 · Verify JWT ES256 và JWKS cache</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">C++17 · libcrypto · nlohmann/json</span><span class="chip t-base">120 phút</span></div>
+  <p>Viết <code>jwt.cpp</code>: tạo public key EC P-256 từ JWK (<code>EVP_PKEY_fromdata</code>); <code>JwksCache</code> chọn key theo <code>kid</code>, tải lại khi gặp kid lạ (tối đa mỗi 10 giây) <b>và</b> định kỳ (5 phút), giữ cache cũ nếu tải lỗi; <code>verify_es256</code> kiểm tra allowlist <code>alg</code> trước mọi thứ, chuyển chữ ký raw r‖s sang DER, verify, rồi kiểm tra <code>iss</code>, <code>aud</code>, <code>exp</code>/<code>nbf</code> có leeway và các claim bắt buộc. Dùng Python (PyJWT) sinh JWKS và 11 token mẫu; chương trình <code>jwt_check</code> phải cho cùng kết quả với kỳ vọng.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>jwt_check</code> báo đạt cả 11 token, gồm <code>alg=none</code>, HS256 giả mạo, chữ ký DER, sai key, kid lạ, hết hạn, sai aud, sai iss, thiếu cnf.</p>
+  <details><summary>Gợi ý</summary><p>Public key P-256 trong OpenSSL 3: <code>OSSL_PARAM</code> gồm <code>OSSL_PKEY_PARAM_GROUP_NAME = "prime256v1"</code> và <code>OSSL_PKEY_PARAM_PUB_KEY</code> = <code>04 ‖ x ‖ y</code>, rồi <code>EVP_PKEY_fromdata(…, EVP_PKEY_PUBLIC_KEY, …)</code>. Raw → DER: <code>ECDSA_SIG_new</code>, <code>BN_bin2bn</code> cho r và s, <code>ECDSA_SIG_set0</code>, <code>i2d_ECDSA_SIG</code>. Cache dùng <code>std::chrono::steady_clock</code>, không dùng giờ hệ thống (có thể bị chỉnh).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/jwt.hpp">
+#pragma once
+#include <chrono>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <string>
+
+#include <nlohmann/json.hpp>
+
+#include "netsec/ossl.hpp"
+
+namespace netsec {
+
+struct JwtError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+std::shared_ptr<EVP_PKEY> ec_p256_from_jwk(const nlohmann::json& jwk);
+
+class JwksCache {
+public:
+    using Fetch = std::function<std::string()>;   // trả về body JSON của JWKS
+    explicit JwksCache(Fetch fetch, std::chrono::seconds max_age = std::chrono::seconds(300),
+                       std::chrono::seconds min_refresh = std::chrono::seconds(10));
+    std::shared_ptr<EVP_PKEY> key(const std::string& kid);
+
+private:
+    void refresh_locked();
+    Fetch fetch_;
+    std::chrono::seconds max_age_, min_refresh_;
+    std::mutex mu_;
+    std::map<std::string, std::shared_ptr<EVP_PKEY>> keys_;
+    std::chrono::steady_clock::time_point fetched_{};
+    bool tried_ = false;
+};
+
+struct VerifyOptions {
+    std::string issuer;
+    std::string audience;
+    long leeway = 30;
+};
+
+// Trả về claims nếu hợp lệ, throw JwtError (kèm lý do) nếu không
+nlohmann::json verify_es256(const std::string& token, JwksCache& jwks, const VerifyOptions& opt);
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/src/jwt.cpp">
+#include "netsec/jwt.hpp"
+
+#include <algorithm>
+#include <ctime>
+#include <vector>
+
+#include <openssl/bn.h>
+#include <openssl/core_names.h>
+#include <openssl/ecdsa.h>
+#include <openssl/params.h>
+
+#include "netsec/crypto.hpp"
+#include "netsec/log.hpp"
+
+namespace netsec {
+
+using nlohmann::json;
+
+std::shared_ptr<EVP_PKEY> ec_p256_from_jwk(const json& jwk) {
+    if (jwk.value("kty", "") != "EC" || jwk.value("crv", "") != "P-256") throw JwtError("JWK không phải EC P-256");
+    Bytes x = b64url_decode(jwk.at("x").get<std::string>());
+    Bytes y = b64url_decode(jwk.at("y").get<std::string>());
+    if (x.size() != 32 || y.size() != 32) throw JwtError("JWK: x, y phải 32 byte");
+    Bytes pub{0x04};                                   // điểm không nén: 04 ‖ x ‖ y
+    pub.insert(pub.end(), x.begin(), x.end());
+    pub.insert(pub.end(), y.begin(), y.end());
+    char group[] = "prime256v1";
+    OSSL_PARAM params[] = {OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, group, 0),
+                           OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub.data(), pub.size()),
+                           OSSL_PARAM_construct_end()};
+    PkeyCtxPtr pctx(check_ptr(EVP_PKEY_CTX_new_from_name(nullptr, "EC", nullptr), "EVP_PKEY_CTX_new_from_name"));
+    check(EVP_PKEY_fromdata_init(pctx.get()), "EVP_PKEY_fromdata_init");
+    EVP_PKEY* raw = nullptr;
+    check(EVP_PKEY_fromdata(pctx.get(), &raw, EVP_PKEY_PUBLIC_KEY, params), "EVP_PKEY_fromdata (điểm không nằm trên curve?)");
+    return std::shared_ptr<EVP_PKEY>(raw, EVP_PKEY_free);
+}
+
+JwksCache::JwksCache(Fetch fetch, std::chrono::seconds max_age, std::chrono::seconds min_refresh)
+    : fetch_(std::move(fetch)), max_age_(max_age), min_refresh_(min_refresh) {}
+
+std::shared_ptr<EVP_PKEY> JwksCache::key(const std::string& kid) {
+    std::lock_guard<std::mutex> lock(mu_);
+    const auto now = std::chrono::steady_clock::now();
+    const bool stale = !tried_ || now - fetched_ > max_age_;                           // TTL: key đã gỡ phải hết được tin
+    const bool unknown = keys_.count(kid) == 0 && (!tried_ || now - fetched_ > min_refresh_);
+    if (stale || unknown) {
+        tried_ = true;
+        fetched_ = now;
+        try {
+            refresh_locked();
+        } catch (const std::exception& e) {
+            log_json("jwks_refresh_failed", {{"error", e.what()}});                     // giữ cache cũ
+        }
+    }
+    auto it = keys_.find(kid);
+    return it == keys_.end() ? nullptr : it->second;
+}
+
+void JwksCache::refresh_locked() {
+    const json doc = json::parse(fetch_());
+    std::map<std::string, std::shared_ptr<EVP_PKEY>> fresh;
+    for (const json& k : doc.at("keys")) {
+        if (k.value("use", "sig") != "sig" || k.value("alg", "ES256") != "ES256") continue;
+        fresh[k.at("kid").get<std::string>()] = ec_p256_from_jwk(k);
+    }
+    keys_.swap(fresh);
+    std::vector<std::string> kids;
+    for (const auto& kv : keys_) kids.push_back(kv.first);
+    log_json("jwks_refreshed", {{"kids", kids}});
+}
+
+// JWT (RFC 7518) dùng r ‖ s, mỗi số 32 byte. EVP cần cấu trúc DER ECDSA-Sig-Value.
+static Bytes raw_to_der(const Bytes& sig) {
+    if (sig.size() != 64) throw JwtError("chữ ký ES256 phải đúng 64 byte (r ‖ s)");
+    std::unique_ptr<ECDSA_SIG, Deleter<ECDSA_SIG_free>> s(check_ptr(ECDSA_SIG_new(), "ECDSA_SIG_new"));
+    BIGNUM* r = BN_bin2bn(sig.data(), 32, nullptr);
+    BIGNUM* ss = BN_bin2bn(sig.data() + 32, 32, nullptr);
+    if (r == nullptr || ss == nullptr || ECDSA_SIG_set0(s.get(), r, ss) != 1) {   // set0 thành công thì s sở hữu r, ss
+        BN_free(r);
+        BN_free(ss);
+        throw_ossl("ECDSA_SIG_set0");
+    }
+    unsigned char* der = nullptr;
+    int len = i2d_ECDSA_SIG(s.get(), &der);
+    if (len <= 0) throw_ossl("i2d_ECDSA_SIG");
+    Bytes out(der, der + len);
+    OPENSSL_free(der);
+    return out;
+}
+
+static bool es256_verify(EVP_PKEY* key, const std::string& signing_input, const Bytes& der_sig) {
+    MdCtxPtr md(check_ptr(EVP_MD_CTX_new(), "EVP_MD_CTX_new"));
+    check(EVP_DigestVerifyInit(md.get(), nullptr, EVP_sha256(), nullptr, key), "EVP_DigestVerifyInit");
+    int rc = EVP_DigestVerify(md.get(), der_sig.data(), der_sig.size(),
+                              reinterpret_cast<const unsigned char*>(signing_input.data()), signing_input.size());
+    ERR_clear_error();
+    return rc == 1;                                    // KHÔNG viết `return rc;`: -1 (lỗi) sẽ thành true
+}
+
+static json verify_impl(const std::string& token, JwksCache& jwks, const VerifyOptions& opt) {
+    const auto d1 = token.find('.');
+    const auto d2 = d1 == std::string::npos ? std::string::npos : token.find('.', d1 + 1);
+    if (d1 == std::string::npos || d2 == std::string::npos || token.find('.', d2 + 1) != std::string::npos)
+        throw JwtError("token phải có đúng 3 phần");
+    const std::string h64 = token.substr(0, d1), p64 = token.substr(d1 + 1, d2 - d1 - 1), s64 = token.substr(d2 + 1);
+    auto text = [](const Bytes& b) { return std::string(b.begin(), b.end()); };
+
+    const json header = json::parse(text(b64url_decode(h64)));
+    const std::string alg = header.value("alg", "");
+    if (alg != "ES256") throw JwtError("alg không được phép: " + alg);                    // allowlist trước mọi thứ
+    const std::string kid = header.value("kid", "");
+    std::shared_ptr<EVP_PKEY> key = jwks.key(kid);
+    if (!key) throw JwtError("kid không có trong JWKS: " + kid);
+    if (!es256_verify(key.get(), h64 + "." + p64, raw_to_der(b64url_decode(s64)))) throw JwtError("sai chữ ký");
+
+    const json claims = json::parse(text(b64url_decode(p64)));
+    if (claims.value("iss", "") != opt.issuer) throw JwtError("iss sai: " + claims.value("iss", ""));
+    const json aud = claims.value("aud", json());
+    const bool aud_ok = aud.is_string() ? aud == opt.audience
+                                        : aud.is_array() && std::find(aud.begin(), aud.end(), opt.audience) != aud.end();
+    if (!aud_ok) throw JwtError("aud sai");
+    const long long now = static_cast<long long>(std::time(nullptr));
+    if (!claims.contains("exp") || !claims["exp"].is_number() || now > claims["exp"].get<long long>() + opt.leeway)
+        throw JwtError("hết hạn hoặc thiếu exp");
+    if (claims.contains("nbf") && claims["nbf"].is_number() && now + opt.leeway < claims["nbf"].get<long long>())
+        throw JwtError("chưa tới nbf");
+    for (const char* name : {"sub", "scope", "cnf"})
+        if (!claims.contains(name)) throw JwtError(std::string("thiếu claim ") + name);
+    return claims;
+}
+
+json verify_es256(const std::string& token, JwksCache& jwks, const VerifyOptions& opt) {
+    try {
+        return verify_impl(token, jwks, opt);
+    } catch (const JwtError&) {
+        throw;
+    } catch (const std::exception& e) {                // JSON hỏng, base64url hỏng, lỗi OpenSSL…
+        throw JwtError(std::string("token hỏng: ") + e.what());
+    }
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m17/gen_tokens.py">
+#!/usr/bin/env python3
+"""Sinh jwks.json và tokens.txt (tên, kết quả mong đợi, token) để đối chiếu bản C++ với PyJWT."""
+import base64
+import json
+import time
+
+import jwt
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from jwt.algorithms import ECAlgorithm
+
+ISS, AUD = "https://token.security.svc.cluster.local:8443", "orders-api"
+k1, other = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+jwk = json.loads(ECAlgorithm.to_jwk(k1.public_key()))
+jwk.update(kid="k1", use="sig", alg="ES256")
+with open("jwks.json", "w") as f:
+    json.dump({"keys": [jwk]}, f)
+
+
+def b64(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def j(obj: dict) -> str:
+    return b64(json.dumps(obj, separators=(",", ":")).encode())
+
+
+def es(claims: dict, key=k1, kid="k1") -> str:
+    return jwt.encode(claims, key, algorithm="ES256", headers={"kid": kid})
+
+
+now = int(time.time())
+base = {"iss": ISS, "aud": AUD, "sub": "spiffe://netlab.local/ns/web/sa/frontend", "scope": "orders:read",
+        "iat": now, "exp": now + 300, "cnf": {"x5t#S256": "abc"}}
+good = es(base)
+h, p, s = good.split(".")
+der = k1.sign(f"{h}.{p}".encode(), ec.ECDSA(hashes.SHA256()))         # chữ ký đúng nhưng mã hoá DER, sai chuẩn JWT
+cases = [
+    ("valid", "ok", good),
+    ("tampered_scope", "reject", f"{h}.{j({**base, 'scope': 'orders:write'})}.{s}"),
+    ("alg_none", "reject", j({"alg": "none", "kid": "k1"}) + f".{p}."),
+    ("alg_hs256", "reject", jwt.encode(base, "x" * 32, algorithm="HS256", headers={"kid": "k1"})),
+    ("sig_der", "reject", f"{h}.{p}.{b64(der)}"),
+    ("wrong_key", "reject", es(base, other)),
+    ("unknown_kid", "reject", es(base, kid="k9")),
+    ("expired", "reject", es({**base, "iat": now - 7200, "exp": now - 3600})),
+    ("wrong_aud", "reject", es({**base, "aud": "billing-api"})),
+    ("wrong_iss", "reject", es({**base, "iss": "https://evil.example"})),
+    ("no_cnf", "reject", es({k: v for k, v in base.items() if k != "cnf"})),
+]
+with open("tokens.txt", "w") as f:
+    for name, expect, token in cases:
+        f.write(f"{name} {expect} {token}\n")
+print(f"đã ghi jwks.json và {len(cases)} token vào tokens.txt")
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/apps/jwt_check.cpp">
+// jwt_check <jwks.json> <tokens.txt>: mỗi dòng "tên kết_quả_mong_đợi token". So kết quả của C++ với kỳ vọng.
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+
+#include "netsec/jwt.hpp"
+
+int main(int argc, char** argv) {
+    if (argc != 3) {
+        std::cerr << "Dùng: jwt_check jwks.json tokens.txt\n";
+        return 2;
+    }
+    std::ifstream jf(argv[1]);
+    std::stringstream buf;
+    buf << jf.rdbuf();
+    const std::string jwks_body = buf.str();
+    netsec::JwksCache cache([&] { return jwks_body; });
+    const netsec::VerifyOptions opt{"https://token.security.svc.cluster.local:8443", "orders-api", 30};
+
+    std::ifstream in(argv[2]);
+    std::string name, expect, token;
+    int failed = 0;
+    while (in >> name >> expect >> token) {
+        std::string got, detail;
+        try {
+            const auto claims = netsec::verify_es256(token, cache, opt);
+            got = "ok";
+            detail = claims.value("scope", "");
+        } catch (const netsec::JwtError& e) {
+            got = "reject";
+            detail = e.what();
+        }
+        const bool pass = got == expect;
+        failed += pass ? 0 : 1;
+        std::cout << (pass ? "  ✔ " : "  ✘ ") << std::left << std::setw(16) << name << std::setw(8) << got << detail << "\n";
+    }
+    std::cout << (failed ? "THẤT BẠI\n" : "OK: C++ cho cùng kết quả với kỳ vọng\n");
+    return failed ? 1 : 0;
+}
+</script>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m17 && python3 gen_tokens.py
+đã ghi jwks.json và 11 token vào tokens.txt
+$ (cd netsec && cmake --build build -j) && ./netsec/build/jwt_check jwks.json tokens.txt
+{"ts":"…","event":"jwks_refreshed","kids":["k1"]}
+  ✔ valid           ok      orders:read
+  ✔ tampered_scope  reject  sai chữ ký
+  ✔ alg_none        reject  alg không được phép: none          ◀ bị chặn trước khi chạm tới key
+  ✔ alg_hs256       reject  alg không được phép: HS256
+  ✔ sig_der         reject  chữ ký ES256 phải đúng 64 byte (r ‖ s)
+  ✔ wrong_key       reject  sai chữ ký
+  ✔ unknown_kid     reject  kid không có trong JWKS: k9
+  ✔ expired         reject  hết hạn hoặc thiếu exp
+  ✔ wrong_aud       reject  aud sai
+  ✔ wrong_iss       reject  iss sai: https://evil.example
+  ✔ no_cnf          reject  thiếu claim cnf
+OK: C++ cho cùng kết quả với kỳ vọng
+</script>
+  <p class="small muted">Token mẫu sống 5 phút: quá hạn thì chạy lại <code>gen_tokens.py</code>. Thử sửa <code>return rc == 1;</code> thành <code>return rc;</code> và đưa vào một chữ ký sai định dạng: bạn sẽ thấy vì sao dòng đó đáng một comment. JwksCache ở đây đã có TTL, nên lỗi ở M5 của capstone không lặp lại trong bản C++.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 17.4 · Milenage, 5G-AKA và SUCI bằng C++</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">C++17 · libcrypto</span><span class="chip t-base">120 phút</span></div>
+  <p>Viết <code>fiveg.cpp</code>: Milenage f1–f5* (TS 35.206), HE AV của ARPF, HXRES* và KSEAF của AUSF, phía USIM kiểm tra AUTN (MAC, SQN) rồi tính RES* và KSEAF, và SIDF giải SUCI Profile A (X25519, X9.63 KDF, AES-128-CTR, HMAC-SHA-256 cắt 8 byte). Unit test với Test Set 1 (TS 35.208) và các giá trị 5G-AKA đã đối chiếu ở module 15. Cuối cùng giải một SUCI do bản Python (Lab 15.4) tạo ra.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>test_fiveg</code> đạt toàn bộ, gồm replay và mạng giả; <code>suci_check</code> giải đúng SUCI của Python và từ chối SUCI bị sửa.</p>
+  <details><summary>Gợi ý</summary><p>Thuật toán giống hệt Lab 15.3, chỉ đổi ngôn ngữ; dùng lại <code>aes128_ecb_block</code>, <code>kdf_3gpp</code>, <code>equal_ct</code> của Lab 17.1. X25519: <code>EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, …)</code>, <code>EVP_PKEY_new_raw_public_key</code>, rồi <code>EVP_PKEY_derive_init</code>, <code>EVP_PKEY_derive_set_peer</code>, <code>EVP_PKEY_derive</code>. Xoá CK, IK, KAUSF tạm bằng <code>wipe()</code> khi không cần nữa.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/fiveg.hpp">
+#pragma once
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+
+#include "netsec/ossl.hpp"
+
+namespace netsec {
+
+struct MilenageOut {
+    Bytes mac_a, mac_s, res, ck, ik, ak, ak_s;   // f1, f1*, f2, f3, f4, f5, f5*
+};
+Bytes opc_from_op(const Bytes& k, const Bytes& op);
+MilenageOut milenage(const Bytes& k, const Bytes& opc, const Bytes& rand, const Bytes& sqn, const Bytes& amf);
+
+struct HeAv {
+    Bytes rand, autn, xres_star, kausf;          // 5G HE AV do ARPF (UDM) tạo
+};
+HeAv generate_he_av(const Bytes& k, const Bytes& opc, const Bytes& sqn, const Bytes& amf, const Bytes& rand,
+                    const std::string& snn);
+Bytes hxres_star(const Bytes& rand, const Bytes& xres_star);    // AUSF gửi cho SEAF
+Bytes kseaf_from_kausf(const Bytes& kausf, const std::string& snn);
+
+struct AuthError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+struct UeResult {
+    Bytes res_star, kseaf;
+};
+// Phía USIM/UE. sqn_ms: SQN cao nhất đã chấp nhận, được cập nhật khi thành công.
+UeResult usim_authenticate(const Bytes& k, const Bytes& opc, const Bytes& rand, const Bytes& autn, const std::string& snn,
+                           std::uint64_t& sqn_ms);
+
+// SIDF: scheme output = ephemeral public key (32) ‖ ciphertext ‖ MAC (8) → MSIN
+std::string suci_profile_a_deconceal(const Bytes& hn_private_raw, const Bytes& scheme_output);
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/src/fiveg.cpp">
+#include "netsec/fiveg.hpp"
+
+#include "netsec/crypto.hpp"
+
+namespace netsec {
+
+static Bytes xor_b(const Bytes& a, const Bytes& b) {
+    Bytes r(a.size());
+    for (std::size_t i = 0; i < a.size(); ++i) r[i] = a[i] ^ b[i];
+    return r;
+}
+static Bytes rot(const Bytes& x, std::size_t nbytes) {         // xoay trái nbytes byte (r = 8 × nbytes bit)
+    Bytes r(16);
+    for (std::size_t i = 0; i < 16; ++i) r[i] = x[(i + nbytes) % 16];
+    return r;
+}
+static Bytes cst(unsigned char v) {
+    Bytes c(16, 0);
+    c[15] = v;
+    return c;
+}
+static Bytes slice(const Bytes& b, std::size_t off, std::size_t n) { return Bytes(b.begin() + off, b.begin() + off + n); }
+static Bytes cat(std::initializer_list<Bytes> parts) {
+    Bytes r;
+    for (const Bytes& p : parts) r.insert(r.end(), p.begin(), p.end());
+    return r;
+}
+static Bytes bytes_of(const std::string& s) { return Bytes(s.begin(), s.end()); }
+
+Bytes opc_from_op(const Bytes& k, const Bytes& op) { return xor_b(aes128_ecb_block(k, op), op); }
+
+MilenageOut milenage(const Bytes& k, const Bytes& opc, const Bytes& rand, const Bytes& sqn, const Bytes& amf) {
+    if (k.size() != 16 || opc.size() != 16 || rand.size() != 16 || sqn.size() != 6 || amf.size() != 2)
+        throw std::invalid_argument("milenage: sai độ dài tham số");
+    auto E = [&](const Bytes& in) { return aes128_ecb_block(k, in); };
+    const Bytes temp = E(xor_b(rand, opc));
+    const Bytes in1 = cat({sqn, amf, sqn, amf});
+    const Bytes out1 = xor_b(E(xor_b(temp, rot(xor_b(in1, opc), 8))), opc);   // r1 = 64 bit, c1 = 0
+    const Bytes t = xor_b(temp, opc);
+    auto out = [&](std::size_t r, unsigned char c) { return xor_b(E(xor_b(rot(t, r), cst(c))), opc); };
+    const Bytes o2 = out(0, 1), o3 = out(4, 2), o4 = out(8, 4), o5 = out(12, 8);
+    return {slice(out1, 0, 8), slice(out1, 8, 8), slice(o2, 8, 8), o3, o4, slice(o2, 0, 6), slice(o5, 0, 6)};
+}
+
+HeAv generate_he_av(const Bytes& k, const Bytes& opc, const Bytes& sqn, const Bytes& amf, const Bytes& rand,
+                    const std::string& snn) {
+    MilenageOut m = milenage(k, opc, rand, sqn, amf);
+    const Bytes sqn_ak = xor_b(sqn, m.ak);
+    Bytes ckik = cat({m.ck, m.ik});
+    const Bytes sn = bytes_of(snn);
+    HeAv av{rand, cat({sqn_ak, amf, m.mac_a}), slice(kdf_3gpp(ckik, 0x6B, {sn, rand, m.res}), 16, 16),
+            kdf_3gpp(ckik, 0x6A, {sn, sqn_ak})};
+    wipe(ckik);
+    wipe(m.ck);
+    wipe(m.ik);
+    return av;
+}
+
+Bytes hxres_star(const Bytes& rand, const Bytes& xres_star) { return slice(sha256(cat({rand, xres_star})), 16, 16); }
+
+Bytes kseaf_from_kausf(const Bytes& kausf, const std::string& snn) { return kdf_3gpp(kausf, 0x6C, {bytes_of(snn)}); }
+
+UeResult usim_authenticate(const Bytes& k, const Bytes& opc, const Bytes& rand, const Bytes& autn, const std::string& snn,
+                           std::uint64_t& sqn_ms) {
+    if (autn.size() != 16) throw AuthError("AUTN phải 16 byte");
+    const Bytes ak = milenage(k, opc, rand, Bytes(6), Bytes(2)).ak;      // f5 chỉ phụ thuộc K, OPc, RAND
+    const Bytes sqn = xor_b(slice(autn, 0, 6), ak);
+    MilenageOut m = milenage(k, opc, rand, sqn, slice(autn, 6, 2));
+    if (!equal_ct(m.mac_a, slice(autn, 8, 8))) throw AuthError("MAC failure: mạng không có K của SIM này");
+    std::uint64_t s = 0;
+    for (unsigned char b : sqn) s = s << 8 | b;
+    if (s <= sqn_ms) throw AuthError("Synch failure: SQN cũ, có thể là replay");
+    sqn_ms = s;
+    Bytes ckik = cat({m.ck, m.ik});
+    const Bytes sn = bytes_of(snn);
+    Bytes kausf = kdf_3gpp(ckik, 0x6A, {sn, slice(autn, 0, 6)});
+    UeResult r{slice(kdf_3gpp(ckik, 0x6B, {sn, rand, m.res}), 16, 16), kseaf_from_kausf(kausf, snn)};
+    wipe(ckik);
+    wipe(kausf);
+    wipe(m.ck);
+    wipe(m.ik);
+    return r;
+}
+
+std::string suci_profile_a_deconceal(const Bytes& hn_private_raw, const Bytes& out) {
+    if (hn_private_raw.size() != 32) throw std::invalid_argument("private key X25519 phải 32 byte");
+    if (out.size() < 32 + 1 + 8) throw std::invalid_argument("scheme output quá ngắn");
+    const Bytes eph(out.begin(), out.begin() + 32), ct(out.begin() + 32, out.end() - 8), tag(out.end() - 8, out.end());
+    PkeyPtr priv(check_ptr(EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, nullptr, hn_private_raw.data(), 32), "X25519 private key"));
+    PkeyPtr peer(check_ptr(EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, nullptr, eph.data(), 32), "X25519 public key"));
+    PkeyCtxPtr dctx(check_ptr(EVP_PKEY_CTX_new(priv.get(), nullptr), "EVP_PKEY_CTX_new"));
+    check(EVP_PKEY_derive_init(dctx.get()), "EVP_PKEY_derive_init");
+    check(EVP_PKEY_derive_set_peer(dctx.get(), peer.get()), "EVP_PKEY_derive_set_peer");
+    Bytes z(32);
+    std::size_t zlen = z.size();
+    check(EVP_PKEY_derive(dctx.get(), z.data(), &zlen), "EVP_PKEY_derive");
+    Bytes k = x963_kdf_sha256(z, eph, 64);                          // AES key ‖ ICB ‖ MAC key
+    wipe(z);
+    const Bytes enc_key = slice(k, 0, 16), icb = slice(k, 16, 16);
+    Bytes mac_key = slice(k, 32, 32);
+    wipe(k);
+    Bytes mac = hmac_sha256(mac_key, ct);
+    wipe(mac_key);
+    mac.resize(8);
+    if (!equal_ct(mac, tag)) throw AuthError("MAC sai: SUCI đã bị sửa");
+    const Bytes pt = aes128_ctr(enc_key, icb, ct);
+    std::string msin;                                               // TBCD: chữ số đứng sau ở nibble cao, đệm F
+    for (unsigned char b : pt) {
+        const unsigned lo = b & 0x0Fu, hi = b >> 4;
+        for (unsigned nib : {lo, hi}) {
+            if (nib == 0xF) break;
+            if (nib > 9) throw AuthError("MSIN không phải BCD");
+            msin += static_cast<char>('0' + nib);
+        }
+    }
+    return msin;
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/tests/test_fiveg.cpp">
+#include <cstdint>
+
+#include "check.hpp"
+#include "netsec/crypto.hpp"
+#include "netsec/fiveg.hpp"
+
+using namespace netsec;
+
+int main() {
+    const Bytes K = from_hex("465b5ce8b199b49faa5f0a2ee238a6bc");
+    const Bytes OPC = opc_from_op(K, from_hex("cdc202d5123e20f62b6d676ac72cb318"));
+    const Bytes RAND = from_hex("23553cbe9637a89d218ae64dae47bf35");
+    const Bytes SQN = from_hex("ff9bb4d0b607"), AMF = from_hex("b9b9");
+    const std::string SNN = "5G:mnc004.mcc452.3gppnetwork.org";
+
+    std::cout << "Milenage Test Set 1 (3GPP TS 35.208)\n";
+    CHECK_EQ(to_hex(OPC), "cd63cb71954a9f4e48a5994e37a02baf");
+    const MilenageOut m = milenage(K, OPC, RAND, SQN, AMF);
+    CHECK_EQ(to_hex(m.mac_a), "4a9ffac354dfafb3");
+    CHECK_EQ(to_hex(m.mac_s), "01cfaf9ec4e871e9");
+    CHECK_EQ(to_hex(m.res), "a54211d5e3ba50bf");
+    CHECK_EQ(to_hex(m.ck), "b40ba9a3c58b2a05bbf0d987b21bf8cb");
+    CHECK_EQ(to_hex(m.ik), "f769bcd751044604127672711c6d3441");
+    CHECK_EQ(to_hex(m.ak), "aa689c648370");
+    CHECK_EQ(to_hex(m.ak_s), "451e8beca43b");
+
+    std::cout << "5G-AKA (cùng giá trị với Lab 15.3 và widget module 15)\n";
+    const HeAv av = generate_he_av(K, OPC, SQN, AMF, RAND, SNN);
+    CHECK_EQ(to_hex(av.autn), "55f328b43577b9b94a9ffac354dfafb3");
+    CHECK_EQ(to_hex(av.xres_star), "a95d06cbfcc4eb30f2ef2f60089c5778");
+    CHECK_EQ(to_hex(hxres_star(RAND, av.xres_star)), "a418f491067e7116695e560ebac36083");
+    CHECK_EQ(to_hex(av.kausf), "32f3afc00d86a29bc8c929a7cc77053e386ab5977da13e5f00ce7e9acfaa6f24");
+    CHECK_EQ(to_hex(kseaf_from_kausf(av.kausf, SNN)), "1070b0681638cff666490a2e76768380c98122d3bcb6c6cab2399b302b67d06c");
+
+    std::cout << "USIM: hợp lệ, replay, mạng giả, sai serving network name\n";
+    std::uint64_t sqn_ms = 0;
+    const UeResult ue = usim_authenticate(K, OPC, RAND, av.autn, SNN, sqn_ms);
+    CHECK_EQ(to_hex(ue.res_star), to_hex(av.xres_star));
+    CHECK_EQ(to_hex(ue.kseaf), to_hex(kseaf_from_kausf(av.kausf, SNN)));
+    CHECK_THROWS(usim_authenticate(K, OPC, RAND, av.autn, SNN, sqn_ms));          // replay: SQN không mới
+    Bytes fake_k = K;
+    fake_k[0] ^= 0x01;
+    std::uint64_t fresh = 0;
+    CHECK_THROWS(usim_authenticate(K, OPC, RAND, generate_he_av(fake_k, OPC, SQN, AMF, RAND, SNN).autn, SNN, fresh));
+    std::uint64_t fresh2 = 0;
+    const UeResult other = usim_authenticate(K, OPC, RAND, av.autn, "5G:mnc099.mcc452.3gppnetwork.org", fresh2);
+    CHECK_EQ(equal_ct(other.res_star, av.xres_star), false);                      // AUSF sẽ từ chối
+    return test_result();
+}
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/apps/suci_check.cpp">
+// suci_check <hn_private_key_hex> <scheme_output_hex>: giải SUCI Profile A như SIDF trong UDM
+#include <iostream>
+
+#include "netsec/crypto.hpp"
+#include "netsec/fiveg.hpp"
+
+int main(int argc, char** argv) {
+    if (argc != 3) {
+        std::cerr << "Dùng: suci_check <hn_private_key_hex> <scheme_output_hex>\n";
+        return 2;
+    }
+    try {
+        std::cout << "MSIN = " << netsec::suci_profile_a_deconceal(netsec::from_hex(argv[1]), netsec::from_hex(argv[2])) << "\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cout << "lỗi: " << e.what() << "\n";
+        return 1;
+    }
+}
+</script>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m17/netsec && cmake --build build -j && ./build/test_fiveg
+Milenage Test Set 1 (3GPP TS 35.208)
+  ✔ to_hex(OPC)
+  ✔ to_hex(m.mac_a)
+  …
+5G-AKA (cùng giá trị với Lab 15.3 và widget module 15)
+  ✔ to_hex(av.autn)
+  …
+USIM: hợp lệ, replay, mạng giả, sai serving network name
+  ✔ to_hex(ue.res_star)
+  ✔ to_hex(ue.kseaf)
+  ✔ throw: usim_authenticate(K, OPC, RAND, av.autn, SNN, sqn_ms)
+  ✔ throw: usim_authenticate(K, OPC, RAND, generate_he_av(fake_k, OPC, SQN, AMF, RAND, SNN).autn, SNN, fresh)
+  ✔ equal_ct(other.res_star, av.xres_star)
+OK
+# SUCI do Python (Lab 15.4) tạo, C++ giải
+$ read HN SUCI < <(cd ~/netlab/m15 && python3 -c 'from suci import *
+from cryptography.hazmat.primitives.serialization import PrivateFormat, NoEncryption
+k = X25519PrivateKey.generate()
+print(k.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption()).hex(), conceal("0123456789", k.public_key()).hex())')
+$ ./build/suci_check $HN $SUCI
+MSIN = 0123456789                                                 ◀ C++ giải đúng SUCI của Python
+$ ./build/suci_check $HN ${SUCI:0:70}ff${SUCI:72}                 # thay một byte trong ciphertext
+lỗi: MAC sai: SUCI đã bị sửa
+</script>
+  <p class="small muted">Lệnh <code>read … &lt; &lt;(…)</code> có một đoạn Python nhiều dòng; dán nguyên khối vào terminal. Dòng thay byte giả định byte thứ 36 không phải <code>ff</code> sẵn; nếu trùng thì đổi thành <code>00</code>. Đây chính là code mà AUSF/UDM thật chạy, chỉ khác là K và private key của SIDF nằm trong HSM chứ không nằm trong RAM của process.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 17.5 · Parser GTP-U: tìm bug bằng sanitizer và libFuzzer</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">C++17 · clang · ASan · libFuzzer</span><span class="chip t-base">90 phút</span></div>
+  <p>Parser cho protocol nhận từ mạng là nơi sinh ra những lỗi như Heartbleed. Bắt đầu từ parser GTP-U có lỗi cho sẵn dưới đây: nó đọc header bắt buộc 8 byte, 4 byte tuỳ chọn (sequence number, N-PDU, next extension type) và chuỗi extension header (TS 29.281). Viết unit test với packet mẫu, viết fuzz target, chạy libFuzzer với ASan/UBSan cho tới khi tìm ra bug, sửa parser, rồi biến input gây crash thành regression test.</p>
+<script type="text/plain" class="code" data-lang="cpp" data-file="src/gtpu.cpp (bản có lỗi, cho sẵn)">
+std::optional<GtpuHeader> parse_gtpu(const std::uint8_t* d, std::size_t len) {
+    if (len < 8) return std::nullopt;
+    GtpuHeader h{};
+    h.version = d[0] >> 5;
+    h.pt = (d[0] >> 4) & 1;
+    h.flags = d[0] & 0x07;                                        // E, S, PN
+    if (h.version != 1 || h.pt != 1) return std::nullopt;
+    h.msg_type = d[1];
+    h.length = static_cast<std::uint16_t>(d[2] << 8 | d[3]);
+    h.teid = std::uint32_t(d[4]) << 24 | std::uint32_t(d[5]) << 16 | std::uint32_t(d[6]) << 8 | d[7];
+    std::size_t off = 8;
+    if (h.flags) {
+        if (h.flags & 0x02) h.seq = static_cast<std::uint16_t>(d[8] << 8 | d[9]);
+        std::uint8_t next = (h.flags & 0x04) ? d[11] : 0;
+        off = 12;
+        while (next != 0) {
+            std::size_t n = std::size_t(d[off]) * 4;              // độ dài extension, đơn vị 4 byte
+            h.ext_types.push_back(next);
+            next = d[off + n - 1];
+            off += n;
+        }
+    }
+    h.payload_offset = off;
+    return h;
+}
+</script>
+  <p class="done-when"><b>Xong khi:</b> fuzzer tìm ra crash trên bản có lỗi trong vòng vài giây; bản đã sửa chạy 60 giây không crash; mọi input gây crash đều thành ca âm tính trong <code>test_gtpu</code>.</p>
+  <details><summary>Gợi ý</summary><p>Liệt kê mọi chỗ đọc <code>d[i]</code> và hỏi: đã chắc <code>i &lt; len</code> chưa? Trường <code>length</code> khai báo số byte <b>sau</b> 8 byte đầu, nên giới hạn đúng là <code>8 + length</code>, và nó phải không vượt <code>len</code>. Extension có độ dài 0 thì vòng lặp không tiến. Build fuzz target: <code>clang++ -std=c++17 -g -O1 -fsanitize=fuzzer,address,undefined -Iinclude fuzz/fuzz_gtpu.cpp src/gtpu.cpp -o fuzz_gtpu</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/gtpu.hpp">
+#pragma once
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <vector>
+
+namespace netsec {
+
+struct GtpuHeader {
+    std::uint8_t version = 0, pt = 0, flags = 0, msg_type = 0;
+    std::uint16_t length = 0;                    // số byte sau 8 byte header bắt buộc
+    std::uint32_t teid = 0;
+    std::optional<std::uint16_t> seq;
+    std::vector<std::uint8_t> ext_types;         // ví dụ 0x85: PDU Session Container
+    std::size_t payload_offset = 0;              // vị trí bắt đầu packet IP của UE
+};
+
+// Không bao giờ đọc ngoài [data, data + len); input hỏng → std::nullopt
+std::optional<GtpuHeader> parse_gtpu(const std::uint8_t* data, std::size_t len);
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/src/gtpu.cpp">
+#include "netsec/gtpu.hpp"
+
+namespace netsec {
+
+std::optional<GtpuHeader> parse_gtpu(const std::uint8_t* d, std::size_t len) {
+    if (d == nullptr || len < 8) return std::nullopt;
+    GtpuHeader h{};
+    h.version = d[0] >> 5;
+    h.pt = (d[0] >> 4) & 1;
+    h.flags = d[0] & 0x07;                                        // E (0x04), S (0x02), PN (0x01)
+    if (h.version != 1 || h.pt != 1) return std::nullopt;
+    h.msg_type = d[1];
+    h.length = static_cast<std::uint16_t>(d[2] << 8 | d[3]);
+    h.teid = std::uint32_t(d[4]) << 24 | std::uint32_t(d[5]) << 16 | std::uint32_t(d[6]) << 8 | d[7];
+    const std::size_t end = 8 + std::size_t(h.length);
+    if (end > len) return std::nullopt;                           // FIX 1: length khai báo vượt dữ liệu thật
+    std::size_t off = 8;
+    if (h.flags != 0) {
+        if (end < 12) return std::nullopt;                        // FIX 2: thiếu 4 byte tuỳ chọn
+        if (h.flags & 0x02) h.seq = static_cast<std::uint16_t>(d[8] << 8 | d[9]);
+        std::uint8_t next = (h.flags & 0x04) ? d[11] : 0;
+        off = 12;
+        int count = 0;
+        while (next != 0) {
+            if (off >= end || ++count > 16) return std::nullopt;  // FIX 3: hết dữ liệu, hoặc chuỗi extension vô lý
+            const std::size_t n = std::size_t(d[off]) * 4;
+            if (n == 0 || off + n > end) return std::nullopt;     // FIX 4: độ dài 0 (lặp vô hạn) hoặc vượt packet
+            h.ext_types.push_back(next);
+            next = d[off + n - 1];
+            off += n;
+        }
+    }
+    h.payload_offset = off;
+    return h;
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/tests/test_gtpu.cpp">
+#include <vector>
+
+#include "check.hpp"
+#include "netsec/gtpu.hpp"
+
+using netsec::parse_gtpu;
+
+static bool parses(const std::vector<std::uint8_t>& p) { return parse_gtpu(p.data(), p.size()).has_value(); }
+
+int main() {
+    std::cout << "Packet hợp lệ\n";
+    const std::vector<std::uint8_t> simple = {0x30, 0xff, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x45, 0x00, 0x00, 0x00};
+    const auto s = parse_gtpu(simple.data(), simple.size());
+    CHECK_EQ(s.has_value(), true);
+    CHECK_EQ(s->teid, 1u);
+    CHECK_EQ(s->payload_offset, std::size_t{8});
+    // E và S bật, sequence 7, một extension PDU Session Container (0x85) dài 4 byte, payload 2 byte
+    const std::vector<std::uint8_t> ext = {0x36, 0xff, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x07, 0x00, 0x85,
+                                           0x01, 0x10, 0x00, 0x00, 0xab, 0xcd};
+    const auto e = parse_gtpu(ext.data(), ext.size());
+    CHECK_EQ(e.has_value(), true);
+    CHECK_EQ(e->teid, 42u);
+    CHECK_EQ(e->seq.value_or(0), 7);
+    CHECK_EQ(int(e->ext_types.size()), 1);
+    CHECK_EQ(int(e->ext_types.at(0)), 0x85);
+    CHECK_EQ(e->payload_offset, std::size_t{16});
+
+    std::cout << "Packet hỏng phải bị từ chối (regression từ fuzzer)\n";
+    std::vector<std::uint8_t> no_opt(ext.begin(), ext.begin() + 8);
+    no_opt[3] = 0x00;                                             // flag bật nhưng không có 4 byte tuỳ chọn
+    CHECK_EQ(parses(no_opt), false);
+    auto long_len = simple;
+    long_len[3] = 0x20;                                           // khai báo 32 byte, thật chỉ có 4
+    CHECK_EQ(parses(long_len), false);
+    auto zero_ext = ext;
+    zero_ext[12] = 0x00;                                          // extension dài 0: bản lỗi lặp vô hạn
+    CHECK_EQ(parses(zero_ext), false);
+    auto big_ext = ext;
+    big_ext[12] = 0xff;                                           // extension dài 1020 byte
+    CHECK_EQ(parses(big_ext), false);
+    return test_result();
+}
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/fuzz/fuzz_gtpu.cpp">
+// clang++ -std=c++17 -g -O1 -fsanitize=fuzzer,address,undefined -Iinclude fuzz/fuzz_gtpu.cpp src/gtpu.cpp -o fuzz_gtpu
+#include "netsec/gtpu.hpp"
+
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
+    if (auto h = netsec::parse_gtpu(data, size)) {
+        // Bất biến: payload nằm trong packet và trong phần length đã khai báo
+        if (h->payload_offset > size || h->payload_offset > 8u + h->length) __builtin_trap();
+    }
+    return 0;
+}
+</script>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m17/netsec      # bước 1: src/gtpu.cpp là bản có lỗi
+$ mkdir -p corpus && printf '\x36\xff\x00\x0a\x00\x00\x00\x2a\x00\x07\x00\x85\x01\x10\x00\x00\xab\xcd' > corpus/gpdu_ext.bin
+$ clang++ -std=c++17 -g -O1 -fsanitize=fuzzer,address,undefined -Iinclude fuzz/fuzz_gtpu.cpp src/gtpu.cpp -o fuzz_gtpu
+$ ./fuzz_gtpu -max_total_time=60 -timeout=2 corpus/
+INFO: Seed: …
+#2      INITED cov: 14 ft: 15 corp: 1/18b …
+==4211==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x… at pc 0x…
+READ of size 1 at 0x… thread T0
+    #0 0x… in netsec::parse_gtpu(unsigned char const*, unsigned long) src/gtpu.cpp:16
+…
+artifact_prefix='./'; Test unit written to ./crash-9c2e…            ◀ input gây lỗi được lưu lại
+$ xxd crash-9c2e…
+00000000: 36ff 0000 0000 002a                      6......*          ◀ flag bật, packet chỉ có 8 byte
+# bước 2: thay bằng bản đã sửa, build lại, chạy lại
+$ clang++ -std=c++17 -g -O1 -fsanitize=fuzzer,address,undefined -Iinclude fuzz/fuzz_gtpu.cpp src/gtpu.cpp -o fuzz_gtpu
+$ ./fuzz_gtpu crash-9c2e…                                           # chạy lại đúng input cũ
+Executed crash-9c2e… in 0 ms
+$ ./fuzz_gtpu -max_total_time=60 -timeout=2 corpus/ 2>&1 | tail -1
+Done 3127402 runs in 61 second(s)                                   ◀ không crash, không treo
+$ cmake --build build -j && (cd build && ctest --output-on-failure --timeout 10)
+100% tests passed, 0 tests failed out of 3
+</script>
+  <p class="small muted">Byte gây crash, số lần chạy và dòng code trong stack trace của bạn sẽ khác: fuzzer ngẫu nhiên. Nếu nó tìm ra lỗi lặp vô hạn trước, libFuzzer báo <code>ALARM: working on the last Unit for 2 seconds</code> và lưu <code>timeout-…</code> thay vì <code>crash-…</code>. Trong project thật, mọi parser của NGAP, NAS, PFCP, Diameter, X.509 nên có fuzz target chạy trong CI.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 17.6 · orders-api bản C++ trong capstone</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">C++17 · Docker · kind</span><span class="chip t-base">120 phút</span></div>
+  <p>Ghép mọi thứ: viết <code>http.cpp</code> (đọc request HTTP/1.1 có giới hạn kích thước, ghi response JSON, HTTPS GET qua mTLS có kiểm tra hostname để tải JWKS) và <code>orders_api.cpp</code> làm đúng những gì bản Python ở M3 của capstone làm: mTLS bắt buộc, verify token qua JWKS, kiểm tra <code>cnf.x5t#S256</code> với cert của client, scope theo route, 401/403 với <code>WWW-Authenticate</code>, audit log cùng định dạng. Build image nhiều tầng, thay vào deployment <code>orders-api</code> trên kind.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>test.sh</code> của module 16 báo 10/10 mà <b>không sửa một dòng test nào</b>; bài diễn tập xoay cert ở M5 cũng đạt với bản C++ (log <code>tls_context_loaded</code> lần hai, không restart); và key k1 bị gỡ khỏi JWKS thì token k1 bị từ chối sau tối đa 5 phút.</p>
+  <details><summary>Gợi ý</summary><p>Đọc request tới <code>\r\n\r\n</code>, tối đa 8 KB, rồi bỏ. Tên header so sánh không phân biệt hoa thường. Phía client nhớ <code>SSL_set_tlsext_host_name</code> (SNI) và <code>SSL_set1_host</code>. Server Python của token-server đóng connection mà không gửi <code>close_notify</code>, nên <code>SSL_read</code> kết thúc bằng lỗi "unexpected eof": dữ liệu đã đủ, chỉ cần dọn error queue. Image runtime chỉ cần <code>libssl3t64</code> (tên gói trên Ubuntu 24.04).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/include/netsec/http.hpp">
+#pragma once
+#include <cstdint>
+#include <map>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <nlohmann/json.hpp>
+
+#include "netsec/ossl.hpp"
+
+namespace netsec {
+
+struct Request {
+    std::string method, path;
+    std::map<std::string, std::string> headers;   // tên header viết thường
+};
+
+std::optional<Request> read_request(SSL* ssl, std::size_t max_bytes = 8192);
+void write_response(SSL* ssl, int status, const nlohmann::json& body,
+                    const std::vector<std::pair<std::string, std::string>>& extra = {});
+// GET qua TLS với ctx client (mTLS), có SNI và kiểm tra hostname. Trả về body nếu status 200.
+std::string https_get(const std::string& host, std::uint16_t port, const std::string& path, SSL_CTX* ctx);
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/src/http.cpp">
+#include "netsec/http.hpp"
+
+#include <unistd.h>
+
+#include <algorithm>
+#include <cctype>
+#include <sstream>
+
+#include "netsec/tls.hpp"
+
+namespace netsec {
+
+std::optional<Request> read_request(SSL* ssl, std::size_t max_bytes) {
+    std::string buf;
+    char chunk[1024];
+    while (buf.find("\r\n\r\n") == std::string::npos) {
+        if (buf.size() > max_bytes) return std::nullopt;            // header quá lớn: bỏ
+        int n = SSL_read(ssl, chunk, sizeof chunk);
+        if (n <= 0) {
+            ERR_clear_error();
+            return std::nullopt;
+        }
+        buf.append(chunk, static_cast<std::size_t>(n));
+    }
+    std::istringstream in(buf.substr(0, buf.find("\r\n\r\n")));
+    Request r;
+    std::string line, version;
+    if (!std::getline(in, line)) return std::nullopt;
+    std::istringstream first(line);
+    if (!(first >> r.method >> r.path >> version) || version.rfind("HTTP/1.", 0) != 0) return std::nullopt;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const auto colon = line.find(':');
+        if (colon == std::string::npos) continue;
+        std::string name = line.substr(0, colon), value = line.substr(colon + 1);
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        value.erase(0, value.find_first_not_of(" \t"));
+        r.headers[name] = value;
+    }
+    return r;
+}
+
+void write_response(SSL* ssl, int status, const nlohmann::json& body,
+                    const std::vector<std::pair<std::string, std::string>>& extra) {
+    static const std::map<int, const char*> reason = {{200, "OK"},          {400, "Bad Request"}, {401, "Unauthorized"},
+                                                      {403, "Forbidden"},   {404, "Not Found"},   {500, "Internal Server Error"}};
+    const auto it = reason.find(status);
+    const std::string data = body.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    std::string out = "HTTP/1.1 " + std::to_string(status) + " " + (it != reason.end() ? it->second : "Error") + "\r\n";
+    out += "Content-Type: application/json\r\nCache-Control: no-store\r\nConnection: close\r\n";
+    out += "Content-Length: " + std::to_string(data.size()) + "\r\n";
+    for (const auto& [name, value] : extra) out += name + ": " + value + "\r\n";
+    out += "\r\n" + data;
+    SSL_write(ssl, out.data(), static_cast<int>(out.size()));
+}
+
+std::string https_get(const std::string& host, std::uint16_t port, const std::string& path, SSL_CTX* ctx) {
+    struct Fd {
+        int fd;
+        ~Fd() { if (fd >= 0) ::close(fd); }
+    } sock{connect_tcp(host, port)};
+    SslPtr ssl(check_ptr(SSL_new(ctx), "SSL_new"));
+    check(SSL_set_fd(ssl.get(), sock.fd), "SSL_set_fd");
+    check(SSL_set_tlsext_host_name(ssl.get(), host.c_str()), "SNI");
+    check(SSL_set1_host(ssl.get(), host.c_str()), "SSL_set1_host");    // thiếu dòng này: nhận cert của bất kỳ tên nào
+    if (SSL_connect(ssl.get()) != 1) throw_ossl("TLS tới " + host + " thất bại");
+    const std::string req = "GET " + path + " HTTP/1.0\r\nHost: " + host + "\r\n\r\n";
+    if (SSL_write(ssl.get(), req.data(), static_cast<int>(req.size())) <= 0) throw_ossl("SSL_write");
+    std::string resp;
+    char buf[4096];
+    for (int n; (n = SSL_read(ssl.get(), buf, sizeof buf)) > 0;) resp.append(buf, static_cast<std::size_t>(n));
+    ERR_clear_error();                                                  // EOF không có close_notify: bình thường ở đây
+    const auto body = resp.find("\r\n\r\n");
+    if (resp.rfind("HTTP/1.", 0) != 0 || resp.size() < 12 || resp.compare(9, 3, "200") != 0 || body == std::string::npos)
+        throw std::runtime_error("GET " + path + ": phản hồi không phải 200");
+    return resp.substr(body + 4);
+}
+
+}  // namespace netsec
+</script>
+<script type="text/plain" class="code" data-lang="cpp" data-file="~/netlab/m17/netsec/apps/orders_api.cpp">
+// orders-api bản C++: thay thẳng bản Python của capstone (module 16), phải qua nguyên test.sh.
+#include <cstdlib>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <utility>
+
+#include "netsec/http.hpp"
+#include "netsec/jwt.hpp"
+#include "netsec/log.hpp"
+#include "netsec/tls.hpp"
+
+using nlohmann::json;
+
+static std::string env(const char* name, const char* fallback) {
+    const char* v = std::getenv(name);
+    return v ? v : fallback;
+}
+
+int main() {
+    const std::string tls_dir = env("TLS_DIR", "/tls"), trust = env("TRUST_FILE", "/trust/root.crt");
+    const std::string issuer = env("ISSUER", "https://token.security.svc.cluster.local:8443");
+    const std::string audience = env("AUDIENCE", "orders-api");
+    const std::string hostport = issuer.rfind("https://", 0) == 0 ? issuer.substr(8) : issuer;
+    const auto colon = hostport.find(':');
+    const std::string jwks_host = hostport.substr(0, colon);
+    const auto jwks_port = static_cast<std::uint16_t>(colon == std::string::npos ? 443 : std::stoi(hostport.substr(colon + 1)));
+
+    netsec::ReloadingTlsCtx server_tls(true, tls_dir + "/tls.crt", tls_dir + "/tls.key", trust);
+    netsec::ReloadingTlsCtx client_tls(false, tls_dir + "/tls.crt", tls_dir + "/tls.key", trust);   // cert của orders-api
+    netsec::JwksCache jwks([&] { return netsec::https_get(jwks_host, jwks_port, "/.well-known/jwks.json", client_tls.get().get()); });
+    const netsec::VerifyOptions opt{issuer, audience, 30};
+    const std::map<std::pair<std::string, std::string>, std::string> routes = {{{"GET", "/orders"}, "orders:read"},
+                                                                             {{"POST", "/orders"}, "orders:write"}};
+
+    const netsec::Handler handler = [&](SSL* ssl, const netsec::Peer& peer) {
+        const auto req = netsec::read_request(ssl);
+        if (!req) return;
+        const std::string action = req->method + " " + req->path;
+        const auto route = routes.find({req->method, req->path});
+        if (route == routes.end()) return netsec::write_response(ssl, 404, {{"error", "not_found"}});
+        const std::string& need = route->second;
+        auto deny = [&](int status, const std::string& error, const std::string& detail, const std::string& sub = "") {
+            netsec::log_json("deny", {{"client", peer.spiffe_id}, {"action", action}, {"status", status},
+                                      {"error", error}, {"detail", detail}, {"sub", sub}});
+            std::string www = "Bearer error=\"" + error + "\"";
+            if (status == 403) www += ", scope=\"" + need + "\"";
+            netsec::write_response(ssl, status, {{"error", error}, {"detail", detail}}, {{"WWW-Authenticate", www}});
+        };
+        const auto h = req->headers.find("authorization");
+        const std::string auth = h == req->headers.end() ? "" : h->second;
+        if (auth.rfind("Bearer ", 0) != 0) return deny(401, "invalid_request", "thiếu Bearer token");
+        json claims;
+        try {
+            claims = netsec::verify_es256(auth.substr(7), jwks, opt);
+        } catch (const netsec::JwtError& e) {
+            return deny(401, "invalid_token", e.what());
+        }
+        const std::string sub = claims["sub"].is_string() ? claims["sub"].get<std::string>() : "";
+        const json& cnf = claims["cnf"];
+        const bool bound = cnf.is_object() && cnf.contains("x5t#S256") && cnf["x5t#S256"].is_string() &&
+                           cnf["x5t#S256"].get<std::string>() == peer.x5t_s256;
+        if (!bound) return deny(401, "invalid_token", "token không gắn với client cert này", sub);   // token bị đánh cắp
+        std::istringstream scopes(claims["scope"].is_string() ? claims["scope"].get<std::string>() : "");
+        bool allowed = false;
+        for (std::string s; scopes >> s;) allowed = allowed || s == need;
+        if (!allowed) return deny(403, "insufficient_scope", "", sub);
+        netsec::log_json("allow", {{"client", peer.spiffe_id}, {"sub", sub}, {"action", action},
+                                   {"jti", claims.value("jti", "")}});
+        netsec::write_response(ssl, 200, {{"ok", true}, {"caller", sub}, {"action", action}});
+    };
+
+    try {
+        netsec::log_json("start", {{"service", "orders-api (C++)"}, {"issuer", issuer}, {"audience", audience}});
+        netsec::serve_tls(8443, server_tls, handler);
+    } catch (const std::exception& e) {
+        netsec::log_json("fatal", {{"error", e.what()}});
+        return 1;
+    }
+}
+</script>
+<script type="text/plain" class="code" data-lang="dockerfile" data-file="~/netlab/m17/netsec/Dockerfile.cpp">
+# Tầng 1: build với đủ công cụ; tầng 2: chỉ binary + libssl, chạy non-root
+FROM ubuntu:24.04 AS build
+RUN apt-get update && apt-get install -y --no-install-recommends g++ cmake make libssl-dev nlohmann-json3-dev \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY CMakeLists.txt ./
+COPY include include
+COPY src src
+COPY apps apps
+COPY tests tests
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j --target orders_api
+
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends libssl3t64 && rm -rf /var/lib/apt/lists/*
+COPY --from=build /src/build/orders_api /usr/local/bin/orders_api
+USER 10001
+ENTRYPOINT ["/usr/local/bin/orders_api"]
+</script>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m17/netsec && docker build -f Dockerfile.cpp -t netlab/orders-cpp:1.0 .
+$ kind load docker-image netlab/orders-cpp:1.0 --name netlab
+$ kubectl -n apps patch deploy orders-api --type=json -p '[
+>   {"op":"remove","path":"/spec/template/spec/containers/0/command"},
+>   {"op":"replace","path":"/spec/template/spec/containers/0/image","value":"netlab/orders-cpp:1.0"}]'
+$ kubectl -n apps rollout status deploy/orders-api
+$ kubectl -n apps logs deploy/orders-api | head -3
+{"ts":"…","event":"start","service":"orders-api (C++)","issuer":"https://token.security.svc.cluster.local:8443","audience":"orders-api"}
+{"ts":"…","event":"tls_context_loaded","side":"server","cert":"/tls/tls.crt"}
+{"ts":"…","event":"listening","port":8443}
+$ cd ~/netlab/m16 && bash test.sh | tail -3
+  ✔ attacker (default) → bị chặn ở tầng mạng (curl exit 28 = timeout)
+
+Kết quả: 10 đạt, 0 không đạt                                        ◀ cùng test, không sửa dòng nào
+$ kubectl -n apps delete secret orders-api-tls && sleep 90
+$ kubectl -n apps logs deploy/orders-api | grep -c tls_context_loaded
+3                                                                   ◀ server ctx và client ctx đã nạp lại cert mới
+$ kubectl -n apps get pod -l app=orders-api -o jsonpath='{.items[*].status.containerStatuses[0].restartCount}{"\n"}'
+0 0
+</script>
+  <p class="small muted">Image runtime khoảng 80 MB (Ubuntu + libssl); có thể giảm bằng distroless hoặc link tĩnh, nhưng khi đó phải tự lo cập nhật OpenSSL theo CVE. Con số log và thời gian của bạn sẽ khác (client ctx chỉ nạp lại ở lần tải JWKS kế tiếp). Muốn quay lại bản Python: <code>kubectl apply -f ~/netlab/m16/k8s/30-orders-api.yaml</code>.</p>
+  </details>
+</div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m17" data-title="Kiểm tra module 17">
+[
+ {"q":"Server C++ đặt <code>SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr)</code>. Client không gửi cert. Kết quả?","o":["Handshake thất bại","Handshake thành công, server không có identity của client","OpenSSL tự đòi cert","Không compile được"],"a":1,
+  "e":"Phía server phải thêm SSL_VERIFY_FAIL_IF_NO_PEER_CERT mới bắt buộc client cert."},
+ {"q":"Đoạn <code>if (EVP_DigestVerify(...)) accept();</code> sai ở đâu?","o":["Không sai","Hàm trả -1 khi lỗi; -1 là true trong C/C++ nên chữ ký hỏng có thể được chấp nhận","Thiếu ERR_clear_error","Phải dùng EVP_VerifyFinal"],"a":1,
+  "e":"Luôn so == 1 với các hàm verify của OpenSSL."},
+ {"q":"JWT ES256 mang chữ ký 64 byte. Vì sao không đưa thẳng vào <code>EVP_DigestVerify</code>?","o":["Vì quá ngắn","JWT dùng raw r ‖ s, còn EVP cần chữ ký ECDSA mã hoá DER; phải chuyển bằng ECDSA_SIG","Vì cần SHA-512","Vì JWT dùng RSA"],"a":1,
+  "e":"Và không được \"sửa\" bằng cách chấp nhận DER trong token: token DER không đúng chuẩn và mở ra khác biệt giữa các implementation."},
+ {"q":"Lợi ích chính của <code>std::unique_ptr&lt;EVP_PKEY, Deleter&lt;EVP_PKEY_free&gt;&gt;</code>?","o":["Nhanh hơn","Handle luôn được giải phóng đúng một lần, kể cả khi có exception","Thread-safe tự động","Không cần link libcrypto"],"a":1,
+  "e":"RAII loại bỏ leak và double free, hai nguồn bug phổ biến nhất khi dùng C API trong C++."},
+ {"q":"Vì sao phải đọc hết error queue (<code>ERR_get_error</code>) mỗi khi có lỗi?","o":["Để giải phóng bộ nhớ","Lỗi còn sót sẽ xuất hiện ở lần gọi sau, làm log chỉ sai chỗ; queue là riêng của từng thread","Vì OpenSSL sẽ crash","Không cần thiết"],"a":1,
+  "e":"ossl_errors() trong ossl.hpp đọc hết queue và gắn vào exception."},
+ {"q":"Cách an toàn để đổi cert của server đang chạy nhiều thread?","o":["Gọi SSL_CTX_use_certificate trên ctx đang dùng","Tạo SSL_CTX mới, đổi shared_ptr dưới mutex; connection cũ giữ ctx cũ","Restart process","Tắt TLS một lúc"],"a":1,
+  "e":"SSL_CTX dùng chung giữa các thread được khi chỉ đọc; sửa nó trong lúc đang dùng là data race."},
+ {"q":"Server C++ đột ngột chết không log gì khi client ngắt kết nối giữa chừng. Nghi ngờ đầu tiên?","o":["Hết RAM","SIGPIPE khi ghi vào socket đã đóng; phải bỏ qua SIGPIPE","Lỗi OpenSSL","Lỗi DNS"],"a":1,
+  "e":"Python bỏ qua SIGPIPE sẵn; C/C++ thì không."},
+ {"q":"Vì sao <code>JwksCache</code> dùng <code>steady_clock</code> thay vì <code>system_clock</code>?","o":["Nhanh hơn","Giờ hệ thống có thể bị chỉnh (NTP, admin); thời hạn cache phải đo bằng đồng hồ đơn điệu","Vì JWKS dùng steady time","Không khác gì"],"a":1,
+  "e":"Còn exp/nbf của token thì phải so với giờ thật (time()), vì đó là thời điểm tuyệt đối."},
+ {"q":"Fuzzer tìm ra input 8 byte <code>36 ff 00 00 00 00 00 2a</code> làm parser GTP-U crash. Nguyên nhân?","o":["TEID sai","Flag E/S bật nên parser đọc 4 byte tuỳ chọn ở offset 8–11 mà không kiểm tra packet có đủ dài","Version sai","Message type sai"],"a":1,
+  "e":"Mọi phép đọc d[i] phải chứng minh được i < giới hạn; giới hạn đúng là min(len, 8 + length khai báo)."},
+ {"q":"Input gây crash từ fuzzer nên được xử lý thế nào sau khi sửa bug?","o":["Xoá đi","Giữ lại thành regression test (và corpus) để bug không quay lại","Gửi lên mạng","Bỏ qua"],"a":1,
+  "e":"test_gtpu có đúng các ca đó; trong CI, fuzzer chạy tiếp với corpus đã tích luỹ."},
+ {"q":"Vì sao <code>wipe()</code> (OPENSSL_cleanse) thay vì <code>memset</code> để xoá key?","o":["Nhanh hơn","Compiler có thể bỏ memset trên vùng nhớ không còn được đọc; OPENSSL_cleanse được thiết kế để không bị tối ưu mất","memset không chạy với vector","Không khác"],"a":1,
+  "e":"Đây là bẫy tối ưu hoá kinh điển (dead store elimination)."},
+ {"q":"orders-api bản C++ qua được nguyên <code>test.sh</code> của capstone. Điều đó chứng minh gì?","o":["Code C++ không có bug nào","Bản C++ hành xử giống bản Python ở mọi ca đã test, kể cả các ca phải từ chối; bộ test là hợp đồng, không phụ thuộc ngôn ngữ","C++ nhanh hơn","Không chứng minh gì"],"a":1,
+  "e":"Test chỉ chứng minh những gì nó kiểm tra. Đó là lý do bộ test phải có nhiều ca âm tính."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"17 C/C++ cho security services","c":[
+ {"t":"Nền tảng","col":"cpp","c":[{"t":"CMake, C++17, libnetsec"},{"t":"RAII: unique_ptr + Deleter"},{"t":"Error queue → exception"},{"t":"ASan/UBSan, ctest"}]},
+ {"t":"Crypto EVP","col":"sec","c":[{"t":"EVP_MAC (HMAC), EVP_Digest"},{"t":"AES ECB/CTR, KDF 3GPP, X9.63"},{"t":"CRYPTO_memcmp, OPENSSL_cleanse"},{"t":"Test vector RFC/FIPS/3GPP"}]},
+ {"t":"mTLS","col":"app","c":[{"t":"FAIL_IF_NO_PEER_CERT"},{"t":"set_purpose: EKU"},{"t":"SPIFFE ID từ SAN, x5t#S256"},{"t":"Hot reload: SSL_CTX mới"},{"t":"SIGPIPE"}]},
+ {"t":"JWT","col":"k8s","c":[{"t":"Allowlist alg trước"},{"t":"JWK → EVP_PKEY_fromdata"},{"t":"Raw r‖s → DER"},{"t":"rc == 1, không phải rc"},{"t":"JWKS cache có TTL"}]},
+ {"t":"5G","col":"core","c":[{"t":"Milenage f1–f5*"},{"t":"5G-AKA: HE AV, RES*, KSEAF"},{"t":"SUCI: X25519 + X9.63 + CTR"},{"t":"Wipe CK, IK, KAUSF"}]},
+ {"t":"Parser & deploy","col":"net","c":[{"t":"Mọi d[i] phải có giới hạn"},{"t":"libFuzzer + corpus"},{"t":"Crash → regression test"},{"t":"Multi-stage image, non-root"},{"t":"Cùng test.sh với bản Python"}]}
+]}
+</script>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m17"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li><a href="https://docs.openssl.org/3.0/man7/migration_guide/" target="_blank" rel="noopener">OpenSSL 3.0 migration guide</a>: vì sao bỏ HMAC_CTX, EC_KEY và dùng EVP, providers.</li>
+  <li><a href="https://docs.openssl.org/3.0/man3/SSL_CTX_set_verify/" target="_blank" rel="noopener">SSL_CTX_set_verify</a> và <a href="https://docs.openssl.org/3.0/man3/SSL_set1_host/" target="_blank" rel="noopener">SSL_set1_host</a>: hai trang man đáng đọc kỹ nhất cho người viết mTLS.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc7518#section-3.4" target="_blank" rel="noopener">RFC 7518 §3.4</a>: định dạng chữ ký ECDSA trong JWS (r ‖ s).</li>
+  <li><a href="https://llvm.org/docs/LibFuzzer.html" target="_blank" rel="noopener">libFuzzer</a> và <a href="https://github.com/google/oss-fuzz" target="_blank" rel="noopener">OSS-Fuzz</a>: fuzzing liên tục cho thư viện mã nguồn mở (OpenSSL cũng nằm trong đó).</li>
+  <li><a href="https://github.com/open5gs/open5gs/tree/main/lib/crypt" target="_blank" rel="noopener">Open5GS lib/crypt</a>: Milenage, KDF, ECIES trong một core network C thật; so với Lab 17.4.</li>
+  <li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines" target="_blank" rel="noopener">C++ Core Guidelines</a>: phần R (resource management) và ES (expressions) cho code an toàn.</li>
+</ul>

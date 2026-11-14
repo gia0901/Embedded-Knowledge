@@ -1,0 +1,456 @@
+<!-- Core Net Lab · Module 08 · Link layer & data center (Kurose & Ross 8e, Ch.6 + Linux virtual networking) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Giải thích vì sao cần cả MAC address lẫn IP address, và ARP nối hai thứ đó thế nào.</li>
+  <li>Đọc được Ethernet frame và 802.1Q VLAN tag; hiểu switch tự học MAC address ra sao.</li>
+  <li>Nhận ra các tấn công ở link layer: ARP spoofing, MAC flooding, VLAN hopping.</li>
+  <li>Vẽ được kiến trúc mạng data center (leaf-spine, ECMP) và hiểu traffic east-west.</li>
+  <li>Tự dựng "Docker từ con số 0" bằng network namespace, veth và Linux bridge; dựng một VXLAN overlay như của Kubernetes.</li>
+  <li>Kể lại được toàn bộ những gì xảy ra khi laptop mở một trang web, từ DHCP tới HTTP (ôn lại cả nửa đầu khoá).</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ ip link show eth0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 …
+    link/ether 00:15:5d:aa:bb:cc brd ff:ff:ff:ff:ff:ff          ◀ Q1: MAC address của bạn; brd là gì?
+$ ip neigh                                                       # ARP cache: IP ↔ MAC đã biết
+172.28.0.1 dev eth0 lladdr 00:15:5d:11:22:33 REACHABLE
+$ sudo ip neigh flush dev eth0                                   # xoá ARP cache
+$ sudo tcpdump -i eth0 -nn -e 'arp or icmp' &                     # -e: in cả MAC header
+$ ping -c 1 1.1.1.1
+00:15:5d:aa:bb:cc > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 172.28.0.1 tell 172.28.5.9
+00:15:5d:11:22:33 > 00:15:5d:aa:bb:cc, ethertype ARP (0x0806), length 42: Reply 172.28.0.1 is-at 00:15:5d:11:22:33
+00:15:5d:aa:bb:cc > 00:15:5d:11:22:33, ethertype IPv4 (0x0800), length 98: 172.28.5.9 > 1.1.1.1: ICMP echo request
+                                                                 ◀ Q2: ping 1.1.1.1 mà ARP hỏi MAC của ai? Vì sao?
+$ sudo pkill tcpdump
+$ ip -d link show docker0 | grep -o 'bridge.*' | head -1         # Q3: docker0 là loại interface gì?
+$ ip link | grep -c veth                                          # Q4: veth là gì, vì sao có nhiều?
+</script>
+
+<h2>Link layer làm gì</h2>
+<p>Network layer lo đường đi từ host tới host qua nhiều router. Link layer lo <b>từng chặng một</b>: đưa frame qua <b>một link</b> tới node kế tiếp (host, switch, router) <span class="bk">§6.1</span>. Phần lớn link layer chạy trong phần cứng của network interface card (NIC).</p>
+<div class="tbl"><table>
+<thead><tr><th>Service</th><th>Ý nghĩa</th></tr></thead>
+<tbody>
+<tr><td><b>Framing</b></td><td>Bọc datagram thành frame có header (MAC address) và trailer (CRC)</td></tr>
+<tr><td><b>Link access</b></td><td>Nhiều node dùng chung một môi trường (Wi-Fi, cáp cũ) thì phải có <b>MAC protocol</b> quyết định ai được gửi</td></tr>
+<tr><td><b>Error detection</b></td><td>CRC-32 ở cuối Ethernet frame phát hiện bit error; frame lỗi bị bỏ âm thầm <span class="bk">§6.2</span></td></tr>
+<tr><td><b>Reliable delivery</b></td><td>Chỉ có trên link hay lỗi như Wi-Fi (ACK + retransmit ngay tại link); Ethernet có dây thì không</td></tr>
+</tbody></table></div>
+<p class="small muted">Multiple access protocol <span class="bk">§6.3</span>: chia kênh (TDMA, FDMA), random access (ALOHA, CSMA/CD của Ethernet cũ, CSMA/CA của Wi-Fi), taking turns (polling, token). Ethernet hiện đại là full-duplex qua switch nên không còn collision. Phần này đọc lướt trong sách là đủ.</p>
+
+<h2>MAC address và ARP</h2>
+<p>Mỗi interface có một <b>MAC address</b> 48 bit, viết 6 byte hex (<code>00:15:5d:aa:bb:cc</code>). 3 byte đầu (<b>OUI</b>) cho biết nhà sản xuất (<code>00:15:5d</code> là Hyper-V, vì WSL chạy trên Hyper-V). MAC address là <b>phẳng</b> (flat): không có cấu trúc theo vị trí, nên chỉ dùng được trong một LAN. IP address thì <b>phân cấp</b> theo subnet, nên router mới route được <span class="bk">§6.4.1</span>.</p>
+<p><b>ARP</b> (Address Resolution Protocol) trả lời câu hỏi: "trong subnet của tôi, IP này có MAC là gì?". Host broadcast một ARP request tới <code>ff:ff:ff:ff:ff:ff</code>, chủ của IP đó trả lời trực tiếp, kết quả được cache trong <code>ip neigh</code>.</p>
+<script type="application/json" class="seq">
+{"title":"ARP: tìm MAC của default gateway","actors":["Host 172.28.5.9","Mọi host trong LAN","Gateway 172.28.0.1"],"w":220,"steps":[
+ {"f":0,"t":1,"l":"Request: who-has 172.28.0.1?\ndst MAC ff:ff:ff:ff:ff:ff (broadcast)","m":1,"k":"lnk"},
+ {"note":"Mọi host đều nhận; chỉ chủ của 172.28.0.1 trả lời","a":1,"b":2},
+ {"f":2,"t":0,"l":"Reply: 172.28.0.1 is-at 00:15:5d:11:22:33 (unicast)","m":1,"d":1,"k":"lnk"},
+ {"note":"Host lưu vào ARP cache (ip neigh), dùng cho các frame sau","a":0,"b":1}
+]}
+</script>
+<p>Câu trả lời cho Q2: đích <code>1.1.1.1</code> nằm ngoài subnet, nên host gửi frame cho <b>default gateway</b>. ARP hỏi MAC của gateway, không phải của 1.1.1.1. Ở mỗi chặng, <b>MAC đổi, IP giữ nguyên</b>:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 230" role="img" aria-label="Qua router, MAC address đổi ở mỗi chặng còn IP address giữ nguyên">
+  <rect class="box" x="10" y="120" width="130" height="60" rx="8"/><text x="75" y="144" class="t-c t-b">Host A</text><text x="75" y="162" class="t-c t-s t-mono">10.1.0.10 · MAC a</text>
+  <rect class="box" x="290" y="120" width="140" height="60" rx="8"/><text x="360" y="144" class="t-c t-b">Router</text><text x="360" y="162" class="t-c t-s t-mono">r1 ← → r2</text>
+  <rect class="box" x="580" y="120" width="130" height="60" rx="8"/><text x="645" y="144" class="t-c t-b">Host B</text><text x="645" y="162" class="t-c t-s t-mono">10.2.0.20 · MAC b</text>
+  <line class="ln-ink" x1="140" y1="150" x2="282" y2="150"/><path class="ah" d="M290 150 l-10 -5 v10 z"/>
+  <line class="ln-ink" x1="430" y1="150" x2="572" y2="150"/><path class="ah" d="M580 150 l-10 -5 v10 z"/>
+  <g class="t-lnk"><rect class="f" x="40" y="24" width="105" height="30" rx="3"/><text x="92" y="44" class="t-c t-s t-mono">dst MAC r1</text>
+  <rect class="f" x="145" y="24" width="95" height="30" rx="3"/><text x="192" y="44" class="t-c t-s t-mono">src MAC a</text></g>
+  <g class="t-net"><rect class="f" x="40" y="58" width="200" height="30" rx="3"/><text x="140" y="78" class="t-c t-s t-mono">IP 10.1.0.10 → 10.2.0.20</text></g>
+  <g class="t-lnk"><rect class="f" x="480" y="24" width="105" height="30" rx="3"/><text x="532" y="44" class="t-c t-s t-mono">dst MAC b</text>
+  <rect class="f" x="585" y="24" width="95" height="30" rx="3"/><text x="632" y="44" class="t-c t-s t-mono">src MAC r2</text></g>
+  <g class="t-net"><rect class="f" x="480" y="58" width="200" height="30" rx="3"/><text x="580" y="78" class="t-c t-s t-mono">IP 10.1.0.10 → 10.2.0.20</text></g>
+  <path class="ln dash" d="M140 88 V110 L210 140"/><path class="ln dash" d="M580 88 V110 L500 140"/>
+  <text x="140" y="206" class="t-c t-s t-m">chặng 1: ARP để tìm MAC của router</text>
+  <text x="580" y="206" class="t-c t-s t-m">chặng 2: router ARP để tìm MAC của B</text>
+  <text x="360" y="206" class="t-c t-s t-m">router bóc frame, giữ datagram,</text>
+  <text x="360" y="220" class="t-c t-s t-m">đóng frame mới</text>
+</svg></div></figure>
+<div class="note trap"><b>Security: ARP spoofing</b><p>ARP không có authentication: ai cũng có thể gửi reply (kể cả khi không ai hỏi, gọi là <i>gratuitous ARP</i>) nói "172.28.0.1 is-at MAC-của-tôi". Các host khác cập nhật cache và gửi mọi traffic ra Internet qua kẻ tấn công: một <b>man-in-the-middle</b> kinh điển trong LAN. Phòng chống: Dynamic ARP Inspection trên switch, cô lập mạng; và lớp cuối cùng vẫn là TLS có verify certificate. IPv6 thay ARP bằng Neighbor Discovery (ICMPv6), có cùng loại rủi ro.</p></div>
+
+<h2>Ethernet và switch</h2>
+<script type="application/json" class="pkt">
+{"title":"Ethernet II frame (không tính preamble 8 byte)","bits":32,"fields":[["Destination MAC",48,"lnk"],["Source MAC",48,"lnk"],["EtherType",16,"app"],["Payload: IP datagram (46–1,500 byte)","var","net"],["CRC (FCS)",32,"sec"]]}
+</script>
+<p><b>EtherType</b> cho biết payload là gì: <code>0x0800</code> IPv4, <code>0x86DD</code> IPv6, <code>0x0806</code> ARP, <code>0x8100</code> có VLAN tag <span class="bk">§6.4.2</span>. Payload tối đa 1,500 byte chính là <b>MTU</b> của module 06. Ethernet là connectionless và unreliable: frame lỗi CRC bị bỏ, không ai báo lại.</p>
+<h3>Switch tự học</h3>
+<p>Switch có một <b>switch table</b> (MAC → port), tự học từ <b>source MAC</b> của frame đi vào <span class="bk">§6.4.3</span>. Với mỗi frame:</p>
+<ul>
+  <li>Destination MAC <b>có</b> trong bảng ở port khác → <b>forward</b> chỉ ra port đó.</li>
+  <li>Có trong bảng ở cùng port với chỗ frame vào → <b>filter</b> (bỏ).</li>
+  <li><b>Không có</b> trong bảng, hoặc là broadcast → <b>flood</b> ra mọi port khác.</li>
+</ul>
+<p>Thử: gửi A → C khi bảng trống, rồi C → A, rồi A → C lần nữa. Sau đó bấm nút tấn công.</p>
+<div data-widget="switchsim"></div>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Switch</th><th>Router</th></tr></thead>
+<tbody>
+<tr><td>Layer</td><td>2: đọc MAC</td><td>3: đọc IP</td></tr>
+<tr><td>Bảng</td><td>Tự học, plug-and-play</td><td>Do routing protocol hoặc admin điền</td></tr>
+<tr><td>Topology</td><td>Phải không có vòng (spanning tree), nếu không broadcast chạy vòng mãi (broadcast storm)</td><td>Có vòng thoải mái; TTL chặn packet chạy mãi</td></tr>
+<tr><td>Broadcast</td><td>Chuyển broadcast đi khắp LAN</td><td>Chặn broadcast: ranh giới của broadcast domain</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Security: MAC flooding</b><p>Switch table có kích thước giới hạn. Kẻ tấn công gửi hàng nghìn frame với source MAC giả để lấp đầy bảng; entry thật hết hạn và không học lại được, switch phải flood mọi frame, và kẻ tấn công đọc được traffic của người khác (bạn vừa thấy trong widget). Phòng chống: <b>port security</b> giới hạn số MAC mỗi port.</p></div>
+
+<h3>VLAN</h3>
+<p><b>VLAN</b> chia một switch vật lý thành nhiều LAN logic tách biệt: mỗi VLAN là một broadcast domain riêng, đi giữa VLAN phải qua router (hoặc firewall) <span class="bk">§6.4.4</span>. Trên <b>trunk port</b> (nối giữa các switch), frame mang thêm <b>802.1Q tag</b> 4 byte để biết thuộc VLAN nào:</p>
+<script type="application/json" class="pkt">
+{"title":"802.1Q tag (chèn sau Source MAC)","bits":32,"fields":[["TPID = 0x8100",16,"app"],["PCP",3,"tra"],["DEI",1,"base"],["VLAN ID (VID)",12,"sec"]]}
+</script>
+<p>VLAN ID 12 bit → tối đa 4,094 VLAN. PCP là mức ưu tiên (QoS). Trong data center của nhà mạng, các loại traffic thường tách VLAN riêng: O&amp;M, signaling, user plane, storage. Tấn công <b>VLAN hopping</b> (double tagging, giả làm switch để mở trunk) lợi dụng cấu hình trunk lỏng lẻo.</p>
+<p><b>MPLS</b> <span class="bk">§6.5</span>: router gắn một <b>label</b> ngắn vào packet và các router sau chỉ tra label thay vì tra IP. Dùng trong backbone của nhà mạng để làm traffic engineering và VPN cho doanh nghiệp. Đọc lướt.</p>
+
+<h2>Mạng data center</h2>
+<p>Data center hiện đại dùng topology <b>leaf-spine</b> (Clos): mỗi rack có một switch top-of-rack (<b>leaf</b>), mọi leaf nối tới mọi <b>spine</b> <span class="bk">§6.6</span>.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 660 250" role="img" aria-label="Topology leaf-spine: mỗi leaf nối mọi spine">
+  <g class="t-net"><rect class="f" x="180" y="20" width="110" height="36" rx="6"/><text x="235" y="43" class="t-c t-b">Spine 1</text>
+  <rect class="f" x="370" y="20" width="110" height="36" rx="6"/><text x="425" y="43" class="t-c t-b">Spine 2</text></g>
+  <g class="t-lnk">
+    <rect class="f" x="40"  y="120" width="110" height="34" rx="6"/><text x="95"  y="142" class="t-c">Leaf 1</text>
+    <rect class="f" x="200" y="120" width="110" height="34" rx="6"/><text x="255" y="142" class="t-c">Leaf 2</text>
+    <rect class="f" x="360" y="120" width="110" height="34" rx="6"/><text x="415" y="142" class="t-c">Leaf 3</text>
+    <rect class="f" x="520" y="120" width="110" height="34" rx="6"/><text x="575" y="142" class="t-c">Leaf 4</text>
+  </g>
+  <path class="ln" d="M95 120 L235 56 M95 120 L425 56 M255 120 L235 56 M255 120 L425 56 M415 120 L235 56 M415 120 L425 56 M575 120 L235 56 M575 120 L425 56"/>
+  <g class="t-k8s">
+    <rect class="f" x="50"  y="180" width="90" height="44" rx="5"/><text x="95"  y="200" class="t-c t-s">rack 1</text><text x="95"  y="215" class="t-c t-s t-m">k8s node</text>
+    <rect class="f" x="210" y="180" width="90" height="44" rx="5"/><text x="255" y="200" class="t-c t-s">rack 2</text><text x="255" y="215" class="t-c t-s t-m">k8s node</text>
+    <rect class="f" x="370" y="180" width="90" height="44" rx="5"/><text x="415" y="200" class="t-c t-s">rack 3</text><text x="415" y="215" class="t-c t-s t-m">k8s node</text>
+    <rect class="f" x="530" y="180" width="90" height="44" rx="5"/><text x="575" y="200" class="t-c t-s">rack 4</text><text x="575" y="215" class="t-c t-s t-m">storage</text>
+  </g>
+  <path class="ln" d="M95 154 V180 M255 154 V180 M415 154 V180 M575 154 V180"/>
+  <text x="600" y="40" class="t-c t-s t-m">ra Internet /</text><text x="600" y="54" class="t-c t-s t-m">mạng nhà mạng</text>
+  <text x="330" y="244" class="t-c t-s t-m">server bất kỳ ↔ server bất kỳ: luôn đúng 3 hop switch (leaf → spine → leaf)</text>
+</svg></div></figure>
+<ul>
+  <li><b>ECMP</b> (Equal-Cost Multi-Path): giữa hai leaf có nhiều path cùng cost (qua mỗi spine). Switch chọn path bằng hash của 5-tuple, nên một flow luôn đi một path (không bị sai thứ tự), còn các flow khác nhau trải đều ra mọi spine.</li>
+  <li><b>East-west traffic</b> (server ↔ server bên trong data center) lớn hơn nhiều so với <b>north-south</b> (ra/vào từ Internet). Microservice gọi nhau liên tục.</li>
+  <li><b>Load balancer</b> ở cửa vào phân phối request tới các server, thường kèm NAT và TLS termination.</li>
+</ul>
+<div class="note job"><b>Liên hệ job</b><p>Vì east-west traffic chiếm phần lớn và đi qua hạ tầng dùng chung, mô hình "tường lửa bao quanh, bên trong tin nhau" không còn đủ. Cluster platform hiện đại mã hoá và xác thực cả traffic nội bộ giữa các service (mTLS, zero trust), chính là phần việc của team security/authentication.</p></div>
+
+<h2>Linux virtual networking: nền móng của container</h2>
+<p>Docker và Kubernetes không phát minh network mới. Chúng ghép các khối có sẵn trong Linux kernel, và mỗi khối tương ứng với một thiết bị thật bạn vừa học:</p>
+<div class="tbl"><table>
+<thead><tr><th>Khối trong Linux</th><th>Giống thiết bị thật</th><th>Vai trò trong container</th></tr></thead>
+<tbody>
+<tr class="t-k8s"><td><span class="lay"></span><b>Network namespace</b></td><td>Một máy riêng</td><td>Mỗi container/pod có bộ interface, route, iptables, socket riêng</td></tr>
+<tr class="t-lnk"><td><span class="lay"></span><b>veth pair</b></td><td>Một sợi cáp hai đầu</td><td>Một đầu là <code>eth0</code> trong container, đầu kia nằm ở host (Q4)</td></tr>
+<tr class="t-lnk"><td><span class="lay"></span><b>Linux bridge</b></td><td>Switch</td><td><code>docker0</code>, <code>cni0</code>: tự học MAC như widget ở trên (Q3)</td></tr>
+<tr class="t-net"><td><span class="lay"></span><b>Routing + iptables</b></td><td>Router + firewall + NAT</td><td>Ra Internet bằng MASQUERADE, Service bằng DNAT (module 06–07)</td></tr>
+<tr class="t-net"><td><span class="lay"></span><b>VXLAN</b></td><td>Một LAN kéo dài qua network IP</td><td>Overlay nối pod trên các node khác nhau</td></tr>
+</tbody></table></div>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 270" role="img" aria-label="Hai network namespace nối vào Linux bridge bằng veth pair, bridge ra ngoài qua NAT">
+  <rect class="box" x="10" y="10" width="700" height="250" rx="12"/>
+  <text x="26" y="34" class="t-b">Host (root network namespace)</text>
+  <g class="t-k8s">
+    <rect class="f" x="40" y="54" width="170" height="70" rx="8"/><text x="125" y="76" class="t-c t-b">netns "red"</text><text x="125" y="96" class="t-c t-s t-mono">veth-red 10.50.0.2</text><text x="125" y="112" class="t-c t-s t-m">(trong container gọi là eth0)</text>
+    <rect class="f" x="40" y="164" width="170" height="70" rx="8"/><text x="125" y="186" class="t-c t-b">netns "blue"</text><text x="125" y="206" class="t-c t-s t-mono">veth-blue 10.50.0.3</text><text x="125" y="222" class="t-c t-s t-m">(trong container gọi là eth0)</text>
+  </g>
+  <g class="t-lnk"><rect class="f" x="300" y="110" width="140" height="64" rx="8"/><text x="370" y="134" class="t-c t-b">bridge br0</text><text x="370" y="152" class="t-c t-s t-mono">10.50.0.1/24</text><text x="370" y="166" class="t-c t-s t-m">(như docker0)</text></g>
+  <path class="ln-ink" d="M210 89 C255 89 255 128 300 128"/><path class="ln-ink" d="M210 199 C255 199 255 158 300 158"/>
+  <text x="250" y="80" class="t-c t-s t-m">veth pair</text><text x="250" y="226" class="t-c t-s t-m">veth pair</text>
+  <g class="t-net"><rect class="f" x="490" y="110" width="110" height="64" rx="8"/><text x="545" y="134" class="t-c t-b">routing</text><text x="545" y="150" class="t-c t-s">+ iptables</text><text x="545" y="166" class="t-c t-s t-m">MASQUERADE</text></g>
+  <line class="ln-ink" x1="440" y1="142" x2="482" y2="142"/><path class="ah" d="M490 142 l-10 -5 v10 z"/>
+  <rect class="sunk" x="630" y="118" width="64" height="48" rx="6"/><text x="662" y="140" class="t-c t-b">eth0</text><text x="662" y="156" class="t-c t-s t-m">ra ngoài</text>
+  <line class="ln-ink" x1="600" y1="142" x2="622" y2="142"/><path class="ah" d="M630 142 l-10 -5 v10 z"/>
+</svg></div>
+<figcaption>Đây là đúng thứ Docker làm cho mỗi container trên bridge network mặc định. Trong Kubernetes, mọi container của một pod dùng chung <b>một</b> network namespace (do container "pause" giữ), nên chúng gọi nhau qua <code>localhost</code> và có chung một IP. Lab 8.2 dựng lại hình này bằng tay.</figcaption></figure>
+<p><b>VXLAN</b> bọc nguyên Ethernet frame vào <b>UDP port 4789</b> để đi qua network IP giữa các node: pod trên hai node khác nhau "tưởng" đang ở cùng một LAN. Header thêm 50 byte, nên MTU bên trong overlay chỉ còn 1,450 (nhớ lại MTU black hole ở module 06). VXLAN <b>không mã hoá</b>: ai đọc được underlay đều đọc được traffic của pod, trừ khi CNI bật WireGuard/IPsec hoặc ứng dụng tự dùng TLS.</p>
+
+<h2>Một ngày của một web request</h2>
+<p>Sách kết thúc phần protocol stack bằng một câu chuyện <span class="bk">§6.7</span>: sinh viên cắm laptop vào mạng trường và mở google.com. Đây là phiên bản rút gọn, cũng là bản ôn tập module 01–08:</p>
+<script type="application/json" class="seq">
+{"title":"Laptop mới cắm mạng, mở https://www.example.com","actors":["Laptop","Router / DHCP","DNS server","Web server"],"w":175,"steps":[
+ {"sep":"vào mạng · module 06"},
+ {"f":0,"t":1,"l":"DHCP Discover (broadcast)","m":1,"k":"app"},
+ {"f":1,"t":0,"l":"Offer / ACK: IP, gateway, DNS","m":1,"d":1,"k":"app"},
+ {"sep":"tìm MAC của gateway · module 08"},
+ {"f":0,"t":1,"l":"ARP who-has gateway?","m":1,"k":"lnk"},
+ {"f":1,"t":0,"l":"ARP reply: MAC của gateway","m":1,"d":1,"k":"lnk"},
+ {"sep":"DNS · module 03"},
+ {"f":0,"t":2,"l":"A? www.example.com (UDP 53)","m":1,"k":"app"},
+ {"f":2,"t":0,"l":"A 203.0.113.10","m":1,"d":1,"k":"app"},
+ {"sep":"TCP + TLS · module 05, 11"},
+ {"f":0,"t":3,"l":"SYN","m":1,"k":"tra"},
+ {"f":3,"t":0,"l":"SYN-ACK","m":1,"d":1,"k":"tra"},
+ {"f":0,"t":3,"l":"ACK + TLS ClientHello","m":1,"k":"sec"},
+ {"f":3,"t":0,"l":"ServerHello + Certificate …","m":1,"d":1,"k":"sec"},
+ {"sep":"HTTP · module 02"},
+ {"f":0,"t":3,"l":"GET / (encrypted)","m":1},
+ {"f":3,"t":0,"l":"200 OK + HTML","m":1,"d":1},
+ {"note":"Ở mỗi chặng: frame mới (MAC đổi), datagram giữ IP (trừ khi qua NAT),\nrouter chọn next hop bằng longest prefix match (module 06–07).","a":0,"b":3}
+]}
+</script>
+<div class="note key"><b>Ghi nhớ</b><p>Nếu kể lại được sơ đồ này mà không nhìn, kèm lý do của từng bước (vì sao cần ARP trước DNS, vì sao DNS dùng UDP, vì sao TLS sau TCP), bạn đã nắm được phần nền tảng của khoá học. Tuần 3 sẽ mở hộp TLS và authentication bên trong.</p></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m08" data-title="Kiểm tra module 08">
+[
+ {"q":"Host 10.1.0.10/24 gửi packet tới 8.8.8.8. Frame đầu tiên rời host có destination MAC là gì?","o":["MAC của 8.8.8.8","MAC của default gateway","ff:ff:ff:ff:ff:ff","MAC của DNS server"],"a":1,
+  "e":"8.8.8.8 ngoài subnet nên frame gửi cho gateway. IP đích vẫn là 8.8.8.8. Host không bao giờ biết (và không cần biết) MAC của máy ở xa."},
+ {"q":"Qua một router, những field nào thay đổi?","o":["Source và destination MAC","Source và destination IP (khi không có NAT)","TTL","IP header checksum"],"a":[0,2,3],
+  "e":"Router đóng frame mới (MAC mới cho chặng tiếp), trừ TTL đi 1 và vì thế tính lại header checksum. IP address giữ nguyên trừ khi router làm NAT."},
+ {"q":"ARP request được gửi tới đâu?","o":["Unicast tới gateway","Broadcast ff:ff:ff:ff:ff:ff trong LAN","Tới DNS server","Multicast trên toàn Internet"],"a":1,
+  "e":"Host chưa biết MAC nên hỏi cả LAN; chỉ chủ của IP trả lời (unicast). ARP không đi qua router."},
+ {"q":"Switch nhận frame tới một MAC chưa có trong switch table. Switch làm gì?","o":["Drop frame","Flood ra mọi port trừ port nhận vào","Gửi ARP request","Gửi lên router"],"a":1,
+  "e":"Không biết ở đâu thì gửi khắp nơi. Khi host đích trả lời, switch học được port của nó từ source MAC."},
+ {"q":"Kẻ tấn công gửi gratuitous ARP nói rằng IP của gateway có MAC của hắn. Hậu quả?","o":["Không ảnh hưởng vì ARP có chữ ký","Các host gửi traffic ra ngoài qua máy kẻ tấn công: man-in-the-middle","Switch bị treo","Mất DNS"],"a":1,
+  "e":"ARP spoofing. TLS có verify certificate giữ được bí mật nội dung; Dynamic ARP Inspection trên switch chặn từ gốc."},
+ {"q":"Vì sao MAC flooding giúp kẻ tấn công sniff được traffic?","o":["Vì switch table đầy, switch flood mọi frame tới MAC lạ ra mọi port, kể cả port của kẻ tấn công","Vì MAC flooding giải mã TLS","Vì router bị quá tải","Vì VLAN bị xoá"],"a":0,
+  "e":"Khi không học được MAC thật, switch hành xử như hub. Port security giới hạn số MAC mỗi port để chặn."},
+ {"q":"EtherType <code>0x8100</code> trong frame nghĩa là gì?","o":["IPv4","ARP","Frame có 802.1Q VLAN tag","IPv6"],"a":2,
+  "e":"Sau tag 4 byte (TPID 0x8100, PCP, DEI, VID) mới tới EtherType thật của payload."},
+ {"q":"Hai pod trên hai node khác nhau dùng VXLAN overlay. Packet giữa chúng trên underlay trông thế nào?","o":["Ethernet frame của pod nằm trong UDP (port 4789) trong IP datagram giữa hai node","Không có header thêm","Luôn được mã hoá","Chạy trên TCP"],"a":0,
+  "e":"VXLAN = frame trong UDP. Thêm khoảng 50 byte header (MTU còn 1,450) và không mã hoá."},
+ {"q":"Trong Linux, thứ gì đóng vai trò \"sợi cáp\" nối network namespace của container với host?","o":["Linux bridge","veth pair","iptables","VXLAN"],"a":1,
+  "e":"veth pair: hai interface ảo nối nhau, gửi vào đầu này thì ra đầu kia. Bridge mới là \"switch\"."},
+ {"q":"Hai container trong cùng một Kubernetes pod gọi nhau thế nào?","o":["Qua Service IP","Qua localhost, vì chúng chung một network namespace","Phải qua bridge","Không gọi được"],"a":1,
+  "e":"Pod = một network namespace (giữ bởi container pause) dùng chung cho mọi container trong pod: chung IP, chung port space."},
+ {"q":"Trong mạng leaf-spine, vì sao ECMP chọn path bằng hash của 5-tuple thay vì chia từng packet luân phiên?","o":["Cho nhanh","Để mọi packet của một flow đi cùng path, không đến sai thứ tự (TCP sẽ hiểu nhầm là loss)","Vì switch không đếm được","Để tiết kiệm điện"],"a":1,
+  "e":"Packet sai thứ tự tạo duplicate ACK và làm TCP giảm cwnd (module 05). Hash theo flow giữ thứ tự mà vẫn trải tải."},
+ {"q":"Trong câu chuyện \"một ngày của web request\", vì sao ARP cho gateway xảy ra trước DNS query?","o":["Ngẫu nhiên","DNS server nằm ngoài subnet, nên frame chứa DNS query phải gửi tới MAC của gateway","DNS chạy trên ARP","ARP cần DNS"],"a":1,
+  "e":"Mọi packet ra khỏi subnet đều cần MAC của gateway trước. Nếu DNS server ở cùng subnet thì sẽ ARP thẳng cho DNS server."}
+]
+</script>
+
+<h3>Ôn lại module 05–07</h3>
+<script type="application/json" class="quiz" data-id="m08-review" data-title="Ôn lại">
+[
+ {"q":"Ethernet payload tối đa 1,500 byte. Overlay VXLAN thêm 50 byte. MSS hợp lý cho TCP chạy trong overlay là bao nhiêu?","o":["1,460","1,450","1,410","1,500"],"a":2,
+  "e":"MTU trong overlay = 1,450. MSS = 1,450 − 20 (IP) − 20 (TCP) = 1,410. Sai MTU ở đây là nguồn gốc MTU black hole (module 06)."},
+ {"q":"Docker đặt FORWARD policy DROP. Khi bạn tự dựng bridge br0 cho netns (Lab 8.2), ping giữa hai netns có thể bị chặn ở đâu?","o":["Chain FORWARD của host, nếu bridge traffic đi qua iptables (br_netfilter)","DNS","ARP","Không thể bị chặn"],"a":0,
+  "e":"Module 07: traffic đi xuyên qua host (kể cả qua bridge khi br_netfilter bật) đi vào FORWARD. Policy DROP của Docker chặn nó nếu không có rule ACCEPT."},
+ {"q":"Pod gửi packet ra Internet. Rule nào trên node viết lại source IP của pod thành IP của node?","o":["DNAT ở PREROUTING","MASQUERADE ở POSTROUTING","ACCEPT ở INPUT","MSS clamping"],"a":1,
+  "e":"SNAT/MASQUERADE ở POSTROUTING (module 06–07). Server bên ngoài chỉ thấy IP của node."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"08 Link layer & data center","c":[
+ {"t":"Link layer","col":"lnk","c":[{"t":"Từng chặng: node → node"},{"t":"Framing, link access, error detection (CRC)"},{"t":"Multiple access: CSMA/CD, CSMA/CA"}]},
+ {"t":"MAC & ARP","col":"net","c":[{"t":"MAC 48 bit, phẳng; IP phân cấp"},{"t":"ARP: broadcast hỏi, unicast trả lời"},{"t":"Ngoài subnet → MAC của gateway"},{"t":"Qua router: MAC đổi, IP giữ"},{"t":"ARP spoofing → MITM"}]},
+ {"t":"Ethernet & switch","col":"app","c":[{"t":"Frame: dst, src, EtherType, payload, CRC"},{"t":"Self-learning: forward, filter, flood"},{"t":"Spanning tree, broadcast storm"},{"t":"MAC flooding → port security"}]},
+ {"t":"VLAN & MPLS","col":"sec","c":[{"t":"802.1Q tag: VID 12 bit"},{"t":"Trunk port"},{"t":"Tách traffic O&M / signaling / user plane"},{"t":"MPLS: label switching"}]},
+ {"t":"Data center","col":"core","c":[{"t":"Leaf-spine (Clos)"},{"t":"ECMP: hash 5-tuple"},{"t":"East-west > north-south"},{"t":"Zero trust, mTLS nội bộ"}]},
+ {"t":"Linux virtual net","col":"k8s","c":[{"t":"Network namespace = máy riêng"},{"t":"veth = cáp, bridge = switch"},{"t":"iptables = router/NAT"},{"t":"VXLAN: frame trong UDP 4789, MTU 1,450"},{"t":"Pod = một netns chung"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 8.1 · ARP: hỏi ai, khi nào</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Bash · tcpdump · Docker</span><span class="chip t-base">20 phút</span></div>
+  <p>Trong hai container cùng network <code>netlab</code>: xoá ARP cache, capture với <code>-e</code>, rồi (1) ping container kia, (2) ping <code>1.1.1.1</code>. Với mỗi trường hợp, ghi lại ARP hỏi IP nào và MAC nào xuất hiện ở destination của frame ICMP.</p>
+  <p class="done-when"><b>Xong khi:</b> giải thích được vì sao trường hợp (2) không có ARP nào hỏi 1.1.1.1, và MAC trong <code>ip neigh</code> của container khớp với MAC nào ở phía host.</p>
+  <details><summary>Gợi ý</summary><p><code>ip neigh flush all</code> cần <code>--cap-add NET_ADMIN</code>. Gateway của network Docker là address <code>.1</code> của subnet, nằm trên bridge ở host (<code>ip -br link</code> trên host sẽ thấy <code>br-…</code>).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker network create netlab 2>/dev/null; true
+$ docker run -d --name b --network netlab nicolaka/netshoot sleep infinity
+$ docker run -it --rm --name a --network netlab --cap-add NET_ADMIN nicolaka/netshoot bash
+a$ ip neigh flush all
+a$ tcpdump -i eth0 -nn -e -l 'arp or icmp' &
+a$ ping -c 1 b
+02:42:ac:14:00:02 > ff:ff:ff:ff:ff:ff, ARP, Request who-has 172.20.0.3 tell 172.20.0.2     ◀ hỏi thẳng MAC của b
+02:42:ac:14:00:03 > 02:42:ac:14:00:02, ARP, Reply 172.20.0.3 is-at 02:42:ac:14:00:03
+a$ ping -c 1 1.1.1.1
+02:42:ac:14:00:02 > ff:ff:ff:ff:ff:ff, ARP, Request who-has 172.20.0.1 tell 172.20.0.2     ◀ hỏi MAC của gateway
+02:42:ac:14:00:02 > 02:42:b1:9c:6e:10, IPv4, 172.20.0.2 > 1.1.1.1: ICMP echo request     ◀ dst MAC = gateway
+a$ ip neigh
+172.20.0.3 dev eth0 lladdr 02:42:ac:14:00:03 REACHABLE
+172.20.0.1 dev eth0 lladdr 02:42:b1:9c:6e:10 REACHABLE
+a$ exit
+$ ip link show | grep -B1 '02:42:b1:9c:6e:10'          # MAC đó thuộc bridge br-… trên host
+$ docker rm -f b
+</script>
+  <p class="small muted">MAC của container Docker cũ thường bắt đầu bằng <code>02:42</code> và chứa luôn IP (02:42:<b>ac:14:00:02</b> = 172.20.0.2); bản Docker mới có thể sinh MAC ngẫu nhiên.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 8.2 · Docker từ con số 0: netns, veth, bridge, NAT</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Bash · ip · iptables</span><span class="chip t-base">45 phút</span></div>
+  <p>Không dùng Docker. Trên Ubuntu, dựng đúng hình vẽ ở trên: hai network namespace <code>red</code> (10.50.0.2) và <code>blue</code> (10.50.0.3), nối bằng veth vào bridge <code>br0</code> (10.50.0.1). Yêu cầu: red ping được blue; red ping được <code>1.1.1.1</code>. Sau đó xem bảng MAC mà bridge đã học.</p>
+  <p class="done-when"><b>Xong khi:</b> cả hai ping thành công, bạn chỉ ra được 4 thứ cần thêm để ra Internet (default route trong netns, ip_forward, MASQUERADE, rule FORWARD), và <code>bridge fdb</code> cho thấy MAC của red và blue.</p>
+  <details><summary>Gợi ý</summary><p><code>ip netns add</code>, <code>ip link add … type veth peer name …</code>, <code>ip link set … netns …</code>, <code>ip link set … master br0</code>, <code>ip -n NS …</code> để chạy lệnh trong namespace. Nhớ bật interface <code>lo</code> và mọi veth. Docker đặt FORWARD policy DROP (module 07), nên phải mở cho <code>br0</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m08/mini-docker.sh">
+#!/usr/bin/env bash
+# Dựng 2 "container" bằng network namespace + veth + bridge + NAT. Chạy: sudo bash mini-docker.sh
+set -euo pipefail
+
+ip link add br0 type bridge
+ip addr add 10.50.0.1/24 dev br0
+ip link set br0 up
+
+i=2
+for ns in red blue; do
+  ip netns add "$ns"
+  ip link add "veth-$ns" type veth peer name "br-$ns"     # một sợi "cáp" hai đầu
+  ip link set "veth-$ns" netns "$ns"                       # đầu 1 vào namespace
+  ip link set "br-$ns" master br0 up                       # đầu 2 cắm vào "switch"
+  ip -n "$ns" addr add "10.50.0.$i/24" dev "veth-$ns"
+  ip -n "$ns" link set "veth-$ns" up
+  ip -n "$ns" link set lo up
+  ip -n "$ns" route add default via 10.50.0.1              # (1) default route
+  i=$((i + 1))
+done
+
+sysctl -qw net.ipv4.ip_forward=1                           # (2) host làm router
+iptables -t nat -A POSTROUTING -s 10.50.0.0/24 ! -o br0 -j MASQUERADE   # (3) SNAT ra ngoài
+iptables -I FORWARD -i br0 -j ACCEPT                       # (4) mở FORWARD (Docker để DROP)
+iptables -I FORWARD -o br0 -j ACCEPT
+
+echo "== red → blue";   ip netns exec red ping -c 2 -W 1 10.50.0.3
+echo "== red → 1.1.1.1"; ip netns exec red ping -c 2 -W 2 1.1.1.1
+echo "== MAC table của br0"; bridge fdb show br br0 | grep -v permanent
+</script>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m08/cleanup.sh">
+#!/usr/bin/env bash
+# Dọn dẹp. Chạy: sudo bash cleanup.sh
+ip netns del red 2>/dev/null; ip netns del blue 2>/dev/null
+ip link del br0 2>/dev/null
+iptables -t nat -D POSTROUTING -s 10.50.0.0/24 ! -o br0 -j MASQUERADE 2>/dev/null
+iptables -D FORWARD -i br0 -j ACCEPT 2>/dev/null
+iptables -D FORWARD -o br0 -j ACCEPT 2>/dev/null
+true
+</script>
+<script type="text/plain" class="term">
+$ sudo bash mini-docker.sh
+== red → blue
+64 bytes from 10.50.0.3: icmp_seq=1 ttl=64 time=0.07 ms
+== red → 1.1.1.1
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=56 time=6.40 ms
+== MAC table của br0
+5a:1c:…:e1 dev br-red master br0                     ◀ bridge đã học: MAC của red ở port br-red
+9e:47:…:03 dev br-blue master br0
+$ sudo ip netns exec red ip route                     # mỗi namespace có routing table riêng
+$ sudo ip netns exec red iptables -L -n               # và iptables riêng (đang trống)
+$ sudo bash cleanup.sh
+</script>
+  <p><b>Điều vừa làm chính là Docker:</b> mỗi container là một network namespace, <code>eth0</code> trong container là một đầu veth, <code>docker0</code> là bridge, cộng rule MASQUERADE và FORWARD. Mở rộng: tìm đầu veth phía host của một container Docker thật bằng <code>docker exec a cat /sys/class/net/eth0/iflink</code> rồi <code>ip -o link | grep "^SỐ_VỪA_IN:"</code>.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 8.3 · Sniffer Ethernet bằng AF_PACKET</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python</span><span class="chip t-base">40 phút</span></div>
+  <p>Viết một sniffer nhỏ không dùng library: mở raw socket <code>AF_PACKET</code> trên <code>eth0</code>, đọc frame thô, tự parse Ethernet header (MAC, EtherType, VLAN tag nếu có), rồi: với IPv4 in IP nguồn/đích, protocol và port (TCP/UDP); với ARP in câu "who-has … tell …" hoặc "… is-at …".</p>
+  <p class="done-when"><b>Xong khi:</b> chạy sniffer trong lúc <code>ping</code> và <code>curl</code>, output khớp với <code>tcpdump -e</code>, kể cả ARP request/reply sau khi xoá ARP cache.</p>
+  <details><summary>Gợi ý</summary><p><code>socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))</code> nhận mọi loại frame. Ethernet header 14 byte. IPv4: byte 0 chứa IHL ở 4 bit thấp, byte 9 là protocol, byte 12–19 là hai address. ARP: operation ở byte 6–7, sender MAC 8–13, sender IP 14–17, target IP 24–27.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m08/sniff.py">
+#!/usr/bin/env python3
+"""Mini sniffer: đọc Ethernet frame thô bằng AF_PACKET (Linux). Chạy: sudo python3 sniff.py eth0 20"""
+import socket
+import struct
+import sys
+
+ETH_P_ALL = 0x0003
+ETHERTYPES = {0x0800: "IPv4", 0x0806: "ARP", 0x86DD: "IPv6", 0x8100: "802.1Q"}
+PROTOS = {1: "ICMP", 6: "TCP", 17: "UDP", 132: "SCTP"}
+
+
+def mac(b: bytes) -> str:
+    return ":".join(f"{x:02x}" for x in b)
+
+
+def describe(frame: bytes) -> str:
+    dst, src = frame[0:6], frame[6:12]
+    etype = struct.unpack("!H", frame[12:14])[0]
+    payload, tag = frame[14:], ""
+    if etype == 0x8100:                                   # 802.1Q: 4 byte chèn trước EtherType thật
+        vid = struct.unpack("!H", payload[0:2])[0] & 0x0FFF
+        etype = struct.unpack("!H", payload[2:4])[0]
+        payload, tag = payload[4:], f" vlan={vid}"
+    line = f"{mac(src)} > {mac(dst)} {ETHERTYPES.get(etype, hex(etype))}{tag} len={len(frame)}"
+
+    if etype == 0x0800:                                   # IPv4
+        ihl = (payload[0] & 0x0F) * 4
+        proto = payload[9]
+        sip, dip = socket.inet_ntoa(payload[12:16]), socket.inet_ntoa(payload[16:20])
+        line += f" | {sip} > {dip} {PROTOS.get(proto, proto)} ttl={payload[8]}"
+        if proto in (6, 17):
+            sport, dport = struct.unpack("!HH", payload[ihl:ihl + 4])
+            line += f" {sport}→{dport}"
+    elif etype == 0x0806:                                 # ARP
+        op = struct.unpack("!H", payload[6:8])[0]
+        spa, tpa = socket.inet_ntoa(payload[14:18]), socket.inet_ntoa(payload[24:28])
+        line += (f" | who-has {tpa} tell {spa}" if op == 1
+                 else f" | {spa} is-at {mac(payload[8:14])}")
+    return line
+
+
+def main() -> None:
+    ifname = sys.argv[1] if len(sys.argv) > 1 else "eth0"
+    count = int(sys.argv[2]) if len(sys.argv) > 2 else 20
+    with socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(ETH_P_ALL)) as s:
+        s.bind((ifname, 0))
+        for _ in range(count):
+            frame, _ = s.recvfrom(65535)
+            print(describe(frame))
+
+
+if __name__ == "__main__":
+    main()
+</script>
+<script type="text/plain" class="term">
+$ sudo python3 sniff.py eth0 6 &
+$ sudo ip neigh flush dev eth0; ping -c 1 1.1.1.1 > /dev/null
+00:15:5d:aa:bb:cc > ff:ff:ff:ff:ff:ff ARP len=42 | who-has 172.28.0.1 tell 172.28.5.9
+00:15:5d:11:22:33 > 00:15:5d:aa:bb:cc ARP len=42 | 172.28.0.1 is-at 00:15:5d:11:22:33
+00:15:5d:aa:bb:cc > 00:15:5d:11:22:33 IPv4 len=98 | 172.28.5.9 > 1.1.1.1 ICMP ttl=64
+00:15:5d:11:22:33 > 00:15:5d:aa:bb:cc IPv4 len=98 | 1.1.1.1 > 172.28.5.9 ICMP ttl=57
+</script>
+  <p class="small muted">Card mạng và kernel thường gỡ VLAN tag trước khi giao frame cho socket (VLAN offload), nên bạn hiếm khi thấy <code>vlan=</code> trên máy thường; nó xuất hiện khi capture trên trunk. Sniffer này cần <code>CAP_NET_RAW</code>, cùng lý do như raw socket ở module 06.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 8.4 · Tự dựng VXLAN overlay giữa hai "node"</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Docker · ip link vxlan · tcpdump</span><span class="chip t-base">45 phút</span></div>
+  <p>Hai container <code>node1</code> và <code>node2</code> nằm trên network <code>underlay</code> (giả làm mạng vật lý giữa hai node Kubernetes). Tạo interface VXLAN (VNI 42) trên mỗi bên và gán overlay IP <code>192.168.100.1</code> / <code>.2</code>. Ping qua overlay, capture trên <code>eth0</code> để thấy ICMP nằm trong UDP 4789, rồi kiểm tra MTU của overlay bằng <code>ping -M do</code>.</p>
+  <p class="done-when"><b>Xong khi:</b> ping overlay thành công, bạn chỉ ra trong tcpdump hai lớp IP (underlay và overlay), và chứng minh MTU overlay là 1,450 (ping <code>-s 1422</code> qua được, <code>-s 1423</code> thì không).</p>
+  <details><summary>Gợi ý</summary><p><code>ip link add vxlan0 type vxlan id 42 remote IP_BÊN_KIA dstport 4789 dev eth0</code>. Kernel tự đặt MTU của vxlan0 = MTU của eth0 − 50. Nếu báo <i>Unknown device type</i>, kernel WSL của bạn thiếu module vxlan; khi đó chỉ làm phần lý thuyết và quay lại ở module 14 với cluster kind.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker network create --subnet 10.200.0.0/24 underlay
+$ docker run -d --name node1 --network underlay --ip 10.200.0.11 --cap-add NET_ADMIN nicolaka/netshoot sleep infinity
+$ docker run -d --name node2 --network underlay --ip 10.200.0.12 --cap-add NET_ADMIN nicolaka/netshoot sleep infinity
+$ docker exec node1 sh -c 'ip link add vxlan0 type vxlan id 42 remote 10.200.0.12 dstport 4789 dev eth0 &&
+>   ip addr add 192.168.100.1/24 dev vxlan0 && ip link set vxlan0 up'
+$ docker exec node2 sh -c 'ip link add vxlan0 type vxlan id 42 remote 10.200.0.11 dstport 4789 dev eth0 &&
+>   ip addr add 192.168.100.2/24 dev vxlan0 && ip link set vxlan0 up'
+$ docker exec node1 ip link show vxlan0 | grep -o 'mtu [0-9]*'
+mtu 1450                                                            ◀ 1500 − 50 byte header VXLAN
+$ docker exec -d node2 tcpdump -i eth0 -nn -w /tmp/vx.pcap udp port 4789
+$ docker exec node1 ping -c 2 192.168.100.2
+64 bytes from 192.168.100.2: icmp_seq=1 ttl=64 time=0.11 ms
+$ docker exec node2 sh -c 'pkill tcpdump; sleep 1; tcpdump -nn -r /tmp/vx.pcap | head -2'
+IP 10.200.0.11.40123 > 10.200.0.12.4789: VXLAN, flags [I] (0x08), vni 42
+IP 192.168.100.1 > 192.168.100.2: ICMP echo request, id 3, seq 1, length 64   ◀ overlay trong underlay
+$ docker exec node1 ping -c 1 -M do -s 1422 192.168.100.2 | grep -c 'bytes from'
+1                                                                   ◀ 1422 + 8 + 20 = 1450: vừa khít
+$ docker exec node1 ping -c 1 -M do -s 1423 192.168.100.2
+ping: local error: message too long, mtu=1450
+$ docker rm -f node1 node2; docker network rm underlay
+</script>
+  <p><b>Điều cần thấy:</b> payload ICMP của overlay nằm nguyên văn trong UDP, ai capture được underlay đều đọc được. Flannel, Calico (chế độ VXLAN), Cilium dùng đúng cơ chế này, chỉ khác là bảng "MAC/IP của pod ở node nào" được control plane tự điền thay vì <code>remote</code> cố định. Muốn bảo mật underlay thì bật encryption của CNI (WireGuard, IPsec) hoặc dùng mTLS ở application.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m08"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §6.2 (parity, checksum, CRC) và §6.3 (multiple access) đọc lướt; §6.7 "A Day in the Life of a Web Page Request" nên đọc trọn như một bài ôn.</li>
+  <li><a href="https://man7.org/linux/man-pages/man8/ip-netns.8.html" target="_blank" rel="noopener">man ip-netns</a> và <a href="https://man7.org/linux/man-pages/man4/veth.4.html" target="_blank" rel="noopener">man veth</a>: hai trang ngắn, đủ để tự dựng mọi thứ trong Lab 8.2.</li>
+  <li><a href="https://iximiuz.com/en/posts/container-networking-is-simple/" target="_blank" rel="noopener">Ivan Velichko: Container Networking Is Simple!</a>: cùng ý tưởng Lab 8.2, có hình rất rõ.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc7348" target="_blank" rel="noopener">RFC 7348 – VXLAN</a>: §5 mô tả format; phần còn lại tra khi cần.</li>
+  <li><a href="https://engineering.fb.com/2014/11/14/production-engineering/introducing-data-center-fabric-the-next-generation-facebook-data-center-network/" target="_blank" rel="noopener">Facebook: data center fabric</a>: một ví dụ leaf-spine thật ở quy mô lớn.</li>
+</ul>

@@ -1,0 +1,510 @@
+<!-- Core Net Lab · Module 06 · IP, subnet, NAT, ICMP (Kurose & Ross 8e, §4.1–4.3, §5.6) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Phân biệt forwarding (data plane) và routing (control plane).</li>
+  <li>Đọc được IPv4 header và IPv6 header: TTL, protocol, fragmentation, hop limit, next header.</li>
+  <li>Tính nhanh subnet từ CIDR, làm longest prefix match bằng tay, và nhận ra các dải address đặc biệt (private, CGNAT, link-local).</li>
+  <li>Hiểu DHCP, NAT (SNAT, DNAT, masquerade) và hệ quả của NAT với việc log và authentication theo source IP.</li>
+  <li>Hiểu MTU, fragmentation, Path MTU Discovery, và sự cố "MTU black hole" làm TLS handshake treo khi chặn ICMP.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ ip -4 addr show eth0
+    inet 172.28.5.9/20 brd 172.28.15.255 scope global eth0   ◀ Q1: /20 nghĩa là gì? brd là gì?
+$ ip route get 1.1.1.1
+1.1.1.1 via 172.28.0.1 dev eth0 src 172.28.5.9              ◀ có "via": phải gửi qua router
+$ ip route get 172.28.3.3
+172.28.3.3 dev eth0 src 172.28.5.9                           ◀ Q2: vì sao không có "via"?
+$ curl -s ifconfig.me; echo                                 # Q3: vì sao IP này khác 172.28.5.9?
+113.161.x.x
+$ ip link show eth0 | grep -o 'mtu [0-9]*'
+mtu 1500
+$ ping -c 1 -M do -s 1472 1.1.1.1 | tail -2                 # 1472 + 8 (ICMP) + 20 (IP) = 1500
+$ ping -c 1 -M do -s 1473 1.1.1.1                           # Q4: thêm 1 byte thì sao?
+ping: local error: message too long, mtu=1500
+$ sudo iptables -t nat -S | grep -iE 'MASQUERADE|DNAT' | head -3   # Q5: Docker đã cài gì vào đây?
+-A POSTROUTING -s 172.17.0.0/16 ! -o docker0 -j MASQUERADE
+</script>
+<p class="small muted"><code>-M do</code> đặt flag "Don't Fragment". Nếu WSL của bạn có MTU khác 1500 (ví dụ khi bật VPN), con số giới hạn sẽ khác tương ứng.</p>
+
+<h2>Network layer: forwarding và routing</h2>
+<p>Network layer đưa datagram từ host gửi tới host nhận qua nhiều router. Nó có hai chức năng rất khác nhau <span class="bk">§4.1</span>:</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Forwarding (data plane)</th><th>Routing (control plane)</th></tr></thead>
+<tbody>
+<tr><td>Câu hỏi</td><td>Datagram này đi ra output link nào?</td><td>Đường nào từ nguồn tới đích là tốt nhất?</td></tr>
+<tr><td>Phạm vi</td><td>Một router, từng datagram</td><td>Toàn network</td></tr>
+<tr><td>Thời gian</td><td>Nano giây (làm bằng phần cứng)</td><td>Giây (chạy bằng phần mềm)</td></tr>
+<tr><td>Kết quả</td><td>Tra <b>forwarding table</b></td><td>Xây dựng forwarding table (OSPF, BGP, SDN controller: module 07)</td></tr>
+</tbody></table></div>
+<p>Bên trong router <span class="bk">§4.2</span> có input port (tra forwarding table), switching fabric (chuyển datagram sang output port) và output port (có <b>queue</b>). Queue ở output port chính là nơi sinh ra queuing delay và packet loss ở module 01. Chi tiết phần cứng đọc lướt là đủ.</p>
+<p>IP cung cấp dịch vụ <b>best-effort</b>: không đảm bảo datagram tới nơi, không đảm bảo thứ tự, không đảm bảo delay. Mọi đảm bảo đều do layer phía trên (TCP, QUIC) tự làm.</p>
+
+<h2>IPv4 datagram</h2>
+<script type="application/json" class="pkt">
+{"title":"IPv4 header (RFC 791), tối thiểu 20 byte","bits":32,"fields":[["Version",4,"base"],["IHL",4,"base"],["DSCP",6,"app"],["ECN",2,"app"],["Total length",16,"net"],["Identification",16,"lnk"],["Flags",3,"lnk"],["Fragment offset",13,"lnk"],["TTL",8,"sec"],["Protocol",8,"tra"],["Header checksum",16,"base"],["Source address",32,"net"],["Destination address",32,"net"],["Options","var","base"],["Data (TCP / UDP / ICMP …)","var","app"]]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Field</th><th>Ý nghĩa</th><th>Gặp khi nào</th></tr></thead>
+<tbody>
+<tr><td><b>IHL</b></td><td>Độ dài header tính bằng word 4 byte (thường 5 = 20 byte)</td><td>Parse raw packet (Lab 6.4)</td></tr>
+<tr><td><b>DSCP</b> / <b>ECN</b></td><td>Đánh dấu ưu tiên (QoS) / báo congestion</td><td>Mạng nhà mạng ưu tiên traffic thoại; ECN ở module 05</td></tr>
+<tr><td><b>Total length</b></td><td>Độ dài cả datagram (header + data)</td><td>Tối đa 65,535 byte</td></tr>
+<tr><td><b>Identification, Flags, Fragment offset</b></td><td>Dùng khi datagram bị cắt nhỏ (fragmentation). Flag <b>DF</b> = Don't Fragment</td><td>MTU, xem mục bên dưới</td></tr>
+<tr><td><b>TTL</b></td><td>Mỗi router trừ 1, về 0 thì drop và gửi ICMP Time Exceeded</td><td>traceroute (module 01); chống packet chạy vòng mãi</td></tr>
+<tr><td><b>Protocol</b></td><td>Layer trên là gì: 1 ICMP, 6 TCP, 17 UDP, 50 ESP (IPsec), 132 SCTP</td><td>Firewall lọc theo field này</td></tr>
+<tr><td><b>Header checksum</b></td><td>Chỉ kiểm tra header; router tính lại mỗi hop vì TTL thay đổi</td><td>IPv6 bỏ field này</td></tr>
+</tbody></table></div>
+
+<h3>MTU, fragmentation và Path MTU Discovery</h3>
+<p>Mỗi link có <b>MTU</b> (Maximum Transmission Unit): kích thước IP datagram lớn nhất mà link chở được. Ethernet là 1,500 byte. Khi datagram lớn hơn MTU của link tiếp theo:</p>
+<ul>
+  <li><b>IPv4 không có DF</b>: router cắt datagram thành nhiều <b>fragment</b>; host đích ghép lại nhờ Identification và Fragment offset. Mất một fragment là mất cả datagram.</li>
+  <li><b>IPv4 có DF</b> (Linux đặt DF cho TCP) hoặc <b>IPv6</b>: router drop datagram và gửi về <b>ICMP "Fragmentation Needed"</b> (IPv6: "Packet Too Big") kèm MTU của link. Sender giảm kích thước gói. Đây là <b>Path MTU Discovery (PMTUD)</b>.</li>
+</ul>
+<p>PMTUD phụ thuộc vào ICMP. Nếu một firewall nào đó chặn mọi ICMP "cho an toàn", ta có <b>MTU black hole</b>:</p>
+<script type="application/json" class="seq">
+{"title":"MTU black hole: TLS handshake treo","actors":["Client","Router (MTU 1400)","Server"],"w":220,"steps":[
+ {"f":0,"t":2,"l":"SYN / SYN-ACK / ACK (gói nhỏ: OK)","m":1,"k":"tra"},
+ {"f":0,"t":2,"l":"ClientHello (~300 byte): OK","m":1},
+ {"f":2,"t":1,"l":"ServerHello + Certificate\n1500 byte, DF","m":1,"d":1,"k":"sec"},
+ {"note":"lớn hơn MTU 1400 → drop","a":1,"b":1},
+ {"f":1,"t":2,"l":"ICMP Frag Needed (MTU 1400)\n✗ bị firewall chặn","m":1,"k":"sec"},
+ {"note":"Server không biết gì, cứ retransmit gói 1500 byte.\nClient: connection mở được nhưng TLS treo tới timeout.","a":0,"b":2}
+]}
+</script>
+<div class="note job"><b>Liên hệ job</b><p>Đây là sự cố kinh điển trong cluster và core network. Mỗi lớp <b>tunnel/encapsulation</b> thêm header và làm MTU thực tế nhỏ đi: VXLAN overlay của Kubernetes thêm 50 byte, IPsec thêm khoảng 50–70 byte, GTP-U trong 5G thêm 36–40 byte. Triệu chứng đặc trưng: <code>ping</code> chạy, TCP handshake chạy, <code>curl</code> tới endpoint trả response nhỏ chạy, nhưng <b>TLS handshake treo</b> (vì certificate chain là gói to đầu tiên). Cách sửa: cho phép ICMP type 3 code 4, đặt MTU đúng cho interface của pod, hoặc <b>MSS clamping</b> ở router. Lab 6.3 tái hiện chuyện này.</p></div>
+
+<h2>IPv4 addressing</h2>
+<p>IPv4 address dài 32 bit, viết 4 số thập phân (dotted-decimal). Address gắn với <b>interface</b>, không gắn với host: router có nhiều interface nên có nhiều address <span class="bk">§4.3.3</span>.</p>
+<p>Các interface nối với nhau mà không cần đi qua router tạo thành một <b>subnet</b>. Mọi address trong subnet có chung phần đầu gọi là <b>network part</b> (prefix). Ký hiệu <b>CIDR</b> <code>a.b.c.d/x</code>: x bit đầu là prefix, phần còn lại là <b>host part</b>.</p>
+<div data-widget="cidr"></div>
+<div class="note key"><b>Ghi nhớ</b><ul>
+  <li>/24 → 256 address (254 host). Mỗi bớt 1 bit prefix thì số address <b>gấp đôi</b>: /23 → 512, /20 → 4,096, /16 → 65,536.</li>
+  <li>Address đầu (host part toàn 0) là <b>network address</b>, address cuối (host part toàn 1) là <b>broadcast</b>; không gán cho host. Riêng /31 (link point-to-point) và /32 (một address duy nhất) là ngoại lệ.</li>
+  <li>Đích nằm <b>cùng subnet</b> thì gửi thẳng (Q2: không có "via"); khác subnet thì gửi cho router (default gateway).</li>
+</ul></div>
+
+<h3>Các dải address đặc biệt</h3>
+<div class="tbl"><table>
+<thead><tr><th>Dải</th><th>Tên</th><th>Gặp ở đâu</th></tr></thead>
+<tbody>
+<tr class="t-net"><td><span class="lay"></span><code>10.0.0.0/8</code>, <code>172.16.0.0/12</code>, <code>192.168.0.0/16</code></td><td>Private (RFC 1918)</td><td>Mạng nội bộ, Docker (172.17.0.0/16), pod và Service trong Kubernetes. Không route được trên Internet</td></tr>
+<tr class="t-net"><td><span class="lay"></span><code>100.64.0.0/10</code></td><td>Shared / CGNAT (RFC 6598)</td><td>ISP dùng cho NAT cấp nhà mạng; bạn đã thấy ở traceroute module 01</td></tr>
+<tr><td><code>127.0.0.0/8</code></td><td>Loopback</td><td>Chỉ trong chính host/pod</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>169.254.0.0/16</code></td><td>Link-local</td><td>Không có DHCP thì host tự gán. <code>169.254.169.254</code> là <b>metadata service</b> của cloud, mục tiêu ưa thích của tấn công SSRF để lấy credential</td></tr>
+<tr><td><code>224.0.0.0/4</code></td><td>Multicast</td><td>OSPF, mDNS</td></tr>
+<tr><td><code>0.0.0.0/0</code></td><td>Default route</td><td>"Mọi đích còn lại"</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job</b><p>Một cluster Kubernetes dùng ít nhất 3 dải: node network, <b>pod CIDR</b> (ví dụ <code>10.244.0.0/16</code>, mỗi node một /24) và <b>Service CIDR</b> (ví dụ <code>10.96.0.0/12</code>). Các dải này không được trùng với nhau, cũng không được trùng với mạng của site khác mà cluster cần gọi tới. Trùng CIDR là lỗi khó sửa nhất vì phải dựng lại cluster.</p></div>
+
+<h3>Longest prefix match</h3>
+<p>Forwarding table chứa prefix, không chứa từng address. Một đích có thể khớp nhiều prefix; router chọn prefix <b>dài nhất</b> (cụ thể nhất) <span class="bk">§4.2.1</span>:</p>
+<div class="tbl"><table>
+<thead><tr><th>Prefix</th><th>Output</th><th>Ví dụ đích khớp dài nhất</th></tr></thead>
+<tbody>
+<tr><td><code>10.244.1.0/24</code></td><td>interface C (pod trên node này)</td><td><code>10.244.1.37</code></td></tr>
+<tr><td><code>10.244.0.0/16</code></td><td>interface B (tunnel sang node khác)</td><td><code>10.244.9.9</code></td></tr>
+<tr><td><code>10.0.0.0/8</code></td><td>interface A (mạng công ty)</td><td><code>10.1.2.3</code></td></tr>
+<tr><td><code>0.0.0.0/0</code></td><td>default gateway</td><td><code>8.8.8.8</code></td></tr>
+</tbody></table></div>
+<p><code>10.244.1.37</code> khớp cả 4 dòng nhưng /24 dài nhất nên đi interface C. Nhờ dùng prefix, ISP có thể quảng bá một prefix lớn thay cho hàng nghìn prefix nhỏ của khách hàng (<b>route aggregation</b>). Các block address được cấp từ IANA → registry khu vực (APNIC) → quốc gia (VNNIC) → ISP.</p>
+
+<h2>DHCP</h2>
+<p>Host mới vào mạng lấy address tự động bằng <b>DHCP</b> (Dynamic Host Configuration Protocol), chạy trên UDP port 67/68 <span class="bk">§4.3.3</span>:</p>
+<script type="application/json" class="seq">
+{"title":"DHCP: Discover, Offer, Request, ACK","actors":["Client (chưa có IP)","DHCP server"],"w":260,"steps":[
+ {"f":0,"t":1,"l":"DISCOVER  0.0.0.0:68 → 255.255.255.255:67","m":1,"k":"app"},
+ {"f":1,"t":0,"l":"OFFER  yiaddr 192.168.1.23, lease 86400 s","m":1,"d":1,"k":"app"},
+ {"f":0,"t":1,"l":"REQUEST  (tôi lấy 192.168.1.23)","m":1,"k":"app"},
+ {"f":1,"t":0,"l":"ACK  + subnet mask, gateway, DNS server","m":1,"d":1,"k":"app"},
+ {"note":"Client chưa có IP nên gửi broadcast. Gần hết lease thì gia hạn.","a":0,"b":1}
+]}
+</script>
+<p>Ngoài IP, DHCP còn cấp subnet mask, default gateway và DNS server (thứ bạn thấy trong <code>/etc/resolv.conf</code>). Trong Kubernetes, pod <b>không</b> dùng DHCP: IP do plugin CNI cấp (IPAM) ngay khi tạo pod. Rủi ro security: một <i>rogue DHCP server</i> trong LAN có thể cấp gateway và DNS giả cho mọi máy; switch doanh nghiệp chống bằng <i>DHCP snooping</i>.</p>
+
+<h2>NAT</h2>
+<p>IPv4 chỉ có khoảng 4.3 tỷ address, không đủ cho mọi thiết bị. <b>NAT</b> (Network Address Translation) cho cả một mạng private dùng chung một (hoặc vài) public IP <span class="bk">§4.3.4</span>. Router NAT ghi lại mỗi lượt dịch vào <b>NAT translation table</b>, và dịch ngược khi reply quay về:</p>
+<script type="application/json" class="seq">
+{"title":"NAT: router viết lại source IP và port","actors":["Host 10.0.0.5","NAT router (WAN 203.0.113.7)","Server 198.51.100.7"],"w":240,"steps":[
+ {"f":0,"t":1,"l":"S 10.0.0.5:51000\nD 198.51.100.7:443","m":1},
+ {"note":"NAT router ghi vào translation table:  203.0.113.7:40001 ↔ 10.0.0.5:51000","a":0,"b":2},
+ {"f":1,"t":2,"l":"S 203.0.113.7:40001\nD 198.51.100.7:443","m":1,"k":"net"},
+ {"f":2,"t":1,"l":"S 198.51.100.7:443\nD 203.0.113.7:40001","m":1,"d":1,"k":"net"},
+ {"f":1,"t":0,"l":"S 198.51.100.7:443\nD 10.0.0.5:51000","m":1,"d":1}
+]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Loại NAT</th><th>Viết lại</th><th>Gặp ở đâu</th></tr></thead>
+<tbody>
+<tr><td><b>SNAT / masquerade</b></td><td>Source address (và port) của traffic đi ra</td><td>Router nhà (Q3), WSL2, Docker (Q5), pod gọi ra ngoài cluster</td></tr>
+<tr><td><b>DNAT / port forwarding</b></td><td>Destination address của traffic đi vào</td><td><code>docker run -p 8080:80</code>; Kubernetes Service: kube-proxy DNAT từ ClusterIP sang IP của một pod</td></tr>
+<tr><td><b>CGNAT</b></td><td>NAT nhiều tầng ở nhà mạng</td><td>Dải 100.64.0.0/10</td></tr>
+</tbody></table></div>
+<p>Hệ quả của NAT:</p>
+<ul>
+  <li>Phá <b>end-to-end principle</b> (module 01): từ ngoài không thể chủ động mở connection vào host sau NAT nếu không cấu hình port forwarding.</li>
+  <li>NAT phải nhớ state cho từng connection (Linux: bảng <b>conntrack</b>). Bảng đầy thì connection mới bị drop.</li>
+  <li>NAT <b>không phải firewall</b>, dù nó tình cờ chặn được connection đi vào.</li>
+  <li>Server phía sau NAT/load balancer chỉ thấy IP của NAT, <b>mất source IP thật</b> của client.</li>
+</ul>
+<div class="note trap"><b>Cạm bẫy security</b><p>Đừng dựa vào source IP để xác thực hay phân quyền: sau NAT, nhiều client có chung một IP; trong cluster, IP của pod đổi liên tục. Header <code>X-Forwarded-For</code> giúp lấy lại IP gốc cho mục đích <b>log</b>, nhưng client tự đặt header này được, nên chỉ tin khi nó do proxy của chính bạn thêm vào. Identity phải đến từ certificate hoặc token (module 10–12).</p></div>
+
+<h2>ICMP</h2>
+<p><b>ICMP</b> (Internet Control Message Protocol) là protocol báo lỗi và chẩn đoán của network layer. ICMP message nằm trong IP datagram (protocol 1) <span class="bk">§5.6</span>:</p>
+<div class="tbl"><table>
+<thead><tr><th>Type</th><th>Code</th><th>Ý nghĩa</th><th>Dùng bởi</th></tr></thead>
+<tbody>
+<tr><td>8 / 0</td><td>0</td><td>Echo request / Echo reply</td><td><code>ping</code></td></tr>
+<tr><td>3</td><td>0 / 1</td><td>Destination network / host unreachable</td><td>Router không có route</td></tr>
+<tr><td>3</td><td>3</td><td>Destination port unreachable</td><td>UDP tới port không ai listen; traceroute biết đã tới đích</td></tr>
+<tr class="t-sec"><td><span class="lay"></span>3</td><td>4</td><td>Fragmentation needed (kèm MTU)</td><td><b>PMTUD</b>: không được chặn</td></tr>
+<tr><td>11</td><td>0</td><td>Time exceeded (TTL hết)</td><td><code>traceroute</code></td></tr>
+<tr><td>5</td><td>—</td><td>Redirect</td><td>Thường bị tắt vì có thể bị lợi dụng để đổi route</td></tr>
+</tbody></table></div>
+<div class="note key"><b>Ghi nhớ</b><p>Chặn toàn bộ ICMP không làm hệ thống an toàn hơn bao nhiêu mà làm hỏng PMTUD và khó debug. Chính sách hợp lý: cho phép type 3 (đặc biệt code 4), type 11, và echo trong nội bộ; rate-limit ICMP để chống flood. Với IPv6 càng không được chặn bừa: ICMPv6 lo cả việc tìm MAC address của neighbor (Neighbor Discovery), chặn là mất kết nối.</p></div>
+
+<h2>IPv6</h2>
+<p>IPv6 dùng address <b>128 bit</b>, đủ để mỗi subnet có 2<sup>64</sup> address <span class="bk">§4.3.5</span>. Header được làm gọn để router xử lý nhanh:</p>
+<script type="application/json" class="pkt">
+{"title":"IPv6 header (RFC 8200), cố định 40 byte","bits":32,"fields":[["Version",4,"base"],["Traffic class",8,"app"],["Flow label",20,"app"],["Payload length",16,"net"],["Next header",8,"tra"],["Hop limit",8,"sec"],["Source address (128 bit)",128,"net"],["Destination address (128 bit)",128,"net"],["Data / extension headers","var","app"]]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>So với IPv4</th><th>IPv6</th></tr></thead>
+<tbody>
+<tr><td>Header</td><td>Cố định 40 byte; option chuyển thành <b>extension header</b> nối nhau qua field Next header</td></tr>
+<tr><td>Checksum</td><td>Bỏ hẳn (link layer và transport layer đã có)</td></tr>
+<tr><td>Fragmentation</td><td>Router <b>không</b> fragment; chỉ host gửi làm, dựa vào ICMPv6 Packet Too Big</td></tr>
+<tr><td>TTL</td><td>Đổi tên thành <b>Hop limit</b></td></tr>
+<tr><td>NAT</td><td>Thường không cần; mỗi host có global address</td></tr>
+</tbody></table></div>
+<p>Viết tắt address: bỏ số 0 đầu mỗi nhóm, và thay <b>một</b> dãy nhóm toàn 0 liên tiếp bằng <code>::</code>. Ví dụ <code>2001:0db8:0000:0000:0000:ff00:0042:8329</code> → <code>2001:db8::ff00:42:8329</code>. Loại address: global unicast (<code>2000::/3</code>), link-local (<code>fe80::/10</code>, mọi interface đều có), unique local (<code>fc00::/7</code>, tương tự private), loopback <code>::1</code>, multicast (<code>ff00::/8</code>).</p>
+<p>Thế giới hiện chạy <b>dual stack</b> (cả IPv4 và IPv6). Đó là lý do <code>getaddrinfo()</code> ở module 03 trả về cả hai loại, và client nên thử cả hai (Happy Eyeballs). Mạng di động là nơi IPv6 phổ biến nhất: điện thoại 5G thường chỉ được cấp IPv6.</p>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m06" data-title="Kiểm tra module 06">
+[
+ {"q":"Subnet <code>10.244.3.0/24</code> có bao nhiêu address dùng được cho pod/host?","o":["256","255","254","24"],"a":2,
+  "e":"8 bit host part = 256 address, trừ network address (.0) và broadcast (.255) còn 254."},
+ {"q":"<code>172.28.5.9/20</code> thuộc network address nào?","o":["172.28.5.0","172.28.0.0","172.28.16.0","172.0.0.0"],"a":1,
+  "e":"/20 = 16 bit của hai octet đầu + 4 bit đầu của octet thứ ba. 5 = 0000 0101, 4 bit đầu là 0000 → 0. Network: 172.28.0.0/20, broadcast 172.28.15.255 (khớp output ở Q1)."},
+ {"q":"Forwarding table có <code>10.0.0.0/8 → A</code>, <code>10.244.0.0/16 → B</code>, <code>10.244.1.0/24 → C</code>, <code>0.0.0.0/0 → D</code>. Datagram tới <code>10.244.7.20</code> đi ra đâu?","o":["A","B","C","D"],"a":1,
+  "e":"Khớp /8 và /16, không khớp /24 (10.244.1.x). Longest prefix match chọn /16 → B."},
+ {"q":"Router nhận datagram có TTL = 1 và đích không phải chính nó. Router làm gì?","o":["Forward với TTL = 0","Drop và gửi ICMP Time Exceeded về source","Gửi lại cho source","Tăng TTL lên 64"],"a":1,
+  "e":"Trừ 1 thì TTL = 0 → drop, gửi ICMP type 11. traceroute dựa vào đúng hành vi này."},
+ {"q":"Pod gọi ra ngoài được TCP handshake, nhưng TLS handshake treo ở bước nhận certificate. Cluster dùng VXLAN overlay và firewall chặn mọi ICMP. Nguyên nhân khả năng cao nhất?","o":["Certificate hết hạn","MTU black hole: gói certificate lớn bị drop và ICMP Fragmentation Needed bị chặn","DNS sai","Server hết port"],"a":1,
+  "e":"Gói nhỏ (SYN, ClientHello) đi được; gói lớn đầu tiên (certificate chain) vượt MTU thực của overlay và bị drop âm thầm vì PMTUD không hoạt động. Sửa: cho phép ICMP type 3 code 4, giảm MTU của pod, hoặc MSS clamping."},
+ {"q":"Những dải nào là private address theo RFC 1918?","o":["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","100.64.0.0/10"],"a":[0,1,2],
+  "e":"100.64.0.0/10 là dải shared address cho CGNAT (RFC 6598), không phải RFC 1918, dù cũng không route trên Internet."},
+ {"q":"Service của bạn nằm sau Ingress và NAT. Bạn muốn cho phép một partner gọi API dựa trên source IP của họ. Vấn đề là gì?","o":["Không có vấn đề","Service chỉ thấy IP của proxy/NAT; X-Forwarded-For có thể bị client tự đặt. Nên xác thực partner bằng mTLS hoặc token","IPv6 không hỗ trợ","Phải dùng UDP"],"a":1,
+  "e":"Source IP là địa chỉ, không phải identity. Có thể dùng IP allowlist như một lớp phụ ở edge, nhưng authentication phải dựa trên certificate hoặc token."},
+ {"q":"<code>docker run -p 8080:80 nginx</code> thực chất cài loại NAT nào?","o":["SNAT","DNAT: traffic tới host:8080 được viết lại thành container_IP:80","Không có NAT","CGNAT"],"a":1,
+  "e":"Docker thêm rule DNAT trong iptables nat table (chain DOCKER). Traffic container đi ra ngoài thì dùng MASQUERADE (SNAT) như ở Q5."},
+ {"q":"DHCP DISCOVER được gửi tới address nào và vì sao?","o":["IP của DHCP server, vì client đã biết","255.255.255.255 (broadcast), vì client chưa có IP và chưa biết server ở đâu","127.0.0.1","Default gateway"],"a":1,
+  "e":"Client chưa có IP (dùng 0.0.0.0 làm source) và chưa biết server, nên broadcast trong LAN."},
+ {"q":"Điều nào đúng với IPv6?","o":["Header có checksum","Router không fragment datagram","Header cố định 40 byte","Address dài 64 bit"],"a":[1,2],
+  "e":"IPv6 bỏ checksum, bỏ fragmentation tại router, header cố định 40 byte; address dài 128 bit (thường 64 bit cho prefix của subnet và 64 bit cho interface)."},
+ {"q":"Viết tắt đúng của <code>2001:0db8:0000:0000:0001:0000:0000:0005</code> là:","o":["2001:db8::1::5","2001:db8::1:0:0:5","2001:db8:0:0:1::5","Cả 2 và 3 đều hợp lệ"],"a":3,
+  "e":"<code>::</code> chỉ được dùng một lần (đáp án 1 sai). Thay dãy 0 đầu hay dãy sau đều hợp lệ; chuẩn khuyến nghị (RFC 5952) thay dãy dài nhất, nếu bằng nhau thì dãy đầu tiên: <code>2001:db8::1:0:0:5</code>."},
+ {"q":"Vì sao không nên chặn toàn bộ ICMPv6 trên firewall?","o":["Vì ping sẽ chậm","ICMPv6 lo Neighbor Discovery (tìm MAC của neighbor) và Packet Too Big; chặn là mất kết nối hoặc gặp MTU black hole","Vì IPv6 không có TCP","Không có lý do"],"a":1,
+  "e":"Trong IPv6, ICMPv6 thay cho ARP và là cơ chế PMTUD duy nhất. RFC 4890 có danh sách loại ICMPv6 nên cho phép."}
+]
+</script>
+
+<h3>Ôn lại module 03–05</h3>
+<script type="application/json" class="quiz" data-id="m06-review" data-title="Ôn lại">
+[
+ {"q":"Ping <code>-M do -s 1472</code> chạy được với MTU 1500. Vậy MSS mà TCP thường quảng bá trên link này là:","o":["1500","1472","1460","1400"],"a":2,
+  "e":"MSS = MTU − 20 (IP header) − 20 (TCP header) = 1,460. Ping thì trừ 20 (IP) + 8 (ICMP) = 1,472."},
+ {"q":"nmap báo port 9090 là <i>filtered</i>. Ở module 04, client gọi port đó sẽ gặp lỗi gì?","o":["ECONNREFUSED ngay lập tức","ETIMEDOUT sau một lúc chờ","200 OK","NXDOMAIN"],"a":1,
+  "e":"Filtered = firewall DROP, không có reply → client chờ retransmit SYN rồi timeout. Closed (RST) mới là ECONNREFUSED."},
+ {"q":"CoreDNS trả về <code>10.96.12.5</code> cho Service <code>auth</code>. Đây là IP gì?","o":["IP của pod auth","ClusterIP ảo; kube-proxy DNAT nó sang IP của một pod","IP của node","Public IP"],"a":1,
+  "e":"Module 03 nói ClusterIP là IP ảo. Bây giờ bạn biết cơ chế: DNAT trong iptables/IPVS của node, giống <code>docker -p</code>."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"06 IP, subnet, NAT, ICMP","c":[
+ {"t":"Network layer","col":"base","c":[{"t":"Forwarding (data plane): ns, mỗi router"},{"t":"Routing (control plane): s, toàn mạng"},{"t":"Best-effort service"},{"t":"Output queue → delay, loss"}]},
+ {"t":"IPv4 datagram","col":"net","c":[{"t":"TTL, Protocol (1/6/17/50/132)"},{"t":"Header checksum tính lại mỗi hop"},{"t":"MTU, DF, fragmentation"},{"t":"PMTUD cần ICMP 3/4"},{"t":"MTU black hole: TLS treo"}]},
+ {"t":"Addressing","col":"app","c":[{"t":"Address gắn với interface"},{"t":"CIDR a.b.c.d/x"},{"t":"Network, broadcast, host"},{"t":"Longest prefix match"},{"t":"Private, CGNAT, link-local, metadata"}]},
+ {"t":"DHCP","col":"tra","c":[{"t":"Discover, Offer, Request, ACK"},{"t":"IP + mask + gateway + DNS"},{"t":"Pod: IP từ CNI IPAM"},{"t":"Rogue DHCP → snooping"}]},
+ {"t":"NAT","col":"sec","c":[{"t":"SNAT / masquerade"},{"t":"DNAT: docker -p, Service ClusterIP"},{"t":"conntrack state"},{"t":"Mất source IP → không xác thực bằng IP"}]},
+ {"t":"ICMP & IPv6","col":"core","c":[{"t":"Echo, Unreachable, Time exceeded, Frag needed"},{"t":"Không chặn bừa ICMP"},{"t":"IPv6: 128 bit, header 40 byte"},{"t":"Không checksum, không fragment ở router"},{"t":"Dual stack, Happy Eyeballs"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 6.1 · Longest prefix match và kiểm tra CIDR trùng nhau</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Python</span><span class="chip t-base">30 phút</span></div>
+  <p>Hai việc bằng module chuẩn <code>ipaddress</code> của Python:</p>
+  <ol>
+    <li>Đọc routing table thật của máy (<code>ip -4 route</code>), cài hàm <code>lpm(dst)</code> trả về route khớp dài nhất, và so kết quả với <code>ip route get</code> cho vài đích.</li>
+    <li>Viết hàm kiểm tra một kế hoạch address cho cluster mới có <b>trùng</b> dải nào không: node network, pod CIDR, Service CIDR, Docker bridge, và mạng của 2 site partner.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> <code>lpm()</code> cho cùng kết quả với kernel, và script chỉ ra đúng cặp CIDR bị trùng trong ví dụ.</p>
+  <details><summary>Gợi ý</summary><p><code>ipaddress.ip_network("10.244.0.0/16")</code>, <code>ip_address(x) in net</code>, <code>net.prefixlen</code>, <code>a.overlaps(b)</code>. Dòng <code>default</code> trong <code>ip route</code> tương ứng <code>0.0.0.0/0</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m06/routes.py">
+#!/usr/bin/env python3
+"""Longest prefix match trên routing table thật + kiểm tra CIDR trùng nhau."""
+import ipaddress
+import itertools
+import subprocess
+import sys
+
+
+def load_routes():
+    routes = []
+    for line in subprocess.run(["ip", "-4", "route"], capture_output=True, text=True).stdout.splitlines():
+        parts = line.split()
+        prefix = "0.0.0.0/0" if parts[0] == "default" else parts[0]
+        if "/" not in prefix:
+            prefix += "/32"                       # route tới đúng một host
+        via = parts[parts.index("via") + 1] if "via" in parts else "(trực tiếp)"
+        dev = parts[parts.index("dev") + 1]
+        routes.append((ipaddress.ip_network(prefix, strict=False), via, dev))
+    return routes
+
+
+def lpm(routes, dst: str):
+    ip = ipaddress.ip_address(dst)
+    matches = [r for r in routes if ip in r[0]]
+    return max(matches, key=lambda r: r[0].prefixlen) if matches else None
+
+
+def check_overlaps(plan: dict) -> None:
+    nets = {name: ipaddress.ip_network(cidr) for name, cidr in plan.items()}
+    clean = True
+    for (a, na), (b, nb) in itertools.combinations(nets.items(), 2):
+        if na.overlaps(nb):
+            print(f"  ✘ {a} {na} TRÙNG {b} {nb}")
+            clean = False
+    if clean:
+        print("  ✔ không có dải nào trùng")
+
+
+if __name__ == "__main__":
+    routes = load_routes()
+    for dst in sys.argv[1:] or ["1.1.1.1", "172.17.0.2", "127.0.0.1"]:
+        r = lpm(routes, dst)
+        print(f"{dst:<15} → {r[0]} via {r[1]} dev {r[2]}" if r else f"{dst}: không có route")
+
+    print("\nKiểm tra kế hoạch address cho cluster mới:")
+    check_overlaps({
+        "node network": "10.20.0.0/22",
+        "pod CIDR": "10.244.0.0/16",
+        "service CIDR": "10.96.0.0/12",
+        "docker bridge": "172.17.0.0/16",
+        "site HCM": "10.20.2.0/24",
+        "site HN": "10.100.0.0/16",
+    })
+</script>
+<script type="text/plain" class="term">
+$ python3 routes.py 1.1.1.1 172.28.3.3
+1.1.1.1         → 0.0.0.0/0 via 172.28.0.1 dev eth0
+172.28.3.3      → 172.28.0.0/20 via (trực tiếp) dev eth0
+
+Kiểm tra kế hoạch address cho cluster mới:
+  ✘ node network 10.20.0.0/22 TRÙNG site HCM 10.20.2.0/24
+  ✘ service CIDR 10.96.0.0/12 TRÙNG site HN 10.100.0.0/16    ◀ 10.96/12 chạy tới 10.111.255.255
+$ ip route get 172.28.3.3                                   # đối chiếu với kernel
+</script>
+  <p class="small muted">Lỗi thứ hai rất dễ bỏ sót khi chỉ nhìn bằng mắt: <code>10.96.0.0/12</code> trông không liên quan tới <code>10.100.0.0/16</code>, nhưng /12 bao phủ 10.96.0.0 → 10.111.255.255. Dùng widget CIDR ở trên để kiểm tra lại.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 6.2 · Bắt quả tang NAT đang làm việc</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Docker · iptables · tcpdump · conntrack</span><span class="chip t-base">40 phút</span></div>
+  <p>Chứng minh bằng packet thật rằng Docker dùng cả hai loại NAT:</p>
+  <ol>
+    <li><b>SNAT</b>: container gọi ra Internet. Capture đồng thời trên <code>docker0</code> và <code>eth0</code> của Ubuntu, so source IP ở hai nơi.</li>
+    <li><b>DNAT</b>: chạy container web với <code>-p 8080:80</code>, tìm rule DNAT tương ứng, và xem bảng conntrack khi gọi <code>curl localhost:8080</code>.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> có hai dòng tcpdump của cùng một connection với source IP khác nhau, một rule DNAT trỏ tới IP của container, và một dòng conntrack ghi cả address gốc lẫn address đã dịch.</p>
+  <details><summary>Gợi ý</summary><p>Cài <code>sudo apt install -y conntrack</code>. Container mặc định (không chỉ định network) nằm trên bridge <code>docker0</code>, dải 172.17.0.0/16. Rule NAT xem bằng <code>sudo iptables -t nat -S</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ sudo -v
+$ sudo tcpdump -i docker0 -nn 'tcp port 80 and tcp[tcpflags] & tcp-syn != 0' &
+$ sudo tcpdump -i eth0    -nn 'tcp port 80 and tcp[tcpflags] & tcp-syn != 0' &
+$ docker run --rm nicolaka/netshoot curl -s -o /dev/null http://example.com
+docker0: IP 172.17.0.2.43210 > 203.0.113.10.80: Flags [S]      ◀ trước NAT: IP của container
+eth0:    IP 172.28.5.9.43210 > 203.0.113.10.80: Flags [S]      ◀ sau MASQUERADE: IP của Ubuntu
+$ sudo pkill tcpdump
+$ docker run -d --name web -p 8080:80 nginx:alpine
+$ sudo iptables -t nat -S | grep 8080
+-A DOCKER ! -i docker0 -p tcp -m tcp --dport 8080 -j DNAT --to-destination 172.17.0.3:80
+# Gọi từ một container ở network khác (netlab) tới IP của Ubuntu để traffic đi qua rule DNAT
+$ docker network create netlab 2>/dev/null; true
+$ docker run --rm --network netlab nicolaka/netshoot curl -s -o /dev/null -w '%{http_code}\n' "$(hostname -I | cut -d' ' -f1):8080"
+200
+$ sudo conntrack -L -p tcp --orig-port-dst 8080 2>/dev/null | head -1
+tcp 6 117 TIME_WAIT src=172.20.0.2 dst=172.28.5.9 sport=40312 dport=8080 src=172.17.0.3 dst=172.20.0.2 sport=80 dport=40312 …
+                                                       ◀ nửa đầu: address gốc · nửa sau: reply từ 172.17.0.3:80 (đã DNAT)
+$ docker rm -f web
+</script>
+  <p>Port nguồn có thể đổi khi đi qua NAT nếu bị trùng; trong lab thường giữ nguyên. Nếu gọi <code>curl localhost:8080</code> từ chính Ubuntu, Docker dùng tiến trình <code>docker-proxy</code> thay vì DNAT nên conntrack sẽ không ghi như trên. Tên chain và dạng rule có thể khác tuỳ phiên bản Docker. Kubernetes Service (ClusterIP) dùng đúng cơ chế DNAT này; module 07 sẽ đọc iptables kỹ hơn.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 6.3 · Tái hiện MTU black hole và sửa bằng MSS clamping</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Docker · ip · iptables</span><span class="chip t-base">60 phút</span></div>
+  <p>Dựng 3 container: <code>client</code> (10.10.1.10) — <code>router</code> — <code>server</code> (10.10.2.10). Server phục vụ một file 2 MB qua TCP. Sau đó:</p>
+  <ol>
+    <li>Tải file khi mọi thứ bình thường.</li>
+    <li>Hạ MTU của interface phía client trên router xuống 1400. Tải lại: vẫn chạy nhờ PMTUD.</li>
+    <li>Chặn ICMP "fragmentation needed" trên router. Tải lại: connection mở được nhưng dữ liệu không về.</li>
+    <li>Sửa bằng <b>MSS clamping</b> trên router mà không cần bỏ chặn ICMP.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> có 4 kết quả (đủ byte / đủ byte / gần 0 byte / đủ byte) và giải thích được vì sao MSS clamping sửa được.</p>
+  <details><summary>Gợi ý</summary><p>Router cần <code>--sysctl net.ipv4.ip_forward=1</code> và <code>--cap-add NET_ADMIN</code>; client và server cần route tới subnet bên kia qua router. Interface của network đầu tiên trong router là <code>eth0</code>, network nối thêm bằng <code>docker network connect</code> là <code>eth1</code>. Rule chặn: <code>iptables -A OUTPUT -p icmp --icmp-type fragmentation-needed -j DROP</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker network create --subnet 10.10.1.0/24 neta
+$ docker network create --subnet 10.10.2.0/24 netb
+$ docker run -d --name router --network neta --ip 10.10.1.254 --cap-add NET_ADMIN \
+    --sysctl net.ipv4.ip_forward=1 nicolaka/netshoot sleep infinity
+$ docker network connect --ip 10.10.2.254 netb router
+$ docker run -d --name server --network netb --ip 10.10.2.10 --cap-add NET_ADMIN nicolaka/netshoot sh -c \
+    'ip route replace 10.10.1.0/24 via 10.10.2.254 && head -c 2000000 /dev/urandom > /tmp/f &&
+     exec socat TCP-LISTEN:8000,fork,reuseaddr SYSTEM:"cat /tmp/f"'
+$ docker run -d --name client --network neta --ip 10.10.1.10 --cap-add NET_ADMIN nicolaka/netshoot sh -c \
+    'ip route replace 10.10.2.0/24 via 10.10.1.254 && exec sleep infinity'
+# 1. Bình thường
+$ docker exec client sh -c 'timeout 10 nc 10.10.2.10 8000 | wc -c'
+2000000
+# 2. MTU 1400 trên interface phía client của router
+$ docker exec router ip link set eth0 mtu 1400
+$ docker exec client sh -c 'timeout 10 nc 10.10.2.10 8000 | wc -c'
+2000000                                                ◀ PMTUD: server nhận ICMP và tự giảm gói
+# 3. Chặn ICMP frag-needed
+$ docker exec router iptables -A OUTPUT -p icmp --icmp-type fragmentation-needed -j DROP
+$ docker exec server ip route flush cache              # xoá PMTU server đã học được ở bước 2
+$ docker exec client sh -c 'timeout 10 nc 10.10.2.10 8000 | wc -c'
+0                                                      ◀ black hole: handshake OK, dữ liệu kẹt
+# 4. MSS clamping trên router
+$ docker exec router iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+$ docker exec client sh -c 'timeout 10 nc 10.10.2.10 8000 | wc -c'
+2000000
+$ docker rm -f client router server; docker network rm neta netb
+</script>
+  <p><b>Vì sao MSS clamping chạy:</b> router sửa field MSS trong gói SYN/SYN-ACK đi qua nó thành MTU của link hẹp nhất trừ 40 (ở đây 1,360). Server tin MSS đó nên ngay từ đầu không gửi segment quá lớn, không cần tới ICMP. Đây là cấu hình chuẩn trên VPN gateway và các tunnel trong core network. Nếu ở bước 3 bạn vẫn nhận đủ byte, hãy kiểm tra server đã xoá PMTU cache chưa, hoặc dừng và tạo lại container server.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 6.4 · Viết ping bằng raw socket trong C</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">C · raw socket</span><span class="chip t-base">45 phút</span></div>
+  <p>Viết <code>myping</code>: tự build ICMP echo request (type 8) kèm checksum, gửi bằng raw socket, nhận reply, tự parse IP header (dùng IHL để biết ICMP bắt đầu ở đâu), in TTL và RTT. Lọc đúng reply của mình bằng identifier và sequence number.</p>
+  <p class="done-when"><b>Xong khi:</b> output tương tự <code>ping</code> thật, và bạn giải thích được vì sao chương trình cần <code>sudo</code>.</p>
+  <details><summary>Gợi ý</summary><ul>
+    <li><code>socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)</code>. Khi nhận, raw socket trả về cả IP header.</li>
+    <li>Checksum Internet (RFC 1071): cộng các word 16 bit vào số 32 bit, gấp phần tràn về, rồi đảo bit. Cùng thuật toán với checksum UDP/TCP ở module 05.</li>
+    <li><code>struct icmphdr</code> và <code>struct iphdr</code> có trong <code>&lt;netinet/ip_icmp.h&gt;</code> và <code>&lt;netinet/ip.h&gt;</code>.</li>
+  </ul></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="c" data-file="~/netlab/m06/myping.c">
+// myping.c — ICMP echo bằng raw socket (cần sudo hoặc CAP_NET_RAW)
+#define _DEFAULT_SOURCE
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
+
+static uint16_t checksum(const void *data, size_t len) {       // Internet checksum, RFC 1071
+    const uint16_t *p = data;
+    uint32_t sum = 0;
+    for (; len > 1; len -= 2) sum += *p++;
+    if (len) sum += *(const uint8_t *)p;
+    while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);       // gấp phần tràn về 16 bit
+    return (uint16_t)~sum;
+}
+
+static double now_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) { fprintf(stderr, "usage: %s host [count]\n", argv[0]); return 1; }
+    int count = argc > 2 ? atoi(argv[2]) : 4;
+
+    struct addrinfo hints = { .ai_family = AF_INET }, *res;
+    if (getaddrinfo(argv[1], NULL, &hints, &res) != 0) { fprintf(stderr, "cannot resolve %s\n", argv[1]); return 1; }
+    struct sockaddr_in dst = *(struct sockaddr_in *)res->ai_addr;
+    freeaddrinfo(res);
+
+    int s = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if (s < 0) { perror("socket (cần sudo?)"); return 1; }
+    struct timeval tv = { .tv_sec = 1 };
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+
+    uint16_t id = (uint16_t)(getpid() & 0xFFFF);
+    for (int seq = 1; seq <= count; seq++) {
+        unsigned char pkt[64] = {0};
+        struct icmphdr *icmp = (struct icmphdr *)pkt;
+        icmp->type = ICMP_ECHO;                                  // type 8, code 0
+        icmp->un.echo.id = htons(id);
+        icmp->un.echo.sequence = htons((uint16_t)seq);
+        memcpy(pkt + sizeof *icmp, "core-net-lab", 12);          // payload tuỳ ý
+        icmp->checksum = checksum(pkt, sizeof pkt);              // tính khi field checksum = 0
+
+        double t0 = now_ms();
+        if (sendto(s, pkt, sizeof pkt, 0, (struct sockaddr *)&dst, sizeof dst) < 0) { perror("sendto"); return 1; }
+        for (;;) {
+            unsigned char buf[1500];
+            ssize_t n = recv(s, buf, sizeof buf, 0);              // raw socket: nhận cả IP header
+            if (n < 0) { printf("seq=%d timeout\n", seq); break; }
+            struct iphdr *ip = (struct iphdr *)buf;
+            size_t ihl = ip->ihl * 4u;                            // IHL tính bằng word 4 byte
+            struct icmphdr *r = (struct icmphdr *)(buf + ihl);
+            if (r->type == ICMP_ECHOREPLY && ntohs(r->un.echo.id) == id &&
+                ntohs(r->un.echo.sequence) == seq) {
+                char from[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &ip->saddr, from, sizeof from);
+                printf("%zd bytes from %s: seq=%d ttl=%d time=%.2f ms\n",
+                       n - (ssize_t)ihl, from, seq, ip->ttl, now_ms() - t0);
+                break;
+            }
+            // ICMP khác (của ping khác, hoặc chính request khi ping localhost): bỏ qua, đọc tiếp
+        }
+        sleep(1);
+    }
+    close(s);
+    return 0;
+}
+</script>
+<script type="text/plain" class="term">
+$ gcc -O2 -Wall -Wextra -o myping myping.c
+$ ./myping 1.1.1.1
+socket (cần sudo?): Operation not permitted
+$ sudo ./myping 1.1.1.1 3
+64 bytes from 1.1.1.1: seq=1 ttl=57 time=6.02 ms
+64 bytes from 1.1.1.1: seq=2 ttl=57 time=5.71 ms
+64 bytes from 1.1.1.1: seq=3 ttl=57 time=5.88 ms
+</script>
+  <p>Raw socket cho phép tự dựng mọi loại packet (kể cả giả source IP), nên Linux chỉ cho process có capability <code>CAP_NET_RAW</code>. Trong Kubernetes, security best practice là <b>drop capability này</b> khỏi container của bạn. Mở rộng: đặt TTL tăng dần bằng <code>setsockopt(s, IPPROTO_IP, IP_TTL, …)</code> và xử lý <code>ICMP_TIME_EXCEEDED</code> để biến chương trình thành traceroute.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m06"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §4.2 (bên trong router: input/output port, switching fabric, scheduling) đọc lướt; §4.3.4 có thêm phần NAT traversal.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc1918" target="_blank" rel="noopener">RFC 1918</a> (private address) và <a href="https://www.rfc-editor.org/rfc/rfc6890" target="_blank" rel="noopener">RFC 6890</a> (bảng mọi dải address đặc biệt).</li>
+  <li><a href="https://blog.cloudflare.com/path-mtu-discovery-in-practice/" target="_blank" rel="noopener">Cloudflare: Path MTU discovery in practice</a>: các sự cố MTU thật ở quy mô lớn.</li>
+  <li><a href="https://kubernetes.io/docs/concepts/cluster-administration/networking/" target="_blank" rel="noopener">Kubernetes: Cluster Networking</a>: pod CIDR, Service CIDR, mô hình "mỗi pod một IP".</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc4890" target="_blank" rel="noopener">RFC 4890</a>: nên cho phép loại ICMPv6 nào qua firewall.</li>
+</ul>

@@ -1,0 +1,713 @@
+<!-- Core Net Lab · Module 14 · Kubernetes networking & security (ngoài sách) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Giải thích được Kubernetes network model và lần theo một packet từ pod này sang pod khác node, qua Service (DNAT), qua DNS.</li>
+  <li>Viết NetworkPolicy đúng: default deny, cho phép theo namespace + label, egress kèm DNS; tránh bẫy AND/OR của YAML.</li>
+  <li>Hiểu identity trong cluster: ServiceAccount, projected token (một JWT), Kubernetes RBAC, <code>kubectl auth can-i</code>.</li>
+  <li>Biết Secret thật ra được bảo vệ đến đâu, và cấp certificate tự động bằng cert-manager với CA nội bộ của module 10.</li>
+  <li>Hiểu service mesh làm mTLS tự động thế nào, và các thiết lập bảo mật pod cơ bản.</li>
+</ul></div>
+
+<h2>Làm trước (20 phút)</h2>
+<p>Cài <code>kind</code> (Kubernetes chạy trong Docker container) và <code>kubectl</code> trong WSL, rồi tạo cluster 1 control-plane + 2 worker. Cluster này dùng cho cả module 14 và module 16.</p>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/kind.yaml">
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: netlab
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+</script>
+<script type="text/plain" class="term">
+$ curl -Lo kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64 && sudo install kind /usr/local/bin/
+$ curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install kubectl /usr/local/bin/
+$ mkdir -p ~/netlab/m14 && cd ~/netlab/m14 && kind create cluster --config kind.yaml
+$ kubectl get nodes -o wide | awk '{print $1, $2, $6}'
+NAME STATUS INTERNAL-IP
+netlab-control-plane Ready 172.18.0.2                         ◀ Q1: "node" ở đây thật ra là gì? (docker ps)
+netlab-worker Ready 172.18.0.3
+netlab-worker2 Ready 172.18.0.4
+$ kubectl get pods -A -o wide | awk '{print $1, $2, $7}' | head -8
+NAMESPACE NAME IP
+kube-system coredns-… 10.244.0.3
+kube-system kindnet-… 172.18.0.3                              ◀ Q2: vì sao pod này có IP của node?
+kube-system kube-proxy-… 172.18.0.4
+…
+$ kubectl run tmp --rm -it --restart=Never --image=busybox:1.36 -- cat /etc/resolv.conf
+search default.svc.cluster.local svc.cluster.local cluster.local
+nameserver 10.96.0.10                                         ◀ Q3: IP này là của ai? ndots:5 nghĩa là gì (module 03)?
+options ndots:5
+$ docker exec netlab-worker ip route
+default via 172.18.0.1 dev eth0
+10.244.0.0/24 via 172.18.0.2 dev eth0                         ◀ Q4: pod ở node khác được tới bằng cách nào?
+10.244.2.0/24 via 172.18.0.4 dev eth0
+172.18.0.0/16 dev eth0 proto kernel scope link src 172.18.0.3
+</script>
+<p class="small muted">Số IP và tên pod của bạn sẽ khác. Phiên bản kind mới hơn cũng được; xem trang <a href="https://github.com/kubernetes-sigs/kind/releases" target="_blank" rel="noopener">release của kind</a>. Xoá cluster khi không dùng: <code>kind delete cluster --name netlab</code>.</p>
+
+<h2>Kubernetes network model</h2>
+<p>Kubernetes chỉ đặt ra yêu cầu, còn việc hiện thực giao cho <b>CNI plugin</b> (module 08):</p>
+<ol>
+  <li>Mỗi pod có <b>IP riêng</b>, mọi container trong pod dùng chung network namespace đó.</li>
+  <li>Pod nói chuyện được với mọi pod khác, kể cả ở node khác, <b>không qua NAT</b>: pod nhận thấy đúng IP của pod gửi.</li>
+  <li>Agent trên node (kubelet) nói chuyện được với mọi pod của node đó.</li>
+</ol>
+<p>Hệ quả quan trọng cho security: <b>mặc định mọi pod gọi được mọi pod</b>. Mạng phẳng này tiện cho phát triển nhưng là thiên đường cho lateral movement (module 13), cho tới khi bạn thêm NetworkPolicy.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 296" role="img" aria-label="Hai node kind, mỗi pod nối veth vào root netns của node, route tới pod CIDR của node kia qua underlay">
+  <rect class="box" x="10" y="10" width="340" height="222" rx="10"/>
+  <text x="180" y="30" class="t-c t-s t-b">Node netlab-worker</text>
+  <g class="t-app"><rect class="f" x="30" y="42" width="140" height="58" rx="7"/><rect class="f" x="190" y="42" width="140" height="58" rx="7"/></g>
+  <text x="100" y="64" class="t-c t-s t-b">Pod echo-a</text><text x="100" y="84" class="t-c t-mono">10.244.1.3</text>
+  <text x="260" y="64" class="t-c t-s t-b">Pod client</text><text x="260" y="84" class="t-c t-mono">10.244.1.4</text>
+  <rect class="sunk" x="30" y="128" width="300" height="62" rx="7"/>
+  <text x="180" y="146" class="t-c t-s t-b">root netns của node: routing table</text>
+  <text x="180" y="163" class="t-c t-mono">10.244.1.4 dev veth… (pod local)</text>
+  <text x="180" y="180" class="t-c t-mono">10.244.2.0/24 via 172.18.0.4</text>
+  <text x="196" y="222" class="t-mono t-m">eth0 172.18.0.3</text>
+  <rect class="box" x="370" y="10" width="340" height="222" rx="10"/>
+  <text x="540" y="30" class="t-c t-s t-b">Node netlab-worker2</text>
+  <g class="t-app"><rect class="f" x="390" y="42" width="140" height="58" rx="7"/><rect class="f" x="550" y="42" width="140" height="58" rx="7"/></g>
+  <text x="460" y="64" class="t-c t-s t-b">Pod echo-b</text><text x="460" y="84" class="t-c t-mono">10.244.2.5</text>
+  <text x="620" y="64" class="t-c t-s t-b">Pod coredns</text><text x="620" y="84" class="t-c t-mono">10.244.2.2</text>
+  <rect class="sunk" x="390" y="128" width="300" height="62" rx="7"/>
+  <text x="540" y="146" class="t-c t-s t-b">root netns của node: routing table</text>
+  <text x="540" y="163" class="t-c t-mono">10.244.2.5 dev veth… (pod local)</text>
+  <text x="540" y="180" class="t-c t-mono">10.244.1.0/24 via 172.18.0.3</text>
+  <text x="556" y="222" class="t-mono t-m">eth0 172.18.0.4</text>
+  <line class="ln" x1="100" y1="100" x2="100" y2="128"/><line class="ln" x1="620" y1="100" x2="620" y2="128"/>
+  <text x="106" y="118" class="t-s t-m">veth</text>
+  <g class="t-net"><rect class="f" x="10" y="250" width="700" height="38" rx="7"/></g>
+  <text x="360" y="274" class="t-c t-s">Docker network "kind" = underlay giữa các node (172.18.0.0/16); kindnet chỉ thêm route, không overlay</text>
+  <g class="t-sec"><path class="st" d="M260 100 V128 M180 190 V250 M180 250 H540 M540 250 V190 M460 128 V100" style="fill:none;stroke-width:3"/></g>
+  <text x="268" y="119" class="t-s t-b">①</text><text x="188" y="244" class="t-s t-b">②</text><text x="548" y="244" class="t-s t-b">③</text><text x="468" y="119" class="t-s t-b">④</text>
+</svg></div>
+<figcaption>Client gửi tới echo-b: ① qua veth ra root netns của node; ② route <code>10.244.2.0/24 via 172.18.0.4</code> gửi ra eth0; ③ node kia nhận, tra route; ④ đưa vào veth của echo-b. Không NAT, không encapsulation (Q4). CNI khác (Flannel VXLAN, Calico IPIP/BGP, Cilium eBPF) thay bước ②③ bằng overlay hoặc BGP, nhưng ý tưởng giống nhau.</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th>CNI</th><th>Giữa các node</th><th>NetworkPolicy</th><th>Ghi chú</th></tr></thead>
+<tbody>
+<tr><td>kindnet</td><td>Route trực tiếp (cùng L2)</td><td>Có (kind ≥ 0.24)</td><td>Chỉ để lab</td></tr>
+<tr><td>Flannel</td><td>VXLAN overlay (module 08)</td><td>Không</td><td>Đơn giản</td></tr>
+<tr><td>Calico</td><td>BGP (module 07) hoặc IPIP/VXLAN</td><td>Có, thêm policy riêng</td><td>Phổ biến on-prem; mã hoá tuỳ chọn bằng WireGuard</td></tr>
+<tr><td>Cilium</td><td>VXLAN/Geneve hoặc native routing</td><td>Có, cả L7</td><td>Dựa trên <b>eBPF</b>, có thể thay luôn kube-proxy</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job: CNF trong core network</b><p>Network function 5G chạy trên Kubernetes (CNF) thường cần nhiều interface tách biệt: OAM, signaling, user plane. <b>Multus</b> gắn thêm interface vào pod ngoài interface mặc định, <b>SR-IOV</b> và DPDK cho UPF cần throughput cao. Interface phụ thường <b>không</b> đi qua kube-proxy hay NetworkPolicy của CNI chính, nên phải bảo vệ bằng cách khác (firewall ở underlay, policy riêng của plugin). Đây là chỗ hay bị bỏ sót khi review security.</p></div>
+
+<h2>Service: một IP ảo trước nhiều pod</h2>
+<p>Pod sinh ra và chết đi, IP thay đổi. <b>Service</b> cho một tên DNS và một <b>ClusterIP</b> cố định, chọn pod bằng label selector. Danh sách pod đang <b>Ready</b> nằm trong <b>EndpointSlice</b>. Trên mỗi node, kube-proxy biến Service thành rule DNAT (module 07, Lab 7.3 đã tự viết lại):</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 210" role="img" aria-label="Client gửi tới ClusterIP, kube-proxy DNAT tới một trong hai pod">
+  <g class="t-app"><rect class="f" x="10" y="72" width="110" height="56" rx="7"/></g>
+  <text x="65" y="95" class="t-c t-s t-b">Pod client</text><text x="65" y="113" class="t-c t-mono">10.244.1.4</text>
+  <line class="ln-ink" x1="120" y1="100" x2="227" y2="100"/><path class="ah" d="M235 100 l-9 -4.5 v9 z"/>
+  <text x="177" y="90" class="t-c t-s">dst 10.96.47.12:80</text>
+  <rect class="empty" x="235" y="60" width="170" height="80" rx="8"/>
+  <text x="320" y="84" class="t-c t-s t-b">Service echo</text><text x="320" y="103" class="t-c t-mono">10.96.47.12:80</text><text x="320" y="122" class="t-c t-s t-m">IP ảo, không ai giữ</text>
+  <rect class="sunk" x="235" y="152" width="170" height="48" rx="7"/>
+  <text x="320" y="172" class="t-c t-s">rule của kube-proxy:</text><text x="320" y="189" class="t-c t-s">DNAT ngẫu nhiên 50/50</text>
+  <g class="t-k8s"><rect class="f" x="480" y="20" width="170" height="56" rx="7"/><rect class="f" x="480" y="124" width="170" height="56" rx="7"/></g>
+  <text x="565" y="43" class="t-c t-s t-b">Pod echo-a</text><text x="565" y="62" class="t-c t-mono">10.244.1.3:8080</text>
+  <text x="565" y="147" class="t-c t-s t-b">Pod echo-b</text><text x="565" y="166" class="t-c t-mono">10.244.2.5:8080</text>
+  <line class="ln-ink" x1="405" y1="90" x2="472" y2="52"/><path class="ah" d="M480 48 l-10 0.5 l5 8 z"/>
+  <line class="ln-ink" x1="405" y1="110" x2="472" y2="148"/><path class="ah" d="M480 152 l-5 -8 l-5 7.5 z"/>
+  <text x="440" y="60" class="t-c t-s t-b">DNAT</text><text x="440" y="150" class="t-c t-s t-b">DNAT</text>
+  <text x="565" y="200" class="t-c t-s t-m">EndpointSlice: các pod Ready</text>
+</svg></div>
+<figcaption>Gói reply từ echo-b mang source 10.244.2.5; conntrack trên node của client đổi ngược thành 10.96.47.12 nên client không hề biết đã có DNAT. ClusterIP không phải interface thật nên thường <b>không ping được</b>; muốn kiểm tra hãy dùng curl/nc tới đúng port.</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th>Loại Service</th><th>Truy cập từ</th><th>Cơ chế</th></tr></thead>
+<tbody>
+<tr><td><b>ClusterIP</b> (mặc định)</td><td>Trong cluster</td><td>IP ảo + DNAT</td></tr>
+<tr><td><b>Headless</b> (<code>clusterIP: None</code>)</td><td>Trong cluster</td><td>DNS trả thẳng IP từng pod (module 03); hợp với StatefulSet, client tự chọn</td></tr>
+<tr><td><b>NodePort</b></td><td>Ngoài cluster, qua IP:port của mọi node (30000–32767)</td><td>DNAT trên node; mặc định còn SNAT nên pod mất IP thật của client</td></tr>
+<tr><td><b>LoadBalancer</b></td><td>Ngoài cluster, qua IP của LB</td><td>Cloud LB hoặc MetalLB trỏ vào NodePort</td></tr>
+<tr><td><b>ExternalName</b></td><td>Trong cluster</td><td>Chỉ là DNS CNAME tới tên bên ngoài</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy Service</b><ul>
+  <li><b>Selector không khớp</b> label của pod, hoặc pod chưa qua readiness probe: EndpointSlice rỗng. Với kube-proxy iptables, client nhận <code>connection refused</code> ngay. Lệnh đầu tiên khi debug: <code>kubectl get endpointslices -l kubernetes.io/service-name=&lt;svc&gt;</code>.</li>
+  <li>NodePort/LoadBalancer mặc định <b>SNAT</b>: log và rate limit theo IP ở pod thấy IP của node, không phải client. Đặt <code>externalTrafficPolicy: Local</code> để giữ IP client (đổi lại, chỉ node có pod mới nhận traffic).</li>
+  <li>Gọi tên ngắn <code>auth</code> từ namespace khác sẽ không tìm thấy (search domain chỉ có namespace của mình); dùng <code>auth.security</code>. Và certificate phải có đúng tên đó trong SAN (module 10).</li>
+</ul></div>
+
+<h2>Đưa traffic vào cluster: Ingress và Gateway API</h2>
+<p><b>Ingress</b> (và thế hệ sau là <b>Gateway API</b>) là L7 router đứng trước các Service: route theo host và path, terminate TLS (module 11, ba kiểu termination). Controller thực sự làm việc là Envoy, NGINX, HAProxy, Traefik… Gateway API tách vai rõ hơn: platform team quản lý <code>Gateway</code> (listener, certificate), app team khai báo <code>HTTPRoute</code>, và hỗ trợ TLS passthrough, gRPC, TCP. Dự án ingress-nginx của cộng đồng Kubernetes đã ngừng bảo trì vào năm 2026, nên hệ thống mới nên chọn Gateway API.</p>
+
+<h2>NetworkPolicy</h2>
+<p>NetworkPolicy là firewall cho pod, viết bằng label thay vì IP (vì IP pod thay đổi liên tục). Ba quy tắc cần nhớ:</p>
+<ol>
+  <li>Pod chưa bị policy nào chọn thì <b>cho phép tất cả</b>. Pod bị ít nhất một policy chọn (theo hướng Ingress hoặc Egress) thì hướng đó chuyển sang <b>default deny</b>, chỉ cho những gì các policy liệt kê.</li>
+  <li>Policy <b>cộng dồn</b> (union). Không có rule "deny": muốn chặn thì đừng cho phép.</li>
+  <li>Chỉ có hiệu lực khi <b>CNI hỗ trợ</b>. Flannel thuần sẽ âm thầm bỏ qua toàn bộ policy.</li>
+</ol>
+<p>Simulator dưới đây có 5 pod gửi tới service <code>auth</code> (namespace <code>security</code>, port 8443 cho API và 9090 cho metrics). Mục tiêu: chỉ <code>web/frontend</code> gọi được 8443, chỉ <code>monitoring/prometheus</code> gọi được 9090. Bấm từng preset:</p>
+<div data-widget="netpol"></div>
+<div class="note trap"><b>Cạm bẫy NetworkPolicy</b><ul>
+  <li><b>AND hay OR chỉ khác nhau một dấu gạch:</b> <code>namespaceSelector</code> và <code>podSelector</code> trong <b>cùng</b> một phần tử của <code>from</code> là AND; tách thành hai phần tử (hai dấu <code>-</code>) là OR. Preset "Bẫy YAML" mở cửa cho mọi pod của namespace <code>web</code>.</li>
+  <li><code>podSelector</code> đứng một mình trong <code>from</code> chỉ chọn pod <b>cùng namespace với policy</b>, không phải mọi namespace.</li>
+  <li>Bật default deny cho <b>Egress</b> là chặn luôn DNS: mọi thứ báo "could not resolve host". Luôn cho phép UDP và TCP 53 tới CoreDNS (Lab 14.2).</li>
+  <li>Thiếu <code>ports</code> nghĩa là mọi port. Preset "Quên ports" cho Prometheus gọi được cả API.</li>
+</ul></div>
+
+<h2>Identity và RBAC trong cluster</h2>
+<p>Mọi request tới Kubernetes API server đều qua authentication, authorization (RBAC), rồi admission control. Với người dùng, credential thường là client certificate (file kubeconfig của kind chứa sẵn một cái) hoặc OIDC token từ IdP (module 12). Với workload, identity là <b>ServiceAccount</b>:</p>
+<ul>
+  <li>Kubelet gắn vào pod một <b>projected ServiceAccount token</b> tại <code>/var/run/secrets/kubernetes.io/serviceaccount/token</code>. Token này là <b>JWT</b> (module 12): <code>iss</code> là API server, <code>sub</code> là <code>system:serviceaccount:&lt;ns&gt;:&lt;sa&gt;</code>, có <code>aud</code> và <code>exp</code>, và kubelet tự làm mới định kỳ.</li>
+  <li>Token này còn dùng để chứng minh danh tính pod với hệ thống bên ngoài: Vault Kubernetes auth, cloud IAM (workload identity), đổi lấy token khác.</li>
+  <li><b>RBAC</b> của Kubernetes đúng là mô hình RBAC ở module 12: <code>Role</code>/<code>ClusterRole</code> là tập permission (verb trên resource), <code>RoleBinding</code>/<code>ClusterRoleBinding</code> gán role cho subject (user, group, ServiceAccount). Không có rule deny.</li>
+</ul>
+<script type="text/plain" class="term" data-title="Hỏi RBAC trước khi thử">
+$ kubectl auth can-i list secrets -n security --as=system:serviceaccount:security:reader
+no
+$ kubectl auth can-i --list --as=system:serviceaccount:security:reader -n security | head -4
+Resources   Non-Resource URLs   Resource Names   Verbs
+pods        []                  []               [get list]      ◀ đúng bằng Role đã gán (Lab 14.3)
+…
+</script>
+<div class="note trap"><b>Cạm bẫy RBAC</b><ul>
+  <li><code>get</code>/<code>list</code> trên <code>secrets</code> = đọc mọi password, key, token trong namespace. Quyền <code>create pods</code> cũng gần như vậy: tạo pod mount secret bất kỳ hoặc chạy bằng ServiceAccount mạnh hơn.</li>
+  <li>Binding <code>cluster-admin</code> cho ServiceAccount của một app "cho nhanh" là lỗi kinh điển: chiếm app là chiếm cluster.</li>
+  <li>Pod không cần gọi API thì đặt <code>automountServiceAccountToken: false</code>: không có token để đánh cắp.</li>
+</ul></div>
+
+<h2>Secret và certificate</h2>
+<p>Kubernetes Secret chỉ là <b>base64</b>, không phải mã hoá: ai đọc được object là có giá trị. Mặc định Secret nằm trong etcd dạng plaintext (Lab 14.3 cho bạn thấy trực tiếp). Các lớp bảo vệ:</p>
+<div class="tbl"><table>
+<thead><tr><th>Lớp</th><th>Chống lại</th></tr></thead>
+<tbody>
+<tr><td>RBAC chặt trên <code>secrets</code></td><td>Người/pod không liên quan đọc qua API</td></tr>
+<tr><td><b>Encryption at rest</b> (EncryptionConfiguration, tốt nhất với KMS provider)</td><td>Lộ file backup etcd hoặc ổ đĩa</td></tr>
+<tr><td>Secret store ngoài: Vault, cloud secret manager, qua External Secrets Operator hoặc CSI driver</td><td>Secret nằm rải rác, khó xoay vòng, khó audit</td></tr>
+<tr><td>Mount thành file thay vì biến môi trường</td><td>Lộ qua log, <code>ps</code>, crash dump; file được cập nhật khi Secret đổi, env thì không</td></tr>
+</tbody></table></div>
+<p><b>cert-manager</b> (module 10) tự động hoá certificate trong cluster: <code>Issuer</code>/<code>ClusterIssuer</code> nói CA nào ký (ACME, Vault, hoặc CA nội bộ của bạn), <code>Certificate</code> khai báo tên, thời hạn, mục đích; kết quả là Secret kiểu <code>kubernetes.io/tls</code> với <code>tls.crt</code>, <code>tls.key</code>, <code>ca.crt</code>, được gia hạn trước khi hết hạn. <b>trust-manager</b> phân phối trust bundle (root CA) vào mọi namespace. Lab 14.4 dùng chính intermediate CA của Lab 10.2.</p>
+<script type="text/plain" class="code" data-lang="yaml" data-file="Certificate cho service auth (Lab 14.4)">
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: auth-server, namespace: security}
+spec:
+  secretName: auth-server-tls          # Secret kubernetes.io/tls được tạo và gia hạn tự động
+  duration: 24h                        # cert ngắn hạn
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256}
+  usages: [server auth, digital signature]
+  dnsNames: [auth-mtls.security.svc.cluster.local, auth-mtls.security]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+</script>
+
+<h2>Service mesh: mTLS mà application không cần biết</h2>
+<p>Tự cấu hình mTLS cho từng service (Lab 11.2, 14.4) rất tốn công. <b>Service mesh</b> (Istio, Linkerd) đặt một proxy cạnh mỗi pod (sidecar) hoặc trên mỗi node (Istio ambient mode với ztunnel). Proxy tự làm mTLS với nhau bằng certificate ngắn hạn do control plane cấp, identity theo chuẩn SPIFFE:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 232" role="img" aria-label="Hai pod, mỗi pod có app và sidecar; sidecar làm mTLS với nhau; control plane cấp certificate">
+  <g class="t-k8s"><rect class="f" x="250" y="10" width="220" height="52" rx="8"/></g>
+  <text x="360" y="32" class="t-c t-s t-b">Control plane (istiod)</text><text x="360" y="50" class="t-c t-s">CA: cấp cert SPIFFE ngắn hạn</text>
+  <rect class="empty" x="10" y="96" width="300" height="104" rx="10"/>
+  <text x="160" y="114" class="t-c t-s t-b t-m">Pod frontend (ns web, sa frontend)</text>
+  <g class="t-app"><rect class="f" x="25" y="128" width="120" height="56" rx="7"/></g>
+  <text x="85" y="151" class="t-c t-s t-b">app</text><text x="85" y="169" class="t-c t-s">HTTP thường</text>
+  <g class="t-sec"><rect class="f" x="175" y="128" width="120" height="56" rx="7"/></g>
+  <text x="235" y="151" class="t-c t-s t-b">Envoy sidecar</text><text x="235" y="169" class="t-c t-s">giữ cert + key</text>
+  <rect class="empty" x="410" y="96" width="300" height="104" rx="10"/>
+  <text x="560" y="114" class="t-c t-s t-b t-m">Pod auth (ns security, sa auth)</text>
+  <g class="t-sec"><rect class="f" x="425" y="128" width="120" height="56" rx="7"/></g>
+  <text x="485" y="151" class="t-c t-s t-b">Envoy sidecar</text><text x="485" y="169" class="t-c t-s">verify + policy</text>
+  <g class="t-app"><rect class="f" x="575" y="128" width="120" height="56" rx="7"/></g>
+  <text x="635" y="151" class="t-c t-s t-b">app</text><text x="635" y="169" class="t-c t-s">HTTP thường</text>
+  <line class="ln" x1="145" y1="156" x2="168" y2="156"/><path class="ah-m" d="M175 156 l-8 -4 v8 z"/>
+  <line class="ln" x1="545" y1="156" x2="568" y2="156"/><path class="ah-m" d="M575 156 l-8 -4 v8 z"/>
+  <g class="t-sec"><line class="st" x1="295" y1="156" x2="417" y2="156" style="stroke-width:3"/></g><path class="ah" d="M425 156 l-9 -4.5 v9 z"/>
+  <text x="360" y="148" class="t-c t-s t-b">mTLS</text><text x="360" y="174" class="t-c t-s t-m">SPIFFE ID</text>
+  <line class="ln dash" x1="300" y1="62" x2="245" y2="126"/><line class="ln dash" x1="420" y1="62" x2="475" y2="126"/>
+  <text x="250" y="88" class="t-e t-s t-m">cert qua SDS</text><text x="470" y="88" class="t-s t-m">cert qua SDS</text>
+  <text x="360" y="222" class="t-c t-s t-m">AuthorizationPolicy: chỉ spiffe://cluster.local/ns/web/sa/frontend được gọi auth</text>
+</svg></div>
+<figcaption>Đây là toàn bộ module 10–12 được tự động hoá: CA nội bộ, cert 24 giờ xoay vòng tự động, mTLS (module 11), authorization theo identity (module 12). Với Istio, <code>PeerAuthentication</code> mode <code>STRICT</code> bắt buộc mTLS; <code>AuthorizationPolicy</code> cho phép theo principal (SPIFFE ID), namespace, method, path. Cạm bẫy XFCC ở module 11 áp dụng nguyên vẹn ở đây.</figcaption></figure>
+
+<h2>Bảo mật pod</h2>
+<p>Container chỉ là process trên node với namespace và cgroup. Nếu bị chiếm, thiết lập của pod quyết định kẻ tấn công làm được gì tiếp:</p>
+<div class="tbl"><table>
+<thead><tr><th>Thiết lập</th><th>Nên</th><th>Vì sao</th></tr></thead>
+<tbody>
+<tr><td><code>runAsNonRoot</code>, <code>runAsUser</code></td><td>Không chạy root</td><td>Giảm tác hại nếu thoát khỏi container</td></tr>
+<tr><td><code>capabilities</code></td><td><code>drop: [ALL]</code>, thêm đúng cái cần</td><td><code>NET_RAW</code> cho phép raw socket: ARP spoofing, giả packet (module 06, 08) ngay trong cluster. <code>NET_ADMIN</code> cho đổi route, iptables.</td></tr>
+<tr><td><code>privileged</code>, <code>hostNetwork</code>, <code>hostPID</code>, hostPath</td><td>Không, trừ agent hạ tầng (CNI, UPF có lý do)</td><td>Tương đương root trên node</td></tr>
+<tr><td><code>readOnlyRootFilesystem</code>, <code>allowPrivilegeEscalation: false</code></td><td>Bật</td><td>Khó cài thêm công cụ, khó leo quyền</td></tr>
+</tbody></table></div>
+<p><b>Pod Security Admission</b> áp các mức này cho cả namespace bằng label: <code>pod-security.kubernetes.io/enforce=restricted</code> (chặt nhất), <code>baseline</code>, hoặc <code>privileged</code>. Namespace của auth service nên ở mức <code>restricted</code>.</p>
+
+<h2>Debug mạng trong cluster</h2>
+<div class="tbl"><table>
+<thead><tr><th>Triệu chứng</th><th>Kiểm tra</th></tr></thead>
+<tbody>
+<tr><td><code>could not resolve host</code></td><td><code>/etc/resolv.conf</code> trong pod; CoreDNS có chạy; NetworkPolicy egress có cho UDP/TCP 53; tên đúng namespace</td></tr>
+<tr><td><code>connection refused</code> tới Service</td><td>EndpointSlice rỗng: selector sai, pod chưa Ready, <code>targetPort</code> sai</td></tr>
+<tr><td><code>timed out</code></td><td>NetworkPolicy (ingress phía đích hoặc egress phía nguồn), firewall node, MTU của overlay (module 06)</td></tr>
+<tr><td>Lỗi TLS</td><td>SAN có đúng tên đang gọi; trust bundle trong pod; client cert có EKU clientAuth (module 10, 11)</td></tr>
+<tr><td>Chạy ngoài được, trong cluster thì không</td><td>Egress policy, proxy, image thiếu CA certificates (module 10)</td></tr>
+</tbody></table></div>
+<script type="text/plain" class="code" data-lang="bash" data-file="Bộ lệnh debug mạng Kubernetes">
+kubectl get pods -o wide                                         # pod ở node nào, IP gì, Ready chưa
+kubectl get svc,endpointslices -n NS                             # Service có pod phía sau không
+kubectl describe networkpolicy -n NS                             # policy nào đang chọn pod
+kubectl run dbg --rm -it --image=nicolaka/netshoot:v0.13 -- bash # pod đủ công cụ: curl, dig, tcpdump, openssl…
+kubectl debug -it POD --image=nicolaka/netshoot:v0.13 --target=CONTAINER   # gắn container debug vào pod đang chạy
+kubectl debug node/NODE -it --image=nicolaka/netshoot:v0.13      # shell trên node (hostNetwork): tcpdump, ip route
+kubectl port-forward svc/SVC 8080:80                             # gọi Service từ máy mình, bỏ qua Ingress
+kubectl get events -n NS --sort-by=.lastTimestamp                # lỗi pull image, probe, scheduling
+</script>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m14" data-title="Kiểm tra module 14">
+[
+ {"q":"Cluster mới, chưa có NetworkPolicy nào. Pod ở namespace <code>default</code> gọi được pod <code>auth</code> ở namespace <code>security</code> không?","o":["Không, namespace cách ly mạng","Được: mặc định mọi pod gọi được mọi pod","Chỉ khi cùng node","Chỉ qua Ingress"],"a":1,
+  "e":"Namespace chỉ là ranh giới tên và RBAC, không phải ranh giới mạng. Cần NetworkPolicy."},
+ {"q":"Trong kind, pod ở worker gửi tới pod ở worker2. Packet đi thế nào?","o":["Qua API server","Qua veth ra node, route 10.244.2.0/24 via IP của worker2 trên network Docker, không NAT","Qua Ingress","Qua kube-proxy DNAT"],"a":1,
+  "e":"kindnet chỉ thêm route vì các node cùng một L2. Flannel sẽ bọc VXLAN, Calico có thể dùng BGP."},
+ {"q":"<code>ping 10.96.47.12</code> (ClusterIP) từ pod không có reply nhưng <code>curl 10.96.47.12</code> chạy. Vì sao?","o":["Service lỗi","ClusterIP là IP ảo chỉ có rule DNAT cho port của Service; không ai trả lời ICMP","ICMP bị NetworkPolicy chặn","DNS sai"],"a":1,
+  "e":"Kiểm tra Service bằng curl/nc đúng port, không bằng ping."},
+ {"q":"Service trả <code>connection refused</code> ngay lập tức. Lệnh nào nên chạy đầu tiên?","o":["kubectl logs kube-proxy","kubectl get endpointslices -l kubernetes.io/service-name=SVC","Khởi động lại node","Xoá NetworkPolicy"],"a":1,
+  "e":"EndpointSlice rỗng (selector không khớp, pod chưa Ready) là nguyên nhân phổ biến nhất."},
+ {"q":"Log của auth service sau NodePort chỉ thấy IP của node, không thấy IP client. Cách giữ IP client?","o":["Đổi sang ClusterIP","externalTrafficPolicy: Local","Tắt kube-proxy","Dùng headless"],"a":1,
+  "e":"Mặc định NodePort/LB SNAT để reply quay về đúng node. Local bỏ SNAT nhưng chỉ node có pod mới nhận traffic."},
+ {"q":"Namespace <code>security</code> có policy chọn mọi pod, <code>policyTypes: [Ingress]</code>, không có rule ingress nào. Kết quả?","o":["Không ảnh hưởng gì","Mọi traffic vào pod trong namespace bị chặn (default deny ingress)","Chặn cả egress","Chặn DNS của cluster"],"a":1,
+  "e":"Pod bị policy chọn chuyển sang default deny cho hướng đó; không rule nào cho phép thì chặn hết."},
+ {"q":"Hai cách viết <code>from</code>: (A) một phần tử chứa cả namespaceSelector web và podSelector app=frontend; (B) hai phần tử riêng. Khác nhau thế nào?","o":["Không khác","A là AND: chỉ pod frontend trong web; B là OR: mọi pod trong web, hoặc pod frontend cùng namespace với policy","A là OR, B là AND","B không hợp lệ"],"a":1,
+  "e":"Một dấu gạch đầu dòng thay đổi toàn bộ ý nghĩa. Luôn kiểm tra bằng thử nghiệm âm tính."},
+ {"q":"Bật default deny egress cho namespace web, mọi request của frontend đều báo <code>could not resolve host</code>. Thiếu gì?","o":["Rule cho phép UDP/TCP 53 tới CoreDNS (kube-system, k8s-app=kube-dns)","Rule cho API server","Ingress","Restart pod"],"a":0,
+  "e":"DNS cũng là egress. Mỗi namespace bật egress deny đều cần rule cho DNS."},
+ {"q":"Token ở <code>/var/run/secrets/kubernetes.io/serviceaccount/token</code> là gì?","o":["Password của node","JWT do API server ký, sub = system:serviceaccount:NS:SA, có aud và exp","Private key của pod","Certificate"],"a":1,
+  "e":"Giải mã payload giống hệt Lab 12.2. Kẻ chiếm pod có token này, nên quyền RBAC của SA phải tối thiểu."},
+ {"q":"ServiceAccount của một app có quyền <code>list secrets</code> trên namespace. Rủi ro?","o":["Không đáng kể","Chiếm app là đọc được mọi Secret trong namespace: password, key, token khác","Chỉ lộ tên Secret","Chỉ ảnh hưởng hiệu năng"],"a":1,
+  "e":"list trả về cả nội dung. Chỉ cấp get trên đúng Secret cần (resourceNames), hoặc dùng secret store ngoài."},
+ {"q":"Secret <code>password: UzNjcjN0IQ==</code>. Đây là gì?","o":["Ciphertext AES","Base64 của S3cr3t!: ai đọc được object là có password","Hash","Không đọc được"],"a":1,
+  "e":"Bảo vệ Secret bằng RBAC, encryption at rest (KMS) và secret store ngoài; base64 không phải bảo mật."},
+ {"q":"Service mesh bật mTLS STRICT. Còn thiếu gì để chỉ frontend gọi được auth?","o":["Không thiếu gì","AuthorizationPolicy theo principal (SPIFFE ID): mTLS mới là authentication","Thêm Ingress","Đổi CNI"],"a":1,
+  "e":"Bài học của module 11 và 12 lặp lại: authentication ≠ authorization."},
+ {"q":"Pod có capability <code>NET_RAW</code> bị chiếm. Kẻ tấn công làm thêm được gì?","o":["Không gì","Tạo raw packet: ARP spoofing, giả packet trong mạng pod","Đọc etcd","Đổi RBAC"],"a":1,
+  "e":"Drop ALL capabilities rồi thêm đúng cái cần; namespace dùng Pod Security Admission mức restricted."}
+]
+</script>
+
+<h3>Ôn lại module 03, 07, 10</h3>
+<script type="application/json" class="quiz" data-id="m14-review" data-title="Ôn lại">
+[
+ {"q":"Pod gọi <code>api.github.com</code> với <code>ndots:5</code>. Vì sao CoreDNS nhận nhiều query hơn cần thiết?","o":["Do cache","Tên có ít hơn 5 dấu chấm nên resolver thử ghép từng search domain trước (api.github.com.default.svc.cluster.local…)","Do IPv6","Do TCP"],"a":1,
+  "e":"Dùng tên có dấu chấm cuối (api.github.com.) hoặc chỉnh dnsConfig ndots cho pod gọi nhiều tên ngoài (module 03)."},
+ {"q":"kube-proxy chế độ iptables cân bằng giữa 3 pod bằng cách nào?","o":["Round-robin trong user space","Rule DNAT với -m statistic --mode random, xác suất 1/3, 1/2, 1 lần lượt","DNS","Không cân bằng"],"a":1,
+  "e":"Lab 7.3 đã tự viết đúng chuỗi rule này. Conntrack giữ các packet sau của connection đi cùng pod."},
+ {"q":"Pod ở namespace web gọi <code>https://auth-mtls.security:8443</code>. Certificate của server cần có gì?","o":["CN = auth-mtls","SAN chứa đúng tên auth-mtls.security (và thường cả FQDN)","IP của pod","Wildcard *"],"a":1,
+  "e":"Tên được so với SAN (module 10). Lab 14.4 đặt cả hai tên vào dnsNames."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"14 Kubernetes networking & security","c":[
+ {"t":"Network model","col":"base","c":[{"t":"Mỗi pod một IP, không NAT"},{"t":"veth + route / overlay / BGP / eBPF"},{"t":"CNI: kindnet, Calico, Cilium"},{"t":"Mặc định mọi pod gọi mọi pod"}]},
+ {"t":"Service & DNS","col":"net","c":[{"t":"ClusterIP + DNAT (kube-proxy)"},{"t":"EndpointSlice: pod Ready"},{"t":"NodePort, LB, SNAT, externalTrafficPolicy"},{"t":"CoreDNS, ndots, tên.namespace"},{"t":"Ingress → Gateway API"}]},
+ {"t":"NetworkPolicy","col":"sec","c":[{"t":"Bị chọn → default deny"},{"t":"Cộng dồn, không có deny"},{"t":"AND vs OR trong from"},{"t":"Egress nhớ DNS"},{"t":"CNI phải hỗ trợ"}]},
+ {"t":"Identity & RBAC","col":"app","c":[{"t":"ServiceAccount token = JWT"},{"t":"Role, RoleBinding"},{"t":"kubectl auth can-i"},{"t":"secrets, create pods, cluster-admin"}]},
+ {"t":"Secret & cert","col":"tra","c":[{"t":"Base64 ≠ mã hoá"},{"t":"Encryption at rest, KMS"},{"t":"Vault, External Secrets"},{"t":"cert-manager, trust-manager"}]},
+ {"t":"Mesh & pod security","col":"k8s","c":[{"t":"Sidecar / ambient, SPIFFE"},{"t":"mTLS STRICT + AuthorizationPolicy"},{"t":"Drop capabilities, non-root"},{"t":"Pod Security Admission"},{"t":"Multus, SR-IOV cho CNF"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<p class="small muted">Mọi lab dùng cluster <code>netlab</code> từ phần Làm trước và thư mục <code>~/netlab/m14</code>. Image dùng chung: <code>nicolaka/netshoot:v0.13</code> (đủ curl, dig, tcpdump, openssl) và <code>registry.k8s.io/e2e-test-images/agnhost:2.39</code> (HTTP server trả về tên pod).</p>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 14.1 · Lần theo packet: Pod, Service, DNAT</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">kind · kubectl · iptables</span><span class="chip t-base">40 phút</span></div>
+  <p>Deploy 2 replica của một HTTP server và một Service. Từ một pod client: gọi Service nhiều lần và thấy load balancing; ping ClusterIP và giải thích vì sao không có reply; tìm rule DNAT của kube-proxy trên node; capture trên node để thấy packet giữa hai node mang IP pod thật (không NAT, không encapsulation); scale về 0 và quan sát lỗi.</p>
+  <p class="done-when"><b>Xong khi:</b> chỉ ra được chuỗi rule KUBE-SERVICES → KUBE-SVC → KUBE-SEP của Service, thấy packet pod-to-pod trên eth0 của node, và giải thích lỗi khi không còn endpoint.</p>
+  <details><summary>Gợi ý</summary><p><code>kubectl get endpointslices -l kubernetes.io/service-name=echo</code>. Node của kind là container: <code>docker exec netlab-worker iptables-save -t nat</code>. Capture trên node: <code>kubectl debug node/netlab-worker -it --image=nicolaka/netshoot:v0.13 -- tcpdump …</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/echo.yaml">
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: echo}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: echo}}
+  template:
+    metadata: {labels: {app: echo}}
+    spec:
+      containers:
+      - name: echo
+        image: registry.k8s.io/e2e-test-images/agnhost:2.39
+        args: ["netexec", "--http-port=8080"]         # GET /hostname trả về tên pod
+        ports: [{containerPort: 8080}]
+        readinessProbe: {httpGet: {path: /hostname, port: 8080}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: echo}
+spec:
+  selector: {app: echo}
+  ports: [{port: 80, targetPort: 8080}]
+</script>
+<script type="text/plain" class="term">
+$ kubectl apply -f echo.yaml && kubectl rollout status deploy/echo
+$ kubectl get pods -l app=echo -o wide | awk '{print $1, $6, $7}'
+NAME IP NODE
+echo-7c9d5b6f4-2xk8p 10.244.1.3 netlab-worker
+echo-7c9d5b6f4-q7w4m 10.244.2.5 netlab-worker2                 ◀ mỗi node một pod
+$ kubectl get svc echo -o jsonpath='{.spec.clusterIP}{"\n"}'
+10.96.47.12
+$ kubectl run client --image=nicolaka/netshoot:v0.13 --command -- sleep infinity && kubectl wait --for=condition=Ready pod/client
+$ kubectl exec client -- sh -c 'for i in 1 2 3 4 5 6; do curl -s echo/hostname; echo; done'
+echo-7c9d5b6f4-q7w4m
+echo-7c9d5b6f4-2xk8p                                          ◀ mỗi connection mới được DNAT ngẫu nhiên
+echo-7c9d5b6f4-q7w4m
+…
+$ kubectl exec client -- ping -c1 -W1 10.96.47.12 | tail -2 | head -1
+1 packets transmitted, 0 received, 100% packet loss
+$ docker exec netlab-worker iptables-save -t nat | grep 'default/echo'
+-A KUBE-SERVICES -d 10.96.47.12/32 -p tcp -m comment --comment "default/echo cluster IP" -m tcp --dport 80 -j KUBE-SVC-…
+-A KUBE-SVC-… -m comment --comment "default/echo -> 10.244.1.3:8080" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-…
+-A KUBE-SEP-… -p tcp -m comment --comment "default/echo" -m tcp -j DNAT --to-destination 10.244.1.3:8080
+…
+$ kubectl debug node/netlab-worker2 -it --image=nicolaka/netshoot:v0.13 -- tcpdump -ni eth0 -c 2 tcp port 8080   # terminal thứ hai
+$ kubectl exec client -- sh -c 'for i in 1 2 3 4; do curl -s -o /dev/null echo/hostname; done'   # terminal thứ nhất
+IP 10.244.1.4.53122 > 10.244.2.5.8080: Flags [S], …             ◀ (terminal 2) IP pod thật trên dây giữa hai node
+IP 10.244.2.5.8080 > 10.244.1.4.53122: Flags [S.], …
+$ kubectl scale deploy/echo --replicas=0 && sleep 5
+$ kubectl get endpointslices -l kubernetes.io/service-name=echo -o jsonpath='{.items[0].endpoints}{"\n"}'
+                                                              ◀ rỗng
+$ kubectl exec client -- curl -sS -m 3 echo/hostname
+curl: (7) Failed to connect to echo port 80 after 1 ms: Couldn't connect to server   ◀ refused: kube-proxy REJECT khi không có endpoint
+$ kubectl scale deploy/echo --replicas=2
+</script>
+  <p class="small muted">Nếu cả hai pod chạy trên cùng node, tcpdump sẽ không thấy gì trên eth0; xoá một pod để nó được lập lịch lại, hoặc thêm <code>topologySpreadConstraints</code>. Cluster mới hơn có thể chạy kube-proxy ở chế độ nftables; khi đó xem bằng <code>docker exec netlab-worker nft list table ip kube-proxy</code>. Tên pod, IP và port nguồn của bạn sẽ khác.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 14.2 · NetworkPolicy: default deny, AND/OR, egress và DNS</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">kind · NetworkPolicy</span><span class="chip t-base">50 phút</span></div>
+  <p>Dựng lại kịch bản của simulator trên cluster thật: <code>auth</code> ở namespace <code>security</code>; <code>frontend</code> và <code>batch</code> ở <code>web</code>; <code>attacker</code> ở <code>default</code>. Lần lượt: (1) chưa có policy; (2) default deny ingress cho <code>security</code>; (3) cho phép <code>web/frontend</code> (AND); (4) thay bằng bản OR để thấy <code>batch</code> lọt vào; (5) default deny egress cho <code>web</code>, thấy DNS hỏng, rồi sửa.</p>
+  <p class="done-when"><b>Xong khi:</b> bảng kết quả của 5 bước khớp với simulator, và bạn giải thích được vì sao bước 5 lỗi ở DNS chứ không phải ở kết nối tới auth.</p>
+  <details><summary>Gợi ý</summary><p>Namespace tự có label <code>kubernetes.io/metadata.name</code>. CoreDNS có label <code>k8s-app=kube-dns</code> trong <code>kube-system</code>. curl in <code>000</code> khi timeout. Nếu sau bước 2 attacker vẫn gọi được, CNI của bạn không thực thi NetworkPolicy: dùng kind ≥ 0.24, hoặc tạo cluster với <code>disableDefaultCNI: true</code> rồi cài Calico.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ kubectl create ns security && kubectl create ns web
+$ kubectl -n security create deployment auth --image=registry.k8s.io/e2e-test-images/agnhost:2.39 -- /agnhost netexec --http-port=8443
+$ kubectl -n security expose deployment auth --port 8443
+$ IMG=nicolaka/netshoot:v0.13
+$ kubectl -n web run frontend --image=$IMG --labels app=frontend --command -- sleep infinity
+$ kubectl -n web run batch --image=$IMG --labels app=batch --command -- sleep infinity
+$ kubectl run attacker --image=$IMG --labels app=attacker --command -- sleep infinity
+$ kubectl wait --for=condition=Ready pod --all -A --timeout=120s >/dev/null
+$ t() { for p in web/frontend web/batch default/attacker; do printf '%-18s' $p; \
+>   kubectl exec -n ${p%/*} ${p#*/} -- curl -s -m 3 -o /dev/null -w '%{http_code}\n' http://auth.security:8443/hostname 2>/dev/null || true; done; }
+$ t                                                          # (1) chưa có policy
+web/frontend      200
+web/batch         200
+default/attacker  200                                        ◀ mạng phẳng: ai cũng vào được
+$ kubectl apply -f deny.yaml && t                            # (2) default deny ingress
+web/frontend      000
+web/batch         000
+default/attacker  000
+$ kubectl apply -f allow-and.yaml && t                       # (3) AND
+web/frontend      200
+web/batch         000
+default/attacker  000
+$ kubectl delete -f allow-and.yaml && kubectl apply -f allow-or.yaml && t    # (4) bẫy OR
+web/frontend      200
+web/batch         200                                        ◀ lọt: mọi pod trong namespace web
+default/attacker  000
+$ kubectl delete -f allow-or.yaml && kubectl apply -f allow-and.yaml
+$ kubectl apply -f web-egress-deny.yaml
+$ kubectl -n web exec frontend -- curl -sS -m 3 http://auth.security:8443/hostname
+curl: (28) Resolving timed out after 3000 milliseconds     ◀ (5) chặn egress là chặn luôn DNS
+$ kubectl apply -f web-egress-allow.yaml
+$ kubectl -n web exec frontend -- curl -sS -m 3 http://auth.security:8443/hostname; echo
+auth-6f7d8c9b5-k2m9x
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/deny.yaml + allow-and.yaml">
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-ingress, namespace: security}
+spec:
+  podSelector: {}                    # mọi pod trong namespace
+  policyTypes: [Ingress]             # không có rule ingress → chặn hết
+---
+# allow-and.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: auth-from-frontend, namespace: security}
+spec:
+  podSelector: {matchLabels: {app: auth}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}
+      podSelector: {matchLabels: {app: frontend}}      # cùng phần tử với dòng trên → AND
+    ports: [{protocol: TCP, port: 8443}]
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/allow-or.yaml (SAI có chủ đích)">
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: auth-from-frontend, namespace: security}
+spec:
+  podSelector: {matchLabels: {app: auth}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}
+    - podSelector: {matchLabels: {app: frontend}}      # dấu "-" mới → OR, và chỉ trong namespace security
+    ports: [{protocol: TCP, port: 8443}]
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/web-egress-deny.yaml + web-egress-allow.yaml">
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-egress, namespace: web}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+---
+# web-egress-allow.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: frontend-egress, namespace: web}
+spec:
+  podSelector: {matchLabels: {app: frontend}}
+  policyTypes: [Egress]
+  egress:
+  - to:                                               # DNS
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      podSelector: {matchLabels: {k8s-app: kube-dns}}
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to:                                               # chỉ được gọi auth
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}
+      podSelector: {matchLabels: {app: auth}}
+    ports: [{protocol: TCP, port: 8443}]
+</script>
+  <p class="small muted">Lưu từng phần thành file riêng đúng tên (phần sau dấu <code>---</code> và comment tên file). Policy egress so khớp với IP của <b>pod</b> sau DNAT, nên chọn pod <code>auth</code> bằng label là đúng dù client gọi qua Service. Giữ các policy này cho Lab 14.3; Lab 14.4 sẽ thêm policy riêng.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 14.3 · ServiceAccount token, RBAC và Secret thật ra nằm đâu</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">kind · RBAC · etcd</span><span class="chip t-base">40 phút</span></div>
+  <p>Tạo ServiceAccount <code>reader</code> trong <code>security</code> chỉ được <code>get</code>/<code>list</code> pod. Chạy một pod bằng SA đó: giải mã JWT của nó (dùng lại kỹ năng Lab 12.2), gọi thẳng API server bằng token: list pod được, list secret bị 403. Sau đó tạo một Secret và đọc thẳng từ etcd để thấy nó nằm dạng plaintext.</p>
+  <p class="done-when"><b>Xong khi:</b> chỉ ra được <code>iss</code>, <code>aud</code>, <code>sub</code> của token; gọi API được một lần 200, một lần 403; tìm thấy password của Secret trong dữ liệu thô của etcd.</p>
+  <details><summary>Gợi ý</summary><p>API server trong cluster: <code>https://kubernetes.default.svc</code>, CA ở <code>/var/run/secrets/kubernetes.io/serviceaccount/ca.crt</code>. etcd của kind chạy dạng static pod <code>etcd-netlab-control-plane</code>, cert ở <code>/etc/kubernetes/pki/etcd/</code>; key của Secret là <code>/registry/secrets/&lt;ns&gt;/&lt;name&gt;</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/rbac.yaml">
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: reader, namespace: security}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: pod-reader, namespace: security}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: reader-pod-reader, namespace: security}
+subjects: [{kind: ServiceAccount, name: reader, namespace: security}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: pod-reader}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: toolbox, namespace: security}
+spec:
+  serviceAccountName: reader
+  containers:
+  - name: t
+    image: nicolaka/netshoot:v0.13
+    command: ["sleep", "infinity"]
+</script>
+<script type="text/plain" class="term">
+$ kubectl apply -f rbac.yaml && kubectl -n security wait --for=condition=Ready pod/toolbox
+$ SA=/var/run/secrets/kubernetes.io/serviceaccount
+$ kubectl -n security exec toolbox -- cat $SA/token | python3 -c 'import sys,json,base64; p=sys.stdin.read().split(".")[1]; c=json.loads(base64.urlsafe_b64decode(p+"="*(-len(p)%4))); print(json.dumps({k: c[k] for k in ("iss","aud","sub","exp")}, indent=1))'
+{
+ "iss": "https://kubernetes.default.svc.cluster.local",
+ "aud": ["https://kubernetes.default.svc.cluster.local"],
+ "sub": "system:serviceaccount:security:reader",           ◀ identity mà RBAC dùng
+ "exp": 1826190000
+}
+$ api() { kubectl -n security exec toolbox -- sh -c "curl -s --cacert $SA/ca.crt -H \"Authorization: Bearer \$(cat $SA/token)\" https://kubernetes.default.svc$1"; }
+$ api /api/v1/namespaces/security/pods | jq -r '.items[].metadata.name'
+auth-6f7d8c9b5-k2m9x
+toolbox
+$ api /api/v1/namespaces/security/secrets | jq '{reason, code}'
+{
+  "reason": "Forbidden",
+  "code": 403                                                 ◀ authenticated nhưng không authorized
+}
+$ kubectl -n security create secret generic db-cred --from-literal=password='S3cr3t!'
+$ kubectl -n security get secret db-cred -o jsonpath='{.data.password}'; echo
+UzNjcjN0IQ==                                                  ◀ chỉ là base64
+$ E="--cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt --key /etc/kubernetes/pki/etcd/server.key"
+$ kubectl -n kube-system exec etcd-netlab-control-plane -- etcdctl $E get /registry/secrets/security/db-cred | grep -a -o 'S3cr3t!'
+S3cr3t!                                                       ◀ plaintext trong etcd: chưa bật encryption at rest
+</script>
+  <p class="small muted"><code>exp</code> của bạn sẽ khác và có thể xa tới khoảng một năm: API server mặc định kéo dài hạn của token gắn vào pod để tương thích với client cũ, dù kubelet vẫn làm mới token mỗi giờ. Token bị đánh cắp vì vậy dùng được rất lâu, lý do nữa để giữ quyền RBAC tối thiểu. Bật encryption at rest cần sửa cấu hình API server (<code>--encryption-provider-config</code>); trên cluster thật nên dùng KMS provider.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 14.4 · cert-manager với CA nội bộ và mTLS giữa hai namespace</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">kind · cert-manager · openssl</span><span class="chip t-base">75 phút</span></div>
+  <p>Cài cert-manager, nạp intermediate CA của Lab 10.2 làm <code>ClusterIssuer</code>. Cấp cert server cho <code>auth-mtls</code> (namespace <code>security</code>, sống 24 giờ) và cert client cho frontend (namespace <code>web</code>, SAN là SPIFFE ID, EKU clientAuth). Chạy server mTLS bằng <code>openssl s_server</code>, client bằng curl, tất cả đọc cert từ Secret được mount. Cuối cùng xoay vòng cert server và quan sát: server chỉ dùng cert mới sau khi khởi động lại.</p>
+  <p class="done-when"><b>Xong khi:</b> không có client cert thì bị <code>certificate required</code>, có thì 200; serial của cert server đổi sau khi xoay vòng và restart; bạn giải thích được vì sao cần restart (và cách tránh).</p>
+  <details><summary>Gợi ý</summary><p>Secret của CA cho <code>ClusterIssuer</code> phải nằm trong namespace <code>cert-manager</code>: <code>kubectl -n cert-manager create secret tls netlab-ca --cert=inter.crt --key=inter.key</code>. Secret do CA issuer tạo có <code>ca.crt</code> là cert của CA đã ký (intermediate), dùng làm <code>-cert_chain</code> cho server. Root CA phân phối bằng ConfigMap (vai trò của trust-manager). Nhớ mở NetworkPolicy của Lab 14.2 cho cặp pod mới.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+$ kubectl -n cert-manager wait --for=condition=Available deploy --all --timeout=180s
+$ P=~/netlab/m10/pki
+$ kubectl -n cert-manager create secret tls netlab-ca --cert=$P/inter.crt --key=$P/inter.key
+$ for ns in security web; do kubectl -n $ns create configmap netlab-root --from-file=root.crt=$P/root.crt; done
+$ kubectl apply -f pki.yaml && kubectl wait --for=condition=Ready certificate --all -A --timeout=60s
+$ kubectl get certificate -A
+NAMESPACE   NAME              READY   SECRET                AGE
+security    auth-server       True    auth-server-tls       12s
+web         frontend-client   True    frontend-client-tls   12s
+$ kubectl -n security get secret auth-server-tls -o jsonpath='{.data.tls\.crt}' | base64 -d \
+    | openssl x509 -noout -issuer -enddate -ext subjectAltName,extendedKeyUsage
+issuer=O = NetLab, CN = NetLab Issuing CA 1                  ◀ ký bởi intermediate của Lab 10.2
+notAfter=Nov 15 09:12:00 2026 GMT                             ◀ 24 giờ
+X509v3 Subject Alternative Name:
+    DNS:auth-mtls.security.svc.cluster.local, DNS:auth-mtls.security
+$ kubectl apply -f mtls.yaml && kubectl -n security rollout status deploy/auth-mtls && kubectl -n web wait --for=condition=Ready pod/client-mtls
+$ C="kubectl -n web exec client-mtls -- curl -sS --cacert /trust/root.crt"
+$ $C https://auth-mtls.security:8443/ -o /dev/null -w '%{http_code}\n'
+curl: (56) OpenSSL SSL_read: … tlsv13 alert certificate required   ◀ chưa gửi client cert
+$ $C --cert /tls/tls.crt --key /tls/tls.key https://auth-mtls.security:8443/ -o /dev/null -w '%{http_code}\n'
+200
+$ serial() { kubectl -n web exec client-mtls -- sh -c 'openssl s_client -connect auth-mtls.security:8443 -servername auth-mtls.security -cert /tls/tls.crt -key /tls/tls.key </dev/null 2>/dev/null | openssl x509 -noout -serial'; }
+$ serial
+serial=3A1F…
+$ kubectl -n security delete secret auth-server-tls && sleep 10   # cert-manager cấp lại ngay
+$ serial
+serial=3A1F…                                                  ◀ vẫn cert cũ: s_server chỉ đọc file lúc khởi động
+$ kubectl -n security rollout restart deploy/auth-mtls && kubectl -n security rollout status deploy/auth-mtls
+$ serial
+serial=7B04…                                                  ◀ cert mới
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/pki.yaml">
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: {name: netlab-ca}
+spec:
+  ca: {secretName: netlab-ca}          # intermediate CA của Lab 10.2 (namespace cert-manager)
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: auth-server, namespace: security}
+spec:
+  secretName: auth-server-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256}
+  usages: [server auth, digital signature]
+  dnsNames: [auth-mtls.security.svc.cluster.local, auth-mtls.security]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: frontend-client, namespace: web}
+spec:
+  secretName: frontend-client-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256}
+  usages: [client auth, digital signature]
+  uris: [spiffe://netlab.local/ns/web/sa/frontend]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m14/mtls.yaml">
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: auth-mtls, namespace: security}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: auth-mtls}}
+  template:
+    metadata: {labels: {app: auth-mtls}}
+    spec:
+      automountServiceAccountToken: false            # không cần gọi API server
+      containers:
+      - name: server
+        image: nicolaka/netshoot:v0.13
+        command: ["openssl", "s_server", "-accept", "8443", "-www",
+                  "-cert", "/tls/tls.crt", "-key", "/tls/tls.key", "-cert_chain", "/tls/ca.crt",
+                  "-CAfile", "/trust/root.crt", "-Verify", "1", "-verify_return_error"]
+        ports: [{containerPort: 8443}]
+        volumeMounts:
+        - {name: tls, mountPath: /tls, readOnly: true}
+        - {name: trust, mountPath: /trust, readOnly: true}
+      volumes:
+      - {name: tls, secret: {secretName: auth-server-tls}}
+      - {name: trust, configMap: {name: netlab-root}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: auth-mtls, namespace: security}
+spec:
+  selector: {app: auth-mtls}
+  ports: [{port: 8443, targetPort: 8443}]
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: client-mtls, namespace: web, labels: {app: frontend-mtls}}
+spec:
+  automountServiceAccountToken: false
+  containers:
+  - name: c
+    image: nicolaka/netshoot:v0.13
+    command: ["sleep", "infinity"]
+    volumeMounts:
+    - {name: tls, mountPath: /tls, readOnly: true}
+    - {name: trust, mountPath: /trust, readOnly: true}
+  volumes:
+  - {name: tls, secret: {secretName: frontend-client-tls}}
+  - {name: trust, configMap: {name: netlab-root}}
+---
+# Mở đúng một đường cho cặp pod mới (namespace security và web đang default deny từ Lab 14.2)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: auth-mtls-ingress, namespace: security}
+spec:
+  podSelector: {matchLabels: {app: auth-mtls}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}
+      podSelector: {matchLabels: {app: frontend-mtls}}
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: client-mtls-egress, namespace: web}
+spec:
+  podSelector: {matchLabels: {app: frontend-mtls}}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      podSelector: {matchLabels: {k8s-app: kube-dns}}
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}
+      podSelector: {matchLabels: {app: auth-mtls}}
+    ports: [{protocol: TCP, port: 8443}]
+</script>
+  <p><b>Vì sao phải restart:</b> kubelet cập nhật file trong volume Secret sau khoảng một phút, nhưng <code>openssl s_server</code> chỉ đọc cert lúc khởi động (module 11, phần rotation). Server thật phải tự nạp lại khi file đổi, hoặc nhận cert qua SDS như Envoy; nếu không, cert-manager gia hạn đúng hạn mà service vẫn trả cert cũ tới lúc hết hạn và sập. Ngày giờ và serial của bạn sẽ khác; version cert-manager mới hơn cũng dùng được. Nếu server báo <code>unknown ca</code> với client cert, kiểm tra <code>tls.crt</code> của client có kèm intermediate không (đếm số dòng <code>BEGIN CERTIFICATE</code>). Module 16 sẽ thay <code>openssl s_server</code> bằng token server của Lab 12.3 chạy sau mTLS.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m14"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li><a href="https://kubernetes.io/docs/concepts/services-networking/" target="_blank" rel="noopener">Kubernetes: Services, Load Balancing, and Networking</a>: tài liệu gốc cho network model, Service, NetworkPolicy, Gateway API.</li>
+  <li><a href="https://github.com/ahmetb/kubernetes-network-policy-recipes" target="_blank" rel="noopener">Kubernetes Network Policy Recipes</a>: các mẫu policy hay dùng, có hình minh hoạ.</li>
+  <li><a href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/" target="_blank" rel="noopener">Using RBAC Authorization</a> và <a href="https://kubernetes.io/docs/concepts/security/rbac-good-practices/" target="_blank" rel="noopener">RBAC good practices</a>.</li>
+  <li><a href="https://cert-manager.io/docs/configuration/ca/" target="_blank" rel="noopener">cert-manager: CA issuer</a> và <a href="https://cert-manager.io/docs/trust/trust-manager/" target="_blank" rel="noopener">trust-manager</a>.</li>
+  <li><a href="https://istio.io/latest/docs/concepts/security/" target="_blank" rel="noopener">Istio security concepts</a>: identity, mTLS, authorization trong service mesh.</li>
+  <li><a href="https://kubernetes.io/docs/concepts/security/pod-security-standards/" target="_blank" rel="noopener">Pod Security Standards</a>: chi tiết các mức privileged, baseline, restricted.</li>
+</ul>

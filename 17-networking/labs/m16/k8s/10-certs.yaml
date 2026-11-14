@@ -1,0 +1,49 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: token-server, namespace: security}
+spec:
+  secretName: token-server-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [server auth, digital signature]
+  dnsNames: [token.security.svc.cluster.local, token.security]
+  uris: [spiffe://netlab.local/ns/security/sa/token-server]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: orders-api, namespace: apps}
+spec:
+  secretName: orders-api-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [server auth, client auth, digital signature]
+  dnsNames: [orders.apps.svc.cluster.local, orders.apps]
+  uris: [spiffe://netlab.local/ns/apps/sa/orders-api]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: frontend, namespace: web}
+spec:
+  secretName: frontend-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [client auth, digital signature]
+  uris: [spiffe://netlab.local/ns/web/sa/frontend]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: reporter, namespace: batch}
+spec:
+  secretName: reporter-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [client auth, digital signature]
+  uris: [spiffe://netlab.local/ns/batch/sa/reporter]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}

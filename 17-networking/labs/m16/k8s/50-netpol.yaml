@@ -1,0 +1,78 @@
+# Mỗi phần tử {namespaceSelector, podSelector} cùng một map → AND (module 14)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: security}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: apps}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: web}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: batch}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: token-server-in, namespace: security}
+spec:
+  podSelector: {matchLabels: {app: token-server}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}, podSelector: {matchLabels: {app: frontend}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: batch}}, podSelector: {matchLabels: {app: reporter}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: apps}}, podSelector: {matchLabels: {app: orders-api}}}
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: orders-api-in-out, namespace: apps}
+spec:
+  podSelector: {matchLabels: {app: orders-api}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}, podSelector: {matchLabels: {app: frontend}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: batch}}, podSelector: {matchLabels: {app: reporter}}}
+    ports: [{protocol: TCP, port: 8443}]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}, podSelector: {matchLabels: {app: token-server}}}]
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: client-out, namespace: web}
+spec:
+  podSelector: {matchLabels: {app: frontend}}
+  policyTypes: [Egress]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}, podSelector: {matchLabels: {app: token-server}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: apps}}, podSelector: {matchLabels: {app: orders-api}}}
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: client-out, namespace: batch}
+spec:
+  podSelector: {matchLabels: {app: reporter}}
+  policyTypes: [Egress]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}, podSelector: {matchLabels: {app: token-server}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: apps}}, podSelector: {matchLabels: {app: orders-api}}}
+    ports: [{protocol: TCP, port: 8443}]

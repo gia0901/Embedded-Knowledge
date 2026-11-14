@@ -1,0 +1,533 @@
+<!-- Core Net Lab · Module 10 · PKI & X.509 certificate (Kurose & Ross 8e, §8.3.3 + RFC 5280) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Đọc được một X.509 certificate: subject, issuer, validity, SAN, key usage, extended key usage, basic constraints.</li>
+  <li>Giải thích chain of trust (root → intermediate → leaf) và các bước client verify một chain.</li>
+  <li>Tự dựng PKI nội bộ bằng <code>openssl</code>: root CA, intermediate CA, server cert, client cert cho mTLS.</li>
+  <li>Biết vòng đời certificate: CSR, issue, revocation (CRL, OCSP), rotation tự động (ACME, cert-manager), và vì sao certificate ngày càng ngắn hạn.</li>
+  <li>Debug nhanh các lỗi certificate hay gặp: expired, hostname mismatch, thiếu intermediate, root không được tin.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ echo | openssl s_client -connect example.com:443 -servername example.com 2>/dev/null \
+    | openssl x509 -noout -subject -issuer -dates -ext subjectAltName
+subject=CN = example.com, …                                   ◀ Q1: cert này cấp cho ai, do ai ký?
+issuer=C = US, O = DigiCert Inc, CN = …
+notBefore=… GMT
+notAfter=…  GMT                                               ◀ Q2: còn bao lâu thì hết hạn?
+X509v3 Subject Alternative Name:
+    DNS:example.com, DNS:www.example.com, …
+$ openssl s_client -connect example.com:443 -servername example.com -showcerts </dev/null 2>/dev/null | grep -E '^ *[0-9] s:'
+ 0 s:CN = example.com                                         ◀ Q3: server gửi mấy certificate?
+ 1 s:C = US, O = DigiCert Inc, CN = DigiCert … CA1
+$ ls /etc/ssl/certs/*.pem | wc -l                             # Q4: máy bạn tin bao nhiêu root CA?
+$ openssl x509 -in /etc/ssl/certs/ISRG_Root_X1.pem -noout -subject -issuer   # Q5: subject và issuer có gì lạ?
+$ curl -sS https://expired.badssl.com/ -o /dev/null           # Q6: lỗi gì?
+curl: (60) SSL certificate problem: certificate has expired
+</script>
+<p class="small muted">Tên CA và ngày tháng của bạn sẽ khác. <a href="https://badssl.com/" target="_blank" rel="noopener">badssl.com</a> là bộ subdomain cố ý cấu hình sai để thử; dùng lại nhiều ở Lab 10.1.</p>
+
+<h2>Certificate giải quyết vấn đề gì</h2>
+<p>Module 09 kết thúc bằng câu hỏi: digital signature chỉ chứng minh "người giữ private key tương ứng đã ký", vậy làm sao biết public key đó <b>thật sự</b> thuộc về <code>auth.security.svc.cluster.local</code> chứ không phải của Trudy? <span class="bk">§8.3.3</span></p>
+<p>Lời giải: một bên thứ ba mà mọi người cùng tin, <b>Certification Authority (CA)</b>, kiểm tra danh tính rồi <b>ký</b> lên một văn bản nói "public key này thuộc về tên này, có hiệu lực từ ngày… đến ngày…". Văn bản đó là <b>certificate</b>. Giống như căn cước công dân: cơ quan cấp đứng ra xác nhận ảnh và tên thuộc về một người, và ai tin cơ quan đó thì tin tấm thẻ. Toàn bộ hệ thống CA, certificate, quy trình cấp và thu hồi gọi là <b>PKI</b> (Public Key Infrastructure).</p>
+
+<h2>Bên trong một X.509 certificate</h2>
+<p>Định dạng chuẩn là <b>X.509 v3</b> (RFC 5280). Đây là server certificate bạn sẽ tự tạo ở Lab 10.2:</p>
+<script type="text/plain" class="term" data-title="openssl x509 -in server.crt -noout -text (rút gọn)">
+$ openssl x509 -in server.crt -noout -text
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 5f:3a:91:…                            ◀ số duy nhất trong phạm vi một CA; dùng khi revoke
+        Signature Algorithm: ecdsa-with-SHA256
+        Issuer: O = NetLab, CN = NetLab Issuing CA 1          ◀ ai ký cert này
+        Validity
+            Not Before: Nov 14 09:00:00 2026 GMT
+            Not After : Dec 14 09:00:00 2026 GMT              ◀ ngoài khoảng này là invalid
+        Subject: CN = auth.security.svc.cluster.local         ◀ cấp cho ai (CN chỉ để đọc, không dùng để so tên)
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)                         ◀ public key của service
+        X509v3 extensions:
+            X509v3 Basic Constraints: critical
+                CA:FALSE                                      ◀ cert này KHÔNG được ký cert khác
+            X509v3 Key Usage: critical
+                Digital Signature                             ◀ key dùng để làm gì
+            X509v3 Extended Key Usage:
+                TLS Web Server Authentication                 ◀ chỉ dùng làm server cert (serverAuth)
+            X509v3 Subject Alternative Name:
+                DNS:auth.security.svc.cluster.local, DNS:auth.security, DNS:localhost, IP Address:127.0.0.1
+                                                              ◀ SAN: danh sách tên client được phép dùng để gọi
+            X509v3 Subject Key Identifier: 1C:7E:…
+            X509v3 Authority Key Identifier: 8A:02:…          ◀ trỏ tới key của issuer, giúp ghép chain
+    Signature Algorithm: ecdsa-with-SHA256
+    Signature Value: 30:45:02:21:…                            ◀ chữ ký của issuer trên toàn bộ phần Data
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Extension</th><th>Ý nghĩa</th><th>Sai thì sao</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>subjectAltName (SAN)</b></td><td>Mọi tên hợp lệ: DNS, IP, URI (ví dụ SPIFFE ID <code>spiffe://…</code>)</td><td>Client gọi bằng tên không có trong SAN → hostname mismatch</td></tr>
+<tr><td><b>basicConstraints</b></td><td><code>CA:TRUE</code> cho CA, kèm <code>pathlen</code> (số tầng CA tối đa bên dưới); <code>CA:FALSE</code> cho leaf</td><td>Leaf ký cert khác → chain bị từ chối</td></tr>
+<tr><td><b>keyUsage</b></td><td><code>digitalSignature</code> (leaf), <code>keyCertSign</code>, <code>cRLSign</code> (CA)</td><td>Key dùng sai mục đích bị từ chối</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>extendedKeyUsage (EKU)</b></td><td><code>serverAuth</code>, <code>clientAuth</code>, codeSigning…</td><td>Dùng server cert làm client cert trong mTLS → "unsupported certificate purpose"</td></tr>
+<tr><td><b>AIA / CRL Distribution Points</b></td><td>URL để lấy cert của issuer, URL OCSP, URL CRL</td><td>Không kiểm tra được revocation</td></tr>
+</tbody></table></div>
+<div class="note trap"><b>Cạm bẫy: tên được so ở SAN, không phải CN</b><ul>
+  <li>Client hiện đại (Chrome, Go, OpenSSL khi bật hostname check) <b>chỉ</b> so tên với SAN (RFC 9525). Cert chỉ có CN mà không có SAN sẽ bị từ chối.</li>
+  <li>Wildcard <code>*.example.com</code> khớp <code>a.example.com</code> nhưng <b>không</b> khớp <code>a.b.example.com</code> và cũng không khớp <code>example.com</code>.</li>
+  <li>Trong Kubernetes, pod gọi <code>https://auth:8443</code> (tên ngắn) trong khi cert chỉ có <code>auth.security.svc.cluster.local</code> → lỗi. Hoặc gọi bằng tên đầy đủ, hoặc đưa thêm tên ngắn vào SAN.</li>
+</ul></div>
+
+<h2>Chain of trust</h2>
+<p>Client không thể biết mọi CA trên đời. Nó chỉ tin một tập nhỏ <b>root CA</b> nằm sẵn trong <b>trust store</b> (Q4). Root CA không ký trực tiếp cho server mà ký cho <b>intermediate CA</b>; intermediate CA mới ký <b>leaf certificate</b> cho server:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 260" role="img" aria-label="Root CA ký intermediate CA, intermediate CA ký leaf certificate">
+  <g class="t-sec"><rect class="f" x="10" y="20" width="210" height="140" rx="10"/></g>
+  <text x="115" y="44" class="t-c t-b">Root CA</text>
+  <text x="24" y="70" class="t-s">Subject: NetLab Root CA</text>
+  <text x="24" y="88" class="t-s">Issuer: NetLab Root CA</text>
+  <text x="24" y="106" class="t-s">CA:TRUE · 10 năm</text>
+  <text x="24" y="124" class="t-s t-m">self-signed</text>
+  <text x="24" y="142" class="t-s t-m">private key để offline</text>
+  <g class="t-net"><rect class="f" x="255" y="20" width="210" height="140" rx="10"/></g>
+  <text x="360" y="44" class="t-c t-b">Intermediate CA</text>
+  <text x="269" y="70" class="t-s">Subject: NetLab Issuing CA 1</text>
+  <text x="269" y="88" class="t-s">Issuer: NetLab Root CA</text>
+  <text x="269" y="106" class="t-s">CA:TRUE, pathlen:0 · 5 năm</text>
+  <text x="269" y="124" class="t-s t-m">ký cert hằng ngày</text>
+  <text x="269" y="142" class="t-s t-m">(online, bảo vệ bằng HSM)</text>
+  <g class="t-app"><rect class="f" x="500" y="20" width="210" height="140" rx="10"/></g>
+  <text x="605" y="44" class="t-c t-b">Leaf certificate</text>
+  <text x="514" y="70" class="t-s">Subject: auth.security.svc…</text>
+  <text x="514" y="88" class="t-s">Issuer: NetLab Issuing CA 1</text>
+  <text x="514" y="106" class="t-s">CA:FALSE · EKU serverAuth</text>
+  <text x="514" y="124" class="t-s">SAN: auth.security.svc…</text>
+  <text x="514" y="142" class="t-s t-m">30 ngày, xoay vòng tự động</text>
+  <line class="ln-ink" x1="220" y1="90" x2="247" y2="90"/><path class="ah" d="M255 90 l-10 -5 v10 z"/>
+  <line class="ln-ink" x1="465" y1="90" x2="492" y2="90"/><path class="ah" d="M500 90 l-10 -5 v10 z"/>
+  <text x="237" y="80" class="t-c t-s t-b">ký</text><text x="482" y="80" class="t-c t-s t-b">ký</text>
+  <rect class="sunk" x="10" y="186" width="210" height="58" rx="8"/>
+  <text x="115" y="210" class="t-c t-s t-b">Có sẵn ở client</text><text x="115" y="228" class="t-c t-s t-m">trong trust store</text>
+  <rect class="sunk" x="255" y="186" width="455" height="58" rx="8"/>
+  <text x="482" y="210" class="t-c t-s t-b">Server gửi trong TLS handshake (Q3)</text><text x="482" y="228" class="t-c t-s t-m">leaf + intermediate, không gửi root</text>
+</svg></div>
+<figcaption>Root CA là <b>self-signed</b>: subject trùng issuer (Q5). Nó đáng tin không phải vì chữ ký, mà vì nó được cài sẵn vào trust store qua một kênh tin cậy (cài OS, image, trust bundle).</figcaption></figure>
+<p>Vì sao cần intermediate? Private key của root là thứ quý nhất: lộ là phải thay trust store ở mọi client. Root được giữ <b>offline</b>, chỉ lấy ra vài năm một lần để ký intermediate. Intermediate làm việc hằng ngày; nếu lộ, chỉ cần thu hồi nó và cấp intermediate mới.</p>
+<h3>Client verify một chain thế nào</h3>
+<ol>
+  <li><b>Xây chain</b>: từ leaf, tìm cert có subject = issuer của leaf (trong các cert server gửi kèm), lặp lại tới khi gặp một root trong trust store. Không tới được root → "unable to get local issuer certificate".</li>
+  <li><b>Verify chữ ký</b> từng cert bằng public key của cert phía trên. Tên issuer khớp mà chữ ký sai → bị từ chối (Lab 10.4 thử giả mạo đúng kiểu này).</li>
+  <li><b>Thời hạn</b>: mọi cert trong chain đều phải còn hiệu lực theo đồng hồ <b>của client</b>.</li>
+  <li><b>Ràng buộc</b>: mọi issuer phải có <code>CA:TRUE</code>, đúng <code>keyUsage</code>, không vượt <code>pathlen</code>.</li>
+  <li><b>Mục đích và tên</b>: leaf có EKU phù hợp (serverAuth / clientAuth); tên client đã dùng để gọi nằm trong SAN.</li>
+  <li><b>Revocation</b> (tuỳ chính sách): leaf và intermediate chưa bị thu hồi.</li>
+</ol>
+<div class="note job"><b>Liên hệ job</b><p>Platform của bạn gần như chắc chắn có <b>CA nội bộ</b> riêng để cấp cert cho các service và NF, không dùng CA công cộng. Hai hệ quả: (1) root của CA nội bộ phải được phân phối tới <b>mọi</b> client như một <b>trust bundle</b> (trong Kubernetes thường là ConfigMap hoặc dùng trust-manager); (2) mỗi runtime có trust store riêng: OS (<code>/etc/ssl/certs</code>), Java (<code>cacerts</code>), Python <code>certifi</code>, Go đọc của OS. Image tối giản (distroless, scratch) có thể không có trust store nào. "Chạy được trên máy tôi nhưng lỗi trong container" thường là vì vậy.</p></div>
+
+<h2>Cấp certificate: CSR và tự động hoá</h2>
+<p>Service tự sinh key pair; <b>private key không bao giờ rời khỏi service</b>. Service gửi CA một <b>CSR</b> (Certificate Signing Request) chứa public key, tên mong muốn, và được ký bằng chính private key (chứng minh nó thật sự giữ private key):</p>
+<script type="application/json" class="seq">
+{"title":"Cấp certificate qua CSR","actors":["Service","CA (hoặc cert-manager / Vault)"],"w":300,"steps":[
+ {"note":"sinh key pair; private key nằm lại trong service","a":0,"b":0},
+ {"f":0,"t":1,"l":"CSR: public key + SAN mong muốn\nký bằng private key (proof of possession)","m":1,"k":"sec"},
+ {"note":"CA kiểm tra: service này có được dùng tên đó không?\n(ACME challenge, Kubernetes service account, policy)","a":0,"b":1},
+ {"f":1,"t":0,"l":"certificate (ký bởi CA) + chain","m":1,"d":1,"k":"sec"},
+ {"note":"service cài cert + key; đặt lịch gia hạn trước khi hết hạn","a":0,"b":1}
+]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Công cụ tự động</th><th>Cách CA xác minh quyền dùng tên</th><th>Gặp ở đâu</th></tr></thead>
+<tbody>
+<tr><td><b>ACME</b> (Let's Encrypt)</td><td>HTTP-01: đặt file ở <code>/.well-known/acme-challenge/</code>; <b>DNS-01</b>: tạo TXT record <code>_acme-challenge</code> (module 03); TLS-ALPN-01</td><td>Certificate công khai</td></tr>
+<tr><td><b>cert-manager</b></td><td>Resource <code>Certificate</code> trong Kubernetes; issuer có thể là ACME, Vault, hoặc CA nội bộ; kết quả là Secret <code>kubernetes.io/tls</code> (<code>tls.crt</code>, <code>tls.key</code>, <code>ca.crt</code>)</td><td>Cluster Kubernetes</td></tr>
+<tr><td><b>Vault PKI</b></td><td>Service authenticate với Vault (Kubernetes auth, token) rồi gọi API issue</td><td>CA nội bộ có policy chi tiết</td></tr>
+<tr><td><b>SPIFFE / SPIRE</b>, service mesh (Istio)</td><td>Agent trên node xác minh workload (attestation), cấp cert rất ngắn hạn với SAN là SPIFFE ID</td><td>mTLS giữa các service (module 14)</td></tr>
+</tbody></table></div>
+
+<h2>Revocation và vòng đời</h2>
+<p>Private key bị lộ trước khi cert hết hạn thì phải <b>thu hồi</b> (revoke) cert:</p>
+<div class="tbl"><table>
+<thead><tr><th>Cơ chế</th><th>Cách làm</th><th>Nhược điểm</th></tr></thead>
+<tbody>
+<tr><td><b>CRL</b></td><td>CA định kỳ công bố danh sách serial bị thu hồi, có chữ ký</td><td>File có thể lớn; client chỉ biết khi tải bản mới</td></tr>
+<tr><td><b>OCSP</b></td><td>Client hỏi OCSP responder "serial này còn tốt không?"</td><td>Thêm một round trip; lộ cho CA biết bạn đang truy cập đâu; responder chết thì sao?</td></tr>
+<tr><td><b>OCSP stapling</b></td><td>Server tự lấy OCSP response có chữ ký và gửi kèm trong TLS handshake</td><td>Phải được server hỗ trợ và cấu hình</td></tr>
+<tr><td><b>Short-lived certificate</b></td><td>Cert sống vài giờ tới vài ngày; lộ key thì chỉ cần ngừng gia hạn</td><td>Bắt buộc phải tự động hoá hoàn toàn việc gia hạn</td></tr>
+</tbody></table></div>
+<p>Trên thực tế, browser thường <b>soft-fail</b> (không kiểm tra được thì vẫn cho qua), nên revocation kém tin cậy. Xu hướng là rút ngắn thời hạn: CA/Browser Forum đã thông qua lộ trình giảm thời hạn tối đa của certificate công khai xuống còn 47 ngày vào năm 2029, và Let's Encrypt đã ngừng dịch vụ OCSP năm 2025 để chỉ dùng CRL. Trong cluster, mesh như Istio mặc định cấp cert cho workload sống 24 giờ.</p>
+<div class="note trap"><b>Cạm bẫy: certificate hết hạn làm sập cả mạng di động</b><p>Tháng 12/2018, hàng chục triệu thuê bao của O2 (Anh) và SoftBank (Nhật) mất dịch vụ data gần một ngày vì một certificate hết hạn trong phần mềm của core network. Những sự cố tương tự từng xảy ra với Microsoft Teams, Spotify, nhiều ngân hàng. Bài học cho người làm platform: <b>gia hạn phải tự động, có giám sát ngày hết hạn và cảnh báo sớm</b> (Lab 10.3), và hệ thống phải nạp lại cert mới mà không cần restart.</p></div>
+<p><b>Certificate Transparency (CT)</b>: mọi certificate công khai phải được ghi vào các log công khai chỉ-ghi-thêm, và cert mang theo bằng chứng đã ghi (SCT). Chủ domain theo dõi log (ví dụ qua <a href="https://crt.sh/" target="_blank" rel="noopener">crt.sh</a>) để phát hiện cert bị cấp sai cho domain của mình.</p>
+
+<h2>Định dạng file và lệnh hay dùng</h2>
+<div class="tbl"><table>
+<thead><tr><th>Định dạng</th><th>Nhận biết</th><th>Gặp ở đâu</th></tr></thead>
+<tbody>
+<tr><td><b>PEM</b></td><td>Text base64 giữa <code>-----BEGIN CERTIFICATE-----</code> / <code>END</code>; một file chứa được nhiều cert (chain)</td><td>Linux, nginx, Envoy, Kubernetes Secret</td></tr>
+<tr><td><b>DER</b></td><td>Binary của cùng nội dung</td><td>Java, Windows, bên trong TLS handshake</td></tr>
+<tr><td><b>PKCS#8</b></td><td><code>BEGIN PRIVATE KEY</code> (hoặc <code>ENCRYPTED PRIVATE KEY</code>)</td><td>Private key</td></tr>
+<tr><td><b>PKCS#12</b> (.p12, .pfx)</td><td>Binary gói cert + chain + private key, có mật khẩu</td><td>Java keystore, Windows, import vào browser</td></tr>
+</tbody></table></div>
+<script type="text/plain" class="code" data-lang="bash" data-file="Cheat sheet openssl cho certificate">
+openssl x509 -in cert.pem -noout -text                       # đọc toàn bộ
+openssl x509 -in cert.pem -noout -subject -issuer -dates -ext subjectAltName,extendedKeyUsage
+openssl x509 -in cert.pem -noout -fingerprint -sha256        # fingerprint để so sánh/ghim
+openssl x509 -in cert.pem -noout -checkend 1814400 && echo "còn > 21 ngày"
+openssl verify -CAfile root.pem -untrusted intermediate.pem leaf.pem
+openssl req -in req.csr -noout -text                          # đọc CSR
+# Cert và key có khớp nhau không? Hai hash phải giống nhau
+openssl x509 -in cert.pem -noout -pubkey | sha256sum
+openssl pkey -in key.pem -pubout | sha256sum
+# Chuyển đổi
+openssl x509 -in cert.pem -outform DER -out cert.der
+openssl pkcs12 -export -in cert.pem -inkey key.pem -certfile chain.pem -out bundle.p12
+# Xem cert mà một server thật đang trả về (kèm SNI)
+openssl s_client -connect host:443 -servername host -showcerts </dev/null
+</script>
+
+<h3>Bảng tra lỗi certificate</h3>
+<div class="tbl"><table>
+<thead><tr><th>Thông báo (OpenSSL / curl)</th><th>Nguyên nhân thường gặp</th><th>Cách sửa</th></tr></thead>
+<tbody>
+<tr><td><code>certificate has expired</code></td><td>Cert hết hạn, hoặc đồng hồ client chạy quá nhanh</td><td>Gia hạn; kiểm tra NTP</td></tr>
+<tr><td><code>certificate is not yet valid</code></td><td>Đồng hồ client chậm (VM, container mới khởi động), hoặc cert vừa cấp</td><td>Đồng bộ thời gian; CA nên lùi notBefore vài phút</td></tr>
+<tr><td><code>unable to get local issuer certificate</code></td><td>Server không gửi intermediate, hoặc client thiếu root trong trust store</td><td>Server gửi full chain; cài trust bundle cho client</td></tr>
+<tr><td><code>self-signed certificate in certificate chain</code></td><td>Root của CA nội bộ chưa được client tin</td><td><code>--cacert</code> / cấu hình trust bundle; <b>không</b> tắt verify</td></tr>
+<tr><td><code>no alternative certificate subject name matches</code></td><td>Tên đang gọi không có trong SAN (gọi bằng IP, tên ngắn, tên Service khác)</td><td>Gọi đúng tên, hoặc cấp lại cert có SAN đủ</td></tr>
+<tr><td><code>unsupported certificate purpose</code></td><td>EKU không có serverAuth / clientAuth tương ứng</td><td>Cấp lại cert đúng mục đích</td></tr>
+<tr><td><code>key values mismatch</code></td><td>Cài nhầm private key không khớp cert</td><td>So hash public key (cheat sheet ở trên)</td></tr>
+</tbody></table></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m10" data-title="Kiểm tra module 10">
+[
+ {"q":"Khi verify certificate của server, client tin tưởng tuyệt đối vào thứ gì?","o":["Leaf certificate server gửi","Intermediate CA","Các root CA trong trust store của chính client","DNS"],"a":2,
+  "e":"Mọi thứ server gửi đều có thể bị giả; chỉ root trong trust store (cài qua kênh tin cậy) là điểm neo. Chain phải dẫn được về đó."},
+ {"q":"Trong TLS handshake, server nên gửi những certificate nào?","o":["Chỉ leaf","Leaf + intermediate(s), không cần root","Leaf + intermediate + root","Chỉ root"],"a":1,
+  "e":"Client đã có root. Gửi root là thừa (và không có tác dụng gì vì client không tin root do server gửi). Thiếu intermediate là lỗi phổ biến."},
+ {"q":"curl từ pod báo <code>unable to get local issuer certificate</code>, nhưng mở cùng URL trên browser thì được. Nguyên nhân nào hợp lý?","o":["Cert hết hạn","Server không gửi intermediate (browser tự tải bù qua AIA hoặc có sẵn trong cache), hoặc container thiếu trust store","Sai SAN","Network chậm"],"a":1,
+  "e":"Browser \"che\" lỗi thiếu intermediate. Kiểm tra bằng openssl s_client -showcerts xem server gửi mấy cert, và kiểm tra image có ca-certificates không."},
+ {"q":"Client so tên host với field nào trong certificate?","o":["Subject CN","Subject Alternative Name (SAN)","Issuer","Serial number"],"a":1,
+  "e":"Client hiện đại chỉ dùng SAN (RFC 9525). CN chỉ còn để con người đọc."},
+ {"q":"Cert có SAN <code>*.example.com</code>. Tên nào hợp lệ?","o":["api.example.com","a.b.example.com","example.com","api.example.org"],"a":0,
+  "e":"Wildcard chỉ thay đúng một label ở vị trí trái nhất."},
+ {"q":"Pod gọi <code>https://auth:8443</code>. Cert của service auth có SAN <code>auth.security.svc.cluster.local</code>. Kết quả?","o":["Thành công vì DNS search domain mở rộng tên","Hostname mismatch: client so với tên đã dùng trong URL (auth), không phải tên sau khi DNS resolve","Thành công vì cùng IP","Lỗi expired"],"a":1,
+  "e":"Search domain chỉ ảnh hưởng việc tìm IP. TLS so tên trong URL với SAN. Gọi bằng FQDN hoặc thêm tên ngắn vào SAN."},
+ {"q":"CSR chứa những gì?","o":["Private key của service","Public key, subject/SAN mong muốn, và chữ ký bằng private key tương ứng","Chữ ký của CA","Root certificate"],"a":1,
+  "e":"Private key không bao giờ rời service. Chữ ký trên CSR chứng minh người gửi giữ private key (proof of possession)."},
+ {"q":"Một leaf cert có <code>CA:FALSE</code> bị dùng để ký một cert khác. Client làm gì khi verify chain đó?","o":["Chấp nhận nếu chữ ký đúng","Từ chối, vì issuer phải có CA:TRUE (và keyCertSign)","Chỉ cảnh báo","Tự sửa thành CA:TRUE"],"a":1,
+  "e":"Basic constraints ngăn một leaf bất kỳ tự biến mình thành CA. Lỗ hổng thiếu kiểm tra này từng tồn tại trong nhiều library cũ."},
+ {"q":"Cert dùng làm client certificate trong mTLS cần EKU nào?","o":["serverAuth","clientAuth","codeSigning","emailProtection"],"a":1,
+  "e":"Server kiểm tra EKU của client cert. Dùng nhầm server cert (chỉ có serverAuth) làm client cert sẽ bị từ chối với lỗi unsupported certificate purpose."},
+ {"q":"Private key của một service bị lộ. Cert còn 300 ngày. Việc cần làm?","o":["Chờ hết hạn","Revoke cert (CRL/OCSP), cấp key pair và cert mới, điều tra nguyên nhân","Đổi tên service","Tăng thời hạn cert"],"a":1,
+  "e":"Đây cũng là lý do cert ngắn hạn được ưa chuộng: với cert 24 giờ, rủi ro từ key bị lộ tự hết rất nhanh."},
+ {"q":"OCSP stapling mang lại lợi ích gì?","o":["Mã hoá mạnh hơn","Client không phải tự hỏi OCSP responder: nhanh hơn, không lộ cho CA biết client truy cập đâu","Không cần CA","Cert sống lâu hơn"],"a":1,
+  "e":"Server đính kèm OCSP response có chữ ký của CA vào handshake."},
+ {"q":"Service Java chạy trong container báo lỗi PKIX khi gọi service nội bộ dùng CA của công ty, trong khi curl trong cùng container gọi được. Nghi ngờ đầu tiên?","o":["Java chậm","Java dùng trust store riêng (cacerts) chưa có root CA nội bộ","Lỗi DNS","Sai port"],"a":1,
+  "e":"Mỗi runtime có trust store riêng. Cần import root CA nội bộ vào cacerts hoặc trỏ JVM tới trust store phù hợp."}
+]
+</script>
+
+<h3>Ôn lại module 03, 06, 09</h3>
+<script type="application/json" class="quiz" data-id="m10-review" data-title="Ôn lại">
+[
+ {"q":"cert-manager xin wildcard certificate <code>*.netlab.example</code> từ Let's Encrypt. Loại ACME challenge nào bắt buộc, và nó dùng gì của module 03?","o":["HTTP-01, dùng HTTP 301","DNS-01, tạo TXT record _acme-challenge","TLS-ALPN-01, dùng SRV","Không cần challenge"],"a":1,
+  "e":"Wildcard chỉ cấp qua DNS-01. CA query TXT record để xác nhận bạn kiểm soát DNS của domain."},
+ {"q":"Chữ ký trên certificate là loại nào trong module 09?","o":["HMAC bằng shared key","Digital signature bằng private key của issuer","AES-GCM tag","SHA-256 thuần"],"a":1,
+  "e":"Issuer ký hash của phần Data bằng private key; ai có public key của issuer (trong cert của issuer) đều verify được."},
+ {"q":"Trong Lab 6.3, TLS handshake treo vì MTU black hole. Phần nào của handshake thường là gói lớn đầu tiên?","o":["ClientHello","Certificate chain do server gửi","FIN","DNS query"],"a":1,
+  "e":"Chain gồm leaf + intermediate (có thể vài KB, RSA còn lớn hơn ECDSA) thường vượt một MTU. Chain gọn (ECDSA, không gửi root) cũng giúp handshake nhanh hơn."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"10 PKI & X.509","c":[
+ {"t":"Vì sao","col":"base","c":[{"t":"Ràng buộc tên ↔ public key"},{"t":"CA ký certificate"},{"t":"PKI = CA + cert + quy trình"}]},
+ {"t":"X.509 v3","col":"app","c":[{"t":"Subject, Issuer, Validity, Serial"},{"t":"SAN: DNS, IP, URI (SPIFFE)"},{"t":"basicConstraints, pathlen"},{"t":"keyUsage, EKU serverAuth/clientAuth"},{"t":"So tên ở SAN, không ở CN"}]},
+ {"t":"Chain of trust","col":"sec","c":[{"t":"Root (self-signed, offline)"},{"t":"Intermediate (ký hằng ngày)"},{"t":"Leaf (ngắn hạn)"},{"t":"Trust store / trust bundle"},{"t":"Verify: chain, chữ ký, hạn, ràng buộc, tên"}]},
+ {"t":"Cấp cert","col":"net","c":[{"t":"Key pair ở service, gửi CSR"},{"t":"Proof of possession"},{"t":"ACME: HTTP-01, DNS-01"},{"t":"cert-manager, Vault PKI, SPIRE"}]},
+ {"t":"Vòng đời","col":"tra","c":[{"t":"CRL, OCSP, stapling"},{"t":"Soft-fail → cert ngắn hạn"},{"t":"Tự động gia hạn + giám sát hạn"},{"t":"Certificate Transparency"}]},
+ {"t":"Thực hành","col":"k8s","c":[{"t":"PEM, DER, PKCS#8, PKCS#12"},{"t":"openssl x509 / verify / s_client"},{"t":"Bảng lỗi: expired, issuer, SAN, EKU"},{"t":"Không tắt verify"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 10.1 · Mổ xẻ chain thật và tour lỗi badssl</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">openssl · curl</span><span class="chip t-base">30 phút</span></div>
+  <p>Phần 1: lấy chain mà <code>github.com</code> gửi về, tách thành từng file, đọc subject/issuer/SAN/EKU/AIA của từng cert, rồi tự verify chain bằng <code>openssl verify</code> với trust store của máy. Phần 2: gọi lần lượt các subdomain của badssl.com và ghép mỗi lỗi với một dòng trong bảng tra lỗi ở trên.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>openssl verify</code> báo OK cho chain của github.com, và bạn có bảng 5 dòng: subdomain → thông báo lỗi → nguyên nhân.</p>
+  <details><summary>Gợi ý</summary><p>Tách các block PEM bằng <code>awk</code>. Với <code>openssl verify</code>: leaf là đối số cuối, intermediate qua <code>-untrusted</code>, trust store mặc định của hệ thống được dùng khi không chỉ định <code>-CAfile</code>. Subdomain gợi ý: <code>expired</code>, <code>wrong.host</code>, <code>self-signed</code>, <code>untrusted-root</code>, <code>incomplete-chain</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ mkdir -p ~/netlab/m10 && cd ~/netlab/m10
+$ openssl s_client -connect github.com:443 -servername github.com -showcerts </dev/null 2>/dev/null \
+    | awk '/BEGIN CERTIFICATE/{n++; f="gh" n ".pem"} f{print > f} /END CERTIFICATE/{f=""}'
+$ for f in gh*.pem; do echo "== $f"; openssl x509 -in $f -noout -subject -issuer -ext basicConstraints,extendedKeyUsage; done
+$ openssl x509 -in gh1.pem -noout -ext subjectAltName,authorityInfoAccess,crlDistributionPoints
+$ openssl verify -untrusted gh2.pem gh1.pem
+gh1.pem: OK                                                   ◀ chain dẫn tới một root trong /etc/ssl/certs
+$ for h in expired wrong.host self-signed untrusted-root incomplete-chain; do
+>   printf '%-18s ' $h; curl -sS -o /dev/null https://$h.badssl.com/ 2>&1 | head -1
+> done
+expired            curl: (60) SSL certificate problem: certificate has expired
+wrong.host         curl: (60) SSL: no alternative certificate subject name matches target host name 'wrong.host.badssl.com'
+self-signed        curl: (60) SSL certificate problem: self-signed certificate
+untrusted-root     curl: (60) SSL certificate problem: self-signed certificate in certificate chain
+incomplete-chain   curl: (60) SSL certificate problem: unable to get local issuer certificate
+</script>
+  <p class="small muted">Thông báo chính xác có thể khác chút theo phiên bản curl/OpenSSL. Thử mở <code>https://incomplete-chain.badssl.com</code> bằng browser: nhiều browser vẫn hiển thị được, vì chúng tự tải intermediate còn thiếu. Code của bạn thì không làm vậy.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 10.2 · Dựng PKI nội bộ 3 tầng</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Bash · openssl</span><span class="chip t-base">60 phút</span></div>
+  <p>Viết script tạo:</p>
+  <ul>
+    <li><b>Root CA</b> (EC P-256, 10 năm, <code>CA:TRUE</code>, keyCertSign).</li>
+    <li><b>Intermediate CA</b> ký bởi root (5 năm, <code>CA:TRUE, pathlen:0</code>).</li>
+    <li><b>Server cert</b> cho <code>auth.security.svc.cluster.local</code> (30 ngày, EKU serverAuth, SAN gồm tên đầy đủ, <code>auth.security</code>, <code>localhost</code>, <code>127.0.0.1</code>).</li>
+    <li><b>Client cert</b> cho service <code>svc-a</code> (EKU clientAuth, SAN là URI SPIFFE <code>spiffe://netlab.local/ns/default/sa/svc-a</code>) để dùng ở module 11.</li>
+  </ul>
+  <p>Sau đó chạy một HTTPS server bằng <code>openssl s_server</code> và kiểm tra bằng curl: thành công khi tin đúng root; lỗi khi gọi sai tên; lỗi khi server quên gửi intermediate.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>openssl verify</code> báo OK cho cả hai leaf, và bạn tái hiện được 3 kết quả curl: 200, hostname mismatch, unable to get local issuer certificate.</p>
+  <details><summary>Gợi ý</summary><p>Root: <code>openssl req -x509 -new … -addext</code>. Các cert còn lại: <code>openssl req -new</code> tạo CSR, rồi <code>openssl x509 -req -CA … -CAkey … -extfile</code> để gắn extension (OpenSSL không tự chép extension từ CSR). <code>openssl s_server</code> có <code>-cert_chain</code> để gửi kèm intermediate. curl dùng <code>--cacert</code> cho root nội bộ và <code>--resolve</code> để gọi đúng tên mà không cần DNS.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m10/mkpki.sh">
+#!/usr/bin/env bash
+# PKI nội bộ 3 tầng: root CA → intermediate CA → leaf (server + client). Chạy: bash mkpki.sh
+set -euo pipefail
+mkdir -p pki && cd pki
+newkey() { openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$1"; }
+
+# 1. Root CA: self-signed, chỉ để ký intermediate (thực tế: giữ offline)
+newkey root.key
+openssl req -x509 -new -key root.key -sha256 -days 3650 -subj "/O=NetLab/CN=NetLab Root CA" \
+  -addext "basicConstraints=critical,CA:TRUE" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign" -out root.crt
+
+# 2. Intermediate CA: ký bởi root; pathlen:0 = không được tạo thêm CA bên dưới
+newkey inter.key
+openssl req -new -key inter.key -subj "/O=NetLab/CN=NetLab Issuing CA 1" -out inter.csr
+openssl x509 -req -in inter.csr -CA root.crt -CAkey root.key -CAcreateserial -days 1825 -sha256 \
+  -extfile <(printf '%s\n' "basicConstraints=critical,CA:TRUE,pathlen:0" \
+                           "keyUsage=critical,keyCertSign,cRLSign" \
+                           "subjectKeyIdentifier=hash" "authorityKeyIdentifier=keyid") \
+  -out inter.crt
+
+# 3. Server cert cho service auth (namespace security)
+newkey server.key
+openssl req -new -key server.key -subj "/CN=auth.security.svc.cluster.local" -out server.csr
+openssl x509 -req -in server.csr -CA inter.crt -CAkey inter.key -CAcreateserial -days 30 -sha256 \
+  -extfile <(printf '%s\n' "basicConstraints=critical,CA:FALSE" "keyUsage=critical,digitalSignature" \
+                           "extendedKeyUsage=serverAuth" \
+                           "subjectAltName=DNS:auth.security.svc.cluster.local,DNS:auth.security,DNS:localhost,IP:127.0.0.1") \
+  -out server.crt
+
+# 4. Client cert cho svc-a (dùng cho mTLS ở module 11); identity là SPIFFE ID trong SAN
+newkey client.key
+openssl req -new -key client.key -subj "/CN=svc-a" -out client.csr
+openssl x509 -req -in client.csr -CA inter.crt -CAkey inter.key -CAcreateserial -days 30 -sha256 \
+  -extfile <(printf '%s\n' "basicConstraints=critical,CA:FALSE" "keyUsage=critical,digitalSignature" \
+                           "extendedKeyUsage=clientAuth" \
+                           "subjectAltName=URI:spiffe://netlab.local/ns/default/sa/svc-a") \
+  -out client.crt
+
+# 5. File chain để gửi đi: leaf + intermediate (không gửi root)
+cat server.crt inter.crt > server-chain.crt
+cat client.crt inter.crt > client-chain.crt
+chmod 600 ./*.key
+openssl verify -CAfile root.crt -untrusted inter.crt server.crt client.crt
+</script>
+<script type="text/plain" class="term">
+$ bash mkpki.sh
+server.crt: OK
+client.crt: OK
+$ cd pki
+$ openssl s_server -accept 8443 -cert server.crt -key server.key -cert_chain inter.crt -www -quiet &
+$ curl -sS --cacert root.crt https://localhost:8443/ -o /dev/null -w '%{http_code}\n'
+200
+$ curl -sS --cacert root.crt --resolve auth.security.svc.cluster.local:8443:127.0.0.1 \
+    https://auth.security.svc.cluster.local:8443/ -o /dev/null -w '%{http_code}\n'
+200
+$ curl -sS --cacert root.crt --resolve auth:8443:127.0.0.1 https://auth:8443/ -o /dev/null
+curl: (60) SSL: no alternative certificate subject name matches target host name 'auth'   ◀ tên ngắn không có trong SAN
+$ kill %1
+$ openssl s_server -accept 8443 -cert server.crt -key server.key -www -quiet &              # quên -cert_chain
+$ curl -sS --cacert root.crt https://localhost:8443/ -o /dev/null
+curl: (60) SSL certificate problem: unable to get local issuer certificate                 ◀ thiếu intermediate
+$ kill %1
+</script>
+  <p class="small muted">Thực tế: private key của root không nằm cùng máy với intermediate; CA nội bộ chạy bằng Vault, step-ca, EJBCA hoặc cert-manager thay vì script tay. Giữ thư mục <code>pki/</code> để dùng ở Lab 10.3, 10.4 và module 11.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 10.3 · Công cụ giám sát hạn certificate</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · ssl</span><span class="chip t-base">40 phút</span></div>
+  <p>Viết <code>certcheck.py host:port …</code>: kết nối TLS tới từng endpoint (có verify thật), in số ngày còn lại, issuer và SAN; báo <code>EXPIRING</code> nếu dưới 21 ngày, <code>VERIFY FAIL</code> kèm lý do nếu verify thất bại. Hỗ trợ <code>--cafile</code> cho CA nội bộ. Exit code khác 0 nếu có vấn đề, để gắn vào cron hoặc CI làm cảnh báo.</p>
+  <p class="done-when"><b>Xong khi:</b> chạy được với <code>github.com:443</code>, <code>expired.badssl.com:443</code>, và server <code>localhost:8443</code> của Lab 10.2 (có <code>--cafile pki/root.crt</code>); exit code đúng với kết quả.</p>
+  <details><summary>Gợi ý</summary><p><code>ssl.create_default_context(cafile=…)</code> bật sẵn verify và hostname check. <code>wrap_socket(sock, server_hostname=host)</code> gửi SNI và kiểm tra tên. <code>getpeercert()</code> trả về dict có <code>notAfter</code>, <code>issuer</code>, <code>subjectAltName</code>; <code>ssl.cert_time_to_seconds()</code> đổi ngày sang epoch. Lỗi verify là <code>ssl.SSLCertVerificationError</code>, có thuộc tính <code>verify_message</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m10/certcheck.py">
+#!/usr/bin/env python3
+"""Kiểm tra hạn và tính hợp lệ của certificate. Exit 1 nếu có cert sắp hết hạn hoặc verify thất bại."""
+import argparse
+import socket
+import ssl
+import sys
+import time
+
+
+def check(host: str, port: int, ctx: ssl.SSLContext, warn_days: int) -> tuple[bool, str]:
+    try:
+        with socket.create_connection((host, port), timeout=5) as raw:
+            with ctx.wrap_socket(raw, server_hostname=host) as tls:   # SNI + verify chain + hostname
+                cert = tls.getpeercert()
+                version = tls.version()
+    except ssl.SSLCertVerificationError as e:
+        return False, f"VERIFY FAIL  {e.verify_message}"
+    except (OSError, ssl.SSLError) as e:
+        return False, f"CONNECT FAIL {e}"
+    days = (ssl.cert_time_to_seconds(cert["notAfter"]) - time.time()) / 86400
+    san = ", ".join(v for k, v in cert.get("subjectAltName", ()) if k in ("DNS", "IP Address", "URI"))
+    issuer = dict(x[0] for x in cert["issuer"]).get("commonName", "?")
+    ok = days >= warn_days
+    return ok, f"{'OK' if ok else 'EXPIRING':<12} {days:6.1f} ngày  {version}  issuer={issuer}  SAN={san[:60]}"
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Giám sát hạn certificate")
+    ap.add_argument("targets", nargs="+", help="host:port")
+    ap.add_argument("--cafile", help="root CA nội bộ (mặc định: trust store của hệ thống)")
+    ap.add_argument("--warn-days", type=int, default=21)
+    args = ap.parse_args()
+
+    ctx = ssl.create_default_context(cafile=args.cafile)
+    all_ok = True
+    for target in args.targets:
+        host, _, port = target.partition(":")
+        ok, msg = check(host, int(port or 443), ctx, args.warn_days)
+        all_ok &= ok
+        print(f"{target:<28} {msg}")
+    sys.exit(0 if all_ok else 1)
+
+
+if __name__ == "__main__":
+    main()
+</script>
+<script type="text/plain" class="term">
+$ python3 certcheck.py github.com:443 expired.badssl.com:443 wrong.host.badssl.com:443; echo "exit=$?"
+github.com:443               OK             61.4 ngày  TLSv1.3  issuer=…  SAN=github.com, www.github.com
+expired.badssl.com:443       VERIFY FAIL  certificate has expired
+wrong.host.badssl.com:443    VERIFY FAIL  Hostname mismatch, certificate is not valid for 'wrong.host.badssl.com'.
+exit=1
+$ (cd pki && openssl s_server -accept 8443 -cert server.crt -key server.key -cert_chain inter.crt -www -quiet &)
+$ python3 certcheck.py --cafile pki/root.crt --warn-days 45 localhost:8443; echo "exit=$?"
+localhost:8443               EXPIRING       30.0 ngày  TLSv1.3  issuer=NetLab Issuing CA 1  SAN=auth.security.svc.cluster.local, …
+exit=1                                                ◀ cert 30 ngày < ngưỡng 45: cảnh báo đúng
+$ pkill -f 's_server -accept 8443'
+</script>
+  <p class="small muted">Trong cluster, việc tương tự thường làm bằng metric: cert-manager xuất <code>certmanager_certificate_expiration_timestamp_seconds</code>, và Prometheus cảnh báo khi còn ít ngày. Công cụ tự viết vẫn hữu ích cho endpoint không do cert-manager quản lý (thiết bị, NF của vendor khác, partner).</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 10.4 · Tự verify chain từng bước và bắt cert giả mạo</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Python · cryptography · openssl</span><span class="chip t-base">50 phút</span></div>
+  <p>Viết <code>chain_check.py leaf inter root hostname</code> tự làm các bước verify ở mục "Client verify một chain thế nào": thời hạn, chữ ký từng tầng, <code>CA:TRUE</code> và <code>pathlen</code> của issuer, EKU serverAuth, hostname trong SAN. Chạy trên PKI của Lab 10.2 với 4 tình huống: hợp lệ; sai hostname; dùng client cert làm server cert; và <b>cert giả</b> do một "intermediate" mạo danh cùng tên <code>NetLab Issuing CA 1</code> ký.</p>
+  <p class="done-when"><b>Xong khi:</b> 4 tình huống cho 4 kết quả đúng, và bạn giải thích được vì sao tình huống cuối bị bắt dù tên issuer khớp hoàn toàn.</p>
+  <details><summary>Gợi ý</summary><p><code>x509.load_pem_x509_certificate</code>, <code>cert.verify_directly_issued_by(issuer)</code> (cryptography ≥ 40) kiểm tra tên và chữ ký, <code>cert.extensions.get_extension_for_class(x509.BasicConstraints)</code>. Python cryptography 41 trên Ubuntu 24.04 dùng <code>not_valid_after</code> (không có hậu tố <code>_utc</code>). Đây là bài để hiểu; production phải dùng path validation của library.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m10/chain_check.py">
+#!/usr/bin/env python3
+"""Tự verify certificate chain từng bước (để học; production hãy dùng library). Dùng: leaf inter root hostname"""
+import datetime as dt
+import sys
+
+from cryptography import x509
+from cryptography.x509.oid import ExtendedKeyUsageOID
+
+UTC = dt.timezone.utc
+
+
+def load(path: str) -> x509.Certificate:
+    with open(path, "rb") as f:
+        return x509.load_pem_x509_certificate(f.read())
+
+
+def validity(c: x509.Certificate):
+    try:                                                     # cryptography ≥ 42
+        return c.not_valid_before_utc, c.not_valid_after_utc
+    except AttributeError:                                   # cryptography 41 (Ubuntu 24.04)
+        return c.not_valid_before.replace(tzinfo=UTC), c.not_valid_after.replace(tzinfo=UTC)
+
+
+def check_chain(leaf, inter, root, hostname: str) -> str:
+    chain, now = [leaf, inter, root], dt.datetime.now(UTC)
+    for i, cert in enumerate(chain):
+        name = cert.subject.rfc4514_string()
+        nb, na = validity(cert)
+        if not nb <= now <= na:
+            return f"✘ [{i}] {name}: ngoài thời hạn ({nb:%Y-%m-%d} → {na:%Y-%m-%d})"
+        issuer = chain[i + 1] if i + 1 < len(chain) else root          # root tự ký
+        try:
+            cert.verify_directly_issued_by(issuer)                     # tên issuer + chữ ký
+        except Exception as e:
+            return f"✘ [{i}] {name}: không được ký bởi {issuer.subject.rfc4514_string()} ({type(e).__name__})"
+        if i > 0:                                                      # cert này đóng vai issuer
+            bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
+            if not bc.ca:
+                return f"✘ [{i}] {name}: không phải CA nhưng lại ký cert khác"
+            if bc.path_length is not None and bc.path_length < i - 1:
+                return f"✘ [{i}] {name}: vượt pathlen={bc.path_length}"
+        print(f"  ✔ [{i}] {name}  (hạn tới {na:%Y-%m-%d})")
+
+    try:
+        eku = leaf.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
+    except x509.ExtensionNotFound:
+        return "✘ leaf không có EKU"
+    if ExtendedKeyUsageOID.SERVER_AUTH not in eku:
+        return "✘ leaf không có EKU serverAuth: không dùng làm server cert được"
+    names = leaf.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+    if hostname not in names:
+        return f"✘ hostname '{hostname}' không có trong SAN {names}"
+    return f"✔ chain hợp lệ cho {hostname}"
+
+
+if __name__ == "__main__":
+    leaf_p, inter_p, root_p, host = sys.argv[1:5]
+    print(check_chain(load(leaf_p), load(inter_p), load(root_p), host))
+</script>
+<script type="text/plain" class="term">
+$ H=auth.security.svc.cluster.local
+$ python3 chain_check.py pki/server.crt pki/inter.crt pki/root.crt $H
+  ✔ [0] CN=auth.security.svc.cluster.local  (hạn tới 2026-12-14)
+  ✔ [1] CN=NetLab Issuing CA 1,O=NetLab  (hạn tới 2031-11-13)
+  ✔ [2] CN=NetLab Root CA,O=NetLab  (hạn tới 2036-11-11)
+✔ chain hợp lệ cho auth.security.svc.cluster.local
+$ python3 chain_check.py pki/server.crt pki/inter.crt pki/root.crt auth | tail -1
+✘ hostname 'auth' không có trong SAN ['auth.security.svc.cluster.local', 'auth.security', 'localhost']
+$ python3 chain_check.py pki/client.crt pki/inter.crt pki/root.crt $H | tail -1
+✘ leaf không có EKU serverAuth: không dùng làm server cert được
+# Trudy tự dựng một "intermediate" trùng tên rồi ký cert cho đúng hostname
+$ openssl req -x509 -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout evil-ca.key \
+    -subj "/O=NetLab/CN=NetLab Issuing CA 1" -days 30 -addext "basicConstraints=critical,CA:TRUE" -out evil-ca.crt
+$ openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout evil.key -subj "/CN=$H" -out evil.csr
+$ openssl x509 -req -in evil.csr -CA evil-ca.crt -CAkey evil-ca.key -CAcreateserial -days 30 \
+    -extfile <(printf '%s\n' "extendedKeyUsage=serverAuth" "subjectAltName=DNS:$H") -out evil.crt
+$ python3 chain_check.py evil.crt pki/inter.crt pki/root.crt $H
+✘ [0] CN=auth.security.svc.cluster.local: không được ký bởi CN=NetLab Issuing CA 1,O=NetLab (InvalidSignature)
+</script>
+  <p><b>Vì sao bắt được:</b> tên issuer chỉ là chuỗi ký tự, ai cũng đặt được. Thứ duy nhất Trudy không làm giả được là <b>chữ ký</b>, vì cần private key của intermediate thật. Một library verify chain mà chỉ so tên (từng có lỗi kiểu này trong thực tế) sẽ chấp nhận cert giả. Ngày hạn trong output sẽ khác theo ngày bạn chạy Lab 10.2.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m10"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §8.3.3 phần "Public Key Certification" ngắn; module này đã đi xa hơn sách khá nhiều.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc5280" target="_blank" rel="noopener">RFC 5280</a>: chuẩn X.509 và path validation (§6). Tra cứu khi cần, đừng đọc hết.</li>
+  <li><a href="https://smallstep.com/blog/everything-pki/" target="_blank" rel="noopener">Smallstep: Everything you should know about certificates and PKI</a>: bài dài nhưng dễ đọc nhất về PKI cho người làm hạ tầng.</li>
+  <li><a href="https://cert-manager.io/docs/concepts/" target="_blank" rel="noopener">cert-manager concepts</a>: Issuer, Certificate, CertificateRequest (chuẩn bị cho module 14).</li>
+  <li><a href="https://spiffe.io/docs/latest/spiffe-about/overview/" target="_blank" rel="noopener">SPIFFE overview</a>: identity cho workload bằng certificate ngắn hạn, nền của mTLS trong service mesh.</li>
+</ul>

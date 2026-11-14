@@ -1,0 +1,434 @@
+<!-- Core Net Lab · Module 07 · Routing & netfilter (Kurose & Ross 8e, §4.4–4.5, Ch.5) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Chạy được Dijkstra bằng tay và hiểu link-state khác distance-vector ở đâu.</li>
+  <li>Biết OSPF dùng trong một AS, BGP dùng giữa các AS, và BGP bị tấn công thế nào (hijacking, RPKI).</li>
+  <li>Hiểu generalized forwarding (match + action) là ý tưởng chung của router, firewall, NAT, SDN.</li>
+  <li>Đọc và viết được rule iptables/nftables: hook, table, chain, conntrack state; hiểu kube-proxy dùng iptables để làm load balancing cho Service.</li>
+  <li>Debug được lỗi routing kinh điển: thiếu route chiều về.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ traceroute -n -A 1.1.1.1 | head -8        # Q1: [AS…] là gì? packet đi qua mấy AS?
+ 4  100.64.12.1 [AS7552]   5.3 ms
+ 6  203.113.x.x [AS7552]   7.9 ms
+ 8  1.1.1.1     [AS13335]  9.2 ms           ◀ AS13335 = Cloudflare
+$ whois -h whois.cymru.com " -v 1.1.1.1"     # tra AS của một IP
+AS      | IP       | BGP Prefix  | CC | Registry | AS Name
+13335   | 1.1.1.1  | 1.1.1.0/24  | AU | apnic    | CLOUDFLARENET, US
+$ sudo iptables -L -n --line-numbers | head -20   # Q2: chain nào? policy là gì?
+Chain INPUT (policy ACCEPT)
+Chain FORWARD (policy DROP)                  ◀ Docker đặt DROP cho FORWARD
+1    DOCKER-USER  all  --  0.0.0.0/0  0.0.0.0/0
+$ sudo iptables -t nat -L PREROUTING -n -v   # Q3: rule nào bắt traffic tới port của container?
+$ sudo nft list tables                       # Q4: iptables trên Ubuntu 24.04 thực ra ghi vào đâu?
+table ip filter
+table ip nat
+</script>
+<p class="small muted">Nếu <code>traceroute -A</code> không hiện AS, cài <code>sudo apt install -y traceroute</code> (bản đầy đủ) hoặc dùng <code>mtr -z 1.1.1.1</code>.</p>
+
+<h2>Routing: tìm đường trên một đồ thị</h2>
+<p>Routing algorithm coi network là một <b>graph</b>: node là router, edge là link, mỗi link có <b>cost</b> (do admin đặt, hoặc tỉ lệ nghịch với bandwidth). Mục tiêu: tìm <b>least-cost path</b> từ mỗi router tới mọi đích, rồi ghi <b>next hop</b> vào forwarding table <span class="bk">§5.1–5.2</span>.</p>
+<p>Control plane có thể đặt ở hai chỗ: <b>per-router</b> (mỗi router tự chạy routing protocol, cách truyền thống) hoặc <b>logically centralized</b> (một controller tính rồi đẩy bảng xuống: SDN, mục cuối bài).</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Link-state (LS)</th><th>Distance-vector (DV)</th></tr></thead>
+<tbody>
+<tr><td>Mỗi router biết</td><td>Toàn bộ topology và mọi link cost (flood cho nhau)</td><td>Chỉ cost tới neighbor + vector khoảng cách neighbor gửi sang</td></tr>
+<tr><td>Thuật toán</td><td>Dijkstra</td><td>Bellman-Ford: d<sub>x</sub>(y) = min<sub>v</sub> { c(x,v) + d<sub>v</sub>(y) }</td></tr>
+<tr><td>Khi link thay đổi</td><td>Flood thông tin mới, mọi router tính lại; hội tụ nhanh</td><td>Lan dần từng hop; có thể <b>count-to-infinity</b> khi cost tăng</td></tr>
+<tr><td>Protocol thật</td><td>OSPF, IS-IS</td><td>RIP (cũ); BGP là biến thể path-vector</td></tr>
+</tbody></table></div>
+
+<h3>Dijkstra từng bước</h3>
+<p>Đồ thị dưới là Figure 5.3 trong sách. N' là tập node đã biết chắc least-cost path; D(n) là cost tốt nhất hiện tại tới n; p(n) là node đứng trước n trên path đó. Mỗi bước: lấy node có D nhỏ nhất ngoài N', thêm vào N', rồi thử đi tiếp qua nó.</p>
+<div data-widget="dijkstra"></div>
+<div class="note key"><b>Ghi nhớ</b><p>Kết quả quan trọng không phải là cả đường đi mà là <b>next hop</b>: từ u, mọi đích trừ v đều đi qua x. Forwarding table chỉ lưu "đích → next hop", và mỗi router trên đường tự quyết định phần tiếp theo. Hãy chọn source khác và so sánh.</p></div>
+<p><b>Count-to-infinity</b> ở DV: khi link x–y bỗng có cost lớn, y tin rằng z vẫn tới được x với cost 5 (mà không biết đường đó của z lại đi qua chính y), nên hai bên lần lượt tăng cost lên từng chút, mất hàng chục round mới hội tụ <span class="bk">§5.2.2</span>. Lab 7.1 mô phỏng chuyện này.</p>
+
+<h2>OSPF và BGP</h2>
+<p>Internet có hàng trăm triệu router, không thể chạy một routing algorithm cho tất cả. Nó chia thành các <b>Autonomous System (AS)</b>: mạng do một tổ chức quản lý (ISP, cloud, công ty lớn), mỗi AS có số <b>ASN</b> (Q1). Routing chia hai tầng:</p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Intra-AS</th><th>Inter-AS</th></tr></thead>
+<tbody>
+<tr><td>Protocol</td><td><b>OSPF</b> (hoặc IS-IS) <span class="bk">§5.3</span></td><td><b>BGP</b> <span class="bk">§5.4</span></td></tr>
+<tr><td>Mục tiêu</td><td>Performance: least-cost path</td><td><b>Policy</b>: đường nào được phép và có lợi về kinh doanh</td></tr>
+<tr><td>Cách làm</td><td>Link-state, Dijkstra; chia thành area cho mạng lớn</td><td>Path-vector: quảng bá prefix kèm AS-PATH và NEXT-HOP</td></tr>
+<tr><td>Security</td><td>Message có thể authenticate (MD5/SHA) để chặn router giả</td><td>Mặc định tin quảng bá của neighbor → hijacking; chống bằng RPKI</td></tr>
+</tbody></table></div>
+<h3>BGP</h3>
+<p>Mỗi AS quảng bá cho neighbor: "tôi tới được prefix 1.1.1.0/24, qua AS-PATH 13335". Neighbor thêm ASN của mình vào AS-PATH rồi quảng bá tiếp. Một router nhận nhiều route tới cùng prefix sẽ chọn theo thứ tự: <b>local preference</b> (policy của chính AS) → <b>AS-PATH ngắn nhất</b> → <b>hot potato</b> (đẩy traffic ra khỏi AS mình càng sớm càng tốt) → các tiêu chí phụ. BGP session giữa hai AS là <b>eBGP</b>, phân phối route bên trong một AS là <b>iBGP</b>.</p>
+<p><b>Anycast</b> <span class="bk">§5.4.4</span>: nhiều server ở nhiều nơi cùng quảng bá một prefix; BGP tự đưa client tới server gần nhất. DNS root server (module 03) và 1.1.1.1 dùng cách này.</p>
+<div class="note trap"><b>Security: BGP hijacking</b><p>BGP tin những gì neighbor quảng bá. Một AS quảng bá nhầm hoặc cố ý một prefix của người khác, đặc biệt là prefix <b>cụ thể hơn</b>, sẽ hút traffic về mình nhờ longest prefix match (module 06). Năm 2008, một ISP Pakistan quảng bá một /24 của YouTube và làm YouTube biến mất khỏi Internet khoảng 2 giờ. Phòng chống: <b>RPKI</b>, chủ prefix ký một ROA (Route Origin Authorization) xác nhận AS nào được phép quảng bá prefix đó; router kiểm tra trước khi tin. Và một lần nữa: TLS với certificate verify khiến traffic bị hút đi cũng không đọc hay giả mạo được.</p></div>
+<div class="note job"><b>Liên hệ job</b><p>BGP không chỉ ở Internet. Trong data center và Kubernetes, BGP được dùng để quảng bá IP của pod hoặc LoadBalancer Service ra mạng vật lý (Calico, MetalLB, Cilium). Core network của các nhà mạng kết nối với nhau để roaming qua mạng IPX, cũng bằng BGP. Bạn chưa cần cấu hình BGP, nhưng cần đọc được khi đồng nghiệp nói "route chưa được quảng bá".</p></div>
+
+<h2>Generalized forwarding và SDN</h2>
+<p>Router truyền thống: <i>match</i> destination IP theo prefix, <i>action</i> forward ra một link. Tổng quát hoá: match <b>nhiều field</b> của nhiều layer, action có thể là forward, drop hoặc <b>sửa header</b> <span class="bk">§4.4</span>. OpenFlow chuẩn hoá ý tưởng này thành <b>flow table</b>:</p>
+<div class="tbl"><table>
+<thead><tr><th>Thiết bị</th><th>Match</th><th>Action</th></tr></thead>
+<tbody>
+<tr class="t-net"><td><span class="lay"></span>Router</td><td>Destination IP prefix (longest prefix match)</td><td>Forward ra output link</td></tr>
+<tr class="t-lnk"><td><span class="lay"></span>Switch</td><td>Destination MAC</td><td>Forward ra port</td></tr>
+<tr class="t-sec"><td><span class="lay"></span>Firewall</td><td>IP, protocol, port, connection state</td><td>Accept / drop / reject</td></tr>
+<tr class="t-app"><td><span class="lay"></span>NAT</td><td>IP + port</td><td>Sửa source hoặc destination IP/port</td></tr>
+<tr class="t-k8s"><td><span class="lay"></span>Load balancer (kube-proxy)</td><td>Service IP + port</td><td>Sửa destination thành IP của một backend ngẫu nhiên</td></tr>
+</tbody></table></div>
+<p><b>SDN</b> (Software-Defined Networking) tách control plane ra một <b>controller</b> chạy phần mềm thường; controller tính toán rồi cài flow table xuống các switch qua API <span class="bk">§5.5</span>. Kubernetes làm điều rất giống: control plane quyết định Service nào trỏ tới pod nào, và một agent trên mỗi node (kube-proxy, hoặc Cilium với eBPF) cài match+action tương ứng vào kernel.</p>
+<p><b>Middlebox</b> <span class="bk">§4.5</span> là mọi thiết bị ở giữa làm hơn việc forward: NAT, firewall, load balancer, IDS, proxy. Chúng có ích nhưng phá end-to-end principle và là nguồn gốc của nhiều sự cố khó debug (connection bị cắt khi idle, header bị sửa, MTU).</p>
+
+<h2>Linux netfilter: iptables và nftables</h2>
+<p>Trong Linux, match+action nằm trong framework <b>netfilter</b> của kernel. Packet đi qua 5 <b>hook</b>; tại mỗi hook, kernel duyệt các <b>chain</b> rule tương ứng. <code>iptables</code> và <code>nftables</code> là hai công cụ để viết rule vào đó.</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 260" role="img" aria-label="Đường đi của packet qua các hook của netfilter">
+  <g class="t-app"><rect class="f" x="60" y="150" width="130" height="54" rx="7"/><text x="125" y="172" class="t-c t-b">PREROUTING</text><text x="125" y="190" class="t-c t-s">raw · mangle · nat (DNAT)</text></g>
+  <path d="M250 147 L282 175 L250 203 L218 175 Z" class="sunk"/><text x="250" y="172" class="t-c t-s t-b">route</text><text x="250" y="185" class="t-c t-s">?</text>
+  <g class="t-sec"><rect class="f" x="320" y="150" width="130" height="54" rx="7"/><text x="385" y="172" class="t-c t-b">FORWARD</text><text x="385" y="190" class="t-c t-s">mangle · filter</text></g>
+  <g class="t-net"><rect class="f" x="520" y="150" width="140" height="54" rx="7"/><text x="590" y="172" class="t-c t-b">POSTROUTING</text><text x="590" y="190" class="t-c t-s">mangle · nat (SNAT)</text></g>
+  <g class="t-sec"><rect class="f" x="185" y="26" width="130" height="54" rx="7"/><text x="250" y="48" class="t-c t-b">INPUT</text><text x="250" y="66" class="t-c t-s">mangle · filter</text></g>
+  <rect class="box" x="335" y="26" width="120" height="54" rx="7"/><text x="395" y="48" class="t-c t-b">process</text><text x="395" y="66" class="t-c t-s t-m">socket của app</text>
+  <g class="t-tra"><rect class="f" x="520" y="26" width="140" height="54" rx="7"/><text x="590" y="48" class="t-c t-b">OUTPUT</text><text x="590" y="66" class="t-c t-s">raw · mangle · nat · filter</text></g>
+  <line class="ln-ink" x1="4" y1="177" x2="52" y2="177"/><path class="ah" d="M60 177 l-10 -5 v10 z"/>
+  <text x="4" y="168" class="t-s t-m">vào</text>
+  <line class="ln-ink" x1="190" y1="177" x2="210" y2="177"/><path class="ah" d="M218 177 l-10 -5 v10 z"/>
+  <line class="ln-ink" x1="282" y1="177" x2="312" y2="177"/><path class="ah" d="M320 177 l-10 -5 v10 z"/>
+  <text x="300" y="222" class="t-c t-s t-m">đi tiếp</text>
+  <line class="ln-ink" x1="450" y1="177" x2="512" y2="177"/><path class="ah" d="M520 177 l-10 -5 v10 z"/>
+  <line class="ln-ink" x1="660" y1="177" x2="704" y2="177"/><path class="ah" d="M714 177 l-10 -5 v10 z"/>
+  <text x="690" y="168" class="t-c t-s t-m">ra</text>
+  <line class="ln-ink" x1="250" y1="147" x2="250" y2="88"/><path class="ah" d="M250 80 l-5 10 h10 z"/>
+  <text x="258" y="120" class="t-s t-m">cho chính host</text>
+  <line class="ln-ink" x1="315" y1="53" x2="327" y2="53"/><path class="ah" d="M335 53 l-10 -5 v10 z"/>
+  <line class="ln-ink" x1="455" y1="53" x2="512" y2="53"/><path class="ah" d="M520 53 l-10 -5 v10 z"/>
+  <line class="ln-ink" x1="590" y1="80" x2="590" y2="142"/><path class="ah" d="M590 150 l-5 -10 h10 z"/>
+  <text x="125" y="236" class="t-c t-s t-m">kube-proxy: DNAT Service IP</text>
+  <text x="385" y="236" class="t-c t-s t-m">NetworkPolicy, Docker isolation</text>
+  <text x="590" y="236" class="t-c t-s t-m">MASQUERADE ra ngoài</text>
+</svg></div>
+<figcaption>Packet tới chính host: PREROUTING → INPUT → process. Packet đi xuyên qua (router, node chuyển traffic cho pod): PREROUTING → FORWARD → POSTROUTING. Packet do process tạo ra: OUTPUT → POSTROUTING. DNAT phải làm ở PREROUTING (hoặc OUTPUT) vì nó đổi đích trước khi kernel quyết định route.</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th>Khái niệm</th><th>Ý nghĩa</th></tr></thead>
+<tbody>
+<tr><td><b>Table</b></td><td>Nhóm rule theo mục đích: <code>filter</code> (cho/chặn), <code>nat</code> (sửa address), <code>mangle</code> (sửa field khác: TTL, MSS, mark), <code>raw</code> (bỏ qua conntrack)</td></tr>
+<tr><td><b>Chain</b></td><td>Danh sách rule gắn với một hook (INPUT, FORWARD…) hoặc chain tự đặt tên để gọi tới (DOCKER, KUBE-SERVICES)</td></tr>
+<tr><td><b>Rule</b></td><td>Match (<code>-p tcp --dport 8443 -s 10.0.0.0/8</code>) + target (<code>-j ACCEPT</code>). Duyệt <b>từ trên xuống, rule đầu tiên khớp thì dừng</b></td></tr>
+<tr><td><b>Policy</b></td><td>Hành động mặc định khi không rule nào khớp. Firewall an toàn: policy <b>DROP</b>, chỉ mở thứ cần thiết</td></tr>
+<tr><td><b>Target</b></td><td><code>ACCEPT</code>, <code>DROP</code> (im lặng → client ETIMEDOUT), <code>REJECT</code> (trả RST/ICMP → ECONNREFUSED), <code>DNAT</code>, <code>SNAT</code>, <code>MASQUERADE</code>, <code>LOG</code>, nhảy sang chain khác</td></tr>
+<tr><td><b>conntrack state</b></td><td><code>NEW</code>, <code>ESTABLISHED</code>, <code>RELATED</code>, <code>INVALID</code>. Rule <code>--ctstate ESTABLISHED,RELATED -j ACCEPT</code> biến firewall thành <b>stateful</b>: reply của connection đã cho phép tự đi qua</td></tr>
+</tbody></table></div>
+<p><b>nftables</b> là thế hệ sau của iptables: một công cụ <code>nft</code> cho mọi loại (IPv4, IPv6, ARP, bridge), cú pháp gọn hơn, cập nhật rule nguyên khối. Trên Ubuntu 24.04, lệnh <code>iptables</code> thực chất là <code>iptables-nft</code>: cú pháp cũ nhưng ghi vào nftables (Q4).</p>
+<script type="text/plain" class="code" data-lang="bash" data-file="Cùng một firewall, hai cú pháp">
+# iptables
+iptables -P INPUT DROP
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p tcp --dport 8443 -s 10.0.0.0/8 -j ACCEPT
+
+# nftables (file /etc/nftables.conf, nạp bằng: nft -f /etc/nftables.conf)
+table inet fw {
+  chain input {
+    type filter hook input priority 0; policy drop;
+    iif "lo" accept
+    ct state established,related accept
+    ip saddr 10.0.0.0/8 tcp dport 8443 accept
+  }
+}
+</script>
+<div class="note job"><b>Liên hệ job</b><ul>
+  <li><b>kube-proxy</b> (chế độ iptables) biến mỗi Service thành chuỗi chain: <code>KUBE-SERVICES</code> → <code>KUBE-SVC-…</code> (chọn backend bằng xác suất ngẫu nhiên) → <code>KUBE-SEP-…</code> (DNAT tới IP:port của pod). Lab 7.3 tự viết lại cơ chế này.</li>
+  <li><b>NetworkPolicy</b> là firewall cho pod. Tuỳ CNI, nó thành rule iptables/nftables hoặc chương trình eBPF. Bị policy chặn thường thấy ở client là <b>timeout</b> (DROP), không phải refused.</li>
+  <li>Thứ tự rule là nguồn bug số một: một rule DROP rộng đặt trước rule ACCEPT hẹp sẽ chặn luôn traffic hợp lệ.</li>
+</ul></div>
+
+<h3>Network management: NETCONF và YANG</h3>
+<p>Cấu hình hàng nghìn router và network function bằng tay qua CLI không khả thi. Cách hiện đại <span class="bk">§5.7</span>: mô tả cấu hình và trạng thái bằng <b>YANG</b> (data modeling language), rồi đọc/ghi qua protocol <b>NETCONF</b> (XML trên SSH) hoặc <b>RESTCONF</b> (REST/JSON). NETCONF có transaction: áp cả bộ cấu hình, lỗi thì rollback. Các network function trong core network của nhà mạng thường được quản lý (O&amp;M) theo cách này, và tài khoản/quyền truy cập NETCONF cũng là một phần của security mà platform phải lo. SNMP là cách cũ, chủ yếu còn dùng để đọc metric.</p>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m07" data-title="Kiểm tra module 07">
+[
+ {"q":"Chạy Dijkstra từ u trên đồ thị của bài (Figure 5.3). Least-cost path tới z có cost bao nhiêu và next hop là gì?","o":["cost 4, next hop x","cost 5, next hop w","cost 6, next hop v","cost 4, next hop v"],"a":0,
+  "e":"u → x → y → z = 1 + 1 + 2 = 4. Forwarding table của u chỉ cần ghi: z → x."},
+ {"q":"Điều nào đúng với link-state routing?","o":["Mỗi router biết toàn bộ topology","Dùng Bellman-Ford","Hay bị count-to-infinity","Mỗi router chạy Dijkstra"],"a":[0,3],
+  "e":"LS flood thông tin link cho mọi router, mỗi router tự chạy Dijkstra. Bellman-Ford và count-to-infinity thuộc về distance-vector."},
+ {"q":"OSPF và BGP khác nhau cơ bản ở mục tiêu nào?","o":["OSPF cho IPv6, BGP cho IPv4","OSPF tìm least-cost path trong một AS; BGP chọn route giữa các AS theo policy","BGP nhanh hơn","OSPF chỉ dùng ở nhà"],"a":1,
+  "e":"Trong một AS, admin muốn performance. Giữa các AS, quyết định dựa trên hợp đồng kinh doanh (ai trả tiền cho ai), nên BGP ưu tiên policy (local preference) trước độ dài AS-PATH."},
+ {"q":"AS 666 quảng bá prefix <code>203.0.113.0/25</code>, trong khi chủ thật quảng bá <code>203.0.113.0/24</code>. Traffic tới <code>203.0.113.10</code> trên Internet sẽ đi đâu?","o":["Tới chủ thật, vì /24 có trước","Tới AS 666, vì router chọn longest prefix match","Chia đôi","Bị drop"],"a":1,
+  "e":"/25 cụ thể hơn /24. Đây là cơ chế của BGP hijacking. RPKI giúp router từ chối quảng bá không có ROA hợp lệ."},
+ {"q":"Trong generalized forwarding (match + action), NAT tương ứng với:","o":["Match destination MAC, forward","Match IP + port, action sửa address/port trong header","Match port, drop","Không biểu diễn được"],"a":1,
+  "e":"Router: match prefix → forward. Firewall: match → drop/accept. NAT: match → modify header. Cùng một mô hình."},
+ {"q":"Packet từ client gửi tới một process đang listen trên chính host đi qua các hook nào?","o":["PREROUTING → FORWARD → POSTROUTING","PREROUTING → INPUT","OUTPUT → POSTROUTING","INPUT → OUTPUT"],"a":1,
+  "e":"Đích là chính host nên sau route decision vào INPUT rồi tới socket. FORWARD chỉ dành cho packet đi xuyên qua."},
+ {"q":"Vì sao DNAT cho Service IP nằm ở PREROUTING (và OUTPUT) chứ không ở POSTROUTING?","o":["Quy ước, không có lý do","Phải đổi destination trước khi kernel quyết định route, để packet được route tới backend thật","POSTROUTING không có table nat","Vì DNAT chậm"],"a":1,
+  "e":"Route decision dựa trên destination. Đổi destination sau khi đã route thì packet đi sai hướng. Ngược lại SNAT làm ở POSTROUTING vì chỉ cần biết interface ra."},
+ {"q":"INPUT chain có policy DROP và các rule theo thứ tự: (1) <code>-p tcp -j DROP</code>, (2) <code>-p tcp --dport 8443 -j ACCEPT</code>. Connection tới port 8443 thế nào?","o":["Được phép, vì rule 2 cụ thể hơn","Bị chặn, vì rule 1 khớp trước và dừng duyệt","Tuỳ conntrack","Bị REJECT"],"a":1,
+  "e":"iptables không chọn rule cụ thể nhất như routing. Nó dừng ở rule đầu tiên khớp. Phải đặt ACCEPT hẹp lên trước."},
+ {"q":"Host có INPUT policy DROP, chỉ ACCEPT port 22. Process trên host gọi <code>curl https://example.com</code> nhưng không nhận được response. Thiếu rule nào?","o":["ACCEPT port 443 trong OUTPUT","<code>-m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT</code> trong INPUT","DNAT port 443","MASQUERADE"],"a":1,
+  "e":"Response từ example.com đi vào INPUT với source port 443, không khớp rule port 22 nên bị DROP. Rule ESTABLISHED,RELATED cho phép reply của connection do chính host mở."},
+ {"q":"kube-proxy cài 3 rule cho 3 backend: probability 0.333, rồi 0.5, rồi rule cuối không điều kiện. Mỗi backend nhận khoảng bao nhiêu phần connection mới?","o":["33%, 50%, 100%","33%, 33%, 33%","50%, 25%, 25%","33%, 17%, 50%"],"a":1,
+  "e":"Rule 1: 1/3. Phần còn lại 2/3 tới rule 2, lấy một nửa = 1/3. Còn lại 1/3 cho rule 3. Mỗi backend 1/3."},
+ {"q":"Firewall dùng <code>-j DROP</code> thay vì <code>-j REJECT</code>. Client thấy gì?","o":["ECONNREFUSED ngay","ETIMEDOUT sau một lúc","HTTP 403","Không khác gì"],"a":1,
+  "e":"DROP im lặng → client retransmit SYN rồi timeout. REJECT trả RST hoặc ICMP unreachable → refused ngay. DROP làm kẻ quét port mất thời gian hơn nhưng cũng làm debug khó hơn."},
+ {"q":"NETCONF và YANG dùng để làm gì?","o":["Mã hoá traffic","Quản lý cấu hình network device/NF: YANG mô tả dữ liệu, NETCONF đọc/ghi có transaction","Routing giữa các AS","Thay thế DNS"],"a":1,
+  "e":"Đây là cách tự động hoá cấu hình phổ biến trong mạng nhà mạng; RESTCONF là biến thể REST/JSON."}
+]
+</script>
+
+<h3>Ôn lại module 04–06</h3>
+<script type="application/json" class="quiz" data-id="m07-review" data-title="Ôn lại">
+[
+ {"q":"Router A nhận datagram tới <code>10.244.1.37</code>. Forwarding table có <code>10.244.0.0/16</code> và <code>10.244.1.0/24</code>. Chọn dòng nào?","o":["/16 vì có trước","/24 vì longest prefix match","Cả hai","Default route"],"a":1,
+  "e":"Module 06. Routing protocol trong module này là thứ điền các dòng đó vào bảng."},
+ {"q":"Pod A gọi Service B và bị timeout. Pod B vẫn chạy và listen đúng port. Nghi ngờ hợp lý đầu tiên?","o":["DNS sai","Có NetworkPolicy/firewall DROP traffic","B quên close() socket","Certificate hết hạn"],"a":1,
+  "e":"Module 04: timeout = packet bị drop âm thầm. Nếu B không listen thì sẽ là refused. Kiểm tra NetworkPolicy và chain FORWARD."},
+ {"q":"MSS clamping ở Lab 6.3 được cài vào table/chain nào?","o":["filter INPUT","nat PREROUTING","mangle FORWARD","raw OUTPUT"],"a":2,
+  "e":"Sửa field trong TCP header (không phải address) là việc của table mangle; packet đi xuyên router nên ở chain FORWARD."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"07 Routing & netfilter","c":[
+ {"t":"Routing algorithm","col":"net","c":[{"t":"Graph, link cost, least-cost path"},{"t":"Link-state: Dijkstra, biết cả topology"},{"t":"Distance-vector: Bellman-Ford"},{"t":"Count-to-infinity"},{"t":"Kết quả: đích → next hop"}]},
+ {"t":"Internet routing","col":"app","c":[{"t":"AS, ASN"},{"t":"OSPF: intra-AS, area"},{"t":"BGP: inter-AS, policy, AS-PATH"},{"t":"Anycast"},{"t":"Hijacking → RPKI, ROA"}]},
+ {"t":"Generalized forwarding","col":"k8s","c":[{"t":"Match + action"},{"t":"Router, switch, firewall, NAT, LB"},{"t":"SDN controller, OpenFlow"},{"t":"Middlebox phá end-to-end"}]},
+ {"t":"Netfilter","col":"sec","c":[{"t":"Hook: PREROUTING, INPUT, FORWARD, OUTPUT, POSTROUTING"},{"t":"Table: raw, mangle, nat, filter"},{"t":"Rule đầu tiên khớp thì dừng"},{"t":"Policy DROP + ESTABLISHED,RELATED"},{"t":"DROP → timeout, REJECT → refused"},{"t":"iptables-nft, nftables"}]},
+ {"t":"Kubernetes","col":"tra","c":[{"t":"kube-proxy: KUBE-SVC, KUBE-SEP, DNAT"},{"t":"statistic random → load balancing"},{"t":"NetworkPolicy: iptables / eBPF"},{"t":"BGP: Calico, MetalLB"}]},
+ {"t":"Management","col":"core","c":[{"t":"YANG: data model"},{"t":"NETCONF / RESTCONF"},{"t":"SNMP (cũ)"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 7.1 · Dijkstra, distance-vector và count-to-infinity</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Python</span><span class="chip t-base">40 phút</span></div>
+  <p>Viết ba hàm trên đồ thị Figure 5.3:</p>
+  <ol>
+    <li><code>dijkstra(g, src)</code> dùng <code>heapq</code>, trả về cost và predecessor; từ đó in <b>forwarding table</b> (đích → next hop) của u. So với widget ở trên.</li>
+    <li><code>distance_vector(g)</code>: mô phỏng đồng bộ, mỗi round mọi node áp Bellman-Ford với vector của neighbor ở round trước. Đếm số round tới khi hội tụ và kiểm tra kết quả giống Dijkstra.</li>
+    <li>Tái hiện count-to-infinity với đồ thị 3 node của sách (Figure 5.7): x–y = 4, y–z = 1, x–z = 50; sau khi hội tụ, đổi x–y thành 60 và đếm số round để hội tụ lại.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> forwarding table của u khớp với widget, DV cho cùng cost với Dijkstra, và bạn giải thích được vì sao phần 3 tốn nhiều round như vậy.</p>
+  <details><summary>Gợi ý</summary><p>Lưu graph dạng dict lồng nhau <code>g[a][b] = cost</code>. Next hop: đi ngược predecessor từ đích tới khi gặp node có predecessor là source. Bellman-Ford: <code>min(g[x][v] + D[v][y] for v in g[x])</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m07/routing.py">
+#!/usr/bin/env python3
+"""Link-state (Dijkstra) và distance-vector (Bellman-Ford) trên các đồ thị trong Kurose & Ross Ch.5."""
+import heapq
+
+INF = float("inf")
+FIG_5_3 = {("u", "v"): 2, ("u", "x"): 1, ("u", "w"): 5, ("v", "x"): 2, ("v", "w"): 3,
+           ("x", "w"): 3, ("x", "y"): 1, ("w", "y"): 1, ("w", "z"): 5, ("y", "z"): 2}
+
+
+def graph(links: dict) -> dict:
+    g = {}
+    for (a, b), c in links.items():
+        g.setdefault(a, {})[b] = c
+        g.setdefault(b, {})[a] = c
+    return g
+
+
+def dijkstra(g: dict, src: str):
+    dist, prev, done = {src: 0}, {}, set()
+    pq = [(0, src)]
+    while pq:
+        d, n = heapq.heappop(pq)
+        if n in done:
+            continue
+        done.add(n)                                   # n vào N': cost tới n đã chắc chắn
+        for m, c in g[n].items():
+            if d + c < dist.get(m, INF):
+                dist[m], prev[m] = d + c, n
+                heapq.heappush(pq, (d + c, m))
+    return dist, prev
+
+
+def forwarding_table(prev: dict, src: str) -> dict:
+    table = {}
+    for dst in prev:
+        hop = dst
+        while prev[hop] != src:                       # đi ngược tới node ngay sau source
+            hop = prev[hop]
+        table[dst] = hop
+    return table
+
+
+def dv_round(g: dict, D: dict) -> dict:
+    """Một round đồng bộ: mọi node x tính d_x(y) = min_v c(x,v) + d_v(y) từ vector cũ của neighbor."""
+    return {x: {y: 0 if x == y else min(g[x][v] + D[v][y] for v in g[x]) for y in g} for x in g}
+
+
+def distance_vector(g: dict, D: dict | None = None, max_rounds: int = 500):
+    if D is None:                                     # ban đầu chỉ biết cost tới neighbor
+        D = {x: {y: 0 if x == y else g[x].get(y, INF) for y in g} for x in g}
+    for r in range(1, max_rounds + 1):
+        new = dv_round(g, D)
+        if new == D:
+            return D, r - 1                           # số round còn có thay đổi
+        D = new
+    return D, max_rounds
+
+
+if __name__ == "__main__":
+    g = graph(FIG_5_3)
+    dist, prev = dijkstra(g, "u")
+    print("Dijkstra từ u:", dict(sorted(dist.items())))
+    print("Forwarding table của u:", dict(sorted(forwarding_table(prev, "u").items())))
+
+    D, rounds = distance_vector(g)
+    print(f"DV hội tụ sau {rounds} round; D_u =", dict(sorted(D["u"].items())))
+    assert D["u"] == dist, "DV và Dijkstra phải cho cùng kết quả"
+
+    g3 = graph({("x", "y"): 4, ("y", "z"): 1, ("x", "z"): 50})
+    D3, _ = distance_vector(g3)
+    print(f"\nFigure 5.7 trước: D_y(x) = {D3['y']['x']}, D_z(x) = {D3['z']['x']}")
+    g3["x"]["y"] = g3["y"]["x"] = 60                   # link x–y tăng cost đột ngột
+    D3, rounds = distance_vector(g3, D3)
+    print(f"Sau khi x–y = 60: {rounds} round mới hội tụ, D_y(x) = {D3['y']['x']}, D_z(x) = {D3['z']['x']}")
+</script>
+<script type="text/plain" class="term">
+$ python3 routing.py
+Dijkstra từ u: {'u': 0, 'v': 2, 'w': 3, 'x': 1, 'y': 2, 'z': 4}
+Forwarding table của u: {'v': 'v', 'w': 'x', 'x': 'x', 'y': 'x', 'z': 'x'}
+DV hội tụ sau 2 round; D_u = {'u': 0, 'v': 2, 'w': 3, 'x': 1, 'y': 2, 'z': 4}
+
+Figure 5.7 trước: D_y(x) = 4, D_z(x) = 5
+Sau khi x–y = 60: 47 round mới hội tụ, D_y(x) = 51, D_z(x) = 50
+</script>
+  <p><b>Vì sao 47 round:</b> y thấy z báo "tới x mất 5" nên chọn đi qua z với cost 6, không biết đường của z lại đi qua chính y. z cập nhật lên 7, y lên 8… mỗi hai round tăng 2, cho tới khi vượt 50 (link trực tiếp z–x) thì mới dừng. Sách đếm 44 lần lặp theo cách bất đồng bộ; con số khác nhau một chút nhưng hiện tượng y hệt. Kỹ thuật <i>poisoned reverse</i> (z báo cho y là "∞" với các đích mà z đi qua y) chữa được trường hợp 3 node này nhưng không chữa được mọi trường hợp.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 7.2 · Viết stateful firewall cho một host</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Docker · iptables</span><span class="chip t-base">40 phút</span></div>
+  <p>Container <code>fw</code> (172.30.0.2) chạy hai service: port 8443 (API) và port 9000 (admin). Viết firewall cho INPUT của <code>fw</code>:</p>
+  <ul>
+    <li>Policy mặc định DROP; cho phép loopback và reply của connection đã mở (ESTABLISHED, RELATED).</li>
+    <li>Port 8443 chỉ cho client <code>172.30.0.10</code>; client khác bị DROP.</li>
+    <li>Port 9000 bị REJECT với mọi người (để so sánh refused với timeout).</li>
+    <li>Cho ping, giới hạn 5 packet/giây.</li>
+  </ul>
+  <p>Kiểm tra từ hai client <code>172.30.0.10</code> (được phép) và <code>172.30.0.20</code> (không được phép), rồi đọc bộ đếm packet của từng rule.</p>
+  <p class="done-when"><b>Xong khi:</b> bảng 2 client × 3 phép thử (8443, 9000, ping) ra đúng: succeeded / refused / timed out như thiết kế, và bộ đếm của rule khớp với số lần thử.</p>
+  <details><summary>Gợi ý</summary><p>Rule chạy trong network namespace của container: <code>docker exec fw iptables …</code> (container cần <code>--cap-add NET_ADMIN</code>). Thử port bằng <code>nc -zv -w 3 IP PORT</code>. Bộ đếm: <code>iptables -L INPUT -n -v --line-numbers</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker network create --subnet 172.30.0.0/24 fwlab
+$ docker run -d --name fw --network fwlab --ip 172.30.0.2 --cap-add NET_ADMIN nicolaka/netshoot sh -c \
+    'socat TCP-LISTEN:8443,fork,reuseaddr EXEC:"echo api" & socat TCP-LISTEN:9000,fork,reuseaddr EXEC:"echo admin" & sleep infinity'
+$ docker exec -i fw sh <<'EOF'
+> iptables -P INPUT DROP
+> iptables -A INPUT -i lo -j ACCEPT
+> iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+> iptables -A INPUT -p tcp --dport 8443 -s 172.30.0.10 -j ACCEPT
+> iptables -A INPUT -p tcp --dport 9000 -j REJECT --reject-with tcp-reset
+> iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/second -j ACCEPT
+> EOF
+$ for ip in 172.30.0.10 172.30.0.20; do
+>   echo "== client $ip"
+>   docker run --rm --network fwlab --ip $ip nicolaka/netshoot sh -c \
+>     'nc -zv -w 3 172.30.0.2 8443; nc -zv -w 3 172.30.0.2 9000; ping -c 2 -W 1 172.30.0.2 | tail -2'
+> done
+== client 172.30.0.10
+Connection to 172.30.0.2 8443 port [tcp/*] succeeded!
+nc: connect to 172.30.0.2 port 9000 (tcp) failed: Connection refused    ◀ REJECT
+2 packets transmitted, 2 received, 0% packet loss
+== client 172.30.0.20
+nc: connect to 172.30.0.2 port 8443 (tcp) timed out                     ◀ policy DROP
+nc: connect to 172.30.0.2 port 9000 (tcp) failed: Connection refused
+2 packets transmitted, 2 received, 0% packet loss
+$ docker exec fw iptables -L INPUT -n -v --line-numbers
+Chain INPUT (policy DROP 4 packets, 240 bytes)                          ◀ SYN bị drop (có retransmit)
+num  pkts bytes target  prot  source        destination
+1       0     0 ACCEPT  all   0.0.0.0/0     0.0.0.0/0
+2      10   544 ACCEPT  all   0.0.0.0/0     0.0.0.0/0   ctstate RELATED,ESTABLISHED
+3       1    60 ACCEPT  tcp   172.30.0.10   0.0.0.0/0   tcp dpt:8443
+4       2   120 REJECT  tcp   0.0.0.0/0     0.0.0.0/0   tcp dpt:9000 reject-with tcp-reset
+5       4   336 ACCEPT  icmp  0.0.0.0/0     0.0.0.0/0   icmptype 8 limit: avg 5/sec burst 5
+$ docker rm -f fw; docker network rm fwlab
+</script>
+  <p class="small muted">Output của <code>nc</code> trong netshoot có thể khác chút về chữ; số packet trong bộ đếm cũng tuỳ số lần retransmit. Điều cần thấy: rule 3 chỉ khớp 1 lần (client được phép), policy DROP nuốt SYN của client còn lại, và rule ESTABLISHED gánh mọi packet sau handshake. Mở rộng: viết lại cùng firewall bằng <code>nft</code> theo mẫu ở trên.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 7.3 · Tự viết kube-proxy bằng iptables</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Docker · iptables nat</span><span class="chip t-base">40 phút</span></div>
+  <p>Dựng 3 backend (<code>be1</code>, <code>be2</code>, <code>be3</code>) trả về hostname của chúng. Trong container client, tạo một "Service IP" ảo <code>10.99.0.10:80</code> không gắn với máy nào: mọi connection mới tới IP này được DNAT ngẫu nhiên, đều nhau, tới một trong 3 backend. Gọi 30 lần và đếm phân bố.</p>
+  <p class="done-when"><b>Xong khi:</b> 30 lần curl chia khoảng đều cho 3 backend, và bạn giải thích được vì sao xác suất trong rule là 1/3, 1/2, 1 chứ không phải 1/3, 1/3, 1/3.</p>
+  <details><summary>Gợi ý</summary><p>Tạo chain riêng <code>MINI-SVC</code> trong table nat; nhảy vào nó từ OUTPUT khi <code>-d 10.99.0.10 -p tcp --dport 80</code>. Chọn ngẫu nhiên bằng <code>-m statistic --mode random --probability P</code>. Mỗi lần curl là một connection mới nên conntrack quyết định DNAT lại.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker network create --subnet 172.31.0.0/24 svclab
+$ for i in 1 2 3; do
+>   docker run -d --name be$i --hostname be$i --network svclab --ip 172.31.0.1$i nicolaka/netshoot \
+>     socat TCP-LISTEN:80,fork,reuseaddr SYSTEM:'printf "HTTP/1.0 200 OK\r\n\r\n"; hostname'
+> done
+$ docker run -it --rm --name cli --network svclab --cap-add NET_ADMIN nicolaka/netshoot bash
+cli$ VIP=10.99.0.10
+cli$ iptables -t nat -N MINI-SVC
+cli$ iptables -t nat -A OUTPUT -d $VIP -p tcp --dport 80 -j MINI-SVC
+cli$ iptables -t nat -A MINI-SVC -m statistic --mode random --probability 0.33333 -j DNAT --to-destination 172.31.0.11:80
+cli$ iptables -t nat -A MINI-SVC -m statistic --mode random --probability 0.5 -j DNAT --to-destination 172.31.0.12:80
+cli$ iptables -t nat -A MINI-SVC -j DNAT --to-destination 172.31.0.13:80
+cli$ for i in $(seq 30); do curl -s $VIP; done | sort | uniq -c
+     11 be1
+      9 be2
+     10 be3
+cli$ iptables -t nat -L MINI-SVC -n -v
+cli$ exit
+$ docker rm -f be1 be2 be3; docker network rm svclab
+</script>
+  <p><b>Vì sao 1/3, 1/2, 1:</b> rule được duyệt lần lượt. Rule 1 lấy 1/3. Connection không trúng rule 1 (2/3 còn lại) sang rule 2, lấy một nửa của phần đó = 1/3. Phần còn lại 1/3 rơi vào rule 3. kube-proxy sinh đúng dãy xác suất này cho mỗi Service: với n backend, rule thứ i có probability 1/(n−i+1). Trên cluster thật, xem bằng <code>sudo iptables-save -t nat | grep KUBE-SVC</code> trên một node (module 14).</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 7.4 · Hai router và route chiều về bị thiếu</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Docker · ip route · tcpdump</span><span class="chip t-base">50 phút</span></div>
+  <p>Dựng topology 3 subnet nối bằng 2 router: <code>c</code> (10.1.0.10) — <code>r1</code> — <code>r2</code> — <code>s</code> (10.3.0.10). Cấu hình static route cho chiều đi nhưng <b>cố ý quên</b> route chiều về trên <code>r2</code>. Ping từ c tới s thất bại. Dùng tcpdump trên từng router để tìm chính xác chỗ gãy, sửa, rồi traceroute để thấy đủ 3 hop và quan sát TTL.</p>
+  <p class="done-when"><b>Xong khi:</b> chỉ ra được dòng tcpdump chứng minh echo request tới s và echo reply bị kẹt ở r2; sau khi sửa, traceroute có 3 dòng và ping báo <code>ttl=62</code>.</p>
+  <details><summary>Gợi ý</summary><p>Router cần <code>--sysctl net.ipv4.ip_forward=1</code>. Docker dành address <code>.1</code> của mỗi network cho host, nên router dùng address khác. Xoá default route của r2 để lỗi lộ rõ thay vì packet đi lạc ra host. Lệnh debug: <code>ip route get ĐÍCH</code> trên từng node, <code>tcpdump -nn -i any icmp</code> trên router.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ for n in 1 2 3; do docker network create --subnet 10.$n.0.0/24 rt$n; done
+$ R='--cap-add NET_ADMIN --sysctl net.ipv4.ip_forward=1 --sysctl net.ipv4.conf.all.rp_filter=0 --sysctl net.ipv4.conf.default.rp_filter=0'
+$ docker run -d --name r1 --network rt1 --ip 10.1.0.254 $R nicolaka/netshoot sleep infinity
+$ docker network connect --ip 10.2.0.11 rt2 r1
+$ docker run -d --name r2 --network rt2 --ip 10.2.0.12 $R nicolaka/netshoot sleep infinity
+$ docker network connect --ip 10.3.0.254 rt3 r2
+$ docker run -d --name c --network rt1 --ip 10.1.0.10 --cap-add NET_ADMIN nicolaka/netshoot sleep infinity
+$ docker run -d --name s --network rt3 --ip 10.3.0.10 --cap-add NET_ADMIN nicolaka/netshoot sleep infinity
+$ docker exec c  ip route add 10.3.0.0/24 via 10.1.0.254
+$ docker exec r1 ip route add 10.3.0.0/24 via 10.2.0.12
+$ docker exec s  ip route add 10.1.0.0/24 via 10.3.0.254
+$ docker exec r2 ip route del default                  # r2: KHÔNG có route về 10.1.0.0/24
+$ docker exec c ping -c 2 -W 1 10.3.0.10 | tail -1
+2 packets transmitted, 0 received, 100% packet loss
+$ docker exec r2 sh -c 'timeout 5 tcpdump -nn -i any icmp & sleep 1; ip route get 10.1.0.10; wait'
+RTNETLINK answers: Network is unreachable                                  ◀ r2 không biết đường về
+eth0 In  IP 10.1.0.10 > 10.3.0.10: ICMP echo request, id 9, seq 1         ◀ chiều đi tới r2: OK
+eth1 Out IP 10.1.0.10 > 10.3.0.10: ICMP echo request, id 9, seq 1         ◀ r2 forward tới s: OK
+eth1 In  IP 10.3.0.10 > 10.1.0.10: ICMP echo reply, id 9, seq 1           ◀ s đã trả lời
+eth1 Out IP 10.3.0.254 > 10.3.0.10: ICMP net 10.1.0.10 unreachable        ◀ reply kẹt tại r2
+# (chạy song song: docker exec c ping -c 3 10.3.0.10 ở cửa sổ khác để có traffic)
+$ docker exec r2 ip route add 10.1.0.0/24 via 10.2.0.11
+$ docker exec c ping -c 1 10.3.0.10 | grep ttl
+64 bytes from 10.3.0.10: icmp_seq=1 ttl=62 time=0.12 ms                    ◀ 64 − 2 router
+$ docker exec c traceroute -n 10.3.0.10
+ 1  10.1.0.254  0.06 ms
+ 2  10.2.0.12   0.08 ms
+ 3  10.3.0.10   0.10 ms
+$ docker rm -f c s r1 r2; for n in 1 2 3; do docker network rm rt$n; done
+</script>
+  <p><b>Bài học:</b> mỗi chiều được route độc lập. "Ping không được" không có nghĩa chiều đi hỏng; hãy capture ở từng hop để tìm chỗ packet biến mất. Trong cluster, lỗi tương tự xảy ra khi thêm subnet mới mà quên route chiều về, hoặc khi chiều đi và chiều về qua hai firewall khác nhau (asymmetric routing) và firewall stateful drop reply vì không thấy SYN.</p>
+  <p class="small muted">Lab tắt <code>rp_filter</code> (reverse path filter) trên router để thấy rõ từng bước. Trên router thật nên bật: kernel drop packet mà source address không thể đến từ interface đó, một cách chống IP spoofing rẻ tiền. Bật nó lên và chạy lại phần lỗi, xem r2 còn forward echo request không.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m07"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §5.4.5 (BGP routing policy, quan hệ customer/provider/peer) và §5.5 (SDN control plane, OpenDaylight, ONOS) đọc lướt. §5.2.2 có ví dụ đầy đủ về poisoned reverse.</li>
+  <li><a href="https://www.netfilter.org/documentation/" target="_blank" rel="noopener">netfilter.org documentation</a> và <a href="https://wiki.nftables.org/" target="_blank" rel="noopener">nftables wiki</a>: tra cú pháp.</li>
+  <li><a href="https://kubernetes.io/docs/reference/networking/virtual-ips/" target="_blank" rel="noopener">Kubernetes: Virtual IPs and Service Proxies</a>: kube-proxy ở chế độ iptables, IPVS, nftables.</li>
+  <li><a href="https://blog.cloudflare.com/rpki/" target="_blank" rel="noopener">Cloudflare: RPKI and BGP</a> và <a href="https://isbgpsafeyet.com/" target="_blank" rel="noopener">isbgpsafeyet.com</a>: kiểm tra ISP của bạn có lọc route bằng RPKI không.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc6241" target="_blank" rel="noopener">RFC 6241 – NETCONF</a> và <a href="https://www.rfc-editor.org/rfc/rfc7950" target="_blank" rel="noopener">RFC 7950 – YANG 1.1</a>: tra cứu khi gặp ở công ty.</li>
+</ul>

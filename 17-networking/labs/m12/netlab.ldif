@@ -1,0 +1,29 @@
+dn: ou=people,dc=netlab,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=netlab,dc=local
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=alice,ou=people,dc=netlab,dc=local
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Nguyen
+sn: Nguyen
+
+dn: uid=bob,ou=people,dc=netlab,dc=local
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Tran
+sn: Tran
+
+dn: cn=netops,ou=groups,dc=netlab,dc=local
+objectClass: groupOfNames
+cn: netops
+member: uid=alice,ou=people,dc=netlab,dc=local
+
+dn: cn=auditors,ou=groups,dc=netlab,dc=local
+objectClass: groupOfNames
+cn: auditors
+member: uid=bob,ou=people,dc=netlab,dc=local

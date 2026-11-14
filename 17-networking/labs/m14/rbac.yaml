@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: reader, namespace: security}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: pod-reader, namespace: security}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: reader-pod-reader, namespace: security}
+subjects: [{kind: ServiceAccount, name: reader, namespace: security}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: pod-reader}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: toolbox, namespace: security}
+spec:
+  serviceAccountName: reader
+  containers:
+  - name: t
+    image: nicolaka/netshoot:v0.13
+    command: ["sleep", "infinity"]

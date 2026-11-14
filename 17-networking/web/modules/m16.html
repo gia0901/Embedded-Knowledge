@@ -1,0 +1,1044 @@
+<!-- Core Net Lab · Module 16 · Capstone: mini auth service trên kind -->
+<div class="goals"><h4>Sau capstone này bạn</h4><ul>
+  <li>Tự dựng một hệ thống authentication/authorization hoàn chỉnh trên Kubernetes: CA nội bộ, mTLS giữa mọi workload, OAuth 2.0 token server, resource server.</li>
+  <li>Cài đặt <b>certificate-bound access token</b> (RFC 8705): token bị đánh cắp vô dụng nếu không có private key của client.</li>
+  <li>Áp defense in depth: NetworkPolicy default deny, Pod Security mức restricted, quyền tối thiểu.</li>
+  <li>Vận hành được: xoay vòng certificate không restart, xoay vòng signing key không làm gián đoạn, thu hồi client, truy vết bằng audit log.</li>
+  <li>Viết bộ test chấp nhận (cả ca âm tính) và một threat model cho hệ thống mình xây.</li>
+</ul></div>
+
+<h2>Bạn sẽ xây gì</h2>
+<p>Một phiên bản thu nhỏ của đúng loại hệ thống mà job mô tả: "security and authentication services" cho một cluster platform. Nó cũng chính là mô hình NF gọi NF trong 5G core (module 15): mTLS cho "bạn là ai", token từ một authorization server cho "bạn được gọi API nào".</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 312" role="img" aria-label="Kiến trúc capstone: frontend, reporter, attacker gọi token-server và orders-api; cert-manager cấp cert; audit log">
+  <rect class="empty" x="10" y="20" width="160" height="80" rx="9"/><text x="18" y="35" class="t-s t-m">ns web</text>
+  <rect class="empty" x="10" y="120" width="160" height="80" rx="9"/><text x="18" y="135" class="t-s t-m">ns batch</text>
+  <rect class="empty" x="10" y="225" width="160" height="75" rx="9"/><text x="18" y="240" class="t-s t-m">ns default</text>
+  <g class="t-app"><rect class="f" x="25" y="45" width="130" height="44" rx="7"/><rect class="f" x="25" y="145" width="130" height="44" rx="7"/></g>
+  <text x="90" y="64" class="t-c t-s t-b">frontend</text><text x="90" y="80" class="t-c t-s">scope orders:read</text>
+  <text x="90" y="164" class="t-c t-s t-b">reporter</text><text x="90" y="180" class="t-c t-s">read + write</text>
+  <rect class="box" x="25" y="252" width="130" height="38" rx="7"/><text x="90" y="268" class="t-c t-s t-b">attacker</text><text x="90" y="283" class="t-c t-s t-m">không có cert</text>
+  <rect class="empty" x="280" y="20" width="180" height="120" rx="9"/><text x="288" y="35" class="t-s t-m">ns security</text>
+  <g class="t-sec"><rect class="f" x="300" y="45" width="140" height="44" rx="7"/></g>
+  <text x="370" y="64" class="t-c t-s t-b">token-server</text><text x="370" y="80" class="t-c t-s">OAuth2, JWKS</text>
+  <text x="292" y="110" class="t-s t-m">Secret: k1.pem, k2.pem</text><text x="292" y="127" class="t-s t-m">ConfigMap: clients.json</text>
+  <rect class="empty" x="280" y="180" width="180" height="110" rx="9"/><text x="288" y="195" class="t-s t-m">ns apps</text>
+  <g class="t-k8s"><rect class="f" x="300" y="205" width="140" height="44" rx="7"/></g>
+  <text x="370" y="224" class="t-c t-s t-b">orders-api</text><text x="370" y="240" class="t-c t-s">resource server</text>
+  <text x="292" y="272" class="t-s t-m">verify: chữ ký, aud,</text><text x="292" y="286" class="t-s t-m">scope, cnf</text>
+  <line class="ln-ink" x1="155" y1="60" x2="292" y2="60"/><path class="ah" d="M300 60 l-9 -4.5 v9 z"/>
+  <text x="228" y="52" class="t-c t-s t-b">① token (mTLS)</text>
+  <line class="ln-ink" x1="155" y1="80" x2="294" y2="207"/><path class="ah" d="M300 212 l-10 -2 l5 -7 z"/>
+  <text x="252" y="150" class="t-s t-b">② gọi API</text>
+  <line class="ln dash" x1="430" y1="205" x2="430" y2="97"/><path class="ah-m" d="M430 89 l-4 8 h8 z"/>
+  <text x="436" y="160" class="t-s t-m">JWKS</text>
+  <g class="t-sec"><line class="st" x1="155" y1="271" x2="230" y2="271" style="stroke-width:2;stroke-dasharray:4 3"/></g>
+  <text x="238" y="275" class="t-s t-b" style="fill:var(--bad)">✗</text><text x="160" y="262" class="t-s t-m">NetworkPolicy</text>
+  <g class="t-core"><rect class="f" x="560" y="20" width="150" height="100" rx="9"/></g>
+  <text x="635" y="44" class="t-c t-s t-b">cert-manager</text><text x="635" y="63" class="t-c t-s">ClusterIssuer netlab-ca</text>
+  <text x="635" y="81" class="t-c t-s">cert 24 giờ, tự gia hạn</text><text x="635" y="99" class="t-c t-s t-m">(CA của Lab 10.2)</text>
+  <line class="ln dash" x1="560" y1="70" x2="468" y2="70"/><path class="ah-m" d="M460 70 l9 -4.5 v9 z"/>
+  <text x="514" y="62" class="t-c t-s t-m">cấp cert</text>
+  <rect class="sunk" x="560" y="170" width="150" height="120" rx="9"/>
+  <text x="635" y="194" class="t-c t-s t-b">Audit log</text><text x="635" y="213" class="t-c t-s">JSON trên stdout</text>
+  <text x="635" y="231" class="t-c t-s">allow, deny,</text><text x="635" y="249" class="t-c t-s">token_issued…</text>
+  <text x="635" y="273" class="t-c t-mono">logs | jq</text>
+  <line class="ln dash" x1="440" y1="227" x2="552" y2="227"/><path class="ah-m" d="M560 227 l-9 -4.5 v9 z"/>
+  <text x="500" y="219" class="t-c t-s t-m">log</text>
+</svg></div>
+<figcaption>reporter đi cùng hai đường ① ② như frontend (không vẽ để đỡ rối). Mọi mũi tên là TLS 1.3 với client certificate. Attacker ở namespace <code>default</code> bị NetworkPolicy chặn ngay ở tầng mạng; nếu lọt qua mạng, nó vẫn không có certificate và không có token.</figcaption></figure>
+<script type="application/json" class="seq">
+{"title":"Luồng chính","actors":["frontend (web)","token-server (security)","orders-api (apps)"],"w":230,"steps":[
+ {"sep":"cert-manager đã cấp cert cho cả ba; root CA phân phối qua ConfigMap"},
+ {"f":0,"t":1,"l":"mTLS handshake: client cert\nSAN = spiffe://netlab.local/ns/web/sa/frontend","m":1,"k":"sec"},
+ {"f":0,"t":1,"l":"POST /token\ngrant_type=client_credentials&scope=orders:read","m":1,"k":"sec"},
+ {"note":"client có trong clients.json?\nscope có được phép?","a":1,"b":1},
+ {"f":1,"t":0,"l":"access_token ES256 (kid k1)\ncnf.x5t#S256 = thumbprint của cert","m":1,"k":"sec","d":1},
+ {"f":0,"t":2,"l":"mTLS (cùng client cert) + GET /orders\nAuthorization: Bearer …","m":1,"k":"tra"},
+ {"f":2,"t":1,"l":"GET /.well-known/jwks.json (khi gặp kid lạ)","m":1,"d":1},
+ {"note":"chữ ký, iss, aud, exp\ncnf == thumbprint cert?\nscope có orders:read?","a":2,"b":2},
+ {"f":2,"t":0,"l":"200 OK  (+ audit log: allow)","m":1,"k":"tra","d":1}
+]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Thành phần</th><th>Dựng bằng</th><th>Dùng lại từ</th></tr></thead>
+<tbody>
+<tr><td>CA nội bộ, cert workload 24 giờ</td><td>Intermediate CA của Lab 10.2 + cert-manager ClusterIssuer</td><td>Module 10, Lab 14.4</td></tr>
+<tr><td>mTLS TLS 1.3, tự nạp lại cert</td><td>Python <code>ssl</code>, tạo lại <code>SSLContext</code> khi file đổi</td><td>Module 11, Lab 11.3</td></tr>
+<tr><td>Token server client credentials, JWKS, kid</td><td>Python + PyJWT, ES256</td><td>Lab 12.3, Lab 15.2</td></tr>
+<tr><td>Certificate-bound token</td><td>Claim <code>cnf.x5t#S256</code> (RFC 8705)</td><td>Module 11</td></tr>
+<tr><td>Resource server: aud, scope, 401/403</td><td>Python + PyJWT</td><td>Module 12</td></tr>
+<tr><td>Cách ly mạng, Pod Security, quyền tối thiểu</td><td>NetworkPolicy, PSA restricted, securityContext</td><td>Module 13, 14</td></tr>
+</tbody></table></div>
+
+<h2>Threat model</h2>
+<p>Trước khi viết code, liệt kê mối đe doạ theo <b>STRIDE</b> và control tương ứng. Cột cuối là thứ hệ thống <b>chưa</b> xử lý: một threat model trung thực luôn có cột này.</p>
+<div class="tbl"><table>
+<thead><tr><th>STRIDE</th><th>Ví dụ trong hệ thống này</th><th>Control đã có</th><th>Rủi ro còn lại</th></tr></thead>
+<tbody>
+<tr><td><b>Spoofing</b></td><td>Pod khác giả làm frontend</td><td>mTLS, cert do CA nội bộ cấp; NetworkPolicy</td><td>Ai đọc được Secret <code>frontend-tls</code> là có identity của frontend (cert-manager không ràng buộc cert với ServiceAccount)</td></tr>
+<tr><td><b>Tampering</b></td><td>Sửa scope trong token</td><td>Chữ ký ES256, allowlist thuật toán</td><td>Signing key nằm trong Kubernetes Secret (plaintext trong etcd nếu chưa bật encryption at rest)</td></tr>
+<tr><td><b>Repudiation</b></td><td>"Tôi không hề gọi POST /orders"</td><td>Audit log có identity cert, <code>sub</code>, <code>jti</code>, action</td><td>Log chỉ ở stdout của pod; chưa gửi về nơi chống sửa (SIEM)</td></tr>
+<tr><td><b>Information disclosure</b></td><td>Nghe lén token trên mạng pod</td><td>TLS 1.3 mọi hop; token không chứa dữ liệu nhạy cảm</td><td>Token in ra log/terminal khi debug</td></tr>
+<tr><td><b>Denial of service</b></td><td>Flood token server</td><td>NetworkPolicy giới hạn ai kết nối được</td><td>Chưa có rate limit, chưa đặt resource limits</td></tr>
+<tr><td><b>Elevation of privilege</b></td><td>Token của frontend bị đánh cắp, đem dùng ở pod khác</td><td><code>cnf</code> binding; scope tối thiểu; TTL 5 phút</td><td>JWKS cache không hết hạn (bạn sẽ tự phát hiện ở M5)</td></tr>
+</tbody></table></div>
+
+<h2>Definition of done</h2>
+<p>Đánh dấu khi đạt. Trạng thái được lưu trong browser của bạn.</p>
+<ul class="checklist" data-id="m16-done">
+  <li><label><input type="checkbox"><span><code>test.sh</code> báo đạt toàn bộ, kể cả các ca âm tính</span></label></li>
+  <li><label><input type="checkbox"><span>Mọi traffic giữa các pod là TLS 1.3 có client certificate; không pod nào chạy root; 4 namespace ứng dụng ở mức PSA <code>restricted</code></span></label></li>
+  <li><label><input type="checkbox"><span>Token của frontend bị đem sang pod reporter dùng thì bị từ chối (401)</span></label></li>
+  <li><label><input type="checkbox"><span>Xoá Secret cert của token-server: cert được cấp lại và nạp lại, pod không restart, request không lỗi</span></label></li>
+  <li><label><input type="checkbox"><span>Xoay signing key k1 → k2 không làm request nào lỗi; gỡ k1 thì token ký bằng k1 bị từ chối</span></label></li>
+  <li><label><input type="checkbox"><span>Gỡ reporter khỏi <code>clients.json</code>: token mới bị từ chối trong khoảng một phút, không restart</span></label></li>
+  <li><label><input type="checkbox"><span>Một lệnh <code>jq</code> trên audit log trả lời được "ai đã gọi POST /orders, và ai bị từ chối, trong 10 phút qua"</span></label></li>
+  <li><label><input type="checkbox"><span>Threat model một trang: cập nhật bảng STRIDE ở trên theo hệ thống của bạn và đề xuất cách xử lý từng rủi ro còn lại</span></label></li>
+</ul>
+
+<h2>Cấu trúc project</h2>
+<script type="text/plain" class="code" data-lang="plaintext" data-file="~/netlab/m16">
+m16/
+├── Dockerfile                 # một image chung cho cả hai service
+├── app/
+│   ├── common.py              # TLS tự nạp lại, identity từ client cert, audit log, HTTP server mTLS
+│   ├── token_server.py        # OAuth 2.0 client credentials + JWKS
+│   └── orders_api.py          # resource server
+├── clients.json               # SPIFFE ID → scope được phép
+├── k8s/
+│   ├── 00-base.yaml           # namespace (PSA restricted), ClusterIssuer, ServiceAccount
+│   ├── 10-certs.yaml          # Certificate cho 4 workload
+│   ├── 20-token-server.yaml
+│   ├── 30-orders-api.yaml
+│   ├── 40-clients.yaml        # frontend, reporter, attacker
+│   └── 50-netpol.yaml
+└── test.sh                    # kiểm thử chấp nhận
+</script>
+<p>Mỗi milestone dưới đây có phần "Xong khi", gợi ý và lời giải tham khảo. Hãy thử tự làm trước khi mở lời giải: đây là bài tổng hợp, mọi mảnh ghép đều đã có ở các module trước.</p>
+
+<h2>M0 · Chuẩn bị cluster, CA và image</h2>
+<div class="lab">
+  <div class="lab-h"><h3>M0 · Cluster sạch, cert-manager, image</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">kind · cert-manager · Docker</span><span class="chip t-base">30 phút</span></div>
+  <p>Tạo lại cluster <code>netlab</code> (bỏ các policy của module 14), cài cert-manager, nạp intermediate CA của Lab 10.2, tạo 4 namespace ứng dụng với Pod Security mức <code>restricted</code>, phân phối root CA, build image Python và nạp vào kind.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>kubectl get clusterissuer netlab-ca</code> báo Ready; <code>docker exec netlab-worker crictl images | grep netlab/auth</code> thấy image; tạo pod chạy root trong namespace <code>web</code> bị từ chối.</p>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="dockerfile" data-file="~/netlab/m16/Dockerfile">
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+RUN pip install --no-cache-dir pyjwt==2.9.0 cryptography==43.0.3
+WORKDIR /app
+COPY app/ /app/
+USER 10001
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m16/k8s/00-base.yaml">
+apiVersion: v1
+kind: Namespace
+metadata: {name: security, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: apps, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: web, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: batch, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: {name: netlab-ca}
+spec: {ca: {secretName: netlab-ca}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: token-server, namespace: security}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: orders-api, namespace: apps}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: frontend, namespace: web}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: reporter, namespace: batch}
+automountServiceAccountToken: false
+</script>
+<script type="text/plain" class="term">
+$ mkdir -p ~/netlab/m16/{app,k8s} && cd ~/netlab/m16
+$ kind delete cluster --name netlab; kind create cluster --config ~/netlab/m14/kind.yaml
+$ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+$ kubectl -n cert-manager wait --for=condition=Available deploy --all --timeout=180s
+$ P=~/netlab/m10/pki
+$ kubectl -n cert-manager create secret tls netlab-ca --cert=$P/inter.crt --key=$P/inter.key
+$ kubectl apply -f k8s/00-base.yaml
+$ for ns in security apps web batch; do kubectl -n $ns create configmap netlab-root --from-file=root.crt=$P/root.crt; done
+$ kubectl get clusterissuer netlab-ca
+NAME        READY   AGE
+netlab-ca   True    8s
+$ docker build -t netlab/auth:1.0 . && kind load docker-image netlab/auth:1.0 --name netlab
+$ kubectl -n web run root-test --image=busybox:1.36 -- sleep 1
+Error from server (Forbidden): pods "root-test" is forbidden: violates PodSecurity "restricted:latest": allowPrivilegeEscalation != false …
+</script>
+  <p class="small muted">Image chưa có code ở bước này cũng không sao; build lại sau khi viết xong <code>app/</code> ở M2, M3 (nhớ chạy lại <code>kind load</code> và <code>kubectl rollout restart</code>). Cert của root/intermediate ở Lab 10.2 còn hạn nhiều năm; nếu đã xoá thư mục <code>pki/</code>, chạy lại <code>mkpki.sh</code>.</p>
+  </details>
+</div>
+
+<h2>M1 · Identity cho 4 workload</h2>
+<div class="lab">
+  <div class="lab-h"><h3>M1 · Certificate với SPIFFE ID</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">cert-manager · openssl</span><span class="chip t-base">20 phút</span></div>
+  <p>Cấp 4 certificate sống 24 giờ: <code>token-server</code> (server, tên DNS của Service), <code>orders-api</code> (vừa server vừa client, vì nó gọi JWKS của token server), <code>frontend</code> và <code>reporter</code> (chỉ client). Mỗi cert có SAN URI dạng <code>spiffe://netlab.local/ns/&lt;ns&gt;/sa/&lt;sa&gt;</code>.</p>
+  <p class="done-when"><b>Xong khi:</b> 4 certificate Ready; cert của orders-api có cả DNS SAN, URI SAN và EKU serverAuth + clientAuth.</p>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m16/k8s/10-certs.yaml">
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: token-server, namespace: security}
+spec:
+  secretName: token-server-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [server auth, digital signature]
+  dnsNames: [token.security.svc.cluster.local, token.security]
+  uris: [spiffe://netlab.local/ns/security/sa/token-server]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: orders-api, namespace: apps}
+spec:
+  secretName: orders-api-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [server auth, client auth, digital signature]
+  dnsNames: [orders.apps.svc.cluster.local, orders.apps]
+  uris: [spiffe://netlab.local/ns/apps/sa/orders-api]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: frontend, namespace: web}
+spec:
+  secretName: frontend-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [client auth, digital signature]
+  uris: [spiffe://netlab.local/ns/web/sa/frontend]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: reporter, namespace: batch}
+spec:
+  secretName: reporter-tls
+  duration: 24h
+  renewBefore: 8h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  usages: [client auth, digital signature]
+  uris: [spiffe://netlab.local/ns/batch/sa/reporter]
+  issuerRef: {name: netlab-ca, kind: ClusterIssuer}
+</script>
+<script type="text/plain" class="term">
+$ kubectl apply -f k8s/10-certs.yaml && kubectl wait --for=condition=Ready certificate --all -A --timeout=60s
+$ kubectl get certificate -A
+NAMESPACE   NAME           READY   SECRET             AGE
+apps        orders-api     True    orders-api-tls     6s
+batch       reporter       True    reporter-tls       6s
+security    token-server   True    token-server-tls   6s
+web         frontend       True    frontend-tls       6s
+$ kubectl -n apps get secret orders-api-tls -o jsonpath='{.data.tls\.crt}' | base64 -d \
+    | openssl x509 -noout -ext subjectAltName,extendedKeyUsage
+X509v3 Subject Alternative Name:
+    DNS:orders.apps.svc.cluster.local, DNS:orders.apps, URI:spiffe://netlab.local/ns/apps/sa/orders-api
+X509v3 Extended Key Usage:
+    TLS Web Server Authentication, TLS Web Client Authentication
+</script>
+  <p class="small muted"><code>rotationPolicy: Always</code> sinh private key mới mỗi lần gia hạn, thay vì dùng lại key cũ. Tên trong SAN phải khớp đúng URL mà client dùng (module 10): các service gọi nhau bằng tên đầy đủ <code>*.svc.cluster.local</code>.</p>
+  </details>
+</div>
+
+<h2>M2 · Token server</h2>
+<div class="lab">
+  <div class="lab-h"><h3>M2 · OAuth 2.0 token server với mTLS client authentication</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · PyJWT · ssl</span><span class="chip t-base">75 phút</span></div>
+  <p>Viết <code>common.py</code> và <code>token_server.py</code>:</p>
+  <ul>
+    <li>HTTP server chỉ nhận TLS 1.3 với client certificate; <code>SSLContext</code> được tạo lại khi <code>tls.crt</code> đổi (connection mới dùng cert mới).</li>
+    <li>Client được authenticate bằng chính certificate (RFC 8705, <code>tls_client_auth</code>), không có client secret. Identity = SPIFFE ID trong SAN; phải có trong <code>clients.json</code>.</li>
+    <li><code>POST /token</code>: chỉ cấp scope được phép; access token ES256 sống 5 phút, header có <code>kid</code>, claim <code>cnf: {"x5t#S256": …}</code> là SHA-256 (base64url) của DER client cert.</li>
+    <li><code>GET /.well-known/jwks.json</code>: công bố public key của <b>mọi</b> key trong thư mục key (để xoay vòng); ký bằng key <code>ACTIVE_KID</code>.</li>
+    <li><code>clients.json</code> được đọc lại khi file đổi (thu hồi client không cần restart). Mọi quyết định ghi audit log JSON.</li>
+  </ul>
+  <p class="done-when"><b>Xong khi:</b> từ pod frontend lấy được token, giải mã thấy <code>sub</code> là SPIFFE ID của frontend và <code>cnf</code> khớp thumbprint của cert frontend; xin <code>orders:write</code> bị <code>invalid_scope</code>; gọi không có cert thì thất bại ở TLS.</p>
+  <details><summary>Gợi ý</summary><p>Override <code>get_request</code> của <code>ThreadingHTTPServer</code> để bọc socket bằng context hiện tại với <code>do_handshake_on_connect=False</code>, rồi gọi <code>do_handshake()</code> trong <code>setup()</code> của handler: lỗi handshake khi đó đi vào <code>handle_error</code>, nơi bạn ghi log gọn thay vì traceback. <code>getpeercert(binary_form=True)</code> trả DER của client cert. Secret và ConfigMap mount qua symlink, nên <code>os.stat</code> thấy mtime mới khi kubelet cập nhật.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m16/app/common.py">
+"""Dùng chung: TLS tự nạp lại cert, identity từ client cert, audit log, HTTP server mTLS."""
+import base64
+import hashlib
+import json
+import os
+import ssl
+import sys
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
+
+TLS_DIR = os.environ.get("TLS_DIR", "/tls")                 # tls.crt (leaf + chain), tls.key từ cert-manager
+TRUST_FILE = os.environ.get("TRUST_FILE", "/trust/root.crt")
+
+
+def log(event: str, **fields) -> None:
+    """Audit log: mỗi dòng một JSON (kubectl logs … | jq)."""
+    print(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event, **fields}), flush=True)
+
+
+class ReloadingTLS:
+    """Giữ một SSLContext và tạo lại khi tls.crt đổi. Connection mới dùng cert mới, không restart."""
+
+    def __init__(self, server_side: bool):
+        self.server_side, self.mtime, self.ctx = server_side, None, None
+
+    def get(self) -> ssl.SSLContext:
+        crt, key = os.path.join(TLS_DIR, "tls.crt"), os.path.join(TLS_DIR, "tls.key")
+        mtime = os.stat(crt).st_mtime
+        if mtime != self.mtime:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER if self.server_side else ssl.PROTOCOL_TLS_CLIENT)
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_3
+            ctx.load_cert_chain(crt, key)
+            ctx.load_verify_locations(TRUST_FILE)
+            ctx.verify_mode = ssl.CERT_REQUIRED                 # server: bắt buộc client cert; client: verify server
+            self.ctx, self.mtime = ctx, mtime
+            log("tls_context_loaded", side="server" if self.server_side else "client", mtime=int(mtime))
+        return self.ctx
+
+
+def peer_identity(tls: ssl.SSLSocket) -> tuple[str | None, str]:
+    """(SPIFFE ID duy nhất trong SAN, x5t#S256 = base64url(SHA-256(DER của client cert)))."""
+    cert = tls.getpeercert() or {}
+    ids = [v for k, v in cert.get("subjectAltName", ()) if k == "URI" and v.startswith("spiffe://")]
+    der = tls.getpeercert(binary_form=True) or b""
+    thumb = base64.urlsafe_b64encode(hashlib.sha256(der).digest()).rstrip(b"=").decode()
+    return (ids[0] if len(ids) == 1 else None), thumb
+
+
+class MTLSServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, addr, handler, tls: ReloadingTLS):
+        self.tls = tls
+        super().__init__(addr, handler)
+
+    def get_request(self):
+        sock, addr = self.socket.accept()
+        return self.tls.get().wrap_socket(sock, server_side=True, do_handshake_on_connect=False), addr
+
+    def handle_error(self, request, client_address):
+        err = sys.exc_info()[1]
+        log("connection_error", client=client_address[0], error=f"{type(err).__name__}: {err}")
+
+
+class JSONHandler(BaseHTTPRequestHandler):
+    def setup(self) -> None:
+        self.request.do_handshake()                             # thiếu cert, CA lạ, sai EKU → lỗi ở đây
+        super().setup()
+        self.spiffe_id, self.thumb = peer_identity(self.request)
+
+    def reply(self, code: int, body: dict, extra: dict | None = None) -> None:
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def read_form(self) -> dict:
+        n = int(self.headers.get("Content-Length", 0))
+        return {k: v[0] for k, v in parse_qs(self.rfile.read(n).decode()).items()}
+
+    def log_message(self, *args) -> None:                       # thay log mặc định bằng audit log
+        pass
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m16/app/token_server.py">
+#!/usr/bin/env python3
+"""Token server: OAuth 2.0 client credentials. Client authenticate bằng mTLS (RFC 8705 tls_client_auth);
+access token JWT ES256 gắn với client cert (cnf.x5t#S256); JWKS chứa mọi key để xoay vòng."""
+import glob
+import json
+import os
+import secrets
+import time
+from pathlib import Path
+
+import jwt
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from jwt.algorithms import ECAlgorithm
+
+from common import JSONHandler, MTLSServer, ReloadingTLS, log
+
+ISSUER = os.environ.get("ISSUER", "https://token.security.svc.cluster.local:8443")
+AUDIENCE = os.environ.get("AUDIENCE", "orders-api")
+TTL = int(os.environ.get("TOKEN_TTL", "300"))
+ACTIVE_KID = os.environ["ACTIVE_KID"]
+KEYS = {Path(p).stem: load_pem_private_key(Path(p).read_bytes(), None)
+        for p in glob.glob(os.path.join(os.environ.get("KEYS_DIR", "/keys"), "*.pem"))}
+CLIENTS_FILE = os.environ.get("CLIENTS_FILE", "/config/clients.json")
+_clients = {"mtime": None, "data": {}}
+
+
+def clients() -> dict:
+    """SPIFFE ID → danh sách scope. Đọc lại khi ConfigMap đổi: thu hồi client không cần restart."""
+    mtime = os.stat(CLIENTS_FILE).st_mtime
+    if mtime != _clients["mtime"]:
+        _clients.update(mtime=mtime, data=json.loads(Path(CLIENTS_FILE).read_text()))
+        log("clients_loaded", clients=sorted(_clients["data"]))
+    return _clients["data"]
+
+
+def jwks() -> dict:
+    keys = []
+    for kid, key in sorted(KEYS.items()):
+        jwk = json.loads(ECAlgorithm.to_jwk(key.public_key()))
+        jwk.update(kid=kid, use="sig", alg="ES256")
+        keys.append(jwk)
+    return {"keys": keys}
+
+
+class Handler(JSONHandler):
+    def do_GET(self) -> None:
+        if self.path == "/.well-known/jwks.json":
+            return self.reply(200, jwks())
+        self.reply(404, {"error": "not_found"})
+
+    def do_POST(self) -> None:
+        if self.path != "/token":
+            return self.reply(404, {"error": "not_found"})
+        form, who = self.read_form(), self.spiffe_id
+        if form.get("grant_type") != "client_credentials":
+            return self.reply(400, {"error": "unsupported_grant_type"})
+        allowed = clients().get(who)
+        if allowed is None:                                      # cert hợp lệ nhưng client không được đăng ký
+            log("token_denied", client=who, reason="invalid_client")
+            return self.reply(401, {"error": "invalid_client"})
+        requested = set(form.get("scope", "").split())
+        if not requested or not requested <= set(allowed):
+            log("token_denied", client=who, reason="invalid_scope", requested=sorted(requested))
+            return self.reply(400, {"error": "invalid_scope"})
+        now = int(time.time())
+        claims = {"iss": ISSUER, "sub": who, "aud": AUDIENCE, "scope": " ".join(sorted(requested)),
+                  "iat": now, "exp": now + TTL, "jti": secrets.token_hex(8),
+                  "cnf": {"x5t#S256": self.thumb}}                # gắn token với đúng cert này
+        token = jwt.encode(claims, KEYS[ACTIVE_KID], algorithm="ES256", headers={"kid": ACTIVE_KID})
+        log("token_issued", client=who, scope=claims["scope"], jti=claims["jti"], kid=ACTIVE_KID)
+        self.reply(200, {"access_token": token, "token_type": "Bearer", "expires_in": TTL, "scope": claims["scope"]})
+
+
+if __name__ == "__main__":
+    log("start", service="token-server", issuer=ISSUER, kids=sorted(KEYS), active_kid=ACTIVE_KID)
+    MTLSServer(("0.0.0.0", 8443), Handler, ReloadingTLS(server_side=True)).serve_forever()
+</script>
+<script type="text/plain" class="code" data-lang="json" data-file="~/netlab/m16/clients.json">
+{
+  "spiffe://netlab.local/ns/web/sa/frontend": ["orders:read"],
+  "spiffe://netlab.local/ns/batch/sa/reporter": ["orders:read", "orders:write"]
+}
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m16/k8s/20-token-server.yaml">
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: token-server, namespace: security}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: token-server}}
+  template:
+    metadata: {labels: {app: token-server}}
+    spec:
+      serviceAccountName: token-server
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+      - name: app
+        image: netlab/auth:1.0
+        imagePullPolicy: Never                      # image đã nạp bằng kind load
+        command: ["python3", "token_server.py"]
+        env: [{name: ACTIVE_KID, value: "k1"}]
+        ports: [{containerPort: 8443}]
+        resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 128Mi}}
+        securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+        volumeMounts:
+        - {name: tls, mountPath: /tls, readOnly: true}
+        - {name: trust, mountPath: /trust, readOnly: true}
+        - {name: keys, mountPath: /keys, readOnly: true}
+        - {name: config, mountPath: /config, readOnly: true}
+      volumes:
+      - {name: tls, secret: {secretName: token-server-tls}}
+      - {name: trust, configMap: {name: netlab-root}}
+      - {name: keys, secret: {secretName: token-signing-keys, defaultMode: 0440}}   # đọc được nhờ fsGroup
+      - {name: config, configMap: {name: token-clients}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: token, namespace: security}
+spec:
+  selector: {app: token-server}
+  ports: [{port: 8443, targetPort: 8443}]
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m16/k8s/40-clients.yaml">
+apiVersion: v1
+kind: Pod
+metadata: {name: frontend, namespace: web, labels: {app: frontend}}
+spec:
+  serviceAccountName: frontend
+  automountServiceAccountToken: false
+  securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
+  containers:
+  - name: c
+    image: nicolaka/netshoot:v0.13
+    command: ["sleep", "infinity"]
+    securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+    volumeMounts:
+    - {name: tls, mountPath: /tls, readOnly: true}
+    - {name: trust, mountPath: /trust, readOnly: true}
+  volumes:
+  - {name: tls, secret: {secretName: frontend-tls}}
+  - {name: trust, configMap: {name: netlab-root}}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: reporter, namespace: batch, labels: {app: reporter}}
+spec:
+  serviceAccountName: reporter
+  automountServiceAccountToken: false
+  securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
+  containers:
+  - name: c
+    image: nicolaka/netshoot:v0.13
+    command: ["sleep", "infinity"]
+    securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+    volumeMounts:
+    - {name: tls, mountPath: /tls, readOnly: true}
+    - {name: trust, mountPath: /trust, readOnly: true}
+  volumes:
+  - {name: tls, secret: {secretName: reporter-tls}}
+  - {name: trust, configMap: {name: netlab-root}}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: attacker, namespace: default, labels: {app: attacker}}
+spec:
+  containers:
+  - {name: c, image: "nicolaka/netshoot:v0.13", command: ["sleep", "infinity"]}
+</script>
+<script type="text/plain" class="term">
+$ docker build -t netlab/auth:1.0 . && kind load docker-image netlab/auth:1.0 --name netlab
+$ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out k1.pem
+$ kubectl -n security create secret generic token-signing-keys --from-file=k1.pem
+$ kubectl -n security create configmap token-clients --from-file=clients.json
+$ kubectl apply -f k8s/20-token-server.yaml -f k8s/40-clients.yaml
+$ kubectl -n security rollout status deploy/token-server
+$ kubectl -n web wait --for=condition=Ready pod/frontend && kubectl -n batch wait --for=condition=Ready pod/reporter
+$ kubectl -n security logs deploy/token-server | head -2
+{"ts": "…", "event": "start", "service": "token-server", "issuer": "https://token.security.svc.cluster.local:8443", "kids": ["k1"], "active_kid": "k1"}
+$ MTLS="--cacert /trust/root.crt --cert /tls/tls.crt --key /tls/tls.key"
+$ TOKEN_URL=https://token.security.svc.cluster.local:8443/token
+$ T=$(kubectl -n web exec frontend -- sh -c "curl -s $MTLS -d grant_type=client_credentials -d scope=orders:read $TOKEN_URL" | jq -r .access_token)
+$ python3 -c 'import sys,json,base64; p=sys.argv[1].split(".")[1]; print(json.dumps(json.loads(base64.urlsafe_b64decode(p+"="*(-len(p)%4))), indent=1))' "$T"
+{
+ "iss": "https://token.security.svc.cluster.local:8443",
+ "sub": "spiffe://netlab.local/ns/web/sa/frontend",          ◀ identity lấy từ client cert, không phải từ form
+ "aud": "orders-api",
+ "scope": "orders:read",
+ …
+ "cnf": {"x5t#S256": "q8F2…"}                                ◀ thumbprint của cert frontend
+}
+$ kubectl -n web exec frontend -- sh -c "openssl x509 -in /tls/tls.crt -outform DER | openssl dgst -sha256 -binary | openssl base64 -A | tr '+/' '-_' | tr -d '='"
+q8F2…                                                         ◀ khớp cnf
+$ kubectl -n web exec frontend -- sh -c "curl -s $MTLS -d grant_type=client_credentials -d scope=orders:write $TOKEN_URL"
+{"error": "invalid_scope"}
+$ kubectl -n web exec frontend -- curl -sS --cacert /trust/root.crt -d grant_type=client_credentials $TOKEN_URL
+curl: (56) OpenSSL SSL_read: … tlsv13 alert certificate required
+$ kubectl -n security logs deploy/token-server | jq -c 'select(.event != "start") | {event, client, reason, error}'
+{"event":"tls_context_loaded",…}
+{"event":"clients_loaded",…}
+{"event":"token_issued","client":"spiffe://netlab.local/ns/web/sa/frontend",…}
+{"event":"token_denied","client":"spiffe://netlab.local/ns/web/sa/frontend","reason":"invalid_scope",…}
+{"event":"connection_error","error":"SSLError: [SSL: PEER_DID_NOT_RETURN_A_CERTIFICATE] …"}
+</script>
+  <p class="small muted">Trong <code>tls.crt</code> của cert-manager có leaf rồi tới intermediate; <code>openssl x509</code> chỉ đọc cert đầu tiên (leaf), đúng cert mà server thấy trong handshake. Chuỗi <code>openssl base64 | tr</code> đổi base64 thường sang base64url không padding, đúng định dạng của <code>x5t#S256</code>. Signing key đặt trong Secret là thoả hiệp của lab; production nên để trong KMS/HSM và ký qua API.</p>
+  </details>
+</div>
+
+<h2>M3 · Resource server</h2>
+<div class="lab">
+  <div class="lab-h"><h3>M3 · orders-api: verify token, scope và cnf</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · PyJWT</span><span class="chip t-base">60 phút</span></div>
+  <p>Viết <code>orders_api.py</code>: mTLS bắt buộc; lấy JWKS từ token server qua mTLS bằng chính cert của orders-api (cache theo <code>kid</code>, tải lại khi gặp kid lạ, tối đa một lần mỗi 10 giây); verify chữ ký với allowlist <code>ES256</code>, <code>iss</code>, <code>aud</code>, <code>exp</code>; <b>so <code>cnf.x5t#S256</code> với thumbprint của client cert đang kết nối</b>; kiểm tra scope theo route; trả 401/403 kèm <code>WWW-Authenticate</code>; ghi audit log cho mọi allow/deny. Viết <code>test.sh</code> kiểm tra cả ca dương và ca âm.</p>
+  <p class="done-when"><b>Xong khi:</b> mọi dòng của <code>test.sh</code> (trừ phần mạng, xong ở M4) báo ✔; đặc biệt "reporter dùng token của frontend → 401".</p>
+  <details><summary>Gợi ý</summary><p><code>urllib.request.urlopen(url, context=ssl_ctx)</code> cho phép gửi client cert. <code>jwt.PyJWK(jwk_dict).key</code> đổi JWK thành public key. Lấy <code>kid</code> bằng <code>jwt.get_unverified_header</code>: header chưa được tin, nhưng chỉ dùng để chọn key trong JWKS đã tải từ issuer, nên an toàn (module 12). <code>options={"require": [...]}</code> của PyJWT bắt buộc claim tồn tại.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m16/app/orders_api.py">
+#!/usr/bin/env python3
+"""orders-api: resource server. mTLS bắt buộc; token verify bằng JWKS của token server;
+kiểm tra iss, aud, exp, scope và cnf (token phải đi cùng đúng client cert đã xin nó)."""
+import json
+import os
+import threading
+import time
+import urllib.request
+
+import jwt
+
+from common import JSONHandler, MTLSServer, ReloadingTLS, log
+
+ISSUER = os.environ.get("ISSUER", "https://token.security.svc.cluster.local:8443")
+AUDIENCE = os.environ.get("AUDIENCE", "orders-api")
+ROUTES = {("GET", "/orders"): "orders:read", ("POST", "/orders"): "orders:write"}
+CLIENT_TLS = ReloadingTLS(server_side=False)                # cert của chính orders-api khi gọi token server
+
+
+class JWKSCache:
+    def __init__(self):
+        self.keys, self.fetched, self.lock = {}, 0.0, threading.Lock()
+
+    def refresh(self) -> None:
+        with urllib.request.urlopen(ISSUER + "/.well-known/jwks.json", context=CLIENT_TLS.get(), timeout=3) as r:
+            data = json.load(r)
+        self.keys = {k["kid"]: jwt.PyJWK(k).key for k in data["keys"]}
+        self.fetched = time.time()
+        log("jwks_refreshed", kids=sorted(self.keys))
+
+    def key(self, kid: str):
+        with self.lock:
+            if kid not in self.keys and time.time() - self.fetched > 10:      # kid lạ: tải lại, tối đa 10 s/lần
+                self.refresh()
+            return self.keys.get(kid)
+
+
+JWKS = JWKSCache()
+
+
+class Handler(JSONHandler):
+    def deny(self, code: int, error: str, need: str, detail: str = "", **extra) -> None:
+        log("deny", client=self.spiffe_id, action=f"{self.command} {self.path}", status=code, error=error, detail=detail, **extra)
+        hdr = f'Bearer error="{error}"' + (f', scope="{need}"' if code == 403 else "")
+        self.reply(code, {"error": error, "detail": detail}, {"WWW-Authenticate": hdr})
+
+    def api(self, method: str) -> None:
+        need = ROUTES.get((method, self.path))
+        if not need:
+            return self.reply(404, {"error": "not_found"})
+        auth = self.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return self.deny(401, "invalid_request", need, "thiếu Bearer token")
+        token = auth[7:]
+        try:
+            kid = jwt.get_unverified_header(token).get("kid", "")
+            key = JWKS.key(kid)
+            if key is None:
+                raise jwt.InvalidTokenError(f"kid không có trong JWKS: {kid}")
+            claims = jwt.decode(token, key, algorithms=["ES256"], audience=AUDIENCE, issuer=ISSUER, leeway=30,
+                                options={"require": ["exp", "iat", "sub", "scope", "cnf"]})
+        except (jwt.PyJWTError, OSError) as e:
+            return self.deny(401, "invalid_token", need, str(e))
+        if claims["cnf"].get("x5t#S256") != self.thumb:                       # token đánh cắp, dùng với cert khác
+            return self.deny(401, "invalid_token", need, "token không gắn với client cert này", sub=claims["sub"])
+        if need not in claims["scope"].split():                               # authorization
+            return self.deny(403, "insufficient_scope", need, sub=claims["sub"])
+        log("allow", client=self.spiffe_id, sub=claims["sub"], action=f"{method} {self.path}", jti=claims.get("jti"))
+        self.reply(200, {"ok": True, "caller": claims["sub"], "action": f"{method} {self.path}"})
+
+    def do_GET(self) -> None:
+        self.api("GET")
+
+    def do_POST(self) -> None:
+        self.api("POST")
+
+
+if __name__ == "__main__":
+    log("start", service="orders-api", issuer=ISSUER, audience=AUDIENCE)
+    MTLSServer(("0.0.0.0", 8443), Handler, ReloadingTLS(server_side=True)).serve_forever()
+</script>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m16/k8s/30-orders-api.yaml">
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: orders-api, namespace: apps}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: orders-api}}
+  template:
+    metadata: {labels: {app: orders-api}}
+    spec:
+      serviceAccountName: orders-api
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+      - name: app
+        image: netlab/auth:1.0
+        imagePullPolicy: Never
+        command: ["python3", "orders_api.py"]
+        ports: [{containerPort: 8443}]
+        resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 128Mi}}
+        securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+        volumeMounts:
+        - {name: tls, mountPath: /tls, readOnly: true}
+        - {name: trust, mountPath: /trust, readOnly: true}
+      volumes:
+      - {name: tls, secret: {secretName: orders-api-tls}}
+      - {name: trust, configMap: {name: netlab-root}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: orders, namespace: apps}
+spec:
+  selector: {app: orders-api}
+  ports: [{port: 8443, targetPort: 8443}]
+</script>
+<script type="text/plain" class="code" data-lang="bash" data-file="~/netlab/m16/test.sh">
+#!/usr/bin/env bash
+# Kiểm thử chấp nhận cho capstone: cả ca dương lẫn ca âm. Chạy: bash test.sh
+set -uo pipefail
+TOKEN_URL=https://token.security.svc.cluster.local:8443/token
+API=https://orders.apps.svc.cluster.local:8443/orders
+MTLS="--cacert /trust/root.crt --cert /tls/tls.crt --key /tls/tls.key"
+pass=0; fail=0
+
+check() {  # check <mô tả> <mong đợi> <thực tế>
+  if [[ "$3" == "$2" ]]; then echo "  ✔ $1"; pass=$((pass + 1))
+  else echo "  ✘ $1: mong đợi '$2', nhận '$3'"; fail=$((fail + 1)); fi
+}
+ex() { local ns=$1 pod=$2; shift 2; kubectl -n "$ns" exec "$pod" -- "$@" 2>/dev/null; }
+token() { ex "$1" "$2" sh -c "curl -s -m 5 $MTLS -d grant_type=client_credentials -d 'scope=$3' $TOKEN_URL"; }
+call() { ex "$1" "$2" sh -c "curl -s -m 5 -o /dev/null -w '%{http_code}' $MTLS -X $3 -H 'Authorization: Bearer $4' $API"; }
+field() { python3 -c 'import sys, json; print(json.load(sys.stdin).get(sys.argv[1], ""))' "$1" 2>/dev/null; }
+
+echo "1. Luồng hợp lệ"
+T_FE=$(token web frontend orders:read | field access_token)
+check "frontend lấy được token orders:read" yes "$([[ -n $T_FE ]] && echo yes || echo no)"
+check "frontend GET /orders" 200 "$(call web frontend GET "$T_FE")"
+T_RP=$(token batch reporter 'orders:read orders:write' | field access_token)
+check "reporter POST /orders" 200 "$(call batch reporter POST "$T_RP")"
+
+echo "2. Authorization"
+check "frontend POST /orders → 403" 403 "$(call web frontend POST "$T_FE")"
+check "frontend xin orders:write → invalid_scope" invalid_scope "$(token web frontend orders:write | field error)"
+
+echo "3. Token bị đánh cắp hoặc bị sửa"
+check "reporter dùng token của frontend → 401" 401 "$(call batch reporter GET "$T_FE")"
+check "token bị sửa chữ ký → 401" 401 "$(call web frontend GET "${T_FE:0:-10}AAAAAAAAAA")"
+check "không có token → 401" 401 "$(call web frontend GET '')"
+
+echo "4. Không có cert, hoặc không được phép ở tầng mạng"
+check "gọi token server không có client cert → lỗi TLS" 000 \
+  "$(ex web frontend curl -s -m 5 -o /dev/null -w '%{http_code}' --cacert /trust/root.crt -d grant_type=client_credentials $TOKEN_URL)"
+check "attacker (default) → bị chặn ở tầng mạng (curl exit 28 = timeout)" 28 \
+  "$(kubectl exec attacker -- curl -sk -m 3 -o /dev/null $TOKEN_URL >/dev/null 2>&1; echo $?)"
+
+echo; echo "Kết quả: $pass đạt, $fail không đạt"
+[[ $fail -eq 0 ]]
+</script>
+<script type="text/plain" class="term">
+$ docker build -t netlab/auth:1.0 . && kind load docker-image netlab/auth:1.0 --name netlab
+$ kubectl apply -f k8s/30-orders-api.yaml && kubectl -n apps rollout status deploy/orders-api
+$ bash test.sh
+1. Luồng hợp lệ
+  ✔ frontend lấy được token orders:read
+  ✔ frontend GET /orders
+  ✔ reporter POST /orders
+2. Authorization
+  ✔ frontend POST /orders → 403
+  ✔ frontend xin orders:write → invalid_scope
+3. Token bị đánh cắp hoặc bị sửa
+  ✔ reporter dùng token của frontend → 401
+  ✔ token bị sửa chữ ký → 401
+  ✔ không có token → 401
+4. Không có cert, hoặc không được phép ở tầng mạng
+  ✔ gọi token server không có client cert → lỗi TLS
+  ✘ attacker (default) → bị chặn ở tầng mạng (curl exit 28 = timeout): mong đợi '28', nhận '56'   ◀ đúng dự kiến: chưa có NetworkPolicy (M4)
+
+Kết quả: 9 đạt, 1 không đạt
+</script>
+  <p class="small muted">Test phân biệt hai kiểu bị chặn qua exit code của curl: trước M4, attacker vẫn tới được server và bị TLS từ chối vì không có cert (exit 56, có thể là 35 tuỳ thời điểm alert tới); sau M4, packet bị NetworkPolicy drop nên curl hết giờ chờ (exit 28). Kiểm tra bằng mã HTTP <code>000</code> sẽ không phân biệt được hai trường hợp này. Nếu sửa code, nhớ build lại image, <code>kind load</code> và <code>kubectl rollout restart</code>.</p>
+  </details>
+</div>
+
+<h2>M4 · Cách ly mạng</h2>
+<div class="lab">
+  <div class="lab-h"><h3>M4 · NetworkPolicy default deny cho 4 namespace</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">NetworkPolicy</span><span class="chip t-base">40 phút</span></div>
+  <p>Mỗi namespace ứng dụng: default deny cả ingress lẫn egress. Sau đó chỉ mở đúng các đường trong sơ đồ: frontend/reporter → token-server và orders-api (port 8443) + DNS; orders-api → token-server (JWKS) + DNS; token-server không được đi ra đâu cả.</p>
+  <p class="done-when"><b>Xong khi:</b> <code>test.sh</code> báo đạt toàn bộ; từ pod frontend, <code>curl https://example.com</code> timeout (egress bị chặn); từ token-server không resolve được tên nào.</p>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="yaml" data-file="~/netlab/m16/k8s/50-netpol.yaml">
+# Mỗi phần tử {namespaceSelector, podSelector} cùng một map → AND (module 14)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: security}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: apps}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: web}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: batch}
+spec: {podSelector: {}, policyTypes: [Ingress, Egress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: token-server-in, namespace: security}
+spec:
+  podSelector: {matchLabels: {app: token-server}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}, podSelector: {matchLabels: {app: frontend}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: batch}}, podSelector: {matchLabels: {app: reporter}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: apps}}, podSelector: {matchLabels: {app: orders-api}}}
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: orders-api-in-out, namespace: apps}
+spec:
+  podSelector: {matchLabels: {app: orders-api}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}, podSelector: {matchLabels: {app: frontend}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: batch}}, podSelector: {matchLabels: {app: reporter}}}
+    ports: [{protocol: TCP, port: 8443}]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}, podSelector: {matchLabels: {app: token-server}}}]
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: client-out, namespace: web}
+spec:
+  podSelector: {matchLabels: {app: frontend}}
+  policyTypes: [Egress]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}, podSelector: {matchLabels: {app: token-server}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: apps}}, podSelector: {matchLabels: {app: orders-api}}}
+    ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: client-out, namespace: batch}
+spec:
+  podSelector: {matchLabels: {app: reporter}}
+  policyTypes: [Egress]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  - to:
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: security}}, podSelector: {matchLabels: {app: token-server}}}
+    - {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: apps}}, podSelector: {matchLabels: {app: orders-api}}}
+    ports: [{protocol: TCP, port: 8443}]
+</script>
+<script type="text/plain" class="term">
+$ kubectl apply -f k8s/50-netpol.yaml
+$ bash test.sh | tail -4
+  ✔ gọi token server không có client cert → lỗi TLS
+  ✔ attacker (default) → bị chặn ở tầng mạng (curl exit 28 = timeout)
+
+Kết quả: 10 đạt, 0 không đạt
+$ kubectl -n web exec frontend -- curl -sS -m 3 https://example.com -o /dev/null
+curl: (28) Resolving timed out after 3000 milliseconds          ◀ không ra được Internet (xem giải thích bên dưới)
+</script>
+  <p class="small muted">Dòng cuối có thể là <code>Resolving timed out</code> hoặc <code>Connection timed out</code> tuỳ CoreDNS có forward được ra ngoài không: frontend được hỏi DNS, nhưng kết nối tới IP của example.com thì bị egress policy chặn. Cả hai đều là "không ra được Internet", đúng mục tiêu egress filtering (module 13). Policy so khớp IP của pod sau DNAT, nên chọn pod bằng label vẫn đúng khi client gọi qua Service.</p>
+  </details>
+</div>
+
+<h2>M5 · Diễn tập vận hành</h2>
+<div class="lab">
+  <div class="lab-h"><h3>M5 · Xoay cert, xoay signing key, thu hồi client, truy vết</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">kubectl · jq · openssl</span><span class="chip t-base">75 phút</span></div>
+  <p>Bốn bài diễn tập, mỗi bài đều phải chạy <code>test.sh</code> (hoặc một vòng gọi API liên tục) trong lúc thao tác để chứng minh không gián đoạn:</p>
+  <ol>
+    <li><b>Xoay certificate</b>: xoá Secret <code>token-server-tls</code>. cert-manager cấp cert mới (key mới), kubelet cập nhật file, token-server tự nạp lại. Serial cert đổi, số lần restart của pod vẫn là 0.</li>
+    <li><b>Xoay signing key</b>: thêm <code>k2</code> vào JWKS trước, sau đó chuyển <code>ACTIVE_KID=k2</code>, đợi hết TTL của token cũ (5 phút) rồi gỡ <code>k1</code>. Kiểm tra: một token ký bằng k1 lấy trước khi gỡ có bị từ chối sau khi gỡ không? Nếu không, tìm nguyên nhân và sửa.</li>
+    <li><b>Thu hồi client</b>: gỡ reporter khỏi <code>clients.json</code>. Token mới bị <code>invalid_client</code> trong khoảng một phút. Token cũ của reporter còn dùng được bao lâu? Vì sao chấp nhận được?</li>
+    <li><b>Truy vết</b>: dùng audit log trả lời "ai đã gọi POST /orders, ai bị từ chối và vì sao, trong 10 phút qua", và tìm lần reporter dùng token của frontend ở <code>test.sh</code>.</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> 4 bài diễn tập đạt; bạn tìm ra và sửa lỗi ở bài 2.</p>
+  <details><summary>Gợi ý</summary><p>Bài 2: <code>orders-api</code> chỉ tải lại JWKS khi gặp <code>kid</code> lạ. <code>k1</code> đã nằm trong cache thì sao? Nếu k1 bị gỡ vì <b>bị lộ</b>, kẻ có k1 tự ký được token với <code>exp</code> tuỳ ý. Bài 3: đó là thoả hiệp giữa token tự chứa (không phải hỏi ai) và khả năng thu hồi (module 12).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ MTLS="--cacert /trust/root.crt --cert /tls/tls.crt --key /tls/tls.key"
+$ serial() { kubectl -n web exec frontend -- sh -c "openssl s_client -connect token.security.svc.cluster.local:8443 \
+>   -servername token.security.svc.cluster.local -CAfile /trust/root.crt -cert /tls/tls.crt -key /tls/tls.key </dev/null 2>/dev/null \
+>   | openssl x509 -noout -serial"; }
+# 1. Xoay certificate
+$ serial
+serial=4E1C…
+$ kubectl -n security delete secret token-server-tls && sleep 90     # chờ kubelet đồng bộ volume (tối đa ~1 phút)
+$ serial
+serial=91A7…                                                  ◀ cert mới
+$ kubectl -n security get pod -l app=token-server -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}{"\n"}'
+0                                                             ◀ không restart
+$ kubectl -n security logs deploy/token-server | jq -c 'select(.event=="tls_context_loaded")'
+{"ts":"…","event":"tls_context_loaded","side":"server","mtime":…}
+{"ts":"…","event":"tls_context_loaded","side":"server","mtime":…}   ◀ lần nạp thứ hai, tự động
+# 2. Xoay signing key: công bố k2 trước, rồi mới ký bằng k2
+$ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out k2.pem
+$ kubectl -n security create secret generic token-signing-keys --from-file=k1.pem --from-file=k2.pem \
+    --dry-run=client -o yaml | kubectl apply -f -
+$ kubectl -n security set env deploy/token-server ACTIVE_KID=k2 && kubectl -n security rollout status deploy/token-server
+$ bash test.sh | tail -1
+Kết quả: 10 đạt, 0 không đạt                                  ◀ token mới ký bằng k2; orders-api tải JWKS khi gặp kid k2
+$ sleep 300                                                   # đợi mọi token k1 hợp lệ hết hạn
+$ kubectl -n security create secret generic token-signing-keys --from-file=k2.pem --dry-run=client -o yaml | kubectl apply -f -
+$ kubectl -n security rollout restart deploy/token-server && kubectl -n security rollout status deploy/token-server
+# Kiểm tra: một token k1 "tự ký" (giả sử k1 bị lộ) có còn được nhận không?
+$ FORGED=$(python3 -c 'import jwt,time,sys; c=dict(iss="https://token.security.svc.cluster.local:8443", aud="orders-api", sub="spiffe://x", scope="orders:read orders:write", iat=int(time.time()), exp=int(time.time())+3600, cnf={"x5t#S256": sys.argv[1]}); print(jwt.encode(c, open("k1.pem").read(), algorithm="ES256", headers={"kid":"k1"}))' \
+>   "$(kubectl -n batch exec reporter -- sh -c "openssl x509 -in /tls/tls.crt -outform DER | openssl dgst -sha256 -binary | openssl base64 -A | tr '+/' '-_' | tr -d '='")")
+$ kubectl -n batch exec reporter -- sh -c "curl -s $MTLS -X POST -H 'Authorization: Bearer $FORGED' https://orders.apps.svc.cluster.local:8443/orders"
+{"ok": true, "caller": "spiffe://x", "action": "POST /orders"}  ◀ LỖI: k1 đã gỡ nhưng vẫn nằm trong cache JWKS của orders-api
+</script>
+<p><b>Sửa:</b> JWKS cache phải hết hạn theo thời gian, không chỉ tải khi gặp kid lạ. Thay hàm <code>key()</code> trong <code>orders_api.py</code>:</p>
+<script type="text/plain" class="code" data-lang="python" data-file="orders_api.py (bản sửa của JWKSCache.key)">
+    MAX_AGE = 300                                    # tải lại JWKS ít nhất mỗi 5 phút
+
+    def key(self, kid: str):
+        with self.lock:
+            stale = time.time() - self.fetched > self.MAX_AGE
+            unknown = kid not in self.keys and time.time() - self.fetched > 10
+            if stale or unknown:
+                try:
+                    self.refresh()
+                except OSError as e:                 # token server tạm lỗi: dùng tiếp cache cũ, ghi log
+                    log("jwks_refresh_failed", error=str(e))
+            return self.keys.get(kid)
+</script>
+<script type="text/plain" class="term">
+$ docker build -t netlab/auth:1.0 . && kind load docker-image netlab/auth:1.0 --name netlab
+$ kubectl -n apps rollout restart deploy/orders-api && kubectl -n apps rollout status deploy/orders-api
+$ kubectl -n batch exec reporter -- sh -c "curl -s $MTLS -X POST -H 'Authorization: Bearer $FORGED' https://orders.apps.svc.cluster.local:8443/orders"
+{"error": "invalid_token", "detail": "kid không có trong JWKS: k1"}   ◀ đã sửa
+# 3. Thu hồi reporter
+$ jq 'del(."spiffe://netlab.local/ns/batch/sa/reporter")' clients.json > clients-revoked.json
+$ kubectl -n security create configmap token-clients --from-file=clients.json=clients-revoked.json \
+    --dry-run=client -o yaml | kubectl apply -f -
+$ sleep 70; kubectl -n batch exec reporter -- sh -c "curl -s $MTLS -d grant_type=client_credentials -d scope=orders:read https://token.security.svc.cluster.local:8443/token"
+{"error": "invalid_client"}                                   ◀ thu hồi có hiệu lực, không restart
+# 4. Truy vết: ai gọi POST /orders, ai bị từ chối, trong 10 phút qua
+$ SINCE=$(date -u -d '-10 min' +%Y-%m-%dT%H:%M:%SZ)
+$ kubectl -n apps logs -l app=orders-api --tail=-1 | jq -c --arg s "$SINCE" \
+    'select(.ts >= $s and (.event=="allow" or .event=="deny") and (.action|startswith("POST"))) | {ts, event, client, sub, error, detail}'
+{"ts":"…","event":"allow","client":"spiffe://netlab.local/ns/batch/sa/reporter","sub":"spiffe://netlab.local/ns/batch/sa/reporter",…}
+{"ts":"…","event":"deny","client":"spiffe://netlab.local/ns/web/sa/frontend","error":"insufficient_scope",…}
+$ kubectl -n apps logs -l app=orders-api --tail=-1 | jq -c 'select(.event=="deny" and .sub != null and .client != .sub) | {ts, client, sub, detail}'
+{"ts":"…","client":"spiffe://netlab.local/ns/batch/sa/reporter","sub":"spiffe://netlab.local/ns/web/sa/frontend","detail":"token không gắn với client cert này"}
+                                                              ◀ dấu vết token bị đánh cắp: cert của reporter, token của frontend
+</script>
+  <p class="small muted">Sau khi thu hồi, token cũ của reporter vẫn dùng được tối đa 5 phút (TTL): cái giá của token tự chứa. Muốn thu hồi tức thì thì cần token ngắn hơn, introspection (resource server hỏi lại token server), hoặc denylist theo <code>jti</code>. Nhớ khôi phục <code>clients.json</code> gốc trước khi chạy lại <code>test.sh</code>. Thời gian, serial và số thứ tự log của bạn sẽ khác.</p>
+  </details>
+</div>
+
+<h2>M6 · Tổng kết và mở rộng</h2>
+<div class="lab">
+  <div class="lab-h"><h3>M6 · Threat model và hướng phát triển</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">Viết tài liệu</span><span class="chip t-base">60 phút</span></div>
+  <p>Viết threat model một trang cho hệ thống bạn vừa dựng: sơ đồ (dùng lại hình ở đầu module), bảng STRIDE đã cập nhật (thêm những gì bạn phát hiện ở M5), và với mỗi rủi ro còn lại, đề xuất một cách xử lý cụ thể. Gợi ý các hướng phát triển dưới đây; chọn ít nhất một để làm thật.</p>
+  <div class="tbl"><table>
+  <thead><tr><th>Rủi ro còn lại</th><th>Hướng xử lý</th><th>Liên hệ</th></tr></thead>
+  <tbody>
+  <tr><td>Ai đọc được Secret cert là mạo danh được workload</td><td>Cấp cert gắn với ServiceAccount qua attestation: <b>SPIRE</b> hoặc <b>csi-driver-spiffe</b> của cert-manager (private key sinh trong pod, không nằm trong Secret); siết RBAC trên <code>secrets</code></td><td>Module 10, 14</td></tr>
+  <tr><td>Signing key trong Secret, etcd chưa mã hoá</td><td>Encryption at rest với KMS; tốt hơn: ký bằng KMS/HSM, key không bao giờ vào pod</td><td>Module 09, 14</td></tr>
+  <tr><td>Không có rate limit, không có resource quota</td><td>Rate limit theo client identity ở token server; <code>ResourceQuota</code>, <code>LimitRange</code></td><td>Module 13</td></tr>
+  <tr><td>Thu hồi chậm (tới hết TTL)</td><td>Token introspection hoặc denylist <code>jti</code>; TTL ngắn hơn</td><td>Module 12</td></tr>
+  <tr><td>Log chỉ ở stdout</td><td>Đẩy về Loki/Elasticsearch, cảnh báo khi có <code>deny</code> với <code>client != sub</code></td><td>Module 13</td></tr>
+  <tr><td>Mỗi service tự cài mTLS</td><td>Service mesh (Istio ambient) với AuthorizationPolicy; giữ token cho authorization theo scope</td><td>Module 14</td></tr>
+  <tr><td>Chưa có discovery</td><td>Thêm NFRegister/NFDiscover của Lab 15.2: token server kiêm NRF, cấp token theo <code>targetNfType</code></td><td>Module 15</td></tr>
+  </tbody></table></div>
+  <p class="done-when"><b>Xong khi:</b> có tài liệu threat model và ít nhất một hướng mở rộng chạy được, có test âm tính chứng minh nó hoạt động.</p>
+</div>
+
+<h2>Quiz tổng hợp</h2>
+<script type="application/json" class="quiz" data-id="m16" data-title="Kiểm tra capstone">
+[
+ {"q":"reporter có cert hợp lệ và token hợp lệ (chữ ký đúng, aud đúng, còn hạn) của frontend. orders-api từ chối nhờ kiểm tra nào?","o":["aud","exp","cnf.x5t#S256 so với thumbprint của client cert đang kết nối","scope"],"a":2,
+  "e":"Certificate-bound token (RFC 8705): token chỉ dùng được cùng private key của cert đã xin nó."},
+ {"q":"Vì sao token server ký ES256 thay vì HS256?","o":["Token ngắn hơn","orders-api chỉ cần public key; với HS256 mọi resource server đều ký được token giả","HS256 bị cấm","ES256 nhanh hơn"],"a":1,
+  "e":"Module 12: chỉ authorization server giữ private key."},
+ {"q":"Thứ tự đúng khi xoay signing key?","o":["Gỡ key cũ rồi thêm key mới","Công bố key mới trong JWKS → bắt đầu ký bằng key mới → đợi hết TTL của token cũ → gỡ key cũ","Đổi key và restart mọi thứ cùng lúc","Không cần xoay"],"a":1,
+  "e":"Resource server phải biết key mới trước khi gặp token ký bằng nó, và token cũ còn hạn vẫn cần key cũ."},
+ {"q":"Ở M5, sau khi gỡ k1, orders-api vẫn nhận token ký bằng k1. Nguyên nhân?","o":["PyJWT lỗi","JWKS cache chỉ tải lại khi gặp kid lạ, không bao giờ hết hạn","NetworkPolicy","cert-manager"],"a":1,
+  "e":"Cache phải có thời hạn. Nếu k1 bị gỡ vì bị lộ, đây là lỗ hổng nghiêm trọng."},
+ {"q":"Gỡ reporter khỏi clients.json. Token reporter đã có còn dùng được không?","o":["Không, bị thu hồi ngay","Còn, tới khi hết TTL (5 phút), vì resource server không hỏi lại token server","Còn vĩnh viễn","Tuỳ NetworkPolicy"],"a":1,
+  "e":"Thoả hiệp của token tự chứa. Cần thu hồi tức thì thì dùng introspection hoặc denylist jti."},
+ {"q":"token-server nạp lại cert mới mà không restart bằng cách nào?","o":["Gửi SIGHUP","Kiểm tra mtime của tls.crt khi nhận connection mới và tạo lại SSLContext","cert-manager restart pod","Không thể"],"a":1,
+  "e":"Connection đang mở vẫn dùng cert cũ tới khi đóng; cert chỉ được kiểm tra lúc handshake (module 11)."},
+ {"q":"Attacker ở namespace default có cài sẵn curl và biết URL của token server. Lớp nào chặn nó đầu tiên?","o":["mTLS","NetworkPolicy default deny ở namespace security","Scope","PSA"],"a":1,
+  "e":"Defense in depth: nếu NetworkPolicy hỏng, mTLS vẫn chặn (không có cert), và không có cert thì không có token."},
+ {"q":"Ai có thể mạo danh frontend trong thiết kế này?","o":["Không ai","Bất kỳ ai đọc được Secret frontend-tls (chứa private key) trong namespace web","Chỉ cluster-admin","Chỉ attacker ở default"],"a":1,
+  "e":"cert-manager không ràng buộc cert với ServiceAccount. SPIRE hoặc csi-driver-spiffe sinh key trong pod và attest workload."},
+ {"q":"Vì sao namespace ứng dụng đặt Pod Security mức restricted?","o":["Để chạy nhanh hơn","Chặn pod chạy root, có capability, leo quyền; nếu một pod bị chiếm, tác hại bị giới hạn","Để dùng NetworkPolicy","Bắt buộc cho cert-manager"],"a":1,
+  "e":"Module 14: NET_RAW hay privileged trong một pod bị chiếm là bàn đạp tấn công cả node và mạng pod."},
+ {"q":"Trong audit log, dòng deny có client = reporter nhưng sub = frontend nghĩa là gì?","o":["Lỗi log","Có người dùng token của frontend từ pod mang cert của reporter: dấu hiệu token bị đánh cắp","Bình thường","Reporter được quyền của frontend"],"a":1,
+  "e":"Đây là loại sự kiện nên có cảnh báo tự động trong SIEM."},
+ {"q":"Mô hình này giống luồng nào trong 5G core (module 15)?","o":["5G-AKA","NF consumer xin token từ NRF (client credentials) rồi gọi NF producer qua mTLS","GTP-U","Handover"],"a":1,
+  "e":"Thay frontend = AMF, token-server = NRF, orders-api = UDM, scope = tên NF service."},
+ {"q":"Vì sao <code>test.sh</code> chủ yếu là ca âm tính (bị từ chối)?","o":["Cho nhanh","Một hệ thống bảo mật \"chạy được\" ở ca thành công vẫn có thể cho qua những gì đáng lẽ phải chặn; chỉ ca âm tính chứng minh control hoạt động","Vì ca dương khó viết","Không có lý do"],"a":1,
+  "e":"Lab 11.2 (s_server quên -verify_return_error) và M5 (JWKS cache) đều là lỗi chỉ ca âm tính mới bắt được."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"16 Capstone: mini auth service","c":[
+ {"t":"Identity","col":"sec","c":[{"t":"CA Lab 10.2 + cert-manager"},{"t":"SPIFFE ID trong SAN"},{"t":"Cert 24 giờ, rotationPolicy Always"},{"t":"Hot reload SSLContext"}]},
+ {"t":"Token server","col":"app","c":[{"t":"Client credentials qua mTLS (RFC 8705)"},{"t":"ES256, kid, JWKS nhiều key"},{"t":"cnf.x5t#S256"},{"t":"clients.json đọc lại khi đổi"}]},
+ {"t":"Resource server","col":"k8s","c":[{"t":"Allowlist alg, iss, aud, exp"},{"t":"cnf == thumbprint cert"},{"t":"Scope → 401 / 403"},{"t":"JWKS cache có TTL"}]},
+ {"t":"Hardening","col":"net","c":[{"t":"NetworkPolicy default deny 2 chiều"},{"t":"PSA restricted, non-root"},{"t":"Không mount SA token"},{"t":"Egress filtering"}]},
+ {"t":"Vận hành","col":"tra","c":[{"t":"Xoay cert không restart"},{"t":"Xoay key: publish → sign → retire"},{"t":"Thu hồi client, TTL"},{"t":"Audit log + jq"}]},
+ {"t":"Mở rộng","col":"core","c":[{"t":"SPIRE / csi-driver-spiffe"},{"t":"KMS/HSM cho signing key"},{"t":"Rate limit, SIEM"},{"t":"Mesh, NRF-style discovery"}]}
+]}
+</script>
+
+<h2>Sau khoá học</h2>
+<p>Bạn đã đi từ "packet là gì" tới một hệ thống auth chạy trên Kubernetes với mTLS, OAuth2, NetworkPolicy và xoay vòng key. Một vài hướng đi tiếp, xếp theo mức gần với job:</p>
+<ul>
+  <li><b>Đọc code thật:</b> NRF và AUSF của <a href="https://github.com/free5gc/free5gc" target="_blank" rel="noopener">free5GC</a> (Go) hoặc <a href="https://github.com/open5gs/open5gs" target="_blank" rel="noopener">Open5GS</a> (C). So cách họ làm token, TLS, discovery với Lab 15.2 và capstone.</li>
+  <li><b>Chạy một 5G core lab</b> bằng Open5GS + UERANSIM, capture NGAP, NAS, GTP-U, SBI bằng Wireshark (với SSLKEYLOGFILE như module 02, 11).</li>
+  <li><b>Chứng chỉ Kubernetes:</b> CKA rồi CKS (Certified Kubernetes Security Specialist) khớp phần lớn module 14 và capstone.</li>
+  <li><b>Chuẩn nên đọc dần:</b> RFC 8446 (TLS 1.3), RFC 6749 + RFC 9700 (OAuth 2.0 và best practice), RFC 8705 (mTLS cho OAuth), RFC 8725 (JWT BCP), 3GPP TS 33.501 và SCAS của NF bạn phụ trách.</li>
+  <li><b>Ôn lại có hệ thống:</b> mở trang Keyword, lọc theo module, tự giải thích từng thuật ngữ thành tiếng. Thuật ngữ nào ngập ngừng thì quay lại module đó làm lại lab.</li>
+</ul>
+
+<div class="note more"><b>Bản C/C++</b><p><a href="#m17">Lab 17.6</a> thay orders-api bằng bản C++ (cùng audit log, cùng kiểm tra <code>cnf</code>, JWKS cache có TTL ngay từ đầu) và chạy lại nguyên <code>test.sh</code> của capstone mà không sửa dòng nào. Đây là bước tiếp theo tự nhiên sau M6.</p></div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m16"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li><a href="https://www.rfc-editor.org/rfc/rfc8705" target="_blank" rel="noopener">RFC 8705: OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens</a>: cơ sở của M2, M3.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc7517" target="_blank" rel="noopener">RFC 7517: JSON Web Key (JWK)</a>: định dạng JWKS, <code>kid</code>.</li>
+  <li><a href="https://cert-manager.io/docs/usage/csi-driver-spiffe/" target="_blank" rel="noopener">cert-manager csi-driver-spiffe</a> và <a href="https://spiffe.io/docs/latest/spire-about/" target="_blank" rel="noopener">SPIRE</a>: identity gắn với workload, bước tiếp theo của M6.</li>
+  <li><a href="https://owasp.org/www-community/Threat_Modeling" target="_blank" rel="noopener">OWASP Threat Modeling</a>: cách làm threat model có hệ thống (STRIDE và các phương pháp khác).</li>
+  <li><a href="https://kubernetes.io/docs/concepts/security/security-checklist/" target="_blank" rel="noopener">Kubernetes Security Checklist</a>: đối chiếu cluster của bạn sau capstone.</li>
+</ul>

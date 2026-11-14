@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: auth-from-frontend, namespace: security}
+spec:
+  podSelector: {matchLabels: {app: auth}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: web}}
+    - podSelector: {matchLabels: {app: frontend}}      # dấu "-" mới → OR, và chỉ trong namespace security
+    ports: [{protocol: TCP, port: 8443}]

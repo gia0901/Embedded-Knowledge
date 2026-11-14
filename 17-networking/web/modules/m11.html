@@ -1,0 +1,730 @@
+<!-- Core Net Lab · Module 11 · TLS 1.3 & mTLS (Kurose & Ross 8e, §8.6 + RFC 8446) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Biết TLS cho gì (confidentiality, integrity, authentication) và <b>không</b> che được gì.</li>
+  <li>Đọc được từng message của TLS 1.3 handshake, và biết message nào chống lại attack nào.</li>
+  <li>Hiểu cipher suite, key schedule, record layer, resumption và 0-RTT ở mức đủ để cấu hình và debug.</li>
+  <li>Cấu hình được <b>mTLS</b> bằng PKI của module 10. Phân biệt rõ authentication (cert hợp lệ) với authorization (identity đó được làm gì).</li>
+  <li>Debug lỗi TLS từ thông báo alert, chọn đúng kiểu TLS termination cho cluster.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ echo | openssl s_client -connect example.com:443 -servername example.com -brief 2>&1
+CONNECTION ESTABLISHED
+Protocol version: TLSv1.3                                     ◀ Q1: version nào?
+Ciphersuite: TLS_AES_256_GCM_SHA384                           ◀ Q2: tên này thiếu phần nào so với TLS_ECDHE_RSA_WITH_…?
+Peer certificate: CN = example.com, …
+Hash used: SHA256
+Signature type: ECDSA                                         ◀ Q3: server ký cái gì trong handshake?
+Verification: OK
+Server Temp Key: X25519, 253 bits                             ◀ Q4: "Temp" nghĩa là gì?
+DONE
+$ curl -sv https://example.com/ -o /dev/null 2>&1 | grep -E 'TLSv1.3 \(|SSL connection|ALPN'
+* ALPN: curl offers h2,http/1.1
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):              ◀ Q5: mỗi bên gửi gì? tốn mấy RTT?
+* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / X25519 / id-ecPublicKey
+* ALPN: server accepted h2
+$ curl -s https://client.badssl.com/ | grep -o '<title>.*</title>'
+<title>400 No required SSL certificate was sent</title>      ◀ Q6: server này đòi gì ở client?
+</script>
+<p class="small muted">Kết quả của bạn có thể khác: cipher suite, loại chữ ký, thứ tự dòng của curl. Trả lời Q1–Q6 xong thì đọc tiếp, mọi câu đều có lời giải trong bài.</p>
+
+<h2>TLS cho gì, và nằm ở đâu</h2>
+<p>TLS (Transport Layer Security, tên cũ là SSL) nằm giữa application và TCP. Application ghi dữ liệu vào TLS như ghi vào socket thường; TLS mã hoá và gắn tag rồi giao cho TCP. <span class="bk">§8.6</span></p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 254" role="img" aria-label="TLS nằm giữa application và TCP, cung cấp confidentiality, integrity, authentication">
+  <g class="t-app"><rect class="f" x="10" y="14" width="320" height="40" rx="7"/></g>
+  <text x="170" y="39" class="t-c t-b">Application: HTTP/2, gRPC, LDAP…</text>
+  <g class="t-sec"><rect class="f" x="10" y="62" width="320" height="92" rx="7"/></g>
+  <text x="170" y="80" class="t-c t-b">TLS</text>
+  <rect class="box" x="22" y="90" width="146" height="54" rx="6"/>
+  <text x="95" y="112" class="t-c t-b t-s">Handshake protocol</text>
+  <text x="95" y="130" class="t-c t-s t-m">key exchange, xác thực</text>
+  <rect class="box" x="174" y="90" width="146" height="54" rx="6"/>
+  <text x="247" y="112" class="t-c t-b t-s">Record protocol</text>
+  <text x="247" y="130" class="t-c t-s t-m">mã hoá + tag mỗi record</text>
+  <g class="t-tra"><rect class="f" x="10" y="162" width="320" height="40" rx="7"/></g>
+  <text x="170" y="187" class="t-c t-b">TCP: reliable byte stream</text>
+  <g class="t-net"><rect class="f" x="10" y="210" width="320" height="34" rx="7"/></g>
+  <text x="170" y="232" class="t-c t-b">IP</text>
+  <line class="ln-ink" x1="330" y1="108" x2="356" y2="108"/><path class="ah" d="M364 108 l-10 -5 v10 z"/>
+  <g class="t-sec"><rect class="f" x="370" y="14" width="340" height="52" rx="7"/></g>
+  <text x="384" y="35" class="t-b">Confidentiality</text>
+  <text x="384" y="54" class="t-s">AEAD: AES-GCM, ChaCha20-Poly1305 (module 09)</text>
+  <g class="t-sec"><rect class="f" x="370" y="74" width="340" height="52" rx="7"/></g>
+  <text x="384" y="95" class="t-b">Integrity</text>
+  <text x="384" y="114" class="t-s">auth tag mỗi record: sửa 1 bit là bị phát hiện</text>
+  <g class="t-sec"><rect class="f" x="370" y="134" width="340" height="52" rx="7"/></g>
+  <text x="384" y="155" class="t-b">Authentication</text>
+  <text x="384" y="174" class="t-s">server: bắt buộc · client: tuỳ chọn (= mTLS)</text>
+  <rect class="sunk" x="370" y="196" width="340" height="48" rx="7"/>
+  <text x="540" y="216" class="t-c t-s t-b">TLS không che: IP, port, kích thước và</text>
+  <text x="540" y="233" class="t-c t-s t-b">thời điểm của traffic, SNI (trừ khi có ECH)</text>
+</svg></div>
+<figcaption>TLS chạy trên TCP. Bản cho UDP là DTLS; QUIC (module 05) nhúng thẳng TLS 1.3 handshake vào transport.</figcaption></figure>
+<p>Sách dựng một protocol tạm gọi là <b>"almost-TLS"</b> gồm 3 phase: <b>handshake</b> (xác thực server bằng certificate và thống nhất một master secret), <b>key derivation</b> (từ master secret sinh ra key riêng cho mỗi chiều), <b>data transfer</b> (cắt dữ liệu thành record, mỗi record có MAC kèm sequence number để chống sửa, đổi thứ tự hay replay). <span class="bk">§8.6.1</span> Trong almost-TLS, client tự sinh master secret rồi mã hoá bằng public key của server (RSA key transport). Đó là cách của TLS 1.2 trở về trước. TLS 1.3 giữ nguyên 3 phase nhưng thay bước đó bằng ECDHE, lý do nằm ở mục ngay dưới. <span class="bk">§8.6.2</span></p>
+
+<h2>TLS 1.3 handshake</h2>
+<p>Đây là handshake giữa <code>svc-a</code> và service <code>auth</code> ở Lab 11.2. Message trong <code>{ }</code> đã được mã hoá; message nét đứt chỉ có khi server bật mTLS:</p>
+<script type="application/json" class="seq">
+{"title":"TLS 1.3 full handshake (RFC 8446)","actors":["Client (svc-a)","Server (auth)"],"w":330,"steps":[
+ {"sep":"TCP handshake xong (module 05)"},
+ {"f":0,"t":1,"l":"ClientHello: random, cipher_suites, supported_versions\nkey_share (X25519 public), SNI, ALPN, signature_algorithms","m":1},
+ {"f":1,"t":0,"l":"ServerHello: cipher suite đã chọn, key_share (X25519 public)","m":1},
+ {"note":"Hai bên tính ECDHE shared secret → handshake keys.\nTừ đây mọi message đều được mã hoá { }","a":0,"b":1},
+ {"f":1,"t":0,"l":"{EncryptedExtensions}: ALPN = h2","m":1,"k":"sec"},
+ {"f":1,"t":0,"l":"{CertificateRequest}  (chỉ khi mTLS)","m":1,"k":"app","d":1},
+ {"f":1,"t":0,"l":"{Certificate}: server.crt + inter.crt","m":1,"k":"sec"},
+ {"f":1,"t":0,"l":"{CertificateVerify}: ký transcript hash bằng server.key","m":1,"k":"sec"},
+ {"f":1,"t":0,"l":"{Finished}: HMAC của toàn bộ transcript","m":1,"k":"sec"},
+ {"note":"client verify chain + SAN (module 10), chữ ký CertificateVerify, Finished","a":0,"b":1},
+ {"f":0,"t":1,"l":"{Certificate}: client.crt + inter.crt  (mTLS)","m":1,"k":"app","d":1},
+ {"f":0,"t":1,"l":"{CertificateVerify}: ký bằng client.key  (mTLS)","m":1,"k":"app","d":1},
+ {"f":0,"t":1,"l":"{Finished} + [Application Data] GET /token","m":1,"k":"sec"},
+ {"sep":"chỉ 1 RTT cho TLS"},
+ {"f":1,"t":0,"l":"[NewSessionTicket], [Application Data] 200 OK","m":1,"k":"tra"}
+]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Message</th><th>Làm gì</th><th>Không có thì sao</th></tr></thead>
+<tbody>
+<tr><td><b>ClientHello</b></td><td>Đề xuất version, cipher suite, group; gửi luôn <code>key_share</code> (đoán trước server sẽ chọn X25519) để tiết kiệm 1 RTT. <code>random</code> mới mỗi lần.</td><td>Thiếu random: Trudy replay lại cả connection cũ (sách gọi là connection replay attack)</td></tr>
+<tr><td><b>ServerHello</b></td><td>Chọn cipher suite, gửi <code>key_share</code> của server. Hai bên có ngay ECDHE shared secret.</td><td>Group không khớp: server trả HelloRetryRequest, mất thêm 1 RTT</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Certificate</b></td><td>Chain của server (module 10)</td><td>Certificate là dữ liệu công khai, ai cũng copy được. <b>Một mình nó không chứng minh gì.</b></td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>CertificateVerify</b></td><td>Server ký transcript hash (mọi message tới lúc đó) bằng private key của cert</td><td>Trudy gửi cert copy của server thật mà không bị phát hiện. Đây mới là bước chứng minh "tôi giữ private key".</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>Finished</b></td><td>HMAC của toàn bộ transcript, key derive từ handshake secret</td><td>Trudy sửa ClientHello (bỏ bớt cipher suite mạnh để ép dùng suite yếu: downgrade) mà hai bên không biết</td></tr>
+<tr><td><b>CertificateRequest</b></td><td>Server đòi client cert, kèm danh sách CA và signature algorithm chấp nhận</td><td>Không có mTLS: server không biết client là ai ở tầng TLS</td></tr>
+<tr><td><b>NewSessionTicket</b></td><td>Gửi sau handshake, cho phép lần sau resume nhanh hơn</td><td>Mỗi lần kết nối lại phải làm full handshake</td></tr>
+</tbody></table></div>
+<div class="note key"><b>Điểm mấu chốt</b><p>Trả lời Q3: server chứng minh danh tính bằng <b>chữ ký</b> trong CertificateVerify, ký trên transcript của <b>chính connection này</b> (có random của client). Nhờ vậy chữ ký không thể đem dùng lại cho connection khác. Còn Finished gắn mọi thứ lại: bất kỳ byte nào của handshake bị sửa trên đường, Finished sẽ không khớp và connection bị huỷ.</p></div>
+<p>So với TLS 1.2: TLS 1.2 cần <b>2 RTT</b> (ClientHello → ServerHello…ServerHelloDone → ClientKeyExchange…Finished → Finished) và gửi certificate dạng plaintext. TLS 1.3 gộp key exchange vào ngay ClientHello nên còn <b>1 RTT</b> (Q5), và mã hoá certificate. Cộng với 1 RTT của TCP, một HTTPS request mới mất tối thiểu 3 RTT (module 02).</p>
+
+<h2>Key schedule: từ shared secret tới key</h2>
+<p>ECDHE shared secret không được dùng trực tiếp làm key. TLS 1.3 đưa nó qua <b>HKDF</b> (key derivation function dựa trên HMAC, module 09) cùng với <b>transcript hash</b>, để sinh ra nhiều secret, mỗi secret một mục đích:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 214" role="img" aria-label="Key schedule TLS 1.3: ECDHE shared secret qua HKDF ra handshake secrets, master secret, application secrets">
+  <g class="t-sec"><rect class="f" x="10" y="20" width="160" height="70" rx="8"/></g>
+  <text x="90" y="44" class="t-c t-b">ECDHE secret</text>
+  <text x="90" y="62" class="t-c t-s">từ 2 key_share</text>
+  <text x="90" y="78" class="t-c t-s t-m">(+ PSK nếu resume)</text>
+  <g class="t-net"><rect class="f" x="205" y="20" width="160" height="70" rx="8"/></g>
+  <text x="285" y="44" class="t-c t-b">Handshake secrets</text>
+  <text x="285" y="62" class="t-c t-s">client_hs · server_hs</text>
+  <text x="285" y="78" class="t-c t-s t-m">mã hoá { } handshake</text>
+  <rect class="box" x="400" y="20" width="125" height="70" rx="8"/>
+  <text x="462" y="44" class="t-c t-b">Master secret</text>
+  <text x="462" y="62" class="t-c t-s t-m">không dùng</text>
+  <text x="462" y="78" class="t-c t-s t-m">trực tiếp</text>
+  <g class="t-tra"><rect class="f" x="560" y="20" width="150" height="70" rx="8"/></g>
+  <text x="635" y="44" class="t-c t-b">App secrets</text>
+  <text x="635" y="62" class="t-c t-s">client_ap · server_ap</text>
+  <text x="635" y="78" class="t-c t-s t-m">mã hoá [ ] data</text>
+  <line class="ln-ink" x1="170" y1="58" x2="195" y2="58"/><path class="ah" d="M203 58 l-9 -4.5 v9 z"/>
+  <line class="ln-ink" x1="365" y1="58" x2="390" y2="58"/><path class="ah" d="M398 58 l-9 -4.5 v9 z"/>
+  <line class="ln-ink" x1="525" y1="58" x2="550" y2="58"/><path class="ah" d="M558 58 l-9 -4.5 v9 z"/>
+  <text x="186" y="49" class="t-c t-s t-b">HKDF</text><text x="381" y="49" class="t-c t-s t-b">HKDF</text><text x="541" y="49" class="t-c t-s t-b">HKDF</text>
+  <rect class="sunk" x="205" y="124" width="505" height="34" rx="7"/>
+  <text x="457" y="145" class="t-c t-s">transcript hash: hash của mọi handshake message đã gửi và nhận</text>
+  <line class="ln" x1="285" y1="124" x2="285" y2="100"/><path class="ah-m" d="M285 92 l-4.5 9 h9 z"/>
+  <line class="ln" x1="635" y1="124" x2="635" y2="100"/><path class="ah-m" d="M635 92 l-4.5 9 h9 z"/>
+  <text x="10" y="186" class="t-s t-m">Mỗi chiều một key riêng (client → server khác server → client). Key của record thứ n dùng nonce = IV XOR n,</text>
+  <text x="10" y="204" class="t-s t-m">nên sequence number không cần gửi trên dây mà vẫn chống được đổi thứ tự và replay record.</text>
+</svg></div>
+<figcaption>Đưa transcript vào key nghĩa là: nếu hai bên "thấy" handshake khác nhau (do bị sửa), key sẽ khác và mọi thứ sau đó giải mã thất bại.</figcaption></figure>
+<p>Biến môi trường <code>SSLKEYLOGFILE</code> (đã dùng ở module 02) khiến client ghi chính các secret này ra file, để Wireshark giải mã được capture:</p>
+<script type="text/plain" class="term">
+$ cut -d' ' -f1 /tmp/keys.log
+SERVER_HANDSHAKE_TRAFFIC_SECRET                               ◀ server_hs
+CLIENT_HANDSHAKE_TRAFFIC_SECRET                               ◀ client_hs
+EXPORTER_SECRET
+SERVER_TRAFFIC_SECRET_0                                       ◀ server_ap (số 0: chưa KeyUpdate lần nào)
+CLIENT_TRAFFIC_SECRET_0                                       ◀ client_ap
+CLIENT_RANDOM                                                 ◀ dòng này là của một connection TLS 1.2
+</script>
+<p>Câu Q4: <b>Server Temp Key</b> là ECDHE key pair tạm, sinh mới cho mỗi connection rồi bỏ. Đó là lý do có <b>forward secrecy</b> (module 09): sau này lộ <code>server.key</code> cũng không giải mã được traffic đã ghi lại, vì <code>server.key</code> chỉ dùng để <b>ký</b>, không dùng để thoả thuận key.</p>
+
+<h2>Record layer</h2>
+<p>Sau handshake, mọi dữ liệu đi trong các <b>TLS record</b> (tối đa 16 KB plaintext mỗi record):</p>
+<script type="application/json" class="pkt">
+{"title":"TLS 1.3 record (đã mã hoá)","bits":32,"fields":[["Content type = 23",8,"sec"],["Legacy version = 0x0303",16,"sec"],["Length",16,"sec"],["Encrypted: data + content type thật + padding (tuỳ chọn)","var","app"],["Authentication tag (16 byte)","var","sec"]]}
+</script>
+<div class="note trap"><b>Cạm bẫy khi đọc capture</b><ul>
+  <li>Header ghi <code>0x0303</code> (TLS 1.2) và content type 23 (application_data) cho <b>mọi</b> record của TLS 1.3, kể cả handshake đã mã hoá. Lý do: rất nhiều firewall và load balancer đời cũ chặn những gì "lạ". Version thật nằm trong extension <code>supported_versions</code>. Wireshark vì thế có thể hiện "TLSv1.2 Record Layer" cho traffic 1.3.</li>
+  <li>Content type thật nằm <b>bên trong</b> phần mã hoá. Người nghe lén không phân biệt được record là handshake, alert hay data.</li>
+  <li>Bạn còn thấy một record <code>ChangeCipherSpec</code> giả: TLS 1.3 không cần nó, chỉ gửi để middlebox tưởng đây là TLS 1.2.</li>
+</ul></div>
+
+<h2>Cipher suite</h2>
+<p>Cipher suite là bộ thuật toán hai bên dùng. Trả lời Q2: tên của TLS 1.2 chứa đủ 4 phần (key exchange, authentication, cipher, hash), còn tên của TLS 1.3 <b>chỉ còn cipher AEAD và hash</b>. Key exchange luôn là (EC)DHE, thoả thuận riêng qua <code>supported_groups</code>/<code>key_share</code>. Authentication do loại certificate và <code>signature_algorithms</code> quyết định. Thử gõ một tên cipher suite bất kỳ, ví dụ lấy từ cấu hình nginx hoặc kết quả quét:</p>
+<div data-widget="suite"></div>
+<div class="tbl"><table>
+<thead><tr><th></th><th>TLS 1.2 (2008)</th><th>TLS 1.3 (2018, RFC 8446)</th></tr></thead>
+<tbody>
+<tr><td><b>Handshake</b></td><td>2 RTT</td><td>1 RTT; 0-RTT khi resume</td></tr>
+<tr><td><b>Key exchange</b></td><td>RSA key transport, static DH, DHE, ECDHE</td><td>Chỉ (EC)DHE ephemeral, hoặc PSK. Forward secrecy luôn có.</td></tr>
+<tr><td><b>Cipher</b></td><td>CBC + HMAC, RC4, 3DES, AEAD…</td><td>Chỉ AEAD: <code>TLS_AES_128_GCM_SHA256</code>, <code>TLS_AES_256_GCM_SHA384</code>, <code>TLS_CHACHA20_POLY1305_SHA256</code> (và 2 suite CCM)</td></tr>
+<tr><td><b>Certificate</b></td><td>Gửi plaintext; khi mTLS, cả client cert (identity của client) cũng lộ</td><td>Được mã hoá</td></tr>
+<tr><td><b>Renegotiation</b></td><td>Có (nguồn của nhiều lỗi)</td><td>Bỏ; thay bằng KeyUpdate và post-handshake authentication</td></tr>
+<tr><td><b>Chống downgrade</b></td><td>Yếu</td><td>Finished + giá trị đặc biệt trong ServerHello.random khi phải dùng version thấp hơn</td></tr>
+</tbody></table></div>
+<p>Những gì TLS 1.3 cắt bỏ đều có lý do cụ thể:</p>
+<div class="tbl"><table>
+<thead><tr><th>Attack</th><th>Năm</th><th>Khai thác cái gì</th><th>TLS 1.3 xử lý</th></tr></thead>
+<tbody>
+<tr><td>BEAST, Lucky13, POODLE</td><td>2011–2014</td><td>CBC mode và padding (POODLE nhắm vào SSL 3.0)</td><td>Bỏ CBC, chỉ còn AEAD</td></tr>
+<tr><td>FREAK, Logjam</td><td>2015</td><td>Ép hai bên downgrade xuống "export-grade" crypto yếu</td><td>Bỏ hết suite yếu; Finished bảo vệ transcript</td></tr>
+<tr><td>ROBOT</td><td>2017</td><td>RSA key transport (padding oracle kiểu Bleichenbacher 1998)</td><td>Bỏ RSA key transport</td></tr>
+<tr><td>Heartbleed</td><td>2014</td><td>Lỗi code trong OpenSSL (đọc tràn bộ nhớ, lộ cả private key), không phải lỗi protocol</td><td>Không liên quan protocol: phải vá library kịp thời</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job</b><p>Baseline hợp lý cho service nội bộ hiện nay: <b>chỉ TLS 1.3</b> giữa các service bạn kiểm soát; mở thêm TLS 1.2 (chỉ ECDHE + AEAD) ở biên khi phải nói chuyện với client hoặc NF đời cũ. SSL 3.0, TLS 1.0 và 1.1 đã bị IETF chính thức loại bỏ (RFC 7568, RFC 8996). Nhớ kiểm tra cả version của <b>library</b>: protocol tốt không cứu được OpenSSL chưa vá.</p></div>
+
+<h2>Resumption và 0-RTT</h2>
+<p>Sau handshake, server gửi <b>NewSessionTicket</b>. Lần sau, client gửi ticket đó trong ClientHello dưới dạng <b>PSK</b> (pre-shared key) để bỏ qua bước verify certificate. Thường client vẫn gửi kèm <code>key_share</code> (mode <code>psk_dhe_ke</code>) để giữ forward secrecy.</p>
+<p>Với <b>0-RTT</b> (early data), client gửi luôn request <b>cùng</b> ClientHello, mã hoá bằng key derive từ PSK, không chờ server trả lời.</p>
+<div class="note trap"><b>Cạm bẫy: 0-RTT có thể bị replay</b><p>Trudy ghi lại flight đầu tiên (ClientHello + early data) rồi gửi lại nhiều lần; server không phân biệt được bản gốc với bản replay. Vì vậy 0-RTT chỉ an toàn cho request <b>idempotent</b> (GET đọc dữ liệu). Với auth service (cấp token, đổi mật khẩu, POST bất kỳ): <b>tắt 0-RTT</b>. Nginx mặc định <code>ssl_early_data off</code>; nếu bật thì backend phải kiểm tra header <code>Early-Data: 1</code> và trả 425 Too Early khi cần.</p></div>
+
+<h2>SNI, ALPN và ECH</h2>
+<ul>
+  <li><b>SNI</b> (Server Name Indication): tên host client muốn gọi, gửi plaintext trong ClientHello. Một IP phục vụ nhiều domain nhờ SNI: server chọn đúng certificate theo tên này. Ingress controller và Envoy còn <b>route</b> theo SNI mà không cần giải mã (TLS passthrough). Quên gửi SNI (gọi bằng IP, client tự viết thiếu <code>server_hostname</code>) thì thường nhận cert mặc định sai tên.</li>
+  <li><b>ALPN</b> (module 02): chọn <code>h2</code> hay <code>http/1.1</code> ngay trong handshake. gRPC bắt buộc <code>h2</code>; proxy không hỗ trợ ALPN là nguồn lỗi "gRPC chạy được khi gọi thẳng, lỗi khi qua LB".</li>
+  <li><b>ECH</b> (Encrypted Client Hello): mã hoá phần nhạy cảm của ClientHello (gồm SNI) bằng public key của server công bố qua DNS (HTTPS record). Đang được triển khai dần ở browser và CDN; trong cluster nội bộ hiếm khi cần.</li>
+</ul>
+
+<h2>mTLS: client cũng phải có certificate</h2>
+<p>TLS thông thường chỉ xác thực <b>server</b>. Client là ai thì để application lo (mật khẩu, token). Giữa các service trong cluster, không có người nhập mật khẩu, và ta muốn mọi connection đều được xác thực hai chiều: đó là <b>mutual TLS (mTLS)</b>. Server gửi CertificateRequest, client gửi certificate (EKU <code>clientAuth</code>, module 10) và chữ ký CertificateVerify, server verify giống hệt cách client verify server.</p>
+<p>Nhưng handshake thành công mới chỉ trả lời câu hỏi <b>"bạn là ai"</b>:</p>
+<script type="application/json" class="seq">
+{"title":"mTLS: authentication rồi mới đến authorization","actors":["svc-a","auth: TLS layer","auth: app code"],"w":230,"steps":[
+ {"f":0,"t":1,"l":"mTLS handshake + client-chain.crt","m":1,"k":"sec"},
+ {"note":"verify chain tới root nội bộ,\nEKU clientAuth, còn hạn","a":1,"b":1},
+ {"f":1,"t":2,"l":"peer identity =\nspiffe://netlab.local/ns/default/sa/svc-a","m":1},
+ {"sep":"authentication xong · authorization bắt đầu"},
+ {"f":0,"t":2,"l":"GET /token","m":1,"k":"tra"},
+ {"note":"policy: svc-a → {/token}","a":2,"b":2},
+ {"f":2,"t":0,"l":"200 OK","m":1,"k":"tra","d":1},
+ {"f":0,"t":2,"l":"GET /admin","m":1,"k":"tra"},
+ {"f":2,"t":0,"l":"403 Forbidden","m":1,"k":"app","d":1}
+]}
+</script>
+<div class="note trap"><b>Cạm bẫy lớn nhất của mTLS: authentication ≠ authorization</b><ul>
+  <li>CA nội bộ cấp cert cho <b>mọi</b> service. Nếu server chỉ bật "require client cert" mà không kiểm tra identity, thì <b>bất kỳ</b> service nào trong cluster (kể cả một pod đã bị chiếm) cũng gọi được API admin. Luôn đọc identity (SAN URI/DNS) rồi so với policy (Lab 11.3).</li>
+  <li>Đừng so identity bằng Subject CN hay so chuỗi lỏng lẻo (<code>contains("svc-a")</code> khớp cả <code>svc-a-evil</code>). So nguyên SPIFFE ID.</li>
+  <li>Chế độ "optional": nginx <code>ssl_verify_client optional</code>, Python <code>CERT_OPTIONAL</code>, Go <code>VerifyClientCertIfGiven</code> cho phép client <b>không</b> gửi cert. Code phía sau phải xử lý trường hợp không có identity.</li>
+  <li><code>openssl s_server</code> là tool debug: không có <code>-verify_return_error</code> thì nó <b>báo lỗi verify nhưng vẫn cho qua</b> (Lab 11.2 thử điều này).</li>
+</ul></div>
+<div class="tbl"><table>
+<thead><tr><th>Cách client chứng minh danh tính</th><th>Bằng chứng</th><th>Bị lộ thì sao</th><th>Gặp ở đâu</th></tr></thead>
+<tbody>
+<tr class="t-sec"><td><span class="lay"></span><b>mTLS (client certificate)</b></td><td>Chữ ký bằng private key, không bao giờ gửi đi</td><td>Nghe lén không lấy được gì; private key phải bị đánh cắp từ máy</td><td>Service ↔ service, NF ↔ NF, service mesh</td></tr>
+<tr><td><b>Bearer token</b> (OAuth2, JWT, module 12)</td><td>Token gửi kèm mỗi request</td><td>Ai cầm token thì dùng được tới khi hết hạn</td><td>User, API công khai, authorization chi tiết</td></tr>
+<tr><td><b>API key / shared secret</b></td><td>Chuỗi bí mật cố định</td><td>Như trên nhưng thường không hết hạn</td><td>Hệ thống cũ, partner đơn giản</td></tr>
+<tr><td><b>mTLS + certificate-bound token</b> (RFC 8705)</td><td>Token chứa fingerprint của client cert</td><td>Token bị đánh cắp vô dụng nếu không có private key</td><td>OAuth2 mức bảo mật cao, open banking</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job: 5G core</b><p>Các NF trong 5G core gọi nhau qua <b>SBI</b> (HTTP/2). 3GPP TS 33.501 yêu cầu NF hỗ trợ TLS cho SBI, với NF authenticate lẫn nhau bằng certificate (hoặc bảo vệ ở tầng network bằng NDS/IPsec, module 13). Authorization giữa NF dùng OAuth 2.0 access token do NRF cấp. Giữa hai nhà mạng, SEPP bảo vệ interface N32 (module 15). Nghĩa là đúng mô hình ở trên: mTLS cho "bạn là NF nào", token cho "NF đó được gọi service nào". Các service security/authentication của platform thường là nơi cấp cert, cấu hình TLS và kiểm tra identity cho các component đó.</p></div>
+
+<h2>TLS kết thúc ở đâu trong cluster</h2>
+<p>"TLS termination" là điểm giải mã TLS. Chọn điểm nào quyết định ai thấy được plaintext:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 232" role="img" aria-label="Ba kiểu TLS termination: termination tại ingress, re-encrypt, passthrough">
+  <text x="10" y="38" class="t-b">TLS termination</text>
+  <text x="10" y="56" class="t-s t-m">ingress giải mã;</text>
+  <text x="10" y="71" class="t-s t-m">trong cluster là plaintext</text>
+  <rect class="box" x="200" y="24" width="80" height="40" rx="6"/><text x="240" y="49" class="t-c t-s t-b">Client</text>
+  <g class="t-sec"><line class="st" x1="280" y1="44" x2="380" y2="44" style="stroke-width:3"/></g>
+  <text x="330" y="36" class="t-c t-s t-b">TLS</text>
+  <g class="t-net"><rect class="f" x="380" y="24" width="120" height="40" rx="6"/></g>
+  <text x="440" y="41" class="t-c t-s t-b">Ingress / LB</text><text x="440" y="56" class="t-c t-s t-m">cert công khai</text>
+  <line class="ln dash" x1="500" y1="44" x2="600" y2="44"/>
+  <text x="550" y="36" class="t-c t-s t-m">HTTP</text>
+  <g class="t-app"><rect class="f" x="600" y="24" width="110" height="40" rx="6"/></g>
+  <text x="655" y="41" class="t-c t-s t-b">Pod auth</text><text x="655" y="56" class="t-c t-s t-m">HTTP :8080</text>
+
+  <text x="10" y="112" class="t-b">Re-encrypt</text>
+  <text x="10" y="130" class="t-s t-m">ingress giải mã rồi</text>
+  <text x="10" y="145" class="t-s t-m">mở TLS mới tới pod</text>
+  <rect class="box" x="200" y="98" width="80" height="40" rx="6"/><text x="240" y="123" class="t-c t-s t-b">Client</text>
+  <g class="t-sec"><line class="st" x1="280" y1="118" x2="380" y2="118" style="stroke-width:3"/></g>
+  <text x="330" y="110" class="t-c t-s t-b">TLS</text>
+  <g class="t-net"><rect class="f" x="380" y="98" width="120" height="40" rx="6"/></g>
+  <text x="440" y="115" class="t-c t-s t-b">Ingress / LB</text><text x="440" y="130" class="t-c t-s t-m">thấy plaintext</text>
+  <g class="t-sec"><line class="st" x1="500" y1="118" x2="600" y2="118" style="stroke-width:3"/></g>
+  <text x="550" y="110" class="t-c t-s t-b">(m)TLS</text>
+  <g class="t-app"><rect class="f" x="600" y="98" width="110" height="40" rx="6"/></g>
+  <text x="655" y="115" class="t-c t-s t-b">Pod auth</text><text x="655" y="130" class="t-c t-s t-m">cert nội bộ</text>
+
+  <text x="10" y="186" class="t-b">Passthrough</text>
+  <text x="10" y="204" class="t-s t-m">ingress chỉ đọc SNI,</text>
+  <text x="10" y="219" class="t-s t-m">TLS đi thẳng tới pod</text>
+  <rect class="box" x="200" y="172" width="80" height="40" rx="6"/><text x="240" y="197" class="t-c t-s t-b">Client</text>
+  <g class="t-sec"><line class="st" x1="280" y1="192" x2="600" y2="192" style="stroke-width:3"/></g>
+  <text x="330" y="184" class="t-c t-s t-b">TLS</text><text x="550" y="184" class="t-c t-s t-b">TLS</text>
+  <g class="t-net"><rect class="f" x="380" y="172" width="120" height="40" rx="6"/></g>
+  <text x="440" y="189" class="t-c t-s t-b">Ingress (L4)</text><text x="440" y="204" class="t-c t-s t-m">route theo SNI</text>
+  <g class="t-app"><rect class="f" x="600" y="172" width="110" height="40" rx="6"/></g>
+  <text x="655" y="189" class="t-c t-s t-b">Pod auth</text><text x="655" y="204" class="t-c t-s t-m">giữ private key</text>
+</svg></div>
+<figcaption>Kiểu thứ tư là service mesh (module 14): sidecar Envoy cạnh mỗi pod tự làm mTLS với nhau, application chỉ nói HTTP tới localhost.</figcaption></figure>
+<div class="note trap"><b>Cạm bẫy: identity đi qua header</b><p>Khi ingress hoặc sidecar terminate mTLS, backend không còn thấy client cert. Proxy chuyển identity qua header, ví dụ <code>X-Forwarded-Client-Cert</code> (XFCC) của Envoy. Nếu proxy không <b>xoá header này từ request đi vào</b>, client chỉ cần tự đặt <code>X-Forwarded-Client-Cert: …URI=spiffe://…/sa/admin</code> là giả được bất kỳ ai. Backend chỉ được tin header này khi chắc chắn mọi traffic đều đi qua proxy và proxy đã ghi đè nó (Envoy mặc định <code>SANITIZE</code>).</p></div>
+<div class="note more"><b>Cert rotation không cần restart</b><p>Module 10 nói cert ngắn hạn phải gia hạn tự động. Phía service, cert mới phải được nạp mà <b>không</b> làm rớt connection: Envoy nhận cert qua SDS, Go dùng callback <code>GetCertificate</code>, nginx dùng <code>nginx -s reload</code> (graceful), Python tạo <code>SSLContext</code> mới cho các connection mới. Connection đang mở vẫn dùng key cũ tới khi đóng; cert chỉ được kiểm tra lúc handshake.</p></div>
+
+<h2>Debug lỗi TLS</h2>
+<p>Khi một bên phát hiện lỗi, nó gửi <b>alert</b> (một record nhỏ có mã lỗi) rồi đóng connection. OpenSSL đặt tên alert theo kiểu <code>sslv3 alert …</code>, <code>tlsv1 alert …</code>, <code>tlsv13 alert …</code> (tiền tố chỉ cho biết alert được định nghĩa từ version nào). Lỗi verify certificate xem bảng ở module 10.</p>
+<div class="tbl"><table>
+<thead><tr><th>Thông báo (OpenSSL / curl)</th><th>Alert</th><th>Nguyên nhân thường gặp</th><th>Hướng xử lý</th></tr></thead>
+<tbody>
+<tr><td><code>wrong version number</code></td><td>(không phải alert)</td><td>Nói TLS với port plaintext (hoặc ngược lại), ví dụ <code>https://</code> vào port 8080 HTTP</td><td>Kiểm tra scheme và port</td></tr>
+<tr><td><code>alert handshake failure</code></td><td>40</td><td>Không có version, cipher suite hoặc group chung</td><td><code>openssl s_client -tls1_2 / -tls1_3</code>; so cấu hình hai bên</td></tr>
+<tr><td><code>alert protocol version</code></td><td>70</td><td>Một bên chỉ nhận TLS 1.3, bên kia tối đa 1.2 (client đời cũ)</td><td>Nâng client, hoặc mở 1.2 có kiểm soát</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>tlsv13 alert certificate required</code></td><td>116</td><td>Server đòi mTLS, client không gửi cert</td><td>Cấu hình client cert + key</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>tlsv1 alert unknown ca</code></td><td>48</td><td>Bên <b>kia</b> không tin CA đã ký cert của bạn, hoặc bạn không gửi intermediate</td><td>Gửi full chain; thêm root vào trust bundle bên kia</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><code>alert unsupported certificate</code></td><td>43</td><td>Sai EKU, ví dụ dùng server cert làm client cert</td><td>Cấp cert có EKU đúng</td></tr>
+<tr><td><code>alert no application protocol</code></td><td>120</td><td>ALPN không khớp, ví dụ gRPC đòi <code>h2</code> mà server chỉ có <code>http/1.1</code></td><td>Bật h2 ở server/proxy</td></tr>
+<tr><td><code>unexpected eof while reading</code></td><td>(không có close_notify)</td><td>Bên kia đóng TCP đột ngột: LB timeout, process crash, server từ chối sau handshake</td><td>Xem log phía bên kia</td></tr>
+<tr><td><code>bad record mac</code></td><td>20</td><td>Record bị sửa trên đường: middlebox lỗi, NIC offload hỏng</td><td>Capture hai đầu, tắt từng middlebox</td></tr>
+</tbody></table></div>
+<div class="note key"><b>Đọc alert đúng chiều</b><p>"<code>alert unknown ca</code>" phía client nghĩa là <b>server</b> không tin cert của <b>client</b>, không phải ngược lại. Alert luôn là lời phàn nàn của bên gửi về bên nhận. Trong TLS 1.3 mTLS, client coi handshake đã xong ngay khi gửi Finished, nên lỗi do server từ chối client cert chỉ hiện ra ở lần <b>đọc</b> đầu tiên (curl báo <code>(56) … SSL_read</code>). Lab 11.4 cho bạn thấy trực tiếp.</p></div>
+<script type="text/plain" class="code" data-lang="bash" data-file="Cheat sheet debug TLS">
+openssl s_client -connect host:443 -servername host -brief </dev/null       # version, cipher, group, verify
+openssl s_client -connect host:443 -servername host -tls1_2 </dev/null      # server còn nhận TLS 1.2 không?
+openssl s_client -connect host:443 -servername host -msg </dev/null         # từng handshake message (kể cả phần mã hoá)
+openssl s_client -connect host:443 -cert client-chain.crt -key client.key -CAfile root.crt   # thử mTLS
+openssl ciphers -v -s -tls1_3                                                # cipher suite OpenSSL của bạn hỗ trợ
+curl -v --tlsv1.3 --cacert root.crt https://host/                            # handshake từng bước, như Làm trước
+nmap --script ssl-enum-ciphers -p 443 host                                   # quét version + cipher server chấp nhận
+SSLKEYLOGFILE=/tmp/keys.log curl …   # rồi tshark -o tls.keylog_file:/tmp/keys.log (chỉ trên máy lab)
+</script>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m11" data-title="Kiểm tra module 11">
+[
+ {"q":"TLS cung cấp những dịch vụ bảo mật nào cho connection?","o":["Confidentiality, integrity, authentication (server bắt buộc, client tuỳ chọn)","Chỉ encryption","Confidentiality và availability","Ẩn IP của client"],"a":0,
+  "e":"TLS không chống DoS (availability) và không che IP, port, kích thước traffic hay SNI."},
+ {"q":"Không tính TCP handshake, TLS 1.3 full handshake tốn mấy RTT trước khi client gửi được request?","o":["0","1","2","3"],"a":1,
+  "e":"Client gửi key_share ngay trong ClientHello nên sau một lượt đi về là có key. TLS 1.2 cần 2 RTT. 0-RTT chỉ có khi resume."},
+ {"q":"Trudy copy nguyên certificate chain của server thật rồi dựng server giả. Message nào làm Trudy thất bại?","o":["ClientHello","Certificate","CertificateVerify: Trudy không ký được transcript vì không có private key","NewSessionTicket"],"a":2,
+  "e":"Certificate là dữ liệu công khai. Chỉ chữ ký trên transcript của connection này mới chứng minh việc giữ private key."},
+ {"q":"Vì sao TLS 1.3 bỏ RSA key transport (client mã hoá secret bằng public key của server)?","o":["Vì RSA chậm","Không có forward secrecy: lộ private key của server sau này là giải mã được mọi traffic đã ghi lại","Vì RSA bị phá","Vì không hỗ trợ SNI"],"a":1,
+  "e":"Với (EC)DHE ephemeral, private key dài hạn chỉ dùng để ký; secret của từng connection bị bỏ sau khi dùng."},
+ {"q":"Cipher suite <code>TLS_AES_128_GCM_SHA256</code> không ghi key exchange. Key exchange được chọn thế nào?","o":["Luôn là RSA","Riêng qua extension supported_groups / key_share (X25519, P-256, hybrid PQ…)","Không có key exchange","Do ALPN chọn"],"a":1,
+  "e":"TLS 1.3 tách key exchange và signature algorithm khỏi cipher suite, nên chỉ cần 5 suite thay vì hàng trăm tổ hợp."},
+ {"q":"Finished message dùng để làm gì?","o":["Báo đóng connection","HMAC trên toàn bộ transcript: phát hiện handshake bị sửa, kể cả downgrade","Gửi certificate","Gửi session ticket"],"a":1,
+  "e":"Nếu Trudy xoá bớt cipher suite mạnh khỏi ClientHello, transcript hai bên khác nhau và Finished không khớp."},
+ {"q":"Kẻ nghe lén thụ động trên đường truyền TLS 1.3 thấy được gì?","o":["Nội dung request","Certificate của server","IP, port, SNI, kích thước và thời điểm các record","Không thấy gì cả"],"a":2,
+  "e":"Từ TLS 1.3 certificate đã được mã hoá. SNI vẫn plaintext trừ khi có ECH."},
+ {"q":"Auth service có endpoint POST /token. Có nên bật 0-RTT cho nó không?","o":["Nên, vì nhanh hơn","Không: early data có thể bị replay, chỉ hợp với request idempotent","Không quan trọng","Chỉ bật khi dùng TLS 1.2"],"a":1,
+  "e":"Trudy gửi lại flight đầu (ClientHello + early data) được. POST cấp token không idempotent."},
+ {"q":"Server bật mTLS, CA nội bộ cấp cert cho mọi service. svc-x có cert hợp lệ gọi được API /admin mà nó không được phép. Lỗi ở đâu?","o":["CA cấp sai","Server chỉ authenticate (cert hợp lệ) mà không authorize (so identity với policy)","Thiếu intermediate","TLS 1.2"],"a":1,
+  "e":"Handshake thành công chỉ trả lời 'bạn là ai'. Application phải đọc SAN (SPIFFE ID) và quyết định 'được làm gì'."},
+ {"q":"Client C dùng OpenSSL: SSL_connect() thành công, nhưng SSL_read() đầu tiên báo <code>tlsv13 alert certificate required</code>. Vì sao lỗi không xuất hiện ở SSL_connect?","o":["Bug của OpenSSL","Trong TLS 1.3, client xong handshake ngay khi gửi Finished; server kiểm tra client cert sau đó rồi mới gửi alert","Do network chậm","Do ALPN"],"a":1,
+  "e":"Đây là khác biệt thực tế của TLS 1.3. Code client phải xử lý lỗi TLS ở cả read/write, không chỉ lúc connect."},
+ {"q":"Ingress terminate mTLS rồi chuyển identity cho backend qua header X-Forwarded-Client-Cert. Rủi ro chính?","o":["Header quá dài","Client tự đặt header giả nếu ingress không xoá/ghi đè header đến từ bên ngoài","Mất forward secrecy","Không dùng được HTTP/2"],"a":1,
+  "e":"Backend chỉ được tin header khi mọi traffic bắt buộc qua proxy và proxy sanitize header."},
+ {"q":"Wireshark hiện 'TLSv1.2 Record Layer' cho một connection mà curl báo là TLSv1.3. Giải thích?","o":["curl báo sai","Record header luôn ghi legacy_version 0x0303 để middlebox không chặn; version thật nằm trong supported_versions","Server downgrade","Wireshark lỗi"],"a":1,
+  "e":"Xem ServerHello → extension supported_versions để biết version thật."},
+ {"q":"curl báo <code>wrong version number</code> khi gọi <code>https://auth:8080</code>. Nghi ngờ đầu tiên?","o":["Cert hết hạn","Port 8080 nói HTTP plaintext, không phải TLS","Thiếu SNI","Sai cipher suite"],"a":1,
+  "e":"Client đọc 'HTTP/1.1 400…' và hiểu các byte đầu như một TLS record header vô nghĩa."}
+]
+</script>
+
+<h3>Ôn lại module 05, 09, 10</h3>
+<script type="application/json" class="quiz" data-id="m11-review" data-title="Ôn lại">
+[
+ {"q":"HTTPS qua TCP + TLS 1.3 cần 2 RTT trước request đầu tiên. HTTP/3 (QUIC) cần mấy RTT cho connection mới?","o":["0","1: QUIC gộp transport handshake và TLS 1.3 handshake","2","3"],"a":1,
+  "e":"QUIC mang TLS 1.3 handshake trong chính các packet handshake của nó (module 05)."},
+ {"q":"Record TLS 1.3 bị lật 1 bit trên đường. Bên nhận phát hiện nhờ gì?","o":["TCP checksum","Authentication tag của AEAD (module 09): giải mã thất bại, gửi alert bad_record_mac","Sequence number của TCP","Không phát hiện được"],"a":1,
+  "e":"TCP checksum chỉ bắt lỗi ngẫu nhiên, Trudy tính lại được. AEAD tag cần key nên không giả được."},
+ {"q":"Pod gọi <code>https://10.96.4.7:8443</code> (ClusterIP) tới service auth có cert với SAN <code>auth.security.svc.cluster.local</code>. Kết quả?","o":["Thành công","Hostname mismatch: IP không có trong SAN (module 10)","unknown ca","certificate required"],"a":1,
+  "e":"Gọi bằng DNS name có trong SAN. ClusterIP còn có thể đổi khi Service bị tạo lại."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"11 TLS 1.3 & mTLS","c":[
+ {"t":"TLS cho gì","col":"base","c":[{"t":"Confidentiality, integrity"},{"t":"Server authentication (bắt buộc)"},{"t":"Client authentication = mTLS"},{"t":"Không che: IP, size, SNI"}]},
+ {"t":"Handshake 1.3","col":"sec","c":[{"t":"ClientHello + key_share"},{"t":"ServerHello + key_share"},{"t":"{Certificate} + {CertificateVerify}"},{"t":"{Finished}: HMAC transcript"},{"t":"1 RTT; cert được mã hoá"}]},
+ {"t":"Key & record","col":"app","c":[{"t":"ECDHE → HKDF key schedule"},{"t":"Handshake / application secrets"},{"t":"Record: type 23, 0x0303, AEAD tag"},{"t":"SSLKEYLOGFILE để giải mã capture"}]},
+ {"t":"1.2 → 1.3","col":"tra","c":[{"t":"Bỏ RSA key transport, CBC, RC4"},{"t":"Forward secrecy bắt buộc"},{"t":"Cipher suite = AEAD + hash"},{"t":"Resumption PSK, 0-RTT (replay!)"}]},
+ {"t":"mTLS","col":"k8s","c":[{"t":"CertificateRequest"},{"t":"Client cert EKU clientAuth"},{"t":"Authentication ≠ authorization"},{"t":"SPIFFE ID → policy"},{"t":"Lỗi hiện ở lần read đầu"}]},
+ {"t":"Vận hành","col":"core","c":[{"t":"Termination / re-encrypt / passthrough"},{"t":"SNI routing, ALPN h2"},{"t":"XFCC phải sanitize"},{"t":"Rotation không restart"},{"t":"Alert 40, 48, 70, 116"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<p class="small muted">Các lab dùng lại thư mục <code>~/netlab/m10/pki</code> của Lab 10.2 (root.crt, inter.crt, server.crt/key, client.crt/key, server-chain.crt, client-chain.crt). Chưa có thì chạy lại <code>mkpki.sh</code>. Cert trong đó sống 30 ngày, hết hạn thì chạy lại script.</p>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 11.1 · Nhìn tận mắt TLS 1.2 và TLS 1.3 trên dây</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">tcpdump · tshark · curl</span><span class="chip t-base">30 phút</span></div>
+  <p>Chạy HTTPS server bằng <code>openssl s_server</code> với PKI của Lab 10.2. Capture hai connection, một TLS 1.3 và một TLS 1.2, rồi trả lời: mỗi version để lộ những handshake message nào? Certificate (có SAN của service) có bị người nghe lén đọc được không? Sau đó dùng <code>SSLKEYLOGFILE</code> để giải mã phần handshake đã mã hoá của TLS 1.3.</p>
+  <p class="done-when"><b>Xong khi:</b> chỉ ra được (1) với TLS 1.3, tshark không có key chỉ thấy ClientHello và ServerHello; (2) với TLS 1.2, đọc được SAN của server cert từ capture; (3) có keylog thì thấy đủ EncryptedExtensions, Certificate, CertificateVerify, Finished của TLS 1.3.</p>
+  <details><summary>Gợi ý</summary><p>curl: <code>--tlsv1.3</code> (tối thiểu 1.3), <code>--tls-max 1.2</code> (tối đa 1.2). tshark: <code>-Y tls.handshake -T fields -e tcp.stream -e tls.handshake.type</code>. Field SAN là <code>x509ce.dNSName</code>. Số handshake type: 1 ClientHello, 2 ServerHello, 4 NewSessionTicket, 8 EncryptedExtensions, 11 Certificate, 12 ServerKeyExchange, 14 ServerHelloDone, 15 CertificateVerify, 16 ClientKeyExchange, 20 Finished.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m10
+$ (cd pki && openssl s_server -accept 8443 -cert server.crt -key server.key -cert_chain inter.crt -www -quiet &)
+$ sudo -v
+$ sudo tcpdump -i lo -w /tmp/tls.pcap 'tcp port 8443' &
+$ export SSLKEYLOGFILE=/tmp/keys.log
+$ curl -s --cacert pki/root.crt --tlsv1.3 https://localhost:8443/ -o /dev/null       # tcp.stream 0
+$ curl -s --cacert pki/root.crt --tls-max 1.2 https://localhost:8443/ -o /dev/null   # tcp.stream 1
+$ unset SSLKEYLOGFILE; sleep 1; sudo pkill tcpdump
+$ tshark -r /tmp/tls.pcap -Y tls.handshake -T fields -e tcp.stream -e tls.handshake.type
+0	1                                                ◀ TLS 1.3: ClientHello
+0	2                                                ◀ ServerHello; phần còn lại là record type 23, không đọc được
+1	1
+1	2,11,12,14                                       ◀ TLS 1.2: ServerHello, Certificate, ServerKeyExchange, ServerHelloDone
+1	16                                               ◀ ClientKeyExchange
+$ tshark -r /tmp/tls.pcap -Y 'tls.handshake.type == 11' -T fields -e tcp.stream -e x509ce.dNSName
+1	auth.security.svc.cluster.local,auth.security,localhost   ◀ chỉ connection TLS 1.2 để lộ cert
+$ tshark -r /tmp/tls.pcap -o tls.keylog_file:/tmp/keys.log -Y 'tcp.stream == 0 && tls.handshake' \
+    -T fields -e tls.handshake.type
+1
+2
+8,11,15,20                                       ◀ có key: EncryptedExtensions, Certificate, CertificateVerify, Finished
+20                                               ◀ Finished của client
+4,4                                              ◀ hai NewSessionTicket sau handshake
+$ pkill -f 's_server -accept 8443'; rm -f /tmp/keys.log
+</script>
+  <p class="small muted">Output đã rút gọn: tshark có thể in thêm dòng trống cho các "Encrypted Handshake Message" của TLS 1.2 và gộp message khác nhau tuỳ cách chúng nằm trong TCP segment. Ý chính: với TLS 1.2 và mTLS, client cert (identity của service gọi) cũng đi plaintext như dòng <code>x509ce.dNSName</code> ở trên. Mở <code>/tmp/tls.pcap</code> bằng Wireshark để xem trực quan.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 11.2 · mTLS bằng openssl và curl: 5 tình huống</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Bash · openssl · curl</span><span class="chip t-base">45 phút</span></div>
+  <p>Chạy server đòi client certificate trên port 9443, chỉ tin root CA nội bộ. Gọi bằng curl trong 4 tình huống: không gửi cert; gửi <code>client-chain.crt</code>; gửi <code>client.crt</code> thiếu intermediate; gửi server cert làm client cert. Ghi lại thông báo lỗi và ghép với bảng debug ở trên. Tình huống 5: chạy lại server <b>không</b> có <code>-verify_return_error</code> và thử lại tình huống 4.</p>
+  <p class="done-when"><b>Xong khi:</b> có bảng 5 dòng (tình huống → kết quả → alert → giải thích), và giải thích được vì sao tình huống 5 trả 200 dù cert sai mục đích.</p>
+  <details><summary>Gợi ý</summary><p><code>openssl s_server … -CAfile root.crt -Verify 1 -verify_return_error</code>: <code>-Verify</code> (chữ V hoa) bắt buộc client gửi cert, <code>-CAfile</code> là CA dùng để verify client. curl gửi client cert bằng <code>--cert</code> và <code>--key</code>; file PEM ở <code>--cert</code> có thể chứa cả chain. Server log ra stderr lý do từ chối.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m10/pki
+$ openssl s_server -accept 9443 -cert server.crt -key server.key -cert_chain inter.crt \
+    -CAfile root.crt -Verify 1 -verify_return_error -www -quiet &
+$ U=https://localhost:9443/
+$ curl -sS --cacert root.crt $U -o /dev/null -w '%{http_code}\n'                       # 1. không có cert
+curl: (56) OpenSSL SSL_read: OpenSSL/3.0.13: error:0A00045C:SSL routines::tlsv13 alert certificate required, errno 0
+$ curl -sS --cacert root.crt --cert client-chain.crt --key client.key $U -o /dev/null -w '%{http_code}\n'   # 2. đúng
+200
+$ curl -sS --cacert root.crt --cert client.crt --key client.key $U -o /dev/null       # 3. thiếu intermediate
+curl: (56) OpenSSL SSL_read: … tlsv1 alert unknown ca                    ◀ server không dựng được chain tới root
+$ curl -sS --cacert root.crt --cert server-chain.crt --key server.key $U -o /dev/null # 4. sai EKU
+curl: (56) OpenSSL SSL_read: … sslv3 alert unsupported certificate       ◀ EKU chỉ có serverAuth
+$ kill %1
+$ openssl s_server -accept 9443 -cert server.crt -key server.key -cert_chain inter.crt \
+    -CAfile root.crt -Verify 1 -www -quiet &                                           # 5. quên -verify_return_error
+$ curl -sS --cacert root.crt --cert server-chain.crt --key server.key $U -o /dev/null -w '%{http_code}\n'
+verify error:num=26:unsupported certificate purpose                      ◀ server in lỗi ra stderr…
+200                                                                      ◀ …nhưng vẫn cho qua!
+$ kill %1
+</script>
+  <p><b>Đọc kết quả:</b> mọi lỗi đều là <code>(56) … SSL_read</code>, không phải lỗi lúc handshake: client TLS 1.3 đã xong phần của nó, server từ chối sau đó. Tình huống 3 là lỗi thật hay gặp nhất khi bật mTLS: client chỉ cấu hình leaf cert, quên intermediate. Tình huống 5 cho thấy một server "có bật mTLS" vẫn có thể chấp nhận cert sai: cấu hình verify phải được test bằng các ca âm tính như ở đây, không chỉ ca thành công. Thông báo chính xác thay đổi theo version OpenSSL.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 11.3 · mTLS server có authorization theo SPIFFE ID</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python · ssl</span><span class="chip t-base">50 phút</span></div>
+  <p>Cấp thêm client cert cho <code>svc-b</code> (SAN <code>spiffe://netlab.local/ns/default/sa/svc-b</code>). Viết <code>mtls_server.py</code> chỉ nhận TLS 1.3, bắt buộc client cert do CA nội bộ ký, đọc SPIFFE ID từ SAN rồi áp policy: <code>svc-a</code> chỉ được gọi <code>/token</code>; <code>svc-b</code> được gọi <code>/token</code> và <code>/admin</code>. Thử bằng curl.</p>
+  <p class="done-when"><b>Xong khi:</b> svc-a gọi <code>/token</code> → 200, svc-a gọi <code>/admin</code> → 403, svc-b gọi <code>/admin</code> → 200, không có cert → handshake thất bại; server log đủ identity cho từng request.</p>
+  <details><summary>Gợi ý</summary><p><code>ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)</code>, <code>minimum_version = ssl.TLSVersion.TLSv1_3</code>, <code>verify_mode = ssl.CERT_REQUIRED</code>, <code>load_verify_locations("pki/root.crt")</code>. Sau handshake, <code>getpeercert()["subjectAltName"]</code> là tuple các cặp như <code>('URI', 'spiffe://…')</code>. Lỗi verify client cert là <code>ssl.SSLCertVerificationError</code>, có <code>verify_message</code>. Dùng <code>curl --resolve</code> để gọi đúng tên trong SAN.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ cd ~/netlab/m10/pki
+$ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out svc-b.key
+$ openssl req -new -key svc-b.key -subj "/CN=svc-b" -out svc-b.csr
+$ openssl x509 -req -in svc-b.csr -CA inter.crt -CAkey inter.key -CAcreateserial -days 30 -sha256 \
+    -extfile <(printf '%s\n' "basicConstraints=critical,CA:FALSE" "keyUsage=critical,digitalSignature" \
+      "extendedKeyUsage=clientAuth" "subjectAltName=URI:spiffe://netlab.local/ns/default/sa/svc-b") \
+    -out svc-b.crt
+$ cat svc-b.crt inter.crt > svc-b-chain.crt && chmod 600 svc-b.key && cd ..
+</script>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m10/mtls_server.py">
+#!/usr/bin/env python3
+"""mTLS server: authenticate client bằng certificate, rồi authorize theo SPIFFE ID. Chạy trong ~/netlab/m10."""
+import socket
+import ssl
+
+PORT = 9444
+POLICY = {  # SPIFFE ID → các path được phép. So nguyên chuỗi, không dùng "contains".
+    "spiffe://netlab.local/ns/default/sa/svc-a": {"/token"},
+    "spiffe://netlab.local/ns/default/sa/svc-b": {"/token", "/admin"},
+}
+
+
+def make_context() -> ssl.SSLContext:
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_3
+    ctx.load_cert_chain("pki/server-chain.crt", "pki/server.key")   # leaf + intermediate
+    ctx.load_verify_locations("pki/root.crt")                       # tin client cert do CA nội bộ cấp
+    ctx.verify_mode = ssl.CERT_REQUIRED                             # không có cert → handshake thất bại
+    return ctx
+
+
+def spiffe_id(cert: dict) -> str | None:
+    """Lấy đúng một SPIFFE ID từ SAN; không có hoặc có nhiều hơn một thì coi như không có identity."""
+    ids = [v for k, v in cert.get("subjectAltName", ()) if k == "URI" and v.startswith("spiffe://")]
+    return ids[0] if len(ids) == 1 else None
+
+
+def handle(tls: ssl.SSLSocket) -> None:
+    ident = spiffe_id(tls.getpeercert())
+    request_line = tls.recv(4096).decode(errors="replace").split("\r\n", 1)[0]
+    method, path = (request_line.split() + ["", ""])[:2]
+    if path in POLICY.get(ident, set()):                            # authorization
+        status, body = "200 OK", f"xin chào {ident}, đây là {path}\n"
+    else:
+        status, body = "403 Forbidden", f"{ident} không được phép gọi {path}\n"
+    print(f"   {ident} {method} {path} → {status}")
+    data = body.encode()
+    tls.sendall(f"HTTP/1.1 {status}\r\nContent-Length: {len(data)}\r\nConnection: close\r\n\r\n".encode() + data)
+
+
+def main() -> None:
+    ctx = make_context()
+    with socket.create_server(("127.0.0.1", PORT)) as srv:
+        print(f"mTLS server trên 127.0.0.1:{PORT}")
+        while True:
+            raw, (ip, port) = srv.accept()
+            try:
+                with ctx.wrap_socket(raw, server_side=True) as tls:   # handshake + verify client cert
+                    print(f"{ip}:{port} {tls.version()} {tls.cipher()[0]}")
+                    handle(tls)
+            except ssl.SSLCertVerificationError as e:
+                print(f"{ip}:{port} từ chối client cert: {e.verify_message}")
+            except (ssl.SSLError, OSError) as e:
+                print(f"{ip}:{port} handshake thất bại: {getattr(e, 'reason', None) or e}")
+
+
+if __name__ == "__main__":
+    main()
+</script>
+<script type="text/plain" class="term">
+$ python3 mtls_server.py &
+mTLS server trên 127.0.0.1:9444
+$ C="--cacert pki/root.crt --resolve auth.security.svc.cluster.local:9444:127.0.0.1"
+$ U=https://auth.security.svc.cluster.local:9444
+$ curl -sS $C --cert pki/client-chain.crt --key pki/client.key $U/token
+127.0.0.1:51432 TLSv1.3 TLS_AES_256_GCM_SHA384
+   spiffe://netlab.local/ns/default/sa/svc-a GET /token → 200 OK
+xin chào spiffe://netlab.local/ns/default/sa/svc-a, đây là /token
+$ curl -sS $C --cert pki/client-chain.crt --key pki/client.key $U/admin
+   spiffe://netlab.local/ns/default/sa/svc-a GET /admin → 403 Forbidden     ◀ authenticated, nhưng không authorized
+spiffe://netlab.local/ns/default/sa/svc-a không được phép gọi /admin
+$ curl -sS $C --cert pki/svc-b-chain.crt --key pki/svc-b.key $U/admin
+xin chào spiffe://netlab.local/ns/default/sa/svc-b, đây là /admin
+$ curl -sS $C $U/token
+127.0.0.1:51440 handshake thất bại: PEER_DID_NOT_RETURN_A_CERTIFICATE
+curl: (56) OpenSSL SSL_read: … tlsv13 alert certificate required
+$ kill %1
+</script>
+  <p class="small muted">Dòng log của server và output của curl xen nhau vì cùng in ra một terminal; port nguồn sẽ khác. <b>Mở rộng:</b> (1) thêm reload cert khi file <code>server.crt</code> thay đổi (tạo <code>SSLContext</code> mới, dùng cho các connection sau); (2) thử gửi cert của <code>evil-ca</code> ở Lab 10.4 (nhớ thêm EKU clientAuth) để thấy log "từ chối client cert".</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 11.4 · tlsprobe: TLS 1.3 client bằng C và OpenSSL</h3><span class="chip lvl3">Thử thách</span><span class="chip t-base">C · libssl</span><span class="chip t-base">60 phút</span></div>
+  <p>Middleware trong core network thường viết bằng C/C++ và gọi thẳng OpenSSL. Viết <code>tlsprobe</code>: kết nối tới <code>host port</code>, chỉ nhận TLS 1.3, verify certificate <b>và hostname</b>, gửi SNI và ALPN, tuỳ chọn gửi client cert (mTLS). In thời gian handshake, version, cipher suite, group, ALPN, subject/issuer/SAN của server cert, rồi gửi <code>GET /</code> và in dòng đầu của response. Chạy trên 4 tình huống:</p>
+  <ol>
+    <li><code>example.com 443</code> (trust store của hệ thống).</li>
+    <li>Server mTLS của Lab 11.2 (port 9443), <b>không</b> gửi client cert.</li>
+    <li>Như trên, có gửi <code>client-chain.crt</code>.</li>
+    <li>Gọi bằng tên <code>auth</code> (không có trong SAN).</li>
+  </ol>
+  <p class="done-when"><b>Xong khi:</b> 4 tình huống cho đúng kết quả, và bạn chỉ ra được tình huống nào hỏng ở <code>SSL_connect</code>, tình huống nào hỏng ở <code>SSL_read</code>, kèm lý do.</p>
+  <details><summary>Gợi ý</summary><p>Cần <code>sudo apt install -y libssl-dev</code>. Các hàm chính (OpenSSL 3): <code>SSL_CTX_set_min_proto_version</code>, <code>SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL)</code>, <code>SSL_CTX_load_verify_locations</code> hoặc <code>SSL_CTX_set_default_verify_paths</code>, <code>SSL_CTX_use_certificate_chain_file</code>, <code>SSL_set_tlsext_host_name</code> (SNI), <code>SSL_set1_host</code> (<b>bắt buộc</b> để kiểm tra hostname; thiếu nó thì OpenSSL chấp nhận cert hợp lệ của <b>bất kỳ</b> tên nào), <code>SSL_get_negotiated_group</code> + <code>SSL_group_to_name</code>, <code>SSL_get1_peer_certificate</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="c" data-file="~/netlab/m11/tlsprobe.c">
+// tlsprobe: TLS 1.3 client (mTLS tuỳ chọn) in thông tin handshake.
+// Build: gcc -Wall -O2 tlsprobe.c -o tlsprobe -lssl -lcrypto
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <openssl/x509v3.h>
+
+static double now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+}
+
+static void die(const char *msg) {
+    fprintf(stderr, "✘ %s\n", msg);
+    ERR_print_errors_fp(stderr);                    // lý do chi tiết từ OpenSSL (alert, verify…)
+    exit(1);
+}
+
+static int tcp_connect(const char *addr, const char *port) {
+    struct addrinfo hints = {0}, *res, *p;
+    hints.ai_socktype = SOCK_STREAM;
+    int rc = getaddrinfo(addr, port, &hints, &res);
+    if (rc != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+        return -1;
+    }
+    int fd = -1;
+    for (p = res; p; p = p->ai_next) {
+        fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (fd < 0) continue;
+        if (connect(fd, p->ai_addr, p->ai_addrlen) == 0) break;
+        close(fd);
+        fd = -1;
+    }
+    freeaddrinfo(res);
+    return fd;
+}
+
+static void print_san(X509 *cert) {
+    GENERAL_NAMES *sans = X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
+    if (!sans) return;
+    printf("  SAN        :");
+    for (int i = 0; i < sk_GENERAL_NAME_num(sans); i++) {
+        const GENERAL_NAME *gn = sk_GENERAL_NAME_value(sans, i);
+        if (gn->type == GEN_DNS || gn->type == GEN_URI) {
+            const ASN1_STRING *s = gn->type == GEN_DNS ? gn->d.dNSName : gn->d.uniformResourceIdentifier;
+            printf(" %.*s", ASN1_STRING_length(s), (const char *)ASN1_STRING_get0_data(s));
+        }
+    }
+    printf("\n");
+    GENERAL_NAMES_free(sans);
+}
+
+static void usage(const char *prog) {
+    fprintf(stderr, "Dùng: %s [-c cafile] [-C cert_chain -K key] [-a connect_addr] host port\n", prog);
+    exit(2);
+}
+
+int main(int argc, char **argv) {
+    const char *cafile = NULL, *cert = NULL, *key = NULL, *addr = NULL;
+    int opt;
+    while ((opt = getopt(argc, argv, "c:C:K:a:")) != -1) {
+        if (opt == 'c') cafile = optarg;
+        else if (opt == 'C') cert = optarg;
+        else if (opt == 'K') key = optarg;
+        else if (opt == 'a') addr = optarg;    // IP để connect; host vẫn dùng cho SNI + hostname check
+        else usage(argv[0]);
+    }
+    if (argc - optind != 2) usage(argv[0]);
+    const char *host = argv[optind], *port = argv[optind + 1];
+
+    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+    if (!ctx) die("SSL_CTX_new");
+    SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);          // chỉ nhận TLS 1.3
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);               // bắt buộc verify server
+    if (cafile ? !SSL_CTX_load_verify_locations(ctx, cafile, NULL)
+               : !SSL_CTX_set_default_verify_paths(ctx))
+        die("không nạp được trust store");
+    if (cert) {                                                   // mTLS: gửi cert + chain
+        if (SSL_CTX_use_certificate_chain_file(ctx, cert) != 1 ||
+            SSL_CTX_use_PrivateKey_file(ctx, key ? key : cert, SSL_FILETYPE_PEM) != 1 ||
+            SSL_CTX_check_private_key(ctx) != 1)
+            die("client cert/key không hợp lệ hoặc không khớp nhau");
+    }
+
+    int fd = tcp_connect(addr ? addr : host, port);
+    if (fd < 0) die("không kết nối TCP được");
+    SSL *ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, fd);
+    SSL_set_tlsext_host_name(ssl, host);                          // SNI
+    SSL_set1_host(ssl, host);                                     // so host với SAN khi verify
+    static const unsigned char alpn[] = {8, 'h', 't', 't', 'p', '/', '1', '.', '1'};
+    SSL_set_alpn_protos(ssl, alpn, sizeof alpn);
+
+    double t0 = now_ms();
+    if (SSL_connect(ssl) != 1) {
+        long v = SSL_get_verify_result(ssl);
+        if (v != X509_V_OK) fprintf(stderr, "verify: %s\n", X509_verify_cert_error_string(v));
+        die("handshake thất bại (SSL_connect)");
+    }
+    double t1 = now_ms();
+
+    const unsigned char *proto = NULL;
+    unsigned int plen = 0;
+    SSL_get0_alpn_selected(ssl, &proto, &plen);
+    printf("✔ handshake %.1f ms\n", t1 - t0);
+    printf("  version    : %s\n", SSL_get_version(ssl));
+    printf("  cipher     : %s\n", SSL_get_cipher_name(ssl));
+    printf("  group      : %s\n", SSL_group_to_name(ssl, SSL_get_negotiated_group(ssl)));
+    printf("  ALPN       : %.*s\n", plen ? (int)plen : 6, plen ? (const char *)proto : "(none)");
+    X509 *peer = SSL_get1_peer_certificate(ssl);
+    if (peer) {
+        printf("  subject    : ");
+        X509_NAME_print_ex_fp(stdout, X509_get_subject_name(peer), 0, XN_FLAG_ONELINE);
+        printf("\n  issuer     : ");
+        X509_NAME_print_ex_fp(stdout, X509_get_issuer_name(peer), 0, XN_FLAG_ONELINE);
+        printf("\n");
+        print_san(peer);
+        X509_free(peer);
+    }
+    printf("  client cert: %s\n", cert ? cert : "(không gửi)");
+
+    char req[512];
+    snprintf(req, sizeof req, "GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", host);
+    if (SSL_write(ssl, req, (int)strlen(req)) <= 0) die("SSL_write");
+    char buf[256];
+    int n = SSL_read(ssl, buf, sizeof buf - 1);                   // TLS 1.3: lỗi mTLS hiện ra ở đây
+    if (n <= 0) die("SSL_read thất bại: server từ chối sau handshake?");
+    buf[n] = '\0';
+    buf[strcspn(buf, "\r\n")] = '\0';
+    printf("  response   : %s\n", buf);
+
+    SSL_shutdown(ssl);                                            // gửi close_notify
+    SSL_free(ssl);
+    close(fd);
+    SSL_CTX_free(ctx);
+    return 0;
+}
+</script>
+<script type="text/plain" class="term">
+$ mkdir -p ~/netlab/m11 && cd ~/netlab/m11        # lưu tlsprobe.c vào đây
+$ sudo apt install -y libssl-dev && gcc -Wall -O2 tlsprobe.c -o tlsprobe -lssl -lcrypto
+$ ./tlsprobe example.com 443                                                  # 1
+✔ handshake 41.7 ms
+  version    : TLSv1.3
+  cipher     : TLS_AES_256_GCM_SHA384
+  group      : x25519
+  ALPN       : http/1.1
+  subject    : CN = example.com, …
+  …
+  response   : HTTP/1.1 200 OK
+$ P=~/netlab/m10/pki   # server mTLS của Lab 11.2 phải đang chạy trên 9443
+$ ./tlsprobe -c $P/root.crt -a 127.0.0.1 auth.security.svc.cluster.local 9443     # 2
+✔ handshake 1.9 ms                                            ◀ client tưởng đã xong…
+  …
+  client cert: (không gửi)
+✘ SSL_read thất bại: server từ chối sau handshake?
+…:SSL routines:…:tlsv13 alert certificate required…        ◀ …server từ chối khi nhận Finished của client
+$ ./tlsprobe -c $P/root.crt -C $P/client-chain.crt -K $P/client.key -a 127.0.0.1 auth.security.svc.cluster.local 9443   # 3
+✔ handshake 2.3 ms
+  …
+  SAN        : auth.security.svc.cluster.local auth.security localhost
+  client cert: /home/you/netlab/m10/pki/client-chain.crt
+  response   : HTTP/1.0 200 ok
+$ ./tlsprobe -c $P/root.crt -a 127.0.0.1 auth 9443                                 # 4
+verify: hostname mismatch
+✘ handshake thất bại (SSL_connect)                            ◀ lỗi do client tự phát hiện: hỏng ngay lúc handshake
+</script>
+  <p><b>Giải thích:</b> tình huống 4 hỏng ở <code>SSL_connect</code> vì chính client verify server và thấy sai tên. Tình huống 2 hỏng ở <code>SSL_read</code> vì trong TLS 1.3, client coi handshake xong khi gửi Finished; server kiểm tra client cert sau đó rồi mới gửi alert. Code production phải xử lý lỗi TLS ở mọi lần read/write, và nên đọc response đầu tiên trước khi coi một connection mTLS là "đã thông". Thử bỏ dòng <code>SSL_set1_host</code>, build lại và chạy tình huống 4: nó sẽ <b>thành công</b>. Đây là lỗi bảo mật kinh điển của code TLS viết tay.</p>
+  </details>
+</div>
+
+<div class="note more"><b>Bản C/C++</b><p><a href="#m17">Lab 17.2</a> viết mTLS server bằng C++ và libssl: bắt buộc client cert (<code>SSL_VERIFY_FAIL_IF_NO_PEER_CERT</code>), kiểm tra EKU, đọc SPIFFE ID từ SAN, tự nạp lại cert không restart, cùng bảng các bẫy hay gặp khi dùng OpenSSL. Lab 11.4 (<code>tlsprobe</code>) là phía client của cùng chủ đề.</p></div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m11"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §8.6 (almost-TLS và TLS 1.2). Đọc để hiểu ý tưởng, rồi quay lại bảng TLS 1.2 vs 1.3 ở trên.</li>
+  <li><a href="https://tls13.xargs.org/" target="_blank" rel="noopener">The Illustrated TLS 1.3 Connection</a>: từng byte của một handshake thật, có giải thích. Nên mở song song với Lab 11.1.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc8446" target="_blank" rel="noopener">RFC 8446</a>: chuẩn TLS 1.3. Đọc §2 (overview) và §4.4 (CertificateVerify, Finished) là đủ.</li>
+  <li><a href="https://ssl-config.mozilla.org/" target="_blank" rel="noopener">Mozilla SSL Configuration Generator</a>: cấu hình TLS khuyến nghị cho nginx, Envoy, HAProxy… theo mức Modern / Intermediate.</li>
+  <li><a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/headers#x-forwarded-client-cert" target="_blank" rel="noopener">Envoy: x-forwarded-client-cert</a>: cách proxy chuyển identity mTLS cho backend (chuẩn bị cho module 14).</li>
+</ul>

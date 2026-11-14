@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: security, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: apps, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: web, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: batch, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: {name: netlab-ca}
+spec: {ca: {secretName: netlab-ca}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: token-server, namespace: security}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: orders-api, namespace: apps}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: frontend, namespace: web}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: reporter, namespace: batch}
+automountServiceAccountToken: false

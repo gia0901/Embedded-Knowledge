@@ -1,0 +1,473 @@
+<!-- Core Net Lab · Module 03 · DNS & service discovery (Kurose & Ross 8e, §2.4 + Kubernetes DNS, DNS security) -->
+<div class="goals"><h4>Sau bài này bạn</h4><ul>
+  <li>Đọc được output của <code>dig</code>: status, flag, TTL, từng section.</li>
+  <li>Giải thích được một name resolution đi qua root, TLD và authoritative server thế nào, và cache giúp gì.</li>
+  <li>Biết các resource record hay gặp (A, AAAA, CNAME, NS, MX, TXT, SRV, PTR, SOA, CAA) và record nào liên quan tới certificate.</li>
+  <li>Hiểu service discovery trong Docker và Kubernetes: CoreDNS, Service name, headless Service, và cạm bẫy <code>ndots:5</code>.</li>
+  <li>Biết DNS bị tấn công thế nào (cache poisoning, amplification) và vì sao TLS certificate là lớp bảo vệ cuối cùng.</li>
+</ul></div>
+
+<h2>Làm trước (15 phút)</h2>
+<script type="text/plain" class="term">
+$ cat /etc/resolv.conf                 # Q1: máy bạn gửi DNS query cho ai?
+nameserver 10.255.255.254
+$ dig example.com
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 4021        ◀ status: kết quả của query
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+;; QUESTION SECTION:
+;example.com.                   IN      A                       ◀ câu hỏi: A record của example.com
+;; ANSWER SECTION:
+example.com.            3127    IN      A       203.0.113.10    ◀ name · TTL · class · type · value
+;; Query time: 4 msec
+;; SERVER: 10.255.255.254#53(10.255.255.254) (UDP)              ◀ resolver đã trả lời, qua UDP port 53
+$ dig example.com | grep -A1 'ANSWER SECTION'   # chạy lại ngay: Q2: TTL thay đổi thế nào? Query time?
+$ dig +short www.github.com           # Q3: vì sao ra 2 dòng, dòng đầu không phải IP?
+github.com.
+140.82.121.4
+$ dig +trace example.com | grep -E '^\S+\s+[0-9]+\s+IN\s+(NS|A)\s' | head   # Q4: những server nào đã bị hỏi?
+$ dig -x 8.8.8.8 +short               # Q5: chiều ngược lại: từ IP ra tên
+dns.google.
+$ dig no-such-name-12345.com | grep status     # Q6: tên không tồn tại thì status là gì?
+</script>
+<p class="small muted">IP và TTL của bạn sẽ khác. Nếu <code>dig +trace</code> bị chặn trong mạng công ty, thử lại ở nhà.</p>
+
+<h2>DNS làm gì</h2>
+<p>Con người nhớ tên (<code>auth.example.com</code>), còn router chỉ hiểu IP address. <b>DNS</b> (Domain Name System) là một <b>distributed database</b> dịch hostname thành IP address, cộng một <b>application-layer protocol</b> để hỏi database đó <span class="bk">§2.4.1</span>. DNS chạy chủ yếu trên <b>UDP port 53</b>.</p>
+<p>Ngoài dịch tên, DNS còn làm:</p>
+<ul>
+  <li><b>Host aliasing</b>: một tên "đẹp" trỏ tới tên thật (CNAME). <code>www.github.com</code> → <code>github.com</code> ở Q3.</li>
+  <li><b>Mail server aliasing</b>: MX record cho biết server nhận email của một domain.</li>
+  <li><b>Load distribution</b>: một tên trả về nhiều IP, mỗi lần xoay thứ tự, để client chia đều cho các replica.</li>
+  <li><b>Service discovery</b>: trong cluster, "service auth đang ở IP nào?" được trả lời bằng DNS.</li>
+</ul>
+<div class="note key"><b>Ghi nhớ</b><p>Gần như mọi connection đều bắt đầu bằng một DNS query (bạn đã thấy ở module 00). DNS chậm thì mọi thứ chậm; DNS hỏng thì mọi thứ hỏng. Câu đùa quen thuộc của dân vận hành: <i>"It's always DNS."</i></p></div>
+
+<h2>Hierarchy và name resolution</h2>
+<p>Không có một server nào giữ toàn bộ tên trên Internet. DNS chia thành cây <b>hierarchy</b> với ba loại server <span class="bk">§2.4.2</span>:</p>
+<figure class="fig"><div class="dg-wrap">
+<svg class="dg" viewBox="0 0 720 230" role="img" aria-label="DNS hierarchy: root, TLD server, authoritative server">
+  <g class="t-sec"><rect class="f" x="300" y="14" width="120" height="34" rx="6"/><text x="360" y="36" class="t-c t-b">Root  ( . )</text></g>
+  <g class="t-app">
+    <rect class="f" x="90" y="92" width="90" height="32" rx="6"/><text x="135" y="113" class="t-c t-b">com</text>
+    <rect class="f" x="250" y="92" width="90" height="32" rx="6"/><text x="295" y="113" class="t-c t-b">org</text>
+    <rect class="f" x="410" y="92" width="90" height="32" rx="6"/><text x="455" y="113" class="t-c t-b">net</text>
+    <rect class="f" x="570" y="92" width="90" height="32" rx="6"/><text x="615" y="113" class="t-c t-b">vn</text>
+  </g>
+  <g class="t-net">
+    <rect class="f" x="20" y="168" width="104" height="30" rx="6"/><text x="72" y="188" class="t-c t-s">google.com</text>
+    <rect class="f" x="140" y="168" width="104" height="30" rx="6"/><text x="192" y="188" class="t-c t-s">example.com</text>
+    <rect class="f" x="250" y="168" width="104" height="30" rx="6"/><text x="302" y="188" class="t-c t-s">wikipedia.org</text>
+    <rect class="f" x="400" y="168" width="110" height="30" rx="6"/><text x="455" y="188" class="t-c t-s">vnexpress.net</text>
+    <rect class="f" x="530" y="168" width="80" height="30" rx="6"/><text x="570" y="188" class="t-c t-s">gov.vn</text>
+    <rect class="f" x="620" y="168" width="80" height="30" rx="6"/><text x="660" y="188" class="t-c t-s">com.vn</text>
+  </g>
+  <path class="ln" d="M360 48 L135 92 M360 48 L295 92 M360 48 L455 92 M360 48 L615 92"/>
+  <path class="ln" d="M135 124 L72 168 M135 124 L192 168 M295 124 L302 168 M455 124 L455 168 M615 124 L570 168 M615 124 L660 168"/>
+  <text x="440" y="30" class="t-s t-m">Root server: 13 tên (a → m.root-servers.net),</text>
+  <text x="440" y="44" class="t-s t-m">hàng trăm instance nhờ anycast</text>
+  <text x="20" y="80" class="t-s t-m">TLD server: .com, .org, .vn …</text>
+  <text x="20" y="220" class="t-s t-m">Authoritative server: giữ record thật của từng domain (do chủ domain hoặc nhà cung cấp DNS vận hành)</text>
+</svg></div>
+<figcaption>Đọc tên từ phải sang trái là đi từ gốc xuống: <code>auth.example.com.</code> = root → <code>com</code> → <code>example.com</code> → host <code>auth</code>. Dấu chấm cuối cùng chính là root; một tên có dấu chấm cuối là <b>FQDN</b> (fully qualified domain name).</figcaption></figure>
+
+<p>Máy bạn không tự đi hỏi cây này. Nó gửi một <b>recursive query</b> cho <b>local DNS resolver</b> (ISP, công ty, 8.8.8.8, hoặc CoreDNS trong cluster). Resolver làm phần việc nặng bằng các <b>iterative query</b>:</p>
+<script type="application/json" class="seq">
+{"title":"Resolve auth.example.com (cache đang trống)","actors":["Host","Local resolver","Root","TLD .com","Authoritative"],"w":140,"steps":[
+ {"f":0,"t":1,"l":"A? auth.example.com\n(recursive, RD=1)","m":1,"k":"app"},
+ {"f":1,"t":2,"l":"A? auth.example.com","m":1},
+ {"f":2,"t":1,"l":"referral: hỏi\nNS của com","m":1,"d":1},
+ {"f":1,"t":3,"l":"A? auth.example.com","m":1},
+ {"f":3,"t":1,"l":"referral: hỏi\nns1.example.com","m":1,"d":1},
+ {"f":1,"t":4,"l":"A? auth.example.com","m":1},
+ {"f":4,"t":1,"l":"A 203.0.113.20\nTTL 300, AA=1","m":1,"d":1,"k":"net"},
+ {"f":1,"t":0,"l":"A 203.0.113.20","m":1,"d":1,"k":"app"},
+ {"note":"Resolver cache mọi câu trả lời theo TTL.\nLần sau: trả ngay, không hỏi root/TLD nữa.","a":1,"b":4}
+]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Recursive query</th><th>Iterative query</th></tr></thead>
+<tbody>
+<tr><td>Ai gửi</td><td>Host → local resolver</td><td>Resolver → root, TLD, authoritative</td></tr>
+<tr><td>Ý nghĩa</td><td>"Tìm giúp tôi câu trả lời cuối cùng"</td><td>"Nếu không biết thì chỉ tôi nên hỏi ai tiếp" (referral)</td></tr>
+<tr><td>Flag trong message</td><td>RD=1 (recursion desired)</td><td>RD=0; resolver tự đi tiếp</td></tr>
+</tbody></table></div>
+
+<h3>Caching và TTL</h3>
+<p>Mỗi record có <b>TTL</b> (giây): resolver được giữ bản copy trong khoảng đó. Ở Q2, TTL giảm dần và query time gần bằng 0 vì câu trả lời đến từ cache. Nhờ cache, root server hiếm khi bị hỏi. Câu trả lời "không tồn tại" (NXDOMAIN) cũng được cache: đó là <b>negative caching</b>, thời hạn lấy từ SOA record.</p>
+<div class="note trap"><b>Cạm bẫy khi vận hành</b><ul>
+  <li>Bạn chuyển service sang IP mới, nhưng client vẫn gọi IP cũ trong vài phút: chúng đang dùng bản cache chưa hết TTL. Trước khi migrate, hạ TTL xuống thấp (ví dụ 60 s) từ sớm.</li>
+  <li>Một số runtime cache DNS riêng, không theo TTL. Ví dụ JVM có thể cache vĩnh viễn nếu bật security manager (cấu hình bằng <code>networkaddress.cache.ttl</code>). Middleware viết bằng Java hay gặp lỗi "pod đã đổi IP mà client không biết".</li>
+  <li>Tên được tra trong <code>/etc/hosts</code> trước khi hỏi DNS (thứ tự đặt trong <code>/etc/nsswitch.conf</code>). Một dòng cũ quên xoá trong <code>/etc/hosts</code> có thể làm bạn mất cả buổi debug.</li>
+</ul></div>
+
+<h2>Resource record</h2>
+<p>Database DNS gồm các <b>resource record (RR)</b>, mỗi record có dạng <code>(Name, Value, Type, TTL)</code> <span class="bk">§2.4.3</span>:</p>
+<div class="tbl"><table>
+<thead><tr><th>Type</th><th>Value là</th><th>Ví dụ</th><th>Gặp ở đâu</th></tr></thead>
+<tbody>
+<tr class="t-net"><td><span class="lay"></span><b>A</b> / <b>AAAA</b></td><td>IPv4 / IPv6 address</td><td><code>auth.example.com. A 203.0.113.20</code></td><td>Mọi nơi</td></tr>
+<tr class="t-net"><td><span class="lay"></span><b>CNAME</b></td><td>Tên thật (canonical name) của alias</td><td><code>www.github.com. CNAME github.com.</code></td><td>CDN, load balancer của cloud</td></tr>
+<tr class="t-net"><td><span class="lay"></span><b>NS</b></td><td>Authoritative server của một zone</td><td><code>example.com. NS ns1.example.com.</code></td><td>Delegation trong hierarchy</td></tr>
+<tr class="t-net"><td><span class="lay"></span><b>MX</b></td><td>Mail server (kèm priority)</td><td><code>example.com. MX 10 mail.example.com.</code></td><td>Email</td></tr>
+<tr class="t-app"><td><span class="lay"></span><b>SRV</b></td><td>Priority, weight, <b>port</b>, target của một service</td><td><code>_ldap._tcp.example.com. SRV 0 5 389 dc1.example.com.</code></td><td>LDAP/Active Directory, SIP/IMS, Kubernetes</td></tr>
+<tr class="t-app"><td><span class="lay"></span><b>PTR</b></td><td>Tên của một IP (reverse DNS)</td><td><code>8.8.8.8.in-addr.arpa. PTR dns.google.</code></td><td>Log, kiểm tra mail server</td></tr>
+<tr class="t-app"><td><span class="lay"></span><b>SOA</b></td><td>Thông tin của zone: primary server, serial, TTL cho negative caching</td><td><code>dig example.com SOA</code></td><td>Quản trị zone</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>TXT</b></td><td>Text tuỳ ý</td><td><code>_acme-challenge.example.com. TXT "x9f…"</code></td><td>Chứng minh sở hữu domain khi xin certificate (ACME DNS-01), SPF</td></tr>
+<tr class="t-sec"><td><span class="lay"></span><b>CAA</b></td><td>CA nào được phép cấp certificate cho domain</td><td><code>example.com. CAA 0 issue "letsencrypt.org"</code></td><td>Chống CA lạ cấp certificate</td></tr>
+</tbody></table></div>
+<div class="note job"><b>Liên hệ job</b><p>Ba record cuối bảng gắn trực tiếp với certificate (module 10): <b>TXT</b> trong DNS-01 challenge là cách cert-manager xin wildcard certificate; <b>CAA</b> giới hạn CA được cấp certificate; và tên trong certificate (Subject Alternative Name) phải khớp với tên DNS mà client dùng để gọi. Rất nhiều lỗi TLS handshake thực chất là lỗi tên DNS.</p></div>
+
+<h3>DNS message</h3>
+<p>Query và reply dùng chung một format. Header 12 byte, sau đó là 4 section: question, answer, authority, additional.</p>
+<script type="application/json" class="pkt">
+{"title":"DNS message (RFC 1035 §4.1)","bits":32,"bw":20,"fields":[["Identification",16,"app"],["QR",1,"tra"],["Opcode",4,"tra"],["AA",1,"tra"],["TC",1,"tra"],["RD",1,"tra"],["RA",1,"tra"],["Z",3,"base"],["RCODE",4,"sec"],["QDCOUNT (số question)",16,"net"],["ANCOUNT (số answer)",16,"net"],["NSCOUNT (số authority RR)",16,"net"],["ARCOUNT (số additional RR)",16,"net"],["Questions","var","base"],["Answers","var","base"],["Authority","var","base"],["Additional","var","base"]]}
+</script>
+<div class="tbl"><table>
+<thead><tr><th>Field</th><th>Ý nghĩa</th><th>Trong output dig</th></tr></thead>
+<tbody>
+<tr><td><b>Identification</b></td><td>16 bit, reply phải mang đúng ID của query</td><td><code>id: 4021</code></td></tr>
+<tr><td><b>QR</b></td><td>0 = query, 1 = reply</td><td>flag <code>qr</code></td></tr>
+<tr><td><b>AA</b></td><td>Authoritative answer: trả lời từ authoritative server, không phải cache</td><td>flag <code>aa</code></td></tr>
+<tr><td><b>TC</b></td><td>Truncated: reply quá dài cho UDP, hãy hỏi lại bằng TCP</td><td>flag <code>tc</code></td></tr>
+<tr><td><b>RD / RA</b></td><td>Recursion desired / available</td><td>flag <code>rd ra</code></td></tr>
+<tr><td><b>RCODE</b></td><td>0 NOERROR · 2 SERVFAIL · 3 NXDOMAIN · 5 REFUSED</td><td><code>status:</code></td></tr>
+</tbody></table></div>
+<div class="note key"><b>Ghi nhớ: đọc status khi debug</b><ul>
+  <li><b>NXDOMAIN</b>: tên không tồn tại. Sai chính tả, sai namespace, sai search domain.</li>
+  <li><b>NOERROR nhưng ANSWER: 0</b>: tên tồn tại nhưng không có record loại bạn hỏi (ví dụ hỏi AAAA mà chỉ có A).</li>
+  <li><b>SERVFAIL</b>: resolver không lấy được câu trả lời: authoritative server chết, DNSSEC validation thất bại, hoặc CoreDNS không gọi được upstream.</li>
+  <li><b>Timeout</b> (không có reply): packet không tới được resolver. Lỗi network hoặc firewall, không phải lỗi DNS.</li>
+</ul></div>
+<p>DNS dùng <b>UDP</b> vì nhanh: một query, một reply, không cần handshake. DNS chuyển sang <b>TCP</b> khi reply bị truncated (TC=1), khi transfer cả zone (AXFR), hoặc khi dùng DNS over TLS.</p>
+
+<h2>Service discovery trong cluster</h2>
+<p>Trong Kubernetes, pod sinh ra và chết liên tục, IP thay đổi liên tục. Code không thể hard-code IP; nó gọi tên, và DNS (cụ thể là <b>CoreDNS</b> chạy trong cluster) trả về IP hiện tại. Bạn đã thấy phiên bản nhỏ của cơ chế này với Docker ở Lab 0.1 (DNS server nội bộ <code>127.0.0.11</code>).</p>
+<div class="tbl"><table>
+<thead><tr><th>Bạn gọi tên</th><th>CoreDNS trả về</th></tr></thead>
+<tbody>
+<tr><td><code>auth</code> (cùng namespace)</td><td>Được mở rộng thành tên đầy đủ nhờ search domain, xem bên dưới</td></tr>
+<tr><td><code>auth.security.svc.cluster.local</code></td><td>A record: <b>ClusterIP</b> của Service <code>auth</code> trong namespace <code>security</code>. Một IP ảo, kube-proxy chia traffic tới các pod</td></tr>
+<tr><td>Như trên nhưng Service là <b>headless</b> (<code>clusterIP: None</code>)</td><td>Nhiều A record: IP của <b>từng pod</b>. Client tự chọn pod (hay dùng cho database, cluster có leader)</td></tr>
+<tr><td><code>_https._tcp.auth.security.svc.cluster.local</code></td><td>SRV record: port tên <code>https</code> của Service, kèm target</td></tr>
+</tbody></table></div>
+<p>File <code>/etc/resolv.conf</code> trong một pod ở namespace <code>security</code> trông như sau:</p>
+<script type="text/plain" class="term" data-title="/etc/resolv.conf trong pod">
+nameserver 10.96.0.10                                  ◀ ClusterIP của CoreDNS
+search security.svc.cluster.local svc.cluster.local cluster.local
+options ndots:5                                        ◀ tên có ít hơn 5 dấu chấm thì thử search domain TRƯỚC
+</script>
+<p>Nhờ <code>search</code>, code chỉ cần gọi <code>auth</code>. Nhưng <code>ndots:5</code> có tác dụng phụ: gọi một tên bên ngoài như <code>api.partner.com</code> (2 dấu chấm, ít hơn 5) thì resolver thử ghép với từng search domain trước:</p>
+<script type="application/json" class="seq">
+{"title":"ndots:5: một lần gọi api.partner.com thành 4 query","actors":["Pod (middleware)","CoreDNS"],"w":300,"steps":[
+ {"f":0,"t":1,"l":"A? api.partner.com.security.svc.cluster.local","m":1},
+ {"f":1,"t":0,"l":"NXDOMAIN","m":1,"d":1,"k":"sec"},
+ {"f":0,"t":1,"l":"A? api.partner.com.svc.cluster.local","m":1},
+ {"f":1,"t":0,"l":"NXDOMAIN","m":1,"d":1,"k":"sec"},
+ {"f":0,"t":1,"l":"A? api.partner.com.cluster.local","m":1},
+ {"f":1,"t":0,"l":"NXDOMAIN","m":1,"d":1,"k":"sec"},
+ {"f":0,"t":1,"l":"A? api.partner.com","m":1},
+ {"f":1,"t":0,"l":"A 198.51.100.7","m":1,"d":1,"k":"net"},
+ {"note":"Thường hỏi cả A và AAAA → 8 query thay vì 2","a":0,"b":1}
+]}
+</script>
+<div class="note trap"><b>Cạm bẫy</b><p>Ở traffic lớn, 3 query thừa mỗi lần resolve làm tăng latency và tải CoreDNS. Cách xử lý: gọi tên bên ngoài bằng FQDN có dấu chấm cuối (<code>api.partner.com.</code>), hoặc hạ <code>ndots</code> trong <code>dnsConfig</code> của pod. Lab 3.3 sẽ tái hiện chuyện này bằng Docker.</p></div>
+<div class="note job"><b>Liên hệ job</b><p>5G core có cơ chế service discovery riêng ở application layer: NF hỏi <b>NRF</b> qua REST API (module 02) thay vì chỉ dựa vào DNS. Nhưng bên dưới, NF vẫn dùng DNS để resolve FQDN của NRF, SEPP và các NF khác, và vẫn chạy trong Kubernetes với CoreDNS. Cả hai lớp discovery bạn đều sẽ phải debug.</p></div>
+
+<h2>DNS security</h2>
+<p>DNS gốc không có authentication: reply là UDP không ký, không encrypt. Đây là các rủi ro chính:</p>
+<div class="tbl"><table>
+<thead><tr><th>Tấn công</th><th>Cách làm</th><th>Phòng chống</th></tr></thead>
+<tbody>
+<tr><td><b>DDoS vào DNS server</b></td><td>Làm ngập authoritative hoặc resolver; năm 2016 tấn công vào nhà cung cấp DNS Dyn làm nhiều trang lớn không truy cập được</td><td>Anycast, nhiều nhà cung cấp DNS, cache</td></tr>
+<tr><td><b>DNS amplification</b></td><td>Gửi query nhỏ với source IP giả (IP của nạn nhân); resolver mở trả reply lớn về phía nạn nhân</td><td>Không để resolver mở cho cả Internet; rate limiting</td></tr>
+<tr><td><b>Cache poisoning</b></td><td>Gửi reply giả, đoán đúng ID, tới resolver trước reply thật. Resolver cache IP giả và trả cho mọi client</td><td>Random ID + random source port; <b>DNSSEC</b></td></tr>
+<tr><td><b>Sniffing / MITM</b></td><td>DNS query là plaintext: ai ở giữa cũng đọc và sửa được</td><td>DNS over TLS (DoT, port 853), DNS over HTTPS (DoH)</td></tr>
+</tbody></table></div>
+<p><b>DNSSEC</b> thêm <b>digital signature</b> vào record: mỗi zone ký record của mình (RRSIG) bằng private key, public key nằm trong DNSKEY, và zone cha xác nhận key của zone con (DS record). Chuỗi xác nhận đi từ root xuống, gọi là <b>chain of trust</b>, cùng ý tưởng với certificate chain ở module 10.</p>
+<script type="text/plain" class="term">
+$ dig +dnssec cloudflare.com @1.1.1.1 | grep -E 'flags:|RRSIG'
+;; flags: qr rd ra ad; QUERY: 1, ANSWER: 2, ...         ◀ ad = Authenticated Data: resolver đã verify chữ ký
+cloudflare.com.  300  IN  RRSIG  A 13 2 300 ...          ◀ chữ ký của A record
+</script>
+<div class="note key"><b>Ghi nhớ: TLS là lớp bảo vệ cuối cùng</b><p>Giả sử DNS bị poisoning và client của bạn được trỏ tới server của kẻ tấn công. Nếu client dùng HTTPS và <b>verify certificate</b>, TLS handshake sẽ thất bại, vì kẻ tấn công không có certificate hợp lệ cho tên đó. Nếu client tắt verify (<code>curl -k</code>, <code>verify=False</code>), nó sẽ gửi token thẳng cho kẻ tấn công. Đây là lý do mTLS giữa các service không được tắt verify, kể cả "chỉ trong cluster".</p></div>
+
+<h2>Quiz</h2>
+<script type="application/json" class="quiz" data-id="m03" data-title="Kiểm tra module 03">
+[
+ {"q":"Trong một lần resolve với cache trống, ai đi hỏi lần lượt root, TLD và authoritative server?","o":["Ứng dụng trên host","Local DNS resolver, bằng iterative query","Root server chuyển tiếp hộ","Router mặc định"],"a":1,
+  "e":"Host gửi một recursive query cho local resolver. Resolver tự đi hỏi root → TLD → authoritative bằng iterative query, mỗi bước nhận một referral, rồi trả kết quả cuối cho host."},
+ {"q":"Bạn đổi A record của <code>auth.example.com</code> sang IP mới. TTL cũ là 3600. Điều gì xảy ra?","o":["Mọi client dùng IP mới ngay lập tức","Client có thể vẫn dùng IP cũ tới tối đa 1 giờ, tuỳ lúc resolver cache record","Record cũ bị xoá khỏi mọi cache trong 1 phút","Client nhận lỗi NXDOMAIN"],"a":1,
+  "e":"Resolver được phép giữ bản cache tới hết TTL. Muốn chuyển IP nhanh thì hạ TTL trước, chờ hết TTL cũ, rồi mới đổi IP."},
+ {"q":"Record nào cho biết <code>www.github.com</code> là alias của <code>github.com</code>?","o":["A","NS","CNAME","PTR"],"a":2,
+  "e":"CNAME (canonical name). Resolver sẽ resolve tiếp tên thật để lấy A/AAAA. PTR là chiều ngược lại: từ IP ra tên."},
+ {"q":"Pod gọi <code>auth.securty.svc.cluster.local</code> (gõ nhầm namespace) và nhận lỗi ngay lập tức. <code>dig</code> sẽ báo status gì?","o":["NOERROR","NXDOMAIN","SERVFAIL","Timeout"],"a":1,
+  "e":"Tên không tồn tại → NXDOMAIN. SERVFAIL nghĩa là resolver không lấy được câu trả lời (upstream chết, DNSSEC lỗi). Timeout nghĩa là packet không tới được DNS server: lỗi network, không phải lỗi tên."},
+ {"q":"Khi nào DNS dùng TCP thay vì UDP?","o":["Reply bị truncated (flag TC=1)","Zone transfer (AXFR)","Mọi query tới root server","DNS over TLS"],"a":[0,1,3],
+  "e":"UDP là mặc định. TCP dùng khi reply quá lớn (TC=1 rồi hỏi lại), khi transfer cả zone, và DNS over TLS chạy trên TCP port 853. Root server vẫn nhận query UDP bình thường."},
+ {"q":"Service <code>auth</code> ở namespace <code>security</code>. FQDN của nó trong Kubernetes (cluster domain mặc định) là:","o":["auth.cluster.local","security.auth.svc.cluster.local","auth.security.svc.cluster.local","auth.svc.security.local"],"a":2,
+  "e":"Dạng chuẩn: &lt;service&gt;.&lt;namespace&gt;.svc.&lt;cluster-domain&gt;, cluster domain mặc định là cluster.local."},
+ {"q":"Pod có <code>search</code> gồm 3 domain và <code>ndots:5</code>. Code gọi <code>api.partner.com</code>. Bao nhiêu tên được thử <b>trước</b> tên đúng <code>api.partner.com</code>?","o":["0","1","3","5"],"a":2,
+  "e":"Tên chỉ có 2 dấu chấm (ít hơn 5) nên resolver ghép lần lượt với 3 search domain trước, cả 3 đều NXDOMAIN, rồi mới thử tên gốc. Nếu hỏi cả A và AAAA thì số query còn gấp đôi."},
+ {"q":"Headless Service (<code>clusterIP: None</code>) khác Service thường thế nào khi query DNS?","o":["Không có DNS record","Trả về IP của từng pod thay vì một ClusterIP","Chỉ trả SRV record","Trả về IP của node"],"a":1,
+  "e":"Service thường trả một ClusterIP ảo, kube-proxy chia tải. Headless trả thẳng IP từng pod để client tự chọn; dùng cho database, hệ thống có leader election."},
+ {"q":"Biện pháp nào giúp chống DNS cache poisoning?","o":["Random query ID và random source port","DNSSEC","Tăng TTL","Dùng nhiều CNAME"],"a":[0,1],
+  "e":"Kẻ tấn công phải đoán đúng ID 16 bit và source port; random cả hai làm việc đoán khó hơn rất nhiều. DNSSEC thì cho resolver verify chữ ký nên reply giả bị loại. Tăng TTL không chống được, còn làm bản poisoned tồn tại lâu hơn."},
+ {"q":"DNS bị poisoning, client bị trỏ tới server của kẻ tấn công. Client dùng HTTPS và verify certificate đầy đủ. Kết quả?","o":["Kẻ tấn công đọc được token","TLS handshake thất bại vì server không có certificate hợp lệ cho tên đó","Client tự sửa DNS","Không ảnh hưởng gì vì HTTPS chạy trên port khác"],"a":1,
+  "e":"Certificate gắn với tên. Kẻ tấn công điều khiển được IP nhưng không có private key của certificate hợp lệ cho tên, nên verify thất bại. Chỉ khi client tắt verify thì tấn công mới thành công."},
+ {"q":"Record nào cho biết port của một service, giúp client không phải hard-code port?","o":["A","SRV","TXT","SOA"],"a":1,
+  "e":"SRV chứa priority, weight, port và target. Ví dụ <code>_ldap._tcp.example.com</code> cho biết LDAP server nào ở port nào."}
+]
+</script>
+
+<h3>Ôn lại module 01–02</h3>
+<script type="application/json" class="quiz" data-id="m03-review" data-title="Ôn lại">
+[
+ {"q":"Service xác thực nhận token đúng chữ ký nhưng đã hết hạn. Trả status code nào?","o":["400","401","403","500"],"a":1,
+  "e":"Token hết hạn = authentication thất bại → 401 kèm <code>WWW-Authenticate: Bearer error=\"invalid_token\"</code>. Client sẽ đi xin token mới. 403 chỉ dùng khi token hợp lệ nhưng thiếu quyền."},
+ {"q":"Một DNS query tới resolver cách 8 ms (RTT), reply nhỏ. Transmission delay không đáng kể. DNS lookup mất khoảng bao lâu nếu resolver có sẵn trong cache?","o":["Khoảng 1 ms","Khoảng 8 ms","Khoảng 16 ms","Khoảng 100 ms"],"a":1,
+  "e":"UDP không có handshake: một query đi, một reply về = 1 RTT ≈ 8 ms (propagation + queuing delay hai chiều). So với TCP + TLS + HTTP cần ít nhất 3 RTT."},
+ {"q":"Trong protocol stack, DNS nằm ở layer nào và dùng transport nào là chính?","o":["Network layer, không dùng transport","Application layer, chủ yếu UDP port 53","Transport layer","Link layer"],"a":1,
+  "e":"DNS là application-layer protocol, giống HTTP, chỉ khác là chạy chủ yếu trên UDP. Router không biết DNS là gì."}
+]
+</script>
+
+<h2>Mindmap</h2>
+<script type="application/json" class="mindmap">
+{"t":"03 DNS & service discovery","c":[
+ {"t":"Vai trò","col":"base","c":[{"t":"Hostname → IP address"},{"t":"Aliasing: CNAME, MX"},{"t":"Load distribution"},{"t":"Service discovery"}]},
+ {"t":"Hierarchy","col":"app","c":[{"t":"Root → TLD → authoritative"},{"t":"Local resolver làm iterative query"},{"t":"Host gửi recursive query (RD=1)"},{"t":"FQDN: dấu chấm cuối = root"}]},
+ {"t":"Cache","col":"tra","c":[{"t":"TTL quyết định thời gian cache"},{"t":"Negative caching (NXDOMAIN)"},{"t":"Hạ TTL trước khi migrate"},{"t":"/etc/hosts, nsswitch, JVM cache"}]},
+ {"t":"Record & message","col":"net","c":[{"t":"A, AAAA, CNAME, NS, MX"},{"t":"SRV: port của service"},{"t":"TXT, CAA: gắn với certificate"},{"t":"Header 12 byte: ID, QR, AA, TC, RD, RA, RCODE"},{"t":"UDP 53; TCP khi TC=1, AXFR"}]},
+ {"t":"Cluster","col":"k8s","c":[{"t":"CoreDNS"},{"t":"svc.namespace.svc.cluster.local"},{"t":"Headless → IP của pod"},{"t":"search + ndots:5 → query thừa"}]},
+ {"t":"Security","col":"sec","c":[{"t":"Cache poisoning → random ID/port, DNSSEC"},{"t":"Amplification, DDoS"},{"t":"DoT, DoH"},{"t":"TLS verify là lớp bảo vệ cuối"}]}
+]}
+</script>
+
+<h2>Bài tập</h2>
+<div class="lab">
+  <div class="lab-h"><h3>Lab 3.1 · Tự làm resolver bằng tay</h3><span class="chip lvl1">Cơ bản</span><span class="chip t-base">Bash · dig</span><span class="chip t-base">25 phút</span></div>
+  <p>Dùng <code>dig +norecurse @server</code> (tắt recursion, giống iterative query của resolver) để tự đi từ root xuống tới A record của <code>vnexpress.net</code>. Ghi lại từng server đã hỏi và referral nhận được. Sau đó so với <code>dig +trace vnexpress.net</code>.</p>
+  <p>Phần hai: hỏi local resolver cùng một tên 3 lần liên tiếp, ghi lại TTL và Query time mỗi lần.</p>
+  <p class="done-when"><b>Xong khi:</b> vẽ được sơ đồ 3 bước (root → TLD → authoritative) với tên server thật, và giải thích được vì sao lần hỏi thứ hai nhanh hơn hẳn.</p>
+  <details><summary>Gợi ý</summary><p>Bắt đầu với <code>dig +norecurse @a.root-servers.net vnexpress.net</code>. Đọc AUTHORITY SECTION để biết hỏi ai tiếp. ADDITIONAL SECTION thường có sẵn IP của server đó (gọi là glue record).</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ dig +norecurse @a.root-servers.net vnexpress.net | sed -n '/AUTHORITY/,/^$/p' | head -3
+;; AUTHORITY SECTION:
+net.   172800  IN  NS  a.gtld-servers.net.               ◀ root: "không biết, hỏi TLD server của .net"
+$ dig +norecurse @a.gtld-servers.net vnexpress.net | sed -n '/AUTHORITY/,/^$/p' | head -3
+;; AUTHORITY SECTION:
+vnexpress.net.  172800  IN  NS  ns1.….                     ◀ TLD: "hỏi authoritative server của vnexpress.net"
+$ dig +norecurse @<tên NS vừa nhận> vnexpress.net A
+;; flags: qr aa; ...                                       ◀ aa: câu trả lời authoritative
+$ for i in 1 2 3; do dig vnexpress.net | grep -E '^vnexpress|Query time'; sleep 2; done
+</script>
+  <p>Lần đầu, local resolver có thể phải đi cả 3 bước (hàng chục ms). Các lần sau trả từ cache (gần 0 ms) và TTL giảm dần theo thời gian đã trôi qua.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 3.2 · Viết DNS client bằng UDP socket</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Python</span><span class="chip t-base">60 phút</span></div>
+  <p>Không dùng library DNS. Tự build DNS query bằng <code>struct</code>, gửi qua UDP socket tới <code>8.8.8.8:53</code>, rồi parse reply: in status, các flag, và các record trong answer section (A, AAAA, CNAME). Chạy: <code>python3 mydig.py www.github.com</code>.</p>
+  <p class="done-when"><b>Xong khi:</b> output khớp với <code>dig www.github.com</code>, xử lý được NXDOMAIN, và code có kiểm tra ID của reply. Bật <code>sudo tcpdump -i any -nn -X port 53</code> để nhìn từng byte bạn đã build.</p>
+  <details><summary>Gợi ý</summary><ul>
+    <li>Header: 6 số 16 bit, network byte order: <code>struct.pack("!HHHHHH", id, flags, 1, 0, 0, 0)</code>. flags = <code>0x0100</code> (RD=1).</li>
+    <li>QNAME: mỗi label là 1 byte độ dài + các ký tự, kết thúc bằng byte 0: <code>\x03www\x06github\x03com\x00</code>.</li>
+    <li>Trong reply, tên thường bị nén: nếu 2 bit đầu của byte là <code>11</code> thì 14 bit còn lại là offset (pointer) tới chỗ tên đã xuất hiện trước đó trong message.</li>
+    <li>Mỗi answer: name, rồi <code>!HHIH</code> (type, class, TTL, rdlength), rồi rdata.</li>
+  </ul></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="python" data-file="~/netlab/m03/mydig.py">
+#!/usr/bin/env python3
+"""DNS client tối giản: tự build query, gửi qua UDP, parse A/AAAA/CNAME/NS trong answer."""
+import ipaddress
+import random
+import socket
+import struct
+import sys
+
+TYPES = {"A": 1, "NS": 2, "CNAME": 5, "MX": 15, "TXT": 16, "AAAA": 28}
+TYPE_NAMES = {v: k for k, v in TYPES.items()}
+RCODES = {0: "NOERROR", 1: "FORMERR", 2: "SERVFAIL", 3: "NXDOMAIN", 5: "REFUSED"}
+
+
+def build_query(name: str, qtype: int) -> tuple[int, bytes]:
+    qid = random.randint(0, 0xFFFF)              # ID ngẫu nhiên: chống đoán ID (cache poisoning)
+    header = struct.pack("!HHHHHH", qid, 0x0100, 1, 0, 0, 0)   # RD=1, 1 question
+    qname = b"".join(bytes([len(p)]) + p.encode() for p in name.rstrip(".").split(".")) + b"\x00"
+    return qid, header + qname + struct.pack("!HH", qtype, 1)  # QCLASS 1 = IN
+
+
+def read_name(msg: bytes, off: int) -> tuple[str, int]:
+    """Đọc một domain name tại offset, xử lý compression pointer. Trả về (name, offset kế tiếp)."""
+    labels, end = [], None
+    while True:
+        n = msg[off]
+        if n == 0:
+            off += 1
+            break
+        if n & 0xC0 == 0xC0:                     # 2 bit đầu = 11 → pointer 14 bit
+            if end is None:
+                end = off + 2                    # sau pointer, đọc tiếp từ đây
+            off = struct.unpack("!H", msg[off:off + 2])[0] & 0x3FFF
+            continue
+        labels.append(msg[off + 1:off + 1 + n].decode())
+        off += 1 + n
+    return ".".join(labels) + ".", (end if end is not None else off)
+
+
+def parse(msg: bytes, qid: int) -> None:
+    rid, flags, qd, an, ns, ar = struct.unpack("!HHHHHH", msg[:12])
+    if rid != qid:
+        raise ValueError("ID của reply không khớp query: bỏ qua (có thể là reply giả mạo)")
+    bit = lambda n: (flags >> n) & 1
+    print(f"status={RCODES.get(flags & 0xF, flags & 0xF)}  "
+          f"qr={bit(15)} aa={bit(10)} tc={bit(9)} rd={bit(8)} ra={bit(7)}  "
+          f"answer={an} authority={ns} additional={ar}")
+    off = 12
+    for _ in range(qd):                          # bỏ qua question section
+        _, off = read_name(msg, off)
+        off += 4
+    for _ in range(an):
+        name, off = read_name(msg, off)
+        rtype, _rclass, ttl, rdlen = struct.unpack("!HHIH", msg[off:off + 10])
+        off += 10
+        rdata = msg[off:off + rdlen]
+        if rtype == 1:
+            value = str(ipaddress.IPv4Address(rdata))
+        elif rtype == 28:
+            value = str(ipaddress.IPv6Address(rdata))
+        elif rtype in (2, 5):
+            value, _ = read_name(msg, off)       # NS/CNAME: rdata là một name (có thể bị nén)
+        else:
+            value = rdata.hex()
+        print(f"  {name:<26} TTL={ttl:<6} {TYPE_NAMES.get(rtype, rtype):<6} {value}")
+        off += rdlen
+
+
+if __name__ == "__main__":
+    name = sys.argv[1] if len(sys.argv) > 1 else "example.com"
+    qtype = TYPES[sys.argv[2].upper()] if len(sys.argv) > 2 else TYPES["A"]
+    server = sys.argv[3] if len(sys.argv) > 3 else "8.8.8.8"
+    qid, query = build_query(name, qtype)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(3)
+        s.sendto(query, (server, 53))
+        reply, _ = s.recvfrom(4096)
+    print(f"query {len(query)} byte → reply {len(reply)} byte từ {server}")
+    parse(reply, qid)
+</script>
+<script type="text/plain" class="term">
+$ python3 mydig.py www.github.com
+query 32 byte → reply 62 byte từ 8.8.8.8
+status=NOERROR  qr=1 aa=0 tc=0 rd=1 ra=1  answer=2 authority=0 additional=0
+  www.github.com.            TTL=3600   CNAME  github.com.
+  github.com.                TTL=60     A      140.82.121.4
+$ python3 mydig.py no-such-name-12345.com
+status=NXDOMAIN  qr=1 aa=0 tc=0 rd=1 ra=1  answer=0 authority=1 additional=0
+$ python3 mydig.py google.com AAAA 1.1.1.1
+</script>
+  <p class="small muted">IP, TTL và kích thước reply sẽ khác. Query 32 byte = 12 byte header + 16 byte QNAME (<code>\x03www\x06github\x03com\x00</code>) + 4 byte QTYPE/QCLASS. Mở rộng: khi <code>tc=1</code>, gửi lại query qua TCP (TCP thêm 2 byte độ dài ở đầu message). Module 04 sẽ học kỹ socket.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 3.3 · Tái hiện cạm bẫy ndots:5</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">Docker · tcpdump · dig</span><span class="chip t-base">30 phút</span></div>
+  <p>Chưa cần Kubernetes. Chạy một container netshoot với <code>/etc/resolv.conf</code> giống pod thật: 3 search domain và <code>ndots:5</code>. Capture port 53 trong container rồi resolve <code>example.com</code> theo hai cách: tên thường và FQDN có dấu chấm cuối. Đếm số query mỗi cách.</p>
+  <p class="done-when"><b>Xong khi:</b> có hai con số (số query cho <code>example.com</code> và cho <code>example.com.</code>) và đề xuất được hai cách sửa cho middleware gọi ra ngoài cluster.</p>
+  <details><summary>Gợi ý</summary><p><code>docker run</code> có option <code>--dns</code>, <code>--dns-search</code> (lặp lại nhiều lần), <code>--dns-option</code>. <code>dig</code> mặc định bỏ qua search list; thêm <code>+search</code> để nó dùng search list và ndots như application thật.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="term">
+$ docker run --rm -it --dns 8.8.8.8 \
+    --dns-search security.svc.cluster.local --dns-search svc.cluster.local --dns-search cluster.local \
+    --dns-option ndots:5 nicolaka/netshoot bash
+cli$ cat /etc/resolv.conf
+cli$ tcpdump -i eth0 -nn -l port 53 2>/dev/null | grep -o 'A? [^ ]*' &
+cli$ dig +search +short example.com
+A? example.com.security.svc.cluster.local.        ◀ thử search domain 1 → NXDOMAIN
+A? example.com.svc.cluster.local.                 ◀ thử search domain 2 → NXDOMAIN
+A? example.com.cluster.local.                     ◀ thử search domain 3 → NXDOMAIN
+A? example.com.                                   ◀ cuối cùng mới tới tên thật
+203.0.113.10
+cli$ dig +search +short example.com.
+A? example.com.                                   ◀ FQDN: chỉ 1 query
+203.0.113.10
+cli$ exit
+</script>
+  <p>Hai cách sửa: (1) code gọi tên bên ngoài bằng FQDN có dấu chấm cuối; (2) đặt <code>dnsConfig.options: [{name: ndots, value: "2"}]</code> trong pod spec. Cách (2) ảnh hưởng mọi tên, nên kiểm tra lại các tên nội bộ ngắn vẫn resolve được.</p>
+  </details>
+</div>
+
+<div class="lab">
+  <div class="lab-h"><h3>Lab 3.4 · getaddrinfo() trong C</h3><span class="chip lvl2">Vừa</span><span class="chip t-base">C</span><span class="chip t-base">30 phút</span></div>
+  <p>Mọi client C/C++ (kể cả middleware ở công ty) resolve tên bằng <code>getaddrinfo()</code> trước khi gọi <code>connect()</code>. Viết <code>resolve.c</code>: nhận hostname và port, in mọi address trả về (IPv4 và IPv6) cùng thời gian resolve tính bằng ms. Chạy 2 lần liên tiếp và chạy với tên không tồn tại.</p>
+  <p class="done-when"><b>Xong khi:</b> chương trình in đúng địa chỉ, in lỗi dễ hiểu bằng <code>gai_strerror()</code> khi tên sai, và bạn dùng tcpdump để chỉ ra <code>getaddrinfo()</code> gửi những query nào (gợi ý: không chỉ một).</p>
+  <details><summary>Gợi ý</summary><p>Đặt <code>hints.ai_family = AF_UNSPEC</code> để lấy cả IPv4 và IPv6. Kết quả là một linked list <code>struct addrinfo</code>; nhớ gọi <code>freeaddrinfo()</code>. Đo thời gian bằng <code>clock_gettime(CLOCK_MONOTONIC, …)</code>.</p></details>
+  <details><summary>Lời giải</summary>
+<script type="text/plain" class="code" data-lang="c" data-file="~/netlab/m03/resolve.c">
+// resolve.c — gọi getaddrinfo() giống mọi client C/C++ trước khi connect()
+#define _POSIX_C_SOURCE 200809L
+#include <stdio.h>
+#include <time.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
+static double now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+}
+
+int main(int argc, char **argv) {
+    const char *host = argc > 1 ? argv[1] : "example.com";
+    const char *port = argc > 2 ? argv[2] : "443";
+    struct addrinfo hints = {0}, *res, *p;
+    hints.ai_family = AF_UNSPEC;       /* cả IPv4 và IPv6 */
+    hints.ai_socktype = SOCK_STREAM;   /* address dùng cho TCP */
+
+    double t0 = now_ms();
+    int rc = getaddrinfo(host, port, &hints, &res);
+    double t1 = now_ms();
+    if (rc != 0) {
+        fprintf(stderr, "getaddrinfo(%s): %s (%.2f ms)\n", host, gai_strerror(rc), t1 - t0);
+        return 1;
+    }
+    printf("%s resolved in %.2f ms\n", host, t1 - t0);
+    for (p = res; p != NULL; p = p->ai_next) {
+        char ip[INET6_ADDRSTRLEN];
+        void *addr = (p->ai_family == AF_INET)
+            ? (void *)&((struct sockaddr_in *)p->ai_addr)->sin_addr
+            : (void *)&((struct sockaddr_in6 *)p->ai_addr)->sin6_addr;
+        inet_ntop(p->ai_family, addr, ip, sizeof ip);
+        printf("  %-4s %s port %s\n", p->ai_family == AF_INET ? "IPv4" : "IPv6", ip, port);
+    }
+    freeaddrinfo(res);
+    return 0;
+}
+</script>
+<script type="text/plain" class="term">
+$ gcc -O2 -Wall -Wextra -o resolve resolve.c
+$ ./resolve google.com 443; ./resolve google.com 443
+google.com resolved in 18.40 ms
+  IPv6 2404:6800:4005:…  port 443
+  IPv4 142.250.…         port 443
+google.com resolved in 3.10 ms                       ◀ lần hai nhanh hơn: resolver đã cache
+$ ./resolve no-such-name-12345.com
+getaddrinfo(no-such-name-12345.com): Name or service not known (25.71 ms)
+</script>
+  <p>Với tcpdump bạn sẽ thấy <b>hai</b> query cho mỗi lần resolve: <code>A?</code> và <code>AAAA?</code>, gửi gần như cùng lúc. Thứ tự address trả về theo quy tắc RFC 6724 (thường ưu tiên IPv6 nếu máy có IPv6 route). Client tốt sẽ thử lần lượt từng address khi <code>connect()</code> thất bại, thay vì chỉ thử address đầu tiên.</p>
+  </details>
+</div>
+
+<h2>Keyword</h2>
+<div class="kw-mod" data-mod="m03"></div>
+
+<h2>Đọc thêm</h2>
+<ul class="links">
+  <li>Sách: §2.4 đọc hết (ngắn, nhiều hình). Phần DNS vulnerabilities trong §2.4 là bản rút gọn của mục security ở trên.</li>
+  <li><a href="https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/" target="_blank" rel="noopener">Kubernetes docs: DNS for Services and Pods</a>: tên đầy đủ, SRV, <code>dnsConfig</code>, <code>dnsPolicy</code>.</li>
+  <li><a href="https://jvns.ca/blog/how-updating-dns-works/" target="_blank" rel="noopener">Julia Evans: what happens when you update a DNS record</a> và zine "How DNS Works": giải thích TTL và cache cực dễ hiểu.</li>
+  <li><a href="https://www.rfc-editor.org/rfc/rfc1035" target="_blank" rel="noopener">RFC 1035</a> §4 (message format): tra khi làm Lab 3.2.</li>
+  <li><a href="https://www.cloudflare.com/learning/dns/dns-cache-poisoning/" target="_blank" rel="noopener">Cloudflare Learning: DNS cache poisoning</a> và <a href="https://www.cloudflare.com/learning/dns/dnssec/how-dnssec-works/" target="_blank" rel="noopener">How DNSSEC works</a>.</li>
+</ul>
