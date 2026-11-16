@@ -400,6 +400,49 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .fig-ref strong { color: var(--fg); }
 .fig-ref-k { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-right: 8px; color: var(--copper); }
 .fig-ref .pg { margin-left: 4px; }
+
+/* ===== Quy tắc viết (F02+): 4 loại ô, khối terminal, lab, quiz trong bài ===== */
+.c-nho, .c-viec, .c-bay, .c-doc { border-left-width: 4px; }
+.c-nho { border-color: var(--accent); background: color-mix(in srgb, var(--accent-weak) 45%, var(--surface)); }
+.c-nho .callout-tag { background: var(--accent); color: var(--surface); border-color: transparent; }
+.c-viec { border-color: var(--copper); }
+.c-viec .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.c-bay { border-color: var(--bad); background: color-mix(in srgb, var(--bad-weak) 40%, var(--surface)); }
+.c-bay .callout-tag { background: var(--bad); color: var(--surface); border-color: transparent; }
+.c-doc { border-color: var(--line-strong); border-style: dashed; border-left-style: solid; }
+.c-doc .callout-tag { color: var(--muted); }
+.c-nho .callout-tag::before { content: "◆ "; }
+.c-viec .callout-tag::before { content: "▣ "; }
+.c-bay .callout-tag::before { content: "▲ "; }
+.c-doc .callout-tag::before { content: "→ "; }
+
+.term { margin: var(--s-3) 0 var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--code-bg); overflow: hidden; }
+.term-title, .code-title span { display: block; font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); padding: 5px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.term-title::before { content: "terminal · "; opacity: .7; }
+.prose .term pre.term-pre { margin: 0; border: 0; border-radius: 0; background: transparent; padding: 10px 14px; font-size: 13px; line-height: 1.55; overflow-x: auto; }
+.term-pre code { background: none; padding: 0; white-space: pre; font-size: inherit; }
+.t-cmd { color: var(--fg); font-weight: 600; }
+.t-ps { color: var(--accent); user-select: none; }
+.t-out { color: var(--code-fg); opacity: .86; }
+.t-ann { color: var(--copper); font-style: italic; font-weight: 600; user-select: none; }
+.code-title { margin: var(--s-3) 0 0; }
+.code-title span { border: 1px solid var(--line-strong); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; }
+.code-title span::before { content: "file · "; opacity: .7; }
+.code-title + .hl, .code-title + pre { margin-top: 0; }
+.code-title + .hl pre, .code-title + .hl { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+.badge.lv1 { background: var(--ok-weak); color: var(--ok); }
+.badge.lv2 { background: var(--copper-weak); color: var(--copper); }
+.badge.lv3 { background: var(--bad-weak); color: var(--bad); }
+.badge.time { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.badge.time::before { content: "⏱ "; }
+
+.lq { margin: var(--s-4) 0 var(--s-5); }
+.lq .quiz-bar { margin-bottom: var(--s-3); }
+.lq .qz-g { font-size: 17px; }
+.lab { margin: var(--s-5) 0; padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.lab > h4:first-child { margin-top: 0; }
+.goals li::marker { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -418,7 +461,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
   <div class="wrap tabs"><a class="tab" href="#hoc-sau" data-tab="hoc-sau" role="tab">Học sâu<span class="tab-n">10</span></a><a class="tab" href="#phong-van" data-tab="phong-van" role="tab">Phỏng vấn<span class="tab-n">23</span></a><a class="tab" href="#quiz" data-tab="quiz" role="tab">Quiz<span class="tab-n">20</span></a><a class="tab" href="#flashcard" data-tab="flashcard" role="tab">Flashcard<span class="tab-n">23</span></a><a class="tab" href="#cheatsheet" data-tab="cheatsheet" role="tab">Cheatsheet</a></div>
 </nav>
 
-<main class="wrap main"><section class="panel" id="p-hoc-sau" data-panel="hoc-sau" role="tabpanel" hidden><div class="book"><details class="bk-nav" open><summary><span class="bk-lab">Bài</span><span class="bk-cur" id="bk-cur"></span><span class="mono" id="bk-prog"></span></summary><ol class="bk-list"><li class="bk-ch" data-chap="c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu"><a href="#c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu"><span class="bk-t">Bài 0 · C++ trên vi điều khiển: tính năng nào tốn bao nhiêu</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-zero-cost-va-nhung-thu-khong-zero">&quot;Zero-cost&quot; và những thứ không zero</a></li><li><a href="#c-runtime-ho-tro-ma-bare-metal-phai-tu-lo">Runtime hỗ trợ mà bare-metal phải tự lo</a></li><li><a href="#c-co-bien-dich-thuong-dung-cho-c-tren-mcu">Cờ biên dịch thường dùng cho C++ trên MCU</a></li><li><a href="#c-constructor-cua-doi-tuong-toan-cuc">Constructor của đối tượng toàn cục</a></li></ol></li><li class="bk-ch" data-chap="c-bai-1-template-nen-tang"><a href="#c-bai-1-template-nen-tang"><span class="bk-t">Bài 1 · Template: nền tảng</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-template-la-gi-o-muc-may">Template là gì ở mức máy</a></li><li><a href="#c-tham-so-khong-phai-kieu">Tham số không phải kiểu</a></li><li><a href="#c-chuyen-biet-hoa">Chuyên biệt hóa</a></li><li><a href="#c-variadic-template-va-fold-expression">Variadic template và fold expression</a></li><li><a href="#c-nhung-diem-hay-vap">Những điểm hay vấp</a></li></ol></li><li class="bk-ch" data-chap="c-bai-2-concepts-type-traits-va-if-constexpr"><a href="#c-bai-2-concepts-type-traits-va-if-constexpr"><span class="bk-t">Bài 2 · Concepts, type traits và if constexpr</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-rang-buoc-tham-so-template-bang-concept-c-20">Ràng buộc tham số template bằng concept (C++20)</a></li><li><a href="#c-type-traits">Type traits</a></li><li><a href="#c-if-constexpr">if constexpr</a></li><li><a href="#c-sfinae-doc-duoc-code-cu">SFINAE: đọc được code cũ</a></li></ol></li><li class="bk-ch" data-chap="c-bai-3-tinh-toan-luc-bien-dich"><a href="#c-bai-3-tinh-toan-luc-bien-dich"><span class="bk-t">Bài 3 · Tính toán lúc biên dịch</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-vi-sao-quan-trong-tren-mcu">Vì sao quan trọng trên MCU</a></li><li><a href="#c-bang-crc-sinh-luc-bien-dich">Bảng CRC sinh lúc biên dịch</a></li><li><a href="#c-consteval-bat-buoc-luc-bien-dich">consteval: bắt buộc lúc biên dịch</a></li><li><a href="#c-constinit-khoi-tao-tinh-khong-lo-thu-tu">constinit: khởi tạo tĩnh, không lo thứ tự</a></li><li><a href="#c-gioi-han">Giới hạn</a></li></ol></li><li class="bk-ch" data-chap="c-bai-4-polymorphism-tinh-va-polymorphism-dong"><a href="#c-bai-4-polymorphism-tinh-va-polymorphism-dong"><span class="bk-t">Bài 4 · Polymorphism tĩnh và polymorphism động</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-bon-cach-dat-canh-nhau">Bốn cách, đặt cạnh nhau</a></li><li><a href="#c-crtp">CRTP</a></li><li><a href="#c-khi-nao-crtp-khong-dang">Khi nào CRTP không đáng</a></li></ol></li><li class="bk-ch" data-chap="c-bai-5-khong-cap-phat-dong"><a href="#c-bai-5-khong-cap-phat-dong"><span class="bk-t">Bài 5 · Không cấp phát động</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-vi-sao-va-thay-bang-gi">Vì sao và thay bằng gì</a></li><li><a href="#c-tu-viet-mot-container-dung-luong-co-dinh">Tự viết một container dung lượng cố định</a></li><li><a href="#c-pool-voi-unique-ptr-so-huu-ro-rang-khong-can-heap">Pool với unique_ptr: sở hữu rõ ràng không cần heap</a></li><li><a href="#c-std-pmr-voi-buffer-tinh">std::pmr với buffer tĩnh</a></li></ol></li><li class="bk-ch" data-chap="c-bai-6-truy-cap-phan-cung-an-toan-kieu"><a href="#c-bai-6-truy-cap-phan-cung-an-toan-kieu"><span class="bk-t">Bài 6 · Truy cập phần cứng an toàn kiểu</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-van-de-cua-macro-thanh-ghi-kieu-c">Vấn đề của macro thanh ghi kiểu C</a></li><li><a href="#c-truong-bit-va-thanh-ghi-bang-template">Trường bit và thanh ghi bằng template</a></li><li><a href="#c-volatile-trong-c-hien-dai">volatile trong C++ hiện đại</a></li><li><a href="#c-lt-bit-gt-va-cac-tien-ich-tang-thap">&amp;lt;bit&amp;gt; và các tiện ích tầng thấp</a></li><li><a href="#c-don-vi-va-kieu-manh">Đơn vị và kiểu mạnh</a></li></ol></li><li class="bk-ch" data-chap="c-bai-7-kich-thuoc-code-va-hieu-nang"><a href="#c-bai-7-kich-thuoc-code-va-hieu-nang"><span class="bk-t">Bài 7 · Kích thước code và hiệu năng</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-template-bloat-do-that">Template bloat: đo thật</a></li><li><a href="#c-thay-std-function-tren-mcu">Thay std::function trên MCU</a></li><li><a href="#c-cac-nguyen-tac-khac">Các nguyên tắc khác</a></li></ol></li><li class="bk-ch" data-chap="c-bai-8-xu-ly-loi-khong-dung-exception"><a href="#c-bai-8-xu-ly-loi-khong-dung-exception"><span class="bk-t">Bài 8 · Xử lý lỗi không dùng exception</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-phan-loai-nhu-o-m14-bai-2">Phân loại như ở M14 Bài 2</a></li><li><a href="#c-gia-tri-tra-ve-co-kieu">Giá trị trả về có kiểu</a></li><li><a href="#c-std-expected-khi-tat-exception">std::expected khi tắt exception</a></li><li><a href="#c-assert-va-panic-co-kiem-soat">Assert và panic có kiểm soát</a></li></ol></li><li class="bk-ch" data-chap="c-bai-9-isr-va-dong-thoi-trong-c-nhung"><a href="#c-bai-9-isr-va-dong-thoi-trong-c-nhung"><span class="bk-t">Bài 9 · ISR và đồng thời trong C++ nhúng</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-viet-isr-bang-c">Viết ISR bằng C++</a></li><li><a href="#c-atomic-tren-cortex-m">Atomic trên Cortex-M</a></li><li><a href="#c-mot-nhan-chi-can-chan-compiler-khong-can-chan-cpu">Một nhân: chỉ cần chặn compiler, không cần chặn CPU</a></li><li><a href="#c-critical-section-bang-raii">Critical section bằng RAII</a></li><li><a href="#c-nhung-thu-khong-lam-trong-isr">Những thứ không làm trong ISR</a></li></ol></li></ol></details><div class="bk-body"><section class="chap prose" data-chap="c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu" hidden><h2 id="c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu">Bài 0 · C++ trên vi điều khiển: tính năng nào tốn bao nhiêu</h2>
+<main class="wrap main"><section class="panel" id="p-hoc-sau" data-panel="hoc-sau" role="tabpanel" hidden><div class="book"><details class="bk-nav" open><summary><span class="bk-lab">Bài</span><span class="bk-cur" id="bk-cur"></span><span class="mono" id="bk-prog"></span></summary><ol class="bk-list"><li class="bk-ch" data-chap="c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu"><a href="#c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu"><span class="bk-t">Bài 0 · C++ trên vi điều khiển: tính năng nào tốn bao nhiêu</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-zero-cost-va-nhung-thu-khong-zero">&quot;Zero-cost&quot; và những thứ không zero</a></li><li><a href="#c-runtime-ho-tro-ma-bare-metal-phai-tu-lo">Runtime hỗ trợ mà bare-metal phải tự lo</a></li><li><a href="#c-co-bien-dich-thuong-dung-cho-c-tren-mcu">Cờ biên dịch thường dùng cho C++ trên MCU</a></li><li><a href="#c-constructor-cua-doi-tuong-toan-cuc">Constructor của đối tượng toàn cục</a></li></ol></li><li class="bk-ch" data-chap="c-bai-1-template-nen-tang"><a href="#c-bai-1-template-nen-tang"><span class="bk-t">Bài 1 · Template: nền tảng</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-template-la-gi-o-muc-may">Template là gì ở mức máy</a></li><li><a href="#c-tham-so-khong-phai-kieu">Tham số không phải kiểu</a></li><li><a href="#c-chuyen-biet-hoa">Chuyên biệt hóa</a></li><li><a href="#c-variadic-template-va-fold-expression">Variadic template và fold expression</a></li><li><a href="#c-nhung-diem-hay-vap">Những điểm hay vấp</a></li></ol></li><li class="bk-ch" data-chap="c-bai-2-concepts-type-traits-va-if-constexpr"><a href="#c-bai-2-concepts-type-traits-va-if-constexpr"><span class="bk-t">Bài 2 · Concepts, type traits và if constexpr</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-rang-buoc-tham-so-template-bang-concept-c-20">Ràng buộc tham số template bằng concept (C++20)</a></li><li><a href="#c-type-traits">Type traits</a></li><li><a href="#c-if-constexpr">if constexpr</a></li><li><a href="#c-sfinae-doc-duoc-code-cu">SFINAE: đọc được code cũ</a></li></ol></li><li class="bk-ch" data-chap="c-bai-3-tinh-toan-luc-bien-dich"><a href="#c-bai-3-tinh-toan-luc-bien-dich"><span class="bk-t">Bài 3 · Tính toán lúc biên dịch</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-vi-sao-quan-trong-tren-mcu">Vì sao quan trọng trên MCU</a></li><li><a href="#c-bang-crc-sinh-luc-bien-dich">Bảng CRC sinh lúc biên dịch</a></li><li><a href="#c-consteval-bat-buoc-luc-bien-dich">consteval: bắt buộc lúc biên dịch</a></li><li><a href="#c-constinit-khoi-tao-tinh-khong-lo-thu-tu">constinit: khởi tạo tĩnh, không lo thứ tự</a></li><li><a href="#c-gioi-han">Giới hạn</a></li></ol></li><li class="bk-ch" data-chap="c-bai-4-polymorphism-tinh-va-polymorphism-dong"><a href="#c-bai-4-polymorphism-tinh-va-polymorphism-dong"><span class="bk-t">Bài 4 · Polymorphism tĩnh và polymorphism động</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-bon-cach-dat-canh-nhau">Bốn cách, đặt cạnh nhau</a></li><li><a href="#c-crtp">CRTP</a></li><li><a href="#c-khi-nao-crtp-khong-dang">Khi nào CRTP không đáng</a></li></ol></li><li class="bk-ch" data-chap="c-bai-5-khong-cap-phat-dong"><a href="#c-bai-5-khong-cap-phat-dong"><span class="bk-t">Bài 5 · Không cấp phát động</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-vi-sao-va-thay-bang-gi">Vì sao và thay bằng gì</a></li><li><a href="#c-tu-viet-mot-container-dung-luong-co-dinh">Tự viết một container dung lượng cố định</a></li><li><a href="#c-pool-voi-unique-ptr-so-huu-ro-rang-khong-can-heap">Pool với unique_ptr: sở hữu rõ ràng không cần heap</a></li><li><a href="#c-std-pmr-voi-buffer-tinh">std::pmr với buffer tĩnh</a></li></ol></li><li class="bk-ch" data-chap="c-bai-6-truy-cap-phan-cung-an-toan-kieu"><a href="#c-bai-6-truy-cap-phan-cung-an-toan-kieu"><span class="bk-t">Bài 6 · Truy cập phần cứng an toàn kiểu</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-van-de-cua-macro-thanh-ghi-kieu-c">Vấn đề của macro thanh ghi kiểu C</a></li><li><a href="#c-truong-bit-va-thanh-ghi-bang-template">Trường bit và thanh ghi bằng template</a></li><li><a href="#c-volatile-trong-c-hien-dai">volatile trong C++ hiện đại</a></li><li><a href="#c-lt-bit-gt-va-cac-tien-ich-tang-thap">&lt;bit&gt; và các tiện ích tầng thấp</a></li><li><a href="#c-don-vi-va-kieu-manh">Đơn vị và kiểu mạnh</a></li></ol></li><li class="bk-ch" data-chap="c-bai-7-kich-thuoc-code-va-hieu-nang"><a href="#c-bai-7-kich-thuoc-code-va-hieu-nang"><span class="bk-t">Bài 7 · Kích thước code và hiệu năng</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-template-bloat-do-that">Template bloat: đo thật</a></li><li><a href="#c-thay-std-function-tren-mcu">Thay std::function trên MCU</a></li><li><a href="#c-cac-nguyen-tac-khac">Các nguyên tắc khác</a></li></ol></li><li class="bk-ch" data-chap="c-bai-8-xu-ly-loi-khong-dung-exception"><a href="#c-bai-8-xu-ly-loi-khong-dung-exception"><span class="bk-t">Bài 8 · Xử lý lỗi không dùng exception</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-phan-loai-nhu-o-m14-bai-2">Phân loại như ở M14 Bài 2</a></li><li><a href="#c-gia-tri-tra-ve-co-kieu">Giá trị trả về có kiểu</a></li><li><a href="#c-std-expected-khi-tat-exception">std::expected khi tắt exception</a></li><li><a href="#c-assert-va-panic-co-kiem-soat">Assert và panic có kiểm soát</a></li></ol></li><li class="bk-ch" data-chap="c-bai-9-isr-va-dong-thoi-trong-c-nhung"><a href="#c-bai-9-isr-va-dong-thoi-trong-c-nhung"><span class="bk-t">Bài 9 · ISR và đồng thời trong C++ nhúng</span><span class="bk-done" aria-label="đã đọc"></span></a><ol class="bk-sub"><li><a href="#c-viet-isr-bang-c">Viết ISR bằng C++</a></li><li><a href="#c-atomic-tren-cortex-m">Atomic trên Cortex-M</a></li><li><a href="#c-mot-nhan-chi-can-chan-compiler-khong-can-chan-cpu">Một nhân: chỉ cần chặn compiler, không cần chặn CPU</a></li><li><a href="#c-critical-section-bang-raii">Critical section bằng RAII</a></li><li><a href="#c-nhung-thu-khong-lam-trong-isr">Những thứ không làm trong ISR</a></li></ol></li></ol></details><div class="bk-body"><section class="chap prose" data-chap="c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu" hidden><h2 id="c-bai-0-c-tren-vi-dieu-khien-tinh-nang-nao-ton-bao-nhieu">Bài 0 · C++ trên vi điều khiển: tính năng nào tốn bao nhiêu</h2>
 <h3 id="c-zero-cost-va-nhung-thu-khong-zero">"Zero-cost" và những thứ không zero</h3>
 <p>Nguyên tắc của C++ là <strong>không trả tiền cho thứ không dùng</strong>: class, template, namespace, <code>constexpr</code>, <code>enum class</code>, RAII, lambda không tốn gì hơn code C viết tay tương đương. Nhưng một số tính năng kéo theo <strong>runtime hỗ trợ</strong> (thư viện, bảng dữ liệu) mà trên MCU 64 KB Flash là đáng kể. Đo thật trên Cortex-M4, <code>-Os</code>, newlib-nano, cùng một chương trình nhỏ, chỉ khác tính năng được dùng:</p>
 <div class="tbl"><table>
@@ -1634,10 +1677,9 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     qx.textContent = open ? "Thu gọn tất cả" : "Mở tất cả";
   });
 
-  /* ---------- Quiz ---------- */
-  var quiz = DATA.quiz || [], qEl = $("#quiz");
-  if (qEl && quiz.length) {
-    var answers = load("quiz", {});
+  /* ---------- Quiz (tab Quiz và quiz trong bài dùng chung một hàm) ---------- */
+  function mountQuiz(quiz, qEl, store, scoreEl, meterEl, resetEl) {
+    var answers = load(store, {});
     var letters = "ABCDEFGH";
     function renderQuiz() {
       qEl.innerHTML = "";
@@ -1652,7 +1694,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
         q.o.forEach(function (o, j) {
           var b = document.createElement("button"); b.type = "button"; b.className = "qz-opt";
           b.innerHTML = '<span class="k">' + letters[j] + "</span><span>" + o.t + "</span>";
-          b.addEventListener("click", function () { answers[i] = j; save("quiz", answers); paint(li, q, i); score(); });
+          b.addEventListener("click", function () { answers[i] = j; save(store, answers); paint(li, q, i); score(); });
           opts.appendChild(b);
         });
         li.appendChild(opts);
@@ -1678,12 +1720,19 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     function score() {
       var done = 0, right = 0;
       quiz.forEach(function (q, i) { var a = answers[i]; if (a !== undefined) { done++; if (q.o[a] && q.o[a].ok) right++; } });
-      $("#quiz-score").textContent = "Đúng " + right + "/" + quiz.length + " · đã làm " + done;
-      $("#quiz-meter").style.width = (100 * done / quiz.length) + "%";
+      scoreEl.textContent = "Đúng " + right + "/" + quiz.length + " · đã làm " + done;
+      meterEl.style.width = (100 * done / quiz.length) + "%";
     }
-    $("#quiz-reset").addEventListener("click", function () { answers = {}; save("quiz", answers); renderQuiz(); });
+    resetEl.addEventListener("click", function () { answers = {}; save(store, answers); renderQuiz(); });
     renderQuiz();
   }
+  var quiz = DATA.quiz || [], qEl = $("#quiz");
+  if (qEl && quiz.length) mountQuiz(quiz, qEl, "quiz", $("#quiz-score"), $("#quiz-meter"), $("#quiz-reset"));
+  $$(".lq").forEach(function (box) {
+    var list = (DATA.lq || {})[box.dataset.lq] || [];
+    if (!list.length) return;
+    mountQuiz(list, $('[data-role="list"]', box), "lq:" + box.dataset.lq, $('[data-role="score"]', box), $('[data-role="meter"]', box), $('[data-role="reset"]', box));
+  });
 
   /* ---------- Flashcards ---------- */
   var cards = DATA.flash || [], fc = $("#fc");
@@ -1768,15 +1817,25 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     paintRead();
   }
 
-    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  // Nút chép: khối code chép cả khối; khối terminal (.term-pre) chỉ chép dòng lệnh, bỏ prompt, output và chú thích ◀
+  function textToCopy(pre) {
+    if (pre.classList.contains("term-pre")) {
+      return $$(".t-cmd", pre).map(function (c) {
+        var ps = $(".t-ps", c); var t = c.textContent; return ps ? t.slice(ps.textContent.length) : t;
+      }).join("\n");
+    }
+    var code = pre.querySelector("code") || pre; return code.innerText;
+  }
   $$(".prose pre").forEach(function (pre) {
+    if (pre.classList.contains("term-pre") && !$(".t-cmd", pre)) return;   // chỉ có output: không cần nút
+    var label = pre.classList.contains("term-pre") ? "Chép lệnh" : "Chép";
     var b = document.createElement("button");
-    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.type = "button"; b.className = "copy-btn"; b.textContent = label;
     b.addEventListener("click", function () {
-      var code = pre.querySelector("code") || pre;
-      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
-      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+      var txt = textToCopy(pre);
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = label; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(pre); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
     });
     pre.appendChild(b);
   });

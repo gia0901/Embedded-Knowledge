@@ -1,0 +1,9 @@
+# hooks.nft: một bộ đếm trên mỗi hook netfilter của gw, để xem gói đi qua đâu.
+# Nạp: sudo ip netns exec gw nft -f hooks.nft   Xem: sudo ip netns exec gw nft list table ip hk
+table ip hk {
+    chain prerouting  { type filter hook prerouting  priority 0; icmp type echo-request counter; }
+    chain input       { type filter hook input       priority 0; icmp type echo-request counter; }
+    chain forward     { type filter hook forward     priority 0; icmp type echo-request counter; }
+    chain output      { type filter hook output      priority 0; icmp type echo-reply   counter; }
+    chain postrouting { type filter hook postrouting priority 0; icmp type echo-request counter; icmp type echo-reply counter; }
+}

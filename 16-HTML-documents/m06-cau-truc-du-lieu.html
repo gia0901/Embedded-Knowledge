@@ -400,6 +400,49 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
 .fig-ref strong { color: var(--fg); }
 .fig-ref-k { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-right: 8px; color: var(--copper); }
 .fig-ref .pg { margin-left: 4px; }
+
+/* ===== Quy tắc viết (F02+): 4 loại ô, khối terminal, lab, quiz trong bài ===== */
+.c-nho, .c-viec, .c-bay, .c-doc { border-left-width: 4px; }
+.c-nho { border-color: var(--accent); background: color-mix(in srgb, var(--accent-weak) 45%, var(--surface)); }
+.c-nho .callout-tag { background: var(--accent); color: var(--surface); border-color: transparent; }
+.c-viec { border-color: var(--copper); }
+.c-viec .callout-tag { background: var(--copper); color: var(--surface); border-color: transparent; }
+.c-bay { border-color: var(--bad); background: color-mix(in srgb, var(--bad-weak) 40%, var(--surface)); }
+.c-bay .callout-tag { background: var(--bad); color: var(--surface); border-color: transparent; }
+.c-doc { border-color: var(--line-strong); border-style: dashed; border-left-style: solid; }
+.c-doc .callout-tag { color: var(--muted); }
+.c-nho .callout-tag::before { content: "◆ "; }
+.c-viec .callout-tag::before { content: "▣ "; }
+.c-bay .callout-tag::before { content: "▲ "; }
+.c-doc .callout-tag::before { content: "→ "; }
+
+.term { margin: var(--s-3) 0 var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--code-bg); overflow: hidden; }
+.term-title, .code-title span { display: block; font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); padding: 5px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.term-title::before { content: "terminal · "; opacity: .7; }
+.prose .term pre.term-pre { margin: 0; border: 0; border-radius: 0; background: transparent; padding: 10px 14px; font-size: 13px; line-height: 1.55; overflow-x: auto; }
+.term-pre code { background: none; padding: 0; white-space: pre; font-size: inherit; }
+.t-cmd { color: var(--fg); font-weight: 600; }
+.t-ps { color: var(--accent); user-select: none; }
+.t-out { color: var(--code-fg); opacity: .86; }
+.t-ann { color: var(--copper); font-style: italic; font-weight: 600; user-select: none; }
+.code-title { margin: var(--s-3) 0 0; }
+.code-title span { border: 1px solid var(--line-strong); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; }
+.code-title span::before { content: "file · "; opacity: .7; }
+.code-title + .hl, .code-title + pre { margin-top: 0; }
+.code-title + .hl pre, .code-title + .hl { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+.badge.lv1 { background: var(--ok-weak); color: var(--ok); }
+.badge.lv2 { background: var(--copper-weak); color: var(--copper); }
+.badge.lv3 { background: var(--bad-weak); color: var(--bad); }
+.badge.time { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.badge.time::before { content: "⏱ "; }
+
+.lq { margin: var(--s-4) 0 var(--s-5); }
+.lq .quiz-bar { margin-bottom: var(--s-3); }
+.lq .qz-g { font-size: 17px; }
+.lab { margin: var(--s-5) 0; padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.lab > h4:first-child { margin-top: 0; }
+.goals li::marker { color: var(--accent); }
 </style>
 
 <header class="masthead">
@@ -1666,10 +1709,9 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     qx.textContent = open ? "Thu gọn tất cả" : "Mở tất cả";
   });
 
-  /* ---------- Quiz ---------- */
-  var quiz = DATA.quiz || [], qEl = $("#quiz");
-  if (qEl && quiz.length) {
-    var answers = load("quiz", {});
+  /* ---------- Quiz (tab Quiz và quiz trong bài dùng chung một hàm) ---------- */
+  function mountQuiz(quiz, qEl, store, scoreEl, meterEl, resetEl) {
+    var answers = load(store, {});
     var letters = "ABCDEFGH";
     function renderQuiz() {
       qEl.innerHTML = "";
@@ -1684,7 +1726,7 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
         q.o.forEach(function (o, j) {
           var b = document.createElement("button"); b.type = "button"; b.className = "qz-opt";
           b.innerHTML = '<span class="k">' + letters[j] + "</span><span>" + o.t + "</span>";
-          b.addEventListener("click", function () { answers[i] = j; save("quiz", answers); paint(li, q, i); score(); });
+          b.addEventListener("click", function () { answers[i] = j; save(store, answers); paint(li, q, i); score(); });
           opts.appendChild(b);
         });
         li.appendChild(opts);
@@ -1710,12 +1752,19 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     function score() {
       var done = 0, right = 0;
       quiz.forEach(function (q, i) { var a = answers[i]; if (a !== undefined) { done++; if (q.o[a] && q.o[a].ok) right++; } });
-      $("#quiz-score").textContent = "Đúng " + right + "/" + quiz.length + " · đã làm " + done;
-      $("#quiz-meter").style.width = (100 * done / quiz.length) + "%";
+      scoreEl.textContent = "Đúng " + right + "/" + quiz.length + " · đã làm " + done;
+      meterEl.style.width = (100 * done / quiz.length) + "%";
     }
-    $("#quiz-reset").addEventListener("click", function () { answers = {}; save("quiz", answers); renderQuiz(); });
+    resetEl.addEventListener("click", function () { answers = {}; save(store, answers); renderQuiz(); });
     renderQuiz();
   }
+  var quiz = DATA.quiz || [], qEl = $("#quiz");
+  if (qEl && quiz.length) mountQuiz(quiz, qEl, "quiz", $("#quiz-score"), $("#quiz-meter"), $("#quiz-reset"));
+  $$(".lq").forEach(function (box) {
+    var list = (DATA.lq || {})[box.dataset.lq] || [];
+    if (!list.length) return;
+    mountQuiz(list, $('[data-role="list"]', box), "lq:" + box.dataset.lq, $('[data-role="score"]', box), $('[data-role="meter"]', box), $('[data-role="reset"]', box));
+  });
 
   /* ---------- Flashcards ---------- */
   var cards = DATA.flash || [], fc = $("#fc");
@@ -1800,15 +1849,25 @@ td code, th code { white-space: nowrap; overflow-wrap: normal; }
     paintRead();
   }
 
-    // Nút chép code cho mọi khối code (hữu ích ở tab Thực hành)
+  // Nút chép: khối code chép cả khối; khối terminal (.term-pre) chỉ chép dòng lệnh, bỏ prompt, output và chú thích ◀
+  function textToCopy(pre) {
+    if (pre.classList.contains("term-pre")) {
+      return $$(".t-cmd", pre).map(function (c) {
+        var ps = $(".t-ps", c); var t = c.textContent; return ps ? t.slice(ps.textContent.length) : t;
+      }).join("\n");
+    }
+    var code = pre.querySelector("code") || pre; return code.innerText;
+  }
   $$(".prose pre").forEach(function (pre) {
+    if (pre.classList.contains("term-pre") && !$(".t-cmd", pre)) return;   // chỉ có output: không cần nút
+    var label = pre.classList.contains("term-pre") ? "Chép lệnh" : "Chép";
     var b = document.createElement("button");
-    b.type = "button"; b.className = "copy-btn"; b.textContent = "Chép";
+    b.type = "button"; b.className = "copy-btn"; b.textContent = label;
     b.addEventListener("click", function () {
-      var code = pre.querySelector("code") || pre;
-      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Chép"; }, 1500); };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code.innerText).then(done, function () { b.textContent = "Không chép được"; });
-      else { var r = document.createRange(); r.selectNodeContents(code); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
+      var txt = textToCopy(pre);
+      var done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = label; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { b.textContent = "Không chép được"; });
+      else { var r = document.createRange(); r.selectNodeContents(pre); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Đã chọn, nhấn Ctrl+C"; }
     });
     pre.appendChild(b);
   });

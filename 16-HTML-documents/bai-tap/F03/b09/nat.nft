@@ -1,0 +1,7 @@
+# nat.nft: gw che địa chỉ LAN khi ra phía srv (như Bài 3). Có NAT là có conntrack.
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 100;
+        oifname "veth-gw2" masquerade
+    }
+}

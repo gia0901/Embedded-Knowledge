@@ -74,7 +74,7 @@ def main():
         if verdict != "ĐẠT": ok = False
         why = [] if same else ["kết quả khác ban đầu"]
         if scan: why.append("vẫn quét cả bảng")
-        if not fast: why.append(f"chỉ nhanh hơn {base[k][1] / max(t, 1e-9):.0f} lần")
+        if not fast: why.append(f"chỉ nhanh hơn {base[k][1] / max(t, 1e-9):.1f} lần, cần 10")
         print(f"Sau     {k}: {t * 1000:7.2f} ms   plan: {'; '.join(p)}   {verdict} {', '.join(why)}")
     if n_idx > MAX_INDEXES:
         print(f"\nCHƯA ĐẠT: dùng {n_idx} index, tối đa {MAX_INDEXES}"); ok = False

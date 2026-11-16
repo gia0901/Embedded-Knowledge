@@ -1,0 +1,12 @@
+# NAT trên gw: mọi gói đi ra veth-gw2 mang địa chỉ nguồn của gw (masquerade),
+# và cổng 8080 của gw được chuyển tới dev:8000 (port forward, DNAT).
+table ip nat {
+  chain post {
+    type nat hook postrouting priority srcnat;
+    oifname "veth-gw2" masquerade
+  }
+  chain pre {
+    type nat hook prerouting priority dstnat;
+    iifname "veth-gw2" tcp dport 8080 dnat to 10.0.1.2:8000
+  }
+}

@@ -1,5 +1,6 @@
-Bai thuc hanh F03 (Mang may tinh) va F04 (Co so du lieu)
+Bai thuc hanh F01 (Kien truc may tinh), F02 (He dieu hanh), F03 (Mang may tinh), F04 (Co so du lieu)
 
+- Thu muc bXX/: file lab cua Bai XX (ma nguon day du, lenh build ghi o dau file).
 - Moi file .cpp la ban khung: de bai o dau file, lenh bien dich ngay ben duoi.
   Lam phan TODO, chay lai toi khi in 'DAT tat ca kiem tra'.
 - loi-giai/: loi giai tham khao, chi mo sau khi da tu lam.
